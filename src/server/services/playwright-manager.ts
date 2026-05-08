@@ -48,6 +48,20 @@ export interface BrowserStorageState {
   origins?: unknown[]
 }
 
+/** What's in the JSON file on disk. Note: `sizeBytes` is intentionally NOT
+ *  stored in the file — it's always computed from fs.stat at read time so
+ *  saveSessionState and listSavedStates report the same number. */
+export interface SavedStateFile {
+  name: string
+  savedAt: number
+  savedFromUrl: string | null
+  savedFromTitle: string | null
+  description: string | null
+  storageState: BrowserStorageState
+}
+
+/** API-shape returned to callers — same fields as SavedStateFile minus the
+ *  storageState payload, plus the on-disk file size. */
 export interface SavedStateMeta {
   name: string
   savedAt: number
@@ -55,10 +69,6 @@ export interface SavedStateMeta {
   savedFromTitle: string | null
   description: string | null
   sizeBytes: number
-}
-
-export interface SavedStateFile extends SavedStateMeta {
-  storageState: BrowserStorageState
 }
 
 export interface SessionOptions {
@@ -555,7 +565,6 @@ class PlaywrightManager {
       savedFromUrl: url || null,
       savedFromTitle: title || null,
       description: description ?? null,
-      sizeBytes: 0,
       storageState: storageState as BrowserStorageState,
     }
     const json = JSON.stringify(file)
@@ -564,7 +573,6 @@ class PlaywrightManager {
         `Saved state would exceed max size (${json.length} bytes > ${config.browserSessions.maxStateSizeBytes}). Try saving from a page with less localStorage data.`,
       )
     }
-    file.sizeBytes = json.length
 
     const dir = this.statesDirForKin(kinId)
     await mkdir(dir, { recursive: true })
@@ -581,8 +589,12 @@ class PlaywrightManager {
       }
     }
 
-    await writeFile(existingPath, JSON.stringify({ ...file, sizeBytes: json.length }), { mode: 0o600 })
-    log.info({ kinId, name, sizeBytes: json.length, fromUrl: url }, 'Browser state saved')
+    await writeFile(existingPath, json, { mode: 0o600 })
+    // Read back the actual on-disk size so saveSessionState and listSavedStates
+    // report the same number (otherwise embedding sizeBytes in the file caused
+    // a small chicken-and-egg drift between the two).
+    const stats = await stat(existingPath)
+    log.info({ kinId, name, sizeBytes: stats.size, fromUrl: url }, 'Browser state saved')
 
     return {
       name: file.name,
@@ -590,7 +602,7 @@ class PlaywrightManager {
       savedFromUrl: file.savedFromUrl,
       savedFromTitle: file.savedFromTitle,
       description: file.description,
-      sizeBytes: file.sizeBytes,
+      sizeBytes: stats.size,
     }
   }
 
