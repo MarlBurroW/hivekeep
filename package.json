@@ -1,6 +1,6 @@
 {
   "name": "kinbot",
-  "version": "0.36.1",
+  "version": "0.37.0",
   "type": "module",
   "description": "Self-hosted platform of specialized AI agents (Kins) with persistent identity, memory, tools, and collaboration",
   "license": "AGPL-3.0-only",
