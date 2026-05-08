@@ -152,3 +152,42 @@ Toutes les valeurs configurables de la plateforme, regroupées par domaine. Ces 
 |---|---|---|---|
 | `upload.dir` | `UPLOAD_DIR` | `{dataDir}/uploads` | Répertoire de stockage des fichiers |
 | `upload.maxFileSizeMb` | `UPLOAD_MAX_FILE_SIZE` | `50` | Taille max d'un fichier uploadé (Mo) |
+
+---
+
+## Navigation web (one-shot)
+
+Configuration partagée par les tools `browse_url`, `extract_links`, `screenshot_url`. `browse_url` utilise `fetch` + cheerio par défaut ; le path Playwright est emprunté quand `wait_for_js: true` ou pour `screenshot_url`.
+
+| Clé | Env var | Default | Description |
+|---|---|---|---|
+| `webBrowsing.pageTimeout` | `WEB_BROWSING_PAGE_TIMEOUT` | `30000` | Timeout de chargement d'une page (ms) |
+| `webBrowsing.maxContentLength` | `WEB_BROWSING_MAX_CONTENT_LENGTH` | `100000` | Taille max du contenu extrait (caractères) |
+| `webBrowsing.maxConcurrentFetches` | `WEB_BROWSING_MAX_CONCURRENT` | `5` | Nombre de fetch simultanés |
+| `webBrowsing.userAgent` | `WEB_BROWSING_USER_AGENT` | `Mozilla/5.0 ... Chrome/131.0.0.0 Safari/537.36` | User-Agent envoyé pour les requêtes web |
+| `webBrowsing.blockedDomains` | `WEB_BROWSING_BLOCKED_DOMAINS` | _(vide)_ | Liste de domaines bloqués (séparée par des virgules) |
+| `webBrowsing.proxy` | `WEB_BROWSING_PROXY` | _(vide)_ | URL d'un proxy HTTP à utiliser |
+| `webBrowsing.headless.enabled` | `WEB_BROWSING_HEADLESS_ENABLED` | `true` | Active le pool Playwright (Chromium). Mettre `false` pour désactiver — utile sur des systèmes sans libs Chromium |
+| `webBrowsing.headless.executablePath` | `BROWSER_EXECUTABLE_PATH` (fallback : `PUPPETEER_EXECUTABLE_PATH`) | _(auto)_ | Chemin explicite vers le binaire Chromium. Si non défini, Playwright utilise son binaire bundled |
+| `webBrowsing.headless.maxBrowsers` | `WEB_BROWSING_MAX_BROWSERS` | `2` | Max d'instances Chromium concurrentes dans le pool one-shot |
+| `webBrowsing.headless.idleTimeoutMs` | `WEB_BROWSING_BROWSER_IDLE_TIMEOUT` | `60000` | Délai d'inactivité (ms) avant fermeture d'un browser one-shot |
+
+> **Pré-requis système** : Chromium nécessite des libs partagées (`libnspr4`, `libnss3`, `libasound2t64`, `libatk1.0-0t64`, `libcups2t64`, `libdrm2`, `libxkbcommon0`, `libxcomposite1`, `libxdamage1`, `libxfixes3`, `libxrandr2`, `libgbm1`, `libpango-1.0-0`, `libcairo2`, `libatspi2.0-0t64`, `libwayland-client0` sur Ubuntu 24.04 ; les noms `t64` n'existent que depuis le passage `time_t64`). Sans ces libs, Chromium échoue avec `cannot open shared object file`. Sur WSL2, vérifier aussi que `bun` n'est PAS confiné dans un snap (les snaps sandboxent l'accès à `/usr/lib/`).
+
+---
+
+## Sessions navigateur stateful
+
+Configuration des **sessions de navigateur persistantes par Kin**, utilisées par les tools `browser_open_session`, `browser_navigate`, `browser_click`, etc. (14 tools `browser_*`). Chaque session conserve son état (cookies, scroll, formulaires) entre plusieurs tours LLM.
+
+| Clé | Env var | Default | Description |
+|---|---|---|---|
+| `browserSessions.enabled` | `BROWSER_SESSIONS_ENABLED` | `true` | Active la famille de tools stateful. Mettre `false` pour la désactiver globalement (les tools restent registered mais retournent une erreur). Les tools individuels restent quoi qu'il arrive opt-in par Kin via `tool_config.enabledOptInTools` |
+| `browserSessions.ttlMs` | `BROWSER_SESSION_TTL_MS` | `3_600_000` (1 h) | TTL absolu d'une session, depuis sa création, sans considération d'activité |
+| `browserSessions.idleTimeoutMs` | `BROWSER_SESSION_IDLE_TIMEOUT_MS` | `600_000` (10 min) | Délai d'inactivité avant fermeture automatique (GC) |
+| `browserSessions.maxTotal` | `BROWSER_MAX_TOTAL_SESSIONS` | `5` | Plafond global de sessions actives, toutes Kins confondues |
+| `browserSessions.maxPerKin` | `BROWSER_MAX_SESSIONS_PER_KIN` | `1` | Plafond par Kin |
+| `browserSessions.defaultViewport.width` | `BROWSER_DEFAULT_VIEWPORT_WIDTH` | `1280` | Largeur par défaut du viewport |
+| `browserSessions.defaultViewport.height` | `BROWSER_DEFAULT_VIEWPORT_HEIGHT` | `720` | Hauteur par défaut du viewport |
+
+> **Hooks de fermeture automatique** : sessions auto-closed à la fin d'une task (`resolveTask`), à la suppression d'un Kin (`deleteKin`), au SIGTERM/SIGINT du serveur, et par le GC d'inactivité toutes les 15 s.

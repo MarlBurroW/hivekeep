@@ -838,3 +838,85 @@ Ces trois piliers (interfaces, event bus, hooks) sont les fondations du futur sy
 - S'accrocher aux hooks pour modifier le comportement
 - Exposer de nouveaux outils MCP aux Kins
 - Ajouter des routes API et des composants UI
+
+---
+
+## 14. Navigation web stateful
+
+Au-delà des outils one-shot historiques (`browse_url`, `extract_links`, `screenshot_url`, `http_request`) qui font une requête isolée, KinBot fournit une famille de **14 outils `browser_*`** qui opèrent sur une **session de navigateur persistante par Kin**. Pile sous-jacente : Playwright + Chromium, avec stealth plugin (`playwright-extra` + `puppeteer-extra-plugin-stealth`).
+
+### Cas d'usage
+
+- **Login + scraping authentifié** : se connecter une fois (ou injecter des cookies déjà valides), puis naviguer, lire, soumettre des formulaires en restant authentifié sur plusieurs tours LLM
+- **Workflows multi-étapes** : remplir un formulaire en 3 pages, valider une commande, naviguer un dashboard
+- **Interaction avec des SPAs** : cliquer, taper, attendre des transitions React/Vue/Angular
+- **Resolution de captcha en HITL** : voir `browser_request_human` plus bas
+
+### Tools disponibles
+
+Tous opt-in par Kin via `tool_config.enabledOptInTools` (jamais activés par défaut).
+
+| Tool | Rôle |
+|---|---|
+| `browser_open_session` | Ouvre une session, optionnellement avec une URL de départ et une injection de cookies |
+| `browser_close_session` | Ferme la session et libère les ressources |
+| `browser_list_sessions` | Liste les sessions actives du Kin |
+| `browser_navigate` | Va à une URL dans la session |
+| `browser_click` / `browser_type` / `browser_select` / `browser_press_key` | Actions sur des éléments référencés via le snapshot |
+| `browser_scroll` / `browser_wait_for` | Navigation passive (scroll, attente de condition) |
+| `browser_screenshot` | Capture la page et sauve en fichier shareable |
+| `browser_set_cookies` / `browser_get_cookies` / `browser_clear_cookies` | Gestion des cookies de la session |
+| `browser_request_human` | Pause + screenshot + bouton continuer (pour captcha / blocage visuel) |
+
+### Identification des éléments — accessibility snapshot
+
+Plutôt que d'imposer au LLM de générer des sélecteurs CSS fragiles, chaque action retourne un **`page_state`** en YAML qui liste les éléments interactables avec une référence stable du type `e1`, `e2`, etc. :
+
+```yaml
+url: https://example.com/login
+title: Login
+elements:
+  - ref: e1
+    role: textbox
+    name: "Email"
+  - ref: e2
+    role: textbox
+    name: "Password"
+  - ref: e3
+    role: button
+    name: "Sign in"
+```
+
+Le Kin appelle ensuite `browser_click({ ref: "e3" })`. En interne, on tagge les éléments via un attribut `data-kbref="eN"` injecté côté navigateur, et on résout les références via le sélecteur `[data-kbref="eN"]`. Le pattern est inspiré de Playwright MCP (Microsoft) et browser-use, et donne des résultats beaucoup plus robustes qu'un sélecteur CSS hallucinable.
+
+### Cookies — accès authentifié sans login
+
+`browser_open_session` et `browser_set_cookies` acceptent au choix :
+
+- Un **tableau JSON** de cookies (format Playwright/Puppeteer) : `[{ name, value, domain, path?, expires?, httpOnly?, secure?, sameSite? }, ...]`
+- Une **header string** (`name1=v1; name2=v2; ...`) avec un `default_cookie_domain` requis
+
+Pattern typique : l'utilisateur se logge dans son propre navigateur, exporte les cookies via une extension type "Cookie Editor", les colle dans le chat → le Kin ouvre une session pré-loadée et arrive directement authentifié.
+
+### Lifecycle et garde-fous
+
+- **1 session active max par Kin** par défaut, configurable via `BROWSER_MAX_SESSIONS_PER_KIN`
+- **5 sessions actives globales** par défaut, configurable via `BROWSER_MAX_TOTAL_SESSIONS`
+- **Idle GC** après 10 min sans appel
+- **TTL absolu** de 1 h depuis l'ouverture
+- **Auto-close** à la fin d'une task (`resolveTask`), à la suppression d'un Kin (`deleteKin`), au SIGTERM/SIGINT du serveur
+
+Tous configurables via env vars (`BROWSER_SESSION_TTL_MS`, `BROWSER_SESSION_IDLE_TIMEOUT_MS`, etc.). Voir `config.md` pour la liste complète.
+
+### Human-in-the-loop — `browser_request_human`
+
+Quand un Kin se heurte à un captcha ou un blocage visuel qu'il ne peut pas résoudre programmatiquement, il appelle `browser_request_human({ session_id, reason })`. Le tool :
+
+1. Capture un screenshot full-page
+2. Sauve le PNG via le file storage (URL shareable)
+3. Crée un human prompt avec le screenshot embarqué inline (markdown image dans la `description`)
+4. La task passe en `awaiting_human_input` et l'UI affiche la carte avec deux boutons (continuer / annuler)
+
+L'utilisateur résout le blocage externalement (par exemple en exportant ses cookies puis en les ré-injectant via `browser_set_cookies`), puis clique « C'est résolu ». La task reprend avec la réponse injectée dans l'historique du Kin.
+
+L'implémentation **réutilise entièrement** l'infra `humanPrompts` existante : pas de nouveau type de prompt, pas de migration DB, pas de composant UI dédié. Le rendu est universel grâce au support du markdown image dans `HumanPromptCard`.
