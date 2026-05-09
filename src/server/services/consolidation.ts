@@ -131,6 +131,14 @@ async function mergeCluster(
       model,
       providerId,
       prompt,
+      // Output is a single small JSON object ({content, category, subject,
+      // importance} or {abort: true}). 1500 is generous.
+      maxTokens: 1500,
+      // Hard timeout per pair. consolidateMemories iterates over many pairs
+      // of near-duplicate memories — without per-call timeout, one stuck
+      // provider call would hang the whole consolidation, which is itself
+      // awaited inside runCompacting under the compactingKins lock.
+      timeoutMs: 2 * 60 * 1000,
       callSite: 'consolidation',
       modelId,
       kinId,
