@@ -55,9 +55,10 @@ interface ConversationHeaderProps {
   messageCount: number
   estimatedTokens: number
   maxTokens: number
-  /** Source of `estimatedTokens`: 'api' = ground-truth from last LLM call,
-   *  'estimate' = local BPE-based estimate. Default 'estimate'. */
-  contextSource?: 'api' | 'estimate'
+  /** Provider-reported context size from the most recent LLM call. When
+   *  present, the bar shows it on a separate solid track in addition to
+   *  the (estimated) breakdown blocks. Independent of `estimatedTokens`. */
+  apiContextTokens?: number
   toolCallCount: number
   isToolCallsOpen: boolean
   queueState?: { isProcessing: boolean; queueSize: number }
@@ -98,7 +99,7 @@ export const ConversationHeader = memo(function ConversationHeader({
   messageCount,
   estimatedTokens,
   maxTokens,
-  contextSource,
+  apiContextTokens,
   toolCallCount,
   isToolCallsOpen,
   queueState,
@@ -290,6 +291,7 @@ export const ConversationHeader = memo(function ConversationHeader({
               kinId={kinId}
               estimatedTokens={estimatedTokens}
               maxTokens={maxTokens}
+              apiContextTokens={apiContextTokens}
               contextBreakdown={contextBreakdown}
               pipelineStatus={pipelineStatus}
               compactingPercent={compactingPercent}

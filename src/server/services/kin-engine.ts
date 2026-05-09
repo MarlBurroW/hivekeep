@@ -221,61 +221,64 @@ const activeAbortControllers = new Map<string, AbortController>()
 // AbortController registry for quick sessions — keyed by sessionId
 const quickAbortControllers = new Map<string, AbortController>()
 
-// Cache of last computed context usage per Kin (populated after each LLM call).
-// `contextSource` distinguishes the local BPE estimate (set BEFORE the call)
-// from the provider-reported peak step input (set AFTER the call). The
-// provider value is ground truth; the estimate is what the user sees on the
-// very first turn of a session before any API roundtrip has happened.
-type ContextSource = 'estimate' | 'api'
-const lastContextUsage = new Map<string, { contextTokens: number; contextWindow: number; updatedAt: number; breakdown?: ContextTokenBreakdown; pipelineStatus?: ContextPipelineStatus; contextSource: ContextSource }>()
+// Cache of last computed context usage per Kin. Two values are kept side by
+// side instead of one + a source flag — that earlier design caused subtle
+// sync issues between the SSE-fed navbar and the REST-fed visualizer when
+// one read picked up the source field and the other didn't.
+//
+//   contextTokens     : local BPE estimate (always present once computed).
+//                       Built from the systemPrompt / messages / tools sums.
+//                       Available before any API roundtrip — useful for the
+//                       first message of a session and for the per-section
+//                       breakdown bar.
+//   apiContextTokens  : provider-reported peak step input from the most
+//                       recent LLM call (ground truth). Only present after
+//                       the first turn. Independent of the estimate; the
+//                       UI shows it on a separate solid bar.
+const lastContextUsage = new Map<string, {
+  contextTokens: number
+  apiContextTokens?: number
+  contextWindow: number
+  updatedAt: number
+  breakdown?: ContextTokenBreakdown
+  pipelineStatus?: ContextPipelineStatus
+}>()
 
-/** Store the latest context usage for a Kin.
- *
- *  Called twice per turn:
- *    1. Before the LLM call with `source = 'estimate'` (local tokenizer).
- *    2. After the LLM call with `source = 'api'` and `contextTokens` set
- *       to the peak single-step input — the closest provider-reported
- *       proxy for "current context size".
- *
- *  The breakdown is only attached on the estimate write because the API
- *  doesn't return per-section sizes.
- */
+/** Store the local-estimate context size for a Kin (called BEFORE each LLM
+ *  call). Does NOT touch apiContextTokens — that field is owned by
+ *  recordApiContextSize and reflects the most recent provider roundtrip. */
 export function setLastContextUsage(
   kinId: string,
   contextTokens: number,
   contextWindow: number,
   breakdown?: ContextTokenBreakdown,
   pipelineStatus?: ContextPipelineStatus,
-  source: ContextSource = 'estimate',
 ) {
-  // If we already have an api-sourced value for THIS Kin and this call is an
-  // estimate, keep the breakdown and pipeline fresh but don't downgrade the
-  // total to the (less accurate) estimate.
   const existing = lastContextUsage.get(kinId)
-  if (existing?.contextSource === 'api' && source === 'estimate') {
-    const data = { ...existing, breakdown, pipelineStatus, updatedAt: Date.now(), contextWindow }
-    lastContextUsage.set(kinId, data)
-    setSetting(`context_usage:${kinId}`, JSON.stringify(data)).catch(() => {})
-    return
+  const data = {
+    contextTokens,
+    apiContextTokens: existing?.apiContextTokens,
+    contextWindow,
+    updatedAt: Date.now(),
+    breakdown,
+    pipelineStatus,
   }
-  const data = { contextTokens, contextWindow, updatedAt: Date.now(), breakdown, pipelineStatus, contextSource: source }
   lastContextUsage.set(kinId, data)
-  // Persist to DB so the value survives server restarts
   setSetting(`context_usage:${kinId}`, JSON.stringify(data)).catch(() => {})
 }
 
-/** Update the cached context with a provider-reported peak step input
- *  (ground truth). Called from the kin-engine after each LLM turn. */
+/** Update the cached api-reported context size (ground truth) for a Kin.
+ *  Called from the kin-engine after each LLM turn with the peak single-step
+ *  input from aggregateStepUsage. Leaves the estimate / breakdown intact. */
 export function recordApiContextSize(kinId: string, peakStepInputTokens: number) {
   const existing = lastContextUsage.get(kinId)
-  const contextWindow = existing?.contextWindow ?? 0
   const data = {
-    contextTokens: peakStepInputTokens,
-    contextWindow,
+    contextTokens: existing?.contextTokens ?? peakStepInputTokens,
+    apiContextTokens: peakStepInputTokens,
+    contextWindow: existing?.contextWindow ?? 0,
     updatedAt: Date.now(),
     breakdown: existing?.breakdown,
     pipelineStatus: existing?.pipelineStatus,
-    contextSource: 'api' as const,
   }
   lastContextUsage.set(kinId, data)
   setSetting(`context_usage:${kinId}`, JSON.stringify(data)).catch(() => {})
@@ -300,11 +303,14 @@ export async function getLastContextUsage(kinId: string) {
       try {
         const parsed = JSON.parse(persisted) as Record<string, unknown>
         if (parsed && typeof parsed === 'object') {
-          // Backfill contextSource for entries persisted before this field
-          // existed — they were all written by the local estimator.
-          if (parsed.contextSource !== 'api' && parsed.contextSource !== 'estimate') {
-            parsed.contextSource = 'estimate'
+          // Migrate older payloads that used contextSource='api' to populate
+          // the new dedicated apiContextTokens field. Estimates stay where
+          // they are — older payloads' contextTokens were the source of truth
+          // for whichever source produced them.
+          if (parsed.contextSource === 'api' && parsed.apiContextTokens == null) {
+            parsed.apiContextTokens = parsed.contextTokens
           }
+          delete parsed.contextSource
           cached = parsed as unknown as NonNullable<ReturnType<typeof lastContextUsage.get>>
           lastContextUsage.set(kinId, cached)
         }
@@ -1283,12 +1289,13 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
       kinId,
       data: {
         kinId, queueSize: 0, isProcessing: true, processingStartedAt,
-        // Prefer the cached API-sourced value if we have one (more accurate
-        // than the freshly-computed local BPE estimate). Falls back to the
-        // estimate on the very first turn of a session.
-        contextTokens: preCallUsage?.contextSource === 'api' ? preCallUsage.contextTokens : contextTokens,
+        // Always send both: contextTokens is the local BPE estimate (drives
+        // the breakdown bar), apiContextTokens is the provider ground truth
+        // from the previous turn (drives the real bar). Frontend renders
+        // whichever exist independently.
+        contextTokens,
+        apiContextTokens: preCallUsage?.apiContextTokens,
         contextWindow,
-        contextSource: preCallUsage?.contextSource ?? 'estimate',
         contextBreakdown,
         pipelineStatus,
         ...lastCompactingProximity.get(kinId),
@@ -1680,9 +1687,9 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
       })()
     }
 
-    // Emit queue update with the post-turn cached context (now API-sourced
-    // if the turn produced usage data — that's the ground-truth value the
-    // navbar should pick up).
+    // Emit queue update with the post-turn cached context. apiContextTokens
+    // was just refreshed by recordApiContextSize (if usage data came back),
+    // so the navbar picks up the ground-truth value here.
     const remainingQueue = await getQueueSize(kinId)
     const postTurnUsage = lastContextUsage.get(kinId)
     sseManager.sendToKin(kinId, {
@@ -1693,8 +1700,8 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
         queueSize: remainingQueue,
         isProcessing: false,
         contextTokens: postTurnUsage?.contextTokens,
+        apiContextTokens: postTurnUsage?.apiContextTokens,
         contextWindow: postTurnUsage?.contextWindow,
-        contextSource: postTurnUsage?.contextSource,
       },
     })
 

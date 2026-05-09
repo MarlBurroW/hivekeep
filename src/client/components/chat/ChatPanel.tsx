@@ -64,7 +64,7 @@ interface ChatPanelProps {
   kin: KinInfo
   llmModels: LLMModel[]
   modelUnavailable?: boolean
-  queueState?: { isProcessing: boolean; queueSize: number; processingStartedAt?: number; contextTokens?: number; contextWindow?: number; contextSource?: 'api' | 'estimate'; contextBreakdown?: ContextTokenBreakdown; pipelineStatus?: ContextPipelineStatus; compactingPercent?: number; compactingThresholdPercent?: number; summaryCount?: number; maxSummaries?: number; summaryTokens?: number; summaryBudgetTokens?: number; keepPercent?: number }
+  queueState?: { isProcessing: boolean; queueSize: number; processingStartedAt?: number; contextTokens?: number; contextWindow?: number; apiContextTokens?: number; contextBreakdown?: ContextTokenBreakdown; pipelineStatus?: ContextPipelineStatus; compactingPercent?: number; compactingThresholdPercent?: number; summaryCount?: number; maxSummaries?: number; summaryTokens?: number; summaryBudgetTokens?: number; keepPercent?: number }
   onModelChange: (modelId: string, providerId: string) => void
   onEditKin: () => void
   onOpenSettings?: (section?: string, filters?: { kinId?: string }) => void
@@ -733,7 +733,7 @@ export function ChatPanel({ kin, llmModels, modelUnavailable = false, queueState
         messageCount={messages.length}
         estimatedTokens={queueState?.contextTokens ?? 0}
         maxTokens={queueState?.contextWindow ?? 0}
-        contextSource={queueState?.contextSource}
+        apiContextTokens={queueState?.apiContextTokens}
         contextBreakdown={queueState?.contextBreakdown}
         pipelineStatus={queueState?.pipelineStatus}
         compactingPercent={queueState?.compactingPercent}

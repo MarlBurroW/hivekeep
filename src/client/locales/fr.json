@@ -575,8 +575,12 @@
       "apiHint": "Valeur retournée par le provider lors du dernier appel (réelle).",
       "real": "réel",
       "estimate": "est.",
+      "realLabel": "Retourné par le provider",
+      "estimateLabel": "Estimation locale",
       "realMarkerHint": "Taille de contexte réelle retournée par le provider lors du dernier appel.",
-      "unattributedHint": "Taille rapportée par le provider qui dépasse ce que l'estimateur local peut attribuer par section."
+      "unattributedHint": "Taille rapportée par le provider qui dépasse ce que l'estimateur local peut attribuer par section.",
+      "dualBarHint": "Le détail par section vient de l'estimation locale (approximation BPE). La barre réelle est ce que le provider a effectivement compté lors du dernier appel.",
+      "dualBarExplanation": "Les deux barres peuvent diverger : l'estimation locale BPE approxime moins bien les tokens sur du contenu JSON / YAML / CLI que le tokenizer du provider. La barre « réel » est ce que le provider a vraiment compté lors du dernier appel — c'est la vérité côté coût."
     },
     "cacheChip": {
       "aria": "État du cache au dernier tour",

@@ -133,7 +133,7 @@ export function useKins() {
   }, [sseStatus, fetchKins])
 
   // Track which kins are currently processing (queue state from SSE)
-  const [kinQueueState, setKinQueueState] = useState<Map<string, { isProcessing: boolean; queueSize: number; processingStartedAt?: number; contextTokens?: number; contextWindow?: number; contextSource?: 'api' | 'estimate'; contextBreakdown?: ContextTokenBreakdown; pipelineStatus?: ContextPipelineStatus; compactingPercent?: number; compactingThresholdPercent?: number; summaryCount?: number; maxSummaries?: number; summaryTokens?: number; summaryBudgetTokens?: number; keepPercent?: number }>>(new Map())
+  const [kinQueueState, setKinQueueState] = useState<Map<string, { isProcessing: boolean; queueSize: number; processingStartedAt?: number; contextTokens?: number; contextWindow?: number; apiContextTokens?: number;contextBreakdown?: ContextTokenBreakdown; pipelineStatus?: ContextPipelineStatus; compactingPercent?: number; compactingThresholdPercent?: number; summaryCount?: number; maxSummaries?: number; summaryTokens?: number; summaryBudgetTokens?: number; keepPercent?: number }>>(new Map())
 
   // Listen for kin lifecycle and queue updates via SSE to keep the list in sync
   useSSE({
@@ -199,7 +199,7 @@ export function useKins() {
           // Keep previous context info when not provided (end-of-processing events omit it)
           contextTokens: (data.contextTokens as number | undefined) ?? existing?.contextTokens,
           contextWindow: (data.contextWindow as number | undefined) ?? existing?.contextWindow,
-          contextSource: (data.contextSource as 'api' | 'estimate' | undefined) ?? existing?.contextSource,
+          apiContextTokens: (data.apiContextTokens as number | undefined) ?? existing?.apiContextTokens,
           contextBreakdown: (data.contextBreakdown as ContextTokenBreakdown | undefined) ?? existing?.contextBreakdown,
           pipelineStatus: (data.pipelineStatus as ContextPipelineStatus | undefined) ?? existing?.pipelineStatus,
           compactingPercent: (data.compactingPercent as number | undefined) ?? existing?.compactingPercent,
@@ -245,7 +245,7 @@ export function useKins() {
   // Fetch initial context usage for a kin (so the counter doesn't show "— / —")
   const fetchContextUsage = useCallback(async (kinId: string) => {
     try {
-      const data = await api.get<{ contextTokens: number; contextWindow: number; contextSource?: 'api' | 'estimate'; contextBreakdown?: ContextTokenBreakdown; pipelineStatus?: ContextPipelineStatus; compactingPercent?: number; compactingThresholdPercent?: number; summaryCount?: number; maxSummaries?: number; summaryTokens?: number; summaryBudgetTokens?: number; keepPercent?: number }>(`/kins/${kinId}/context-usage`)
+      const data = await api.get<{ contextTokens: number; contextWindow: number; apiContextTokens?: number;contextBreakdown?: ContextTokenBreakdown; pipelineStatus?: ContextPipelineStatus; compactingPercent?: number; compactingThresholdPercent?: number; summaryCount?: number; maxSummaries?: number; summaryTokens?: number; summaryBudgetTokens?: number; keepPercent?: number }>(`/kins/${kinId}/context-usage`)
       setKinQueueState((prev) => {
         const existing = prev.get(kinId)
         // Don't overwrite if SSE already provided fresh data
@@ -257,7 +257,7 @@ export function useKins() {
           processingStartedAt: existing?.processingStartedAt,
           contextTokens: data.contextTokens,
           contextWindow: data.contextWindow,
-          contextSource: data.contextSource,
+          apiContextTokens: data.apiContextTokens ?? undefined,
           contextBreakdown: data.contextBreakdown,
           pipelineStatus: data.pipelineStatus ?? undefined,
           compactingPercent: data.compactingPercent,

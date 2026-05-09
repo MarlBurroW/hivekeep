@@ -389,8 +389,8 @@ kinRoutes.get('/:id/context-usage', async (c) => {
   if (cached) {
     return c.json({
       contextTokens: cached.contextTokens,
+      apiContextTokens: cached.apiContextTokens ?? null,
       contextWindow: cached.contextWindow,
-      contextSource: cached.contextSource ?? 'estimate',
       contextBreakdown: cached.breakdown ?? null,
       pipelineStatus: cached.pipelineStatus ?? null,
       compactingPercent: compacting.currentPercent,
@@ -496,10 +496,10 @@ kinRoutes.get('/:id/context-preview', async (c) => {
   // Augment with the cached API-reported context size (if any) so the
   // visualizer can show ground truth alongside the estimate breakdown.
   const cached = await getLastContextUsage(kin.id)
-  if (cached?.contextSource === 'api') {
+  if (cached?.apiContextTokens != null) {
     return c.json({
       ...preview,
-      apiContextTokens: cached.contextTokens,
+      apiContextTokens: cached.apiContextTokens,
     })
   }
   return c.json(preview)

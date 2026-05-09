@@ -575,8 +575,12 @@
       "apiHint": "Reported by the provider on the last call (ground truth).",
       "real": "real",
       "estimate": "est.",
+      "realLabel": "Provider-reported",
+      "estimateLabel": "Local estimate",
       "realMarkerHint": "Real context size reported by the provider on the last call.",
-      "unattributedHint": "Provider-reported size beyond what the local estimator can attribute by section."
+      "unattributedHint": "Provider-reported size beyond what the local estimator can attribute by section.",
+      "dualBarHint": "The estimate breakdown shows where tokens come from by section (local BPE approximation). The real bar is what the provider actually counted on the last call.",
+      "dualBarExplanation": "The two bars can diverge: the local BPE estimate approximates token counts on JSON / YAML / CLI output less accurately than the provider tokenizer. The \"real\" bar is what the provider actually counted on the last call — that's the cost-truth."
     },
     "cacheChip": {
       "aria": "Cache state from last turn",

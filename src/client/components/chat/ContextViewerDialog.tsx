@@ -240,79 +240,93 @@ export function ContextViewerDialog({ open, onOpenChange, kinId, taskId, session
             )}
           </div>
           {data?.tokenEstimate && data.contextWindow && data.contextWindow > 0 && (
-            <div className="mt-3 space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                {data.apiContextTokens != null && data.contextWindow > 0 ? (
-                  <span className="flex items-center gap-1">
-                    <span
-                      className="rounded bg-success/15 px-1 py-px text-[9px] font-medium text-success"
-                      title={t('chat.contextSource.apiHint', { defaultValue: 'Reported by the provider on the last call (ground truth).' })}
-                    >
-                      ✓ {t('chat.contextSource.real', { defaultValue: 'real' })}
+            <div className="mt-3 space-y-3">
+              {/* Real bar (provider ground truth) — shown only when available */}
+              {data.apiContextTokens != null && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <span
+                        className="rounded bg-success/15 px-1 py-px text-[9px] font-medium text-success"
+                        title={t('chat.contextSource.apiHint', { defaultValue: 'Reported by the provider on the last call (ground truth).' })}
+                      >
+                        ✓ {t('chat.contextSource.real', { defaultValue: 'real' })}
+                      </span>
+                      <span>{t('chat.contextSource.realLabel', { defaultValue: 'Provider-reported' })}</span>
                     </span>
-                    <span>{formatTokenCount(data.apiContextTokens)} / {formatTokenCount(data.contextWindow)}</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
+                    <span className="text-foreground tabular-nums">
+                      {formatTokenCount(data.apiContextTokens)} / {formatTokenCount(data.contextWindow)} ({Math.round((data.apiContextTokens / data.contextWindow) * 100)}%)
+                    </span>
+                  </div>
+                  <div className="relative w-full overflow-hidden rounded-full bg-success/10 h-2.5">
+                    <div
+                      className="h-full bg-success/80"
+                      style={{ width: `${Math.min(100, (data.apiContextTokens / data.contextWindow) * 100)}%` }}
+                    />
+                    {isMainConversation && data.compactingThresholdPercent != null && (
+                      <div
+                        className="absolute top-[-2px] h-[calc(100%+4px)] w-px bg-warning"
+                        style={{ left: `${data.compactingThresholdPercent}%` }}
+                        title={t('chat.contextViewer.threshold', { percent: data.compactingThresholdPercent })}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Estimate bar with section breakdown */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="flex items-center gap-1 text-muted-foreground">
                     <span
                       className="rounded bg-muted px-1 py-px text-[9px] font-medium text-muted-foreground/80"
                       title={t('chat.contextSource.estimateHint', { defaultValue: 'Local BPE estimate.' })}
                     >
-                      ~
+                      ~ {t('chat.contextSource.estimate', { defaultValue: 'est.' })}
                     </span>
-                    <span>{formatTokenCount(data.tokenEstimate.total)} / {formatTokenCount(data.contextWindow)}</span>
+                    <span>{t('chat.contextSource.estimateLabel', { defaultValue: 'Local estimate' })}</span>
                   </span>
-                )}
-                <span>{Math.round((((data.apiContextTokens ?? data.tokenEstimate.total) / data.contextWindow)) * 100)}%</span>
+                  <span className="text-foreground tabular-nums">
+                    {formatTokenCount(data.tokenEstimate.total)} / {formatTokenCount(data.contextWindow)} ({Math.round((data.tokenEstimate.total / data.contextWindow) * 100)}%)
+                  </span>
+                </div>
+                <div className="relative flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                  {data.tokenEstimate.tools > 0 && (
+                    <div className="bg-blue-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.tools / data.contextWindow) * 100)}%` }} />
+                  )}
+                  {data.tokenEstimate.systemPrompt > 0 && (
+                    <div className="bg-purple-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.systemPrompt / data.contextWindow) * 100)}%` }} />
+                  )}
+                  {data.tokenEstimate.summary > 0 && (
+                    <div className="bg-amber-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.summary / data.contextWindow) * 100)}%` }} />
+                  )}
+                  {data.tokenEstimate.cronRuns > 0 && (
+                    <div className="bg-orange-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.cronRuns / data.contextWindow) * 100)}%` }} />
+                  )}
+                  {(data.tokenEstimate.cronLearnings ?? 0) > 0 && (
+                    <div className="bg-teal-500" style={{ width: `${Math.max(0.5, ((data.tokenEstimate.cronLearnings ?? 0) / data.contextWindow) * 100)}%` }} />
+                  )}
+                  {data.tokenEstimate.messages > 0 && (
+                    <div className="bg-emerald-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.messages / data.contextWindow) * 100)}%` }} />
+                  )}
+                  {isMainConversation && data.compactingThresholdPercent != null && (
+                    <div
+                      className="absolute top-0 h-full w-0.5 bg-red-500/80"
+                      style={{ left: `${data.compactingThresholdPercent}%` }}
+                      title={t('chat.contextViewer.threshold', { percent: data.compactingThresholdPercent })}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="relative flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                {data.tokenEstimate.tools > 0 && (
-                  <div className="bg-blue-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.tools / data.contextWindow) * 100)}%` }} />
-                )}
-                {data.tokenEstimate.systemPrompt > 0 && (
-                  <div className="bg-purple-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.systemPrompt / data.contextWindow) * 100)}%` }} />
-                )}
-                {data.tokenEstimate.summary > 0 && (
-                  <div className="bg-amber-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.summary / data.contextWindow) * 100)}%` }} />
-                )}
-                {data.tokenEstimate.cronRuns > 0 && (
-                  <div className="bg-orange-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.cronRuns / data.contextWindow) * 100)}%` }} />
-                )}
-                {(data.tokenEstimate.cronLearnings ?? 0) > 0 && (
-                  <div className="bg-teal-500" style={{ width: `${Math.max(0.5, ((data.tokenEstimate.cronLearnings ?? 0) / data.contextWindow) * 100)}%` }} />
-                )}
-                {data.tokenEstimate.messages > 0 && (
-                  <div className="bg-emerald-500" style={{ width: `${Math.max(0.5, (data.tokenEstimate.messages / data.contextWindow) * 100)}%` }} />
-                )}
-                {/* "Non attribué" segment: gap between estimate sum and the
-                     provider-reported real value. */}
-                {data.apiContextTokens != null && data.apiContextTokens > data.tokenEstimate.total + (data.contextWindow * 0.005) && (
-                  <div
-                    className="bg-muted-foreground/30"
-                    style={{
-                      width: `${((data.apiContextTokens - data.tokenEstimate.total) / data.contextWindow) * 100}%`,
-                      backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.15) 2px, rgba(255,255,255,0.15) 4px)',
-                    }}
-                    title={t('chat.contextSource.unattributedHint', { defaultValue: 'Provider-reported size beyond what the local estimator can attribute by section.' })}
-                  />
-                )}
-                {/* Compacting threshold marker — only for main conversations */}
-                {isMainConversation && data.compactingThresholdPercent != null && (
-                  <div
-                    className="absolute top-0 h-full w-0.5 bg-red-500/80"
-                    style={{ left: `${data.compactingThresholdPercent}%` }}
-                    title={t('chat.contextViewer.threshold', { percent: data.compactingThresholdPercent })}
-                  />
-                )}
-                {/* Real value marker line — provider-reported context size */}
-                {data.apiContextTokens != null && data.contextWindow > 0 && (
-                  <div
-                    className="absolute -top-px h-[calc(100%+2px)] w-0.5 rounded-sm bg-success shadow-[0_0_4px_var(--color-success)]"
-                    style={{ left: `calc(${Math.min(100, (data.apiContextTokens / data.contextWindow) * 100)}% - 1px)` }}
-                    title={t('chat.contextSource.realMarkerHint', { defaultValue: 'Real context size reported by the provider on the last call.' })}
-                  />
-                )}
-              </div>
+
+              {/* Explanation when the two bars diverge */}
+              {data.apiContextTokens != null && Math.abs(data.apiContextTokens - data.tokenEstimate.total) > Math.max(1000, data.tokenEstimate.total * 0.05) && (
+                <p className="text-[10px] leading-relaxed text-muted-foreground/80 rounded border border-border/40 bg-muted/30 px-2 py-1.5">
+                  {t('chat.contextSource.dualBarExplanation', {
+                    defaultValue: 'The two bars can diverge: the local BPE estimate approximates token counts on JSON / YAML / CLI output less accurately than the provider tokenizer. The "real" bar is what the provider actually counted on the last call — that\'s the cost-truth.',
+                  })}
+                </p>
+              )}
               {/* Legend under the bar */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1">
