@@ -305,6 +305,21 @@ export function setLastContextUsage(
   setSetting(`context_usage:${kinId}`, JSON.stringify(data)).catch(() => {})
 }
 
+/** Drop the cached apiContextTokens (provider ground truth) for a Kin
+ *  without otherwise touching the entry. Used by the compacting service
+ *  after a successful summary write — the previous API count was for a
+ *  payload that no longer reflects reality, so leaving it as the
+ *  displayed "real" value would lie to the user until the next main
+ *  turn happens to update it. The contextTokens estimate stays as the
+ *  best-available signal in the meantime. */
+export function invalidateApiContextSize(kinId: string): void {
+  const existing = lastContextUsage.get(kinId)
+  if (!existing || existing.apiContextTokens == null) return
+  const data = { ...existing, apiContextTokens: undefined, updatedAt: Date.now() }
+  lastContextUsage.set(kinId, data)
+  setSetting(`context_usage:${kinId}`, JSON.stringify(data)).catch(() => {})
+}
+
 /** Update the cached api-reported context size (ground truth) for a Kin and
  *  refine the per-Kin calibration factor by EMA-blending the new observed
  *  ratio. Called from the kin-engine after each LLM turn. */

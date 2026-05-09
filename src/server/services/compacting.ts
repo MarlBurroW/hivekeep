@@ -512,6 +512,23 @@ export async function runCompacting(kinId: string, contextWindow?: number): Prom
       data: { kinId, summary, memoriesExtracted, messageCount: messagesToSummarize.length },
     })
 
+    // The cached apiContextTokens (provider ground truth from the last main
+    // turn) was for a payload that no longer corresponds to the current
+    // context — leaving it would have the navbar still showing the
+    // pre-compaction "real 750k" until the next main turn. Drop it so the
+    // UI falls back to the (calibrated) estimate, which reflects reality
+    // until the next roundtrip restores ground truth.
+    const { invalidateApiContextSize } = await import('@/server/services/kin-engine')
+    invalidateApiContextSize(kinId)
+    sseManager.sendToKin(kinId, {
+      type: 'queue:update',
+      kinId,
+      // null (not undefined) signals to the client SSE handler that we want
+      // to actively clear apiContextTokens, not just "no update for this
+      // field". The handler treats null distinctly from omission.
+      data: { kinId, queueSize: 0, isProcessing: false, apiContextTokens: null },
+    })
+
     // Check if telescopic merge is needed after adding new summary
     await maybeMergeSummaries(kinId, ctxWindow)
 

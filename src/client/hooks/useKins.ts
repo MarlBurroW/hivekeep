@@ -196,10 +196,16 @@ export function useKins() {
           processingStartedAt: isProcessing
             ? (data.processingStartedAt as number | undefined) ?? existing?.processingStartedAt
             : undefined,
-          // Keep previous context info when not provided (end-of-processing events omit it)
+          // Keep previous context info when not provided (end-of-processing events omit it).
+          // For apiContextTokens specifically, an explicit `null` from the server means
+          // "actively clear" (compacting service emits this after a successful summary
+          // since the previous API count is for a payload that no longer applies).
+          // Only `undefined` means "no update for this field".
           contextTokens: (data.contextTokens as number | undefined) ?? existing?.contextTokens,
           contextWindow: (data.contextWindow as number | undefined) ?? existing?.contextWindow,
-          apiContextTokens: (data.apiContextTokens as number | undefined) ?? existing?.apiContextTokens,
+          apiContextTokens: data.apiContextTokens === null
+            ? undefined
+            : (data.apiContextTokens as number | undefined) ?? existing?.apiContextTokens,
           contextBreakdown: (data.contextBreakdown as ContextTokenBreakdown | undefined) ?? existing?.contextBreakdown,
           pipelineStatus: (data.pipelineStatus as ContextPipelineStatus | undefined) ?? existing?.pipelineStatus,
           compactingPercent: (data.compactingPercent as number | undefined) ?? existing?.compactingPercent,
