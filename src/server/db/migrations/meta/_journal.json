@@ -393,6 +393,13 @@
       "when": 1778366258827,
       "tag": "0055_ordinary_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1778448332991,
+      "tag": "0056_strange_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

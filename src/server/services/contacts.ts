@@ -1,38 +1,46 @@
-import { eq, and, like, or, sql } from 'drizzle-orm'
+import { eq, and, like, or } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db, sqlite } from '@/server/db/index'
-import { contacts, contactIdentifiers, contactNotes, contactPlatformIds, kins, user, userProfiles } from '@/server/db/schema'
+import {
+  contacts,
+  contactIdentifiers,
+  contactNicknames,
+  contactNotes,
+  contactPlatformIds,
+  user,
+  userProfiles,
+} from '@/server/db/schema'
 import { sseManager } from '@/server/sse/index'
+import { getContactDisplayName } from '@/shared/contact-display'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ContactType = 'human' | 'kin'
 type NoteScope = 'private' | 'global'
 
 interface CreateContactInput {
-  name: string
-  type: ContactType
+  firstName?: string | null
+  lastName?: string | null
+  nicknames?: string[]
   linkedUserId?: string | null
-  linkedKinId?: string | null
   identifiers?: Array<{ label: string; value: string }>
 }
 
 interface UpdateContactInput {
-  name?: string
-  type?: ContactType
+  firstName?: string | null
+  lastName?: string | null
   linkedUserId?: string | null
-  linkedKinId?: string | null
 }
 
 interface ContactWithDetails {
   id: string
-  name: string
-  type: string
+  firstName: string | null
+  lastName: string | null
+  displayName: string
   linkedUserId: string | null
-  linkedKinId: string | null
   linkedUserName: string | null
   createdAt: Date
   updatedAt: Date
+  nicknames: Array<{ id: string; nickname: string }>
   identifiers: Array<{ id: string; label: string; value: string }>
   notes: Array<{ id: string; kinId: string; scope: string; content: string; createdAt: Date; updatedAt: Date }>
   platformIds: Array<{ id: string; contactId: string; platform: string; platformId: string; createdAt: number }>
@@ -40,9 +48,10 @@ interface ContactWithDetails {
 
 interface ContactSummary {
   id: string
-  name: string
-  type: string
-  linkedKinSlug?: string | null
+  displayName: string
+  firstName: string | null
+  lastName: string | null
+  nicknames: string[]
   linkedUserName?: string | null
   identifierSummary?: string
 }
@@ -70,6 +79,12 @@ export async function getContactWithDetails(
     .where(eq(contactIdentifiers.contactId, contactId))
     .all()
 
+  const nicknames = db
+    .select({ id: contactNicknames.id, nickname: contactNicknames.nickname })
+    .from(contactNicknames)
+    .where(eq(contactNicknames.contactId, contactId))
+    .all()
+
   let notes
   if (kinId) {
     // Global notes from all Kins + private notes from requesting Kin only
@@ -88,7 +103,6 @@ export async function getContactWithDetails(
     notes = db.select().from(contactNotes).where(eq(contactNotes.contactId, contactId)).all()
   }
 
-  // Fetch platform IDs
   const pids = db
     .select({
       id: contactPlatformIds.id,
@@ -101,7 +115,6 @@ export async function getContactWithDetails(
     .where(eq(contactPlatformIds.contactId, contactId))
     .all()
 
-  // Resolve linked user name
   let linkedUserName: string | null = null
   if (contact.linkedUserId) {
     const u = db.select({ name: user.name }).from(user).where(eq(user.id, contact.linkedUserId)).get()
@@ -110,7 +123,13 @@ export async function getContactWithDetails(
 
   return {
     ...contact,
+    displayName: getContactDisplayName({
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      nicknames,
+    }),
     linkedUserName,
+    nicknames,
     identifiers,
     platformIds: pids.map((p) => ({
       id: p.id,
@@ -134,10 +153,14 @@ export async function listContactsWithDetails(): Promise<ContactWithDetails[]> {
   const allContacts = db.select().from(contacts).all()
   if (allContacts.length === 0) return []
 
-  // Batch fetch all sub-resources
   const allIdentifiers = db
     .select({ id: contactIdentifiers.id, contactId: contactIdentifiers.contactId, label: contactIdentifiers.label, value: contactIdentifiers.value })
     .from(contactIdentifiers)
+    .all()
+
+  const allNicknames = db
+    .select({ id: contactNicknames.id, contactId: contactNicknames.contactId, nickname: contactNicknames.nickname })
+    .from(contactNicknames)
     .all()
 
   const allNotes = db.select().from(contactNotes).all()
@@ -153,7 +176,6 @@ export async function listContactsWithDetails(): Promise<ContactWithDetails[]> {
     .from(contactPlatformIds)
     .all()
 
-  // Resolve all linked user names in one query
   const linkedUserIds = allContacts.map((c) => c.linkedUserId).filter(Boolean) as string[]
   const userNames = new Map<string, string>()
   if (linkedUserIds.length > 0) {
@@ -163,12 +185,18 @@ export async function listContactsWithDetails(): Promise<ContactWithDetails[]> {
     }
   }
 
-  // Group by contactId
   const identifiersByContact = new Map<string, typeof allIdentifiers>()
   for (const i of allIdentifiers) {
     const list = identifiersByContact.get(i.contactId) ?? []
     list.push(i)
     identifiersByContact.set(i.contactId, list)
+  }
+
+  const nicknamesByContact = new Map<string, typeof allNicknames>()
+  for (const n of allNicknames) {
+    const list = nicknamesByContact.get(n.contactId) ?? []
+    list.push(n)
+    nicknamesByContact.set(n.contactId, list)
   }
 
   const notesByContact = new Map<string, typeof allNotes>()
@@ -185,43 +213,69 @@ export async function listContactsWithDetails(): Promise<ContactWithDetails[]> {
     pidsByContact.set(p.contactId, list)
   }
 
-  return allContacts.map((contact) => ({
-    ...contact,
-    linkedUserName: contact.linkedUserId ? (userNames.get(contact.linkedUserId) ?? null) : null,
-    identifiers: (identifiersByContact.get(contact.id) ?? []).map((i) => ({ id: i.id, label: i.label, value: i.value })),
-    notes: (notesByContact.get(contact.id) ?? []).map((n) => ({
-      id: n.id, kinId: n.kinId, scope: n.scope, content: n.content, createdAt: n.createdAt, updatedAt: n.updatedAt,
-    })),
-    platformIds: (pidsByContact.get(contact.id) ?? []).map((p) => ({
-      id: p.id, contactId: p.contactId, platform: p.platform, platformId: p.platformId,
-      createdAt: new Date(p.createdAt).getTime(),
-    })),
-  }))
+  return allContacts.map((contact) => {
+    const nicknames = (nicknamesByContact.get(contact.id) ?? []).map((n) => ({ id: n.id, nickname: n.nickname }))
+    return {
+      ...contact,
+      displayName: getContactDisplayName({
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        nicknames,
+      }),
+      linkedUserName: contact.linkedUserId ? (userNames.get(contact.linkedUserId) ?? null) : null,
+      nicknames,
+      identifiers: (identifiersByContact.get(contact.id) ?? []).map((i) => ({ id: i.id, label: i.label, value: i.value })),
+      notes: (notesByContact.get(contact.id) ?? []).map((n) => ({
+        id: n.id, kinId: n.kinId, scope: n.scope, content: n.content, createdAt: n.createdAt, updatedAt: n.updatedAt,
+      })),
+      platformIds: (pidsByContact.get(contact.id) ?? []).map((p) => ({
+        id: p.id, contactId: p.contactId, platform: p.platform, platformId: p.platformId,
+        createdAt: new Date(p.createdAt).getTime(),
+      })),
+    }
+  })
 }
 
 export async function createContact(input: CreateContactInput) {
-  // Prevent duplicate user-contact links
   if (input.linkedUserId) {
     const existing = findContactByLinkedUserId(input.linkedUserId)
     if (existing) {
-      return { error: 'USER_ALREADY_LINKED' as const, linkedContactName: existing.name }
+      const linkedContactName = getContactDisplayName({
+        firstName: existing.firstName,
+        lastName: existing.lastName,
+      })
+      return { error: 'USER_ALREADY_LINKED' as const, linkedContactName }
     }
   }
 
   const id = uuid()
   const now = new Date()
 
+  const firstName = input.firstName?.trim() || null
+  const lastName = input.lastName?.trim() || null
+  const cleanNicknames = (input.nicknames ?? [])
+    .map((n) => n.trim())
+    .filter((n) => n.length > 0)
+
   db.insert(contacts).values({
     id,
-    name: input.name,
-    type: input.type,
+    firstName,
+    lastName,
     linkedUserId: input.linkedUserId ?? null,
-    linkedKinId: input.linkedKinId ?? null,
     createdAt: now,
     updatedAt: now,
   }).run()
 
-  // Insert identifiers if provided
+  for (const nickname of cleanNicknames) {
+    db.insert(contactNicknames).values({
+      id: uuid(),
+      contactId: id,
+      nickname,
+      createdAt: now,
+      updatedAt: now,
+    }).run()
+  }
+
   if (input.identifiers?.length) {
     for (const ident of input.identifiers) {
       db.insert(contactIdentifiers).values({
@@ -236,10 +290,15 @@ export async function createContact(input: CreateContactInput) {
   }
 
   const created = db.select().from(contacts).where(eq(contacts.id, id)).get()!
+  const displayName = getContactDisplayName({
+    firstName: created.firstName,
+    lastName: created.lastName,
+    nicknames: cleanNicknames,
+  })
 
   sseManager.broadcast({
     type: 'contact:created',
-    data: { contactId: id, name: created.name, type: created.type },
+    data: { contactId: id, displayName },
   })
 
   return created
@@ -249,30 +308,36 @@ export async function updateContact(contactId: string, updates: UpdateContactInp
   const existing = db.select().from(contacts).where(eq(contacts.id, contactId)).get()
   if (!existing) return null
 
-  // Prevent duplicate user-contact links
   if (updates.linkedUserId) {
     const linked = findContactByLinkedUserId(updates.linkedUserId)
     if (linked && linked.id !== contactId) {
-      return { error: 'USER_ALREADY_LINKED' as const, linkedContactName: linked.name }
+      const linkedContactName = getContactDisplayName({
+        firstName: linked.firstName,
+        lastName: linked.lastName,
+      })
+      return { error: 'USER_ALREADY_LINKED' as const, linkedContactName }
     }
   }
 
   db.update(contacts)
     .set({
-      ...(updates.name !== undefined ? { name: updates.name } : {}),
-      ...(updates.type !== undefined ? { type: updates.type } : {}),
+      ...(updates.firstName !== undefined ? { firstName: updates.firstName?.trim() || null } : {}),
+      ...(updates.lastName !== undefined ? { lastName: updates.lastName?.trim() || null } : {}),
       ...(updates.linkedUserId !== undefined ? { linkedUserId: updates.linkedUserId } : {}),
-      ...(updates.linkedKinId !== undefined ? { linkedKinId: updates.linkedKinId } : {}),
       updatedAt: new Date(),
     })
     .where(eq(contacts.id, contactId))
     .run()
 
   const updated = db.select().from(contacts).where(eq(contacts.id, contactId)).get()!
+  const displayName = getContactDisplayName({
+    firstName: updated.firstName,
+    lastName: updated.lastName,
+  })
 
   sseManager.broadcast({
     type: 'contact:updated',
-    data: { contactId, name: updated.name, type: updated.type },
+    data: { contactId, displayName },
   })
 
   return updated
@@ -282,7 +347,6 @@ export async function deleteContact(contactId: string): Promise<boolean> {
   const existing = db.select().from(contacts).where(eq(contacts.id, contactId)).get()
   if (!existing) return false
 
-  // Cascade deletes identifiers and notes via FK
   db.delete(contacts).where(eq(contacts.id, contactId)).run()
 
   sseManager.broadcast({
@@ -301,21 +365,24 @@ export async function searchContacts(
 ): Promise<ContactWithDetails[]> {
   const pattern = `%${query}%`
 
-  // Search in contact names
   const byName = db
     .select({ id: contacts.id })
     .from(contacts)
-    .where(like(contacts.name, pattern))
+    .where(or(like(contacts.firstName, pattern), like(contacts.lastName, pattern)))
     .all()
 
-  // Search in identifier labels and values
+  const byNickname = db
+    .select({ id: contactNicknames.contactId })
+    .from(contactNicknames)
+    .where(like(contactNicknames.nickname, pattern))
+    .all()
+
   const byIdentifier = db
     .select({ id: contactIdentifiers.contactId })
     .from(contactIdentifiers)
     .where(or(like(contactIdentifiers.value, pattern), like(contactIdentifiers.label, pattern)))
     .all()
 
-  // Search in note content (only visible notes)
   let byNote
   if (kinId) {
     byNote = db
@@ -336,14 +403,13 @@ export async function searchContacts(
       .all()
   }
 
-  // Deduplicate contact IDs
   const uniqueIds = [...new Set([
     ...byName.map((r) => r.id),
+    ...byNickname.map((r) => r.id),
     ...byIdentifier.map((r) => r.id),
     ...byNote.map((r) => r.id),
   ])]
 
-  // Fetch full details for each
   const results: ContactWithDetails[] = []
   for (const id of uniqueIds) {
     const detail = await getContactWithDetails(id, kinId)
@@ -356,14 +422,13 @@ export async function searchContacts(
 // ─── Identifiers ─────────────────────────────────────────────────────────────
 
 export function addContactIdentifier(contactId: string, label: string, value: string) {
-  // Check for duplicate (same contactId + label + value)
   const existing = db.select().from(contactIdentifiers)
     .where(and(
       eq(contactIdentifiers.contactId, contactId),
       eq(contactIdentifiers.label, label),
       eq(contactIdentifiers.value, value),
     )).get()
-  if (existing) return existing // already exists, skip
+  if (existing) return existing
 
   const now = new Date()
   const id = uuid()
@@ -423,8 +488,6 @@ export function removeContactIdentifier(identifierId: string, contactId?: string
 
 /**
  * Atomically replace all identifiers for a contact in a single SQLite transaction.
- * Deletes all existing identifiers and inserts the new list.
- * Returns the new identifiers list, or null if the contact doesn't exist.
  */
 export function replaceContactIdentifiers(
   contactId: string,
@@ -435,12 +498,10 @@ export function replaceContactIdentifiers(
 
   const now = new Date()
   const txn = sqlite.transaction(() => {
-    // Delete all existing identifiers for this contact
     db.delete(contactIdentifiers)
       .where(eq(contactIdentifiers.contactId, contactId))
       .run()
 
-    // Insert all new identifiers
     for (const ident of identifiers) {
       db.insert(contactIdentifiers).values({
         id: uuid(),
@@ -485,6 +546,97 @@ export function listContactIdentifiers(contactId: string) {
     .select({ id: contactIdentifiers.id, label: contactIdentifiers.label, value: contactIdentifiers.value })
     .from(contactIdentifiers)
     .where(eq(contactIdentifiers.contactId, contactId))
+    .all()
+}
+
+// ─── Nicknames ───────────────────────────────────────────────────────────────
+
+export function listContactNicknames(contactId: string) {
+  return db
+    .select({ id: contactNicknames.id, nickname: contactNicknames.nickname })
+    .from(contactNicknames)
+    .where(eq(contactNicknames.contactId, contactId))
+    .all()
+}
+
+export function addContactNickname(contactId: string, nickname: string) {
+  const existing = db.select().from(contactNicknames)
+    .where(and(
+      eq(contactNicknames.contactId, contactId),
+      eq(contactNicknames.nickname, nickname),
+    )).get()
+  if (existing) return existing
+
+  const now = new Date()
+  const id = uuid()
+  db.insert(contactNicknames).values({
+    id,
+    contactId,
+    nickname,
+    createdAt: now,
+    updatedAt: now,
+  }).run()
+
+  sseManager.broadcast({ type: 'contact:updated', data: { contactId } })
+
+  return { id, contactId, nickname, createdAt: now, updatedAt: now }
+}
+
+export function updateContactNickname(nicknameId: string, nickname: string, contactId?: string) {
+  const existing = db.select().from(contactNicknames).where(eq(contactNicknames.id, nicknameId)).get()
+  if (!existing) return null
+  if (contactId && existing.contactId !== contactId) return null
+
+  db.update(contactNicknames)
+    .set({ nickname, updatedAt: new Date() })
+    .where(eq(contactNicknames.id, nicknameId))
+    .run()
+
+  sseManager.broadcast({ type: 'contact:updated', data: { contactId: existing.contactId } })
+
+  return db.select().from(contactNicknames).where(eq(contactNicknames.id, nicknameId)).get()!
+}
+
+export function removeContactNickname(nicknameId: string, contactId?: string): boolean {
+  const existing = db.select().from(contactNicknames).where(eq(contactNicknames.id, nicknameId)).get()
+  if (!existing) return false
+  if (contactId && existing.contactId !== contactId) return false
+
+  db.delete(contactNicknames).where(eq(contactNicknames.id, nicknameId)).run()
+
+  sseManager.broadcast({ type: 'contact:updated', data: { contactId: existing.contactId } })
+
+  return true
+}
+
+/**
+ * Atomically replace all nicknames for a contact in a single SQLite transaction.
+ */
+export function replaceContactNicknames(contactId: string, nicknames: string[]) {
+  const contact = db.select().from(contacts).where(eq(contacts.id, contactId)).get()
+  if (!contact) return null
+
+  const now = new Date()
+  const txn = sqlite.transaction(() => {
+    db.delete(contactNicknames).where(eq(contactNicknames.contactId, contactId)).run()
+    for (const nickname of nicknames) {
+      db.insert(contactNicknames).values({
+        id: uuid(),
+        contactId,
+        nickname,
+        createdAt: now,
+        updatedAt: now,
+      }).run()
+    }
+  })
+  txn()
+
+  sseManager.broadcast({ type: 'contact:updated', data: { contactId } })
+
+  return db
+    .select({ id: contactNicknames.id, nickname: contactNicknames.nickname })
+    .from(contactNicknames)
+    .where(eq(contactNicknames.contactId, contactId))
     .all()
 }
 
@@ -589,9 +741,8 @@ export async function listContactsForPrompt(): Promise<ContactSummary[]> {
   const allContacts = db
     .select({
       id: contacts.id,
-      name: contacts.name,
-      type: contacts.type,
-      linkedKinId: contacts.linkedKinId,
+      firstName: contacts.firstName,
+      lastName: contacts.lastName,
       linkedUserId: contacts.linkedUserId,
     })
     .from(contacts)
@@ -599,18 +750,19 @@ export async function listContactsForPrompt(): Promise<ContactSummary[]> {
 
   return Promise.all(
     allContacts.map(async (c) => {
-      let linkedKinSlug: string | null = null
-      if (c.type === 'kin' && c.linkedKinId) {
-        const linked = db.select({ slug: kins.slug }).from(kins).where(eq(kins.id, c.linkedKinId)).get()
-        linkedKinSlug = linked?.slug ?? null
-      }
-
       let linkedUserName: string | null = null
       if (c.linkedUserId) {
         const profile = db.select({ pseudonym: userProfiles.pseudonym }).from(userProfiles)
           .where(eq(userProfiles.userId, c.linkedUserId)).get()
         linkedUserName = profile?.pseudonym ?? null
       }
+
+      const nicknames = db
+        .select({ nickname: contactNicknames.nickname })
+        .from(contactNicknames)
+        .where(eq(contactNicknames.contactId, c.id))
+        .all()
+        .map((n) => n.nickname)
 
       const identifiers = db
         .select({ label: contactIdentifiers.label })
@@ -620,7 +772,15 @@ export async function listContactsForPrompt(): Promise<ContactSummary[]> {
 
       const identifierSummary = identifiers.map((i) => i.label).join(', ') || undefined
 
-      return { id: c.id, name: c.name, type: c.type, linkedKinSlug, linkedUserName, identifierSummary }
+      return {
+        id: c.id,
+        displayName: getContactDisplayName({ firstName: c.firstName, lastName: c.lastName, nicknames }),
+        firstName: c.firstName,
+        lastName: c.lastName,
+        nicknames,
+        linkedUserName,
+        identifierSummary,
+      }
     }),
   )
 }
@@ -634,6 +794,7 @@ export async function ensureUserContactsExist() {
       email: user.email,
       firstName: userProfiles.firstName,
       lastName: userProfiles.lastName,
+      pseudonym: userProfiles.pseudonym,
     })
     .from(user)
     .innerJoin(userProfiles, eq(user.id, userProfiles.userId))
@@ -643,8 +804,9 @@ export async function ensureUserContactsExist() {
     const existing = findContactByLinkedUserId(u.id)
     if (!existing) {
       await createContact({
-        name: `${u.firstName} ${u.lastName}`,
-        type: 'human',
+        firstName: u.firstName,
+        lastName: u.lastName,
+        nicknames: u.pseudonym ? [u.pseudonym] : undefined,
         linkedUserId: u.id,
         identifiers: u.email ? [{ label: 'email', value: u.email }] : undefined,
       })

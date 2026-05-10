@@ -216,6 +216,7 @@ export const fullMockSchema = {
   contactIdentifiers: {},
   contactPlatformIds: {},
   contactNotes: {},
+  contactNicknames: {},
   customTools: {},
   quickSessions: {},
   tasks: {},

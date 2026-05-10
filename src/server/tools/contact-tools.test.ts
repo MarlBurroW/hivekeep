@@ -6,10 +6,11 @@ import type { ToolExecutionContext } from '@/server/tools/types'
 const mockContacts = {
   getContactWithDetails: mock(() => Promise.resolve(null as any)),
   searchContacts: mock(() => Promise.resolve([] as any[])),
-  createContact: mock(() => Promise.resolve({ id: 'c-1', name: 'Alice', type: 'human' })),
+  createContact: mock(() => Promise.resolve({ id: 'c-1', firstName: 'Alice' as string | null, lastName: null as string | null })),
   updateContact: mock(() => Promise.resolve(null as any)),
   deleteContact: mock(() => Promise.resolve(false)),
   addContactIdentifier: mock(() => {}),
+  addContactNickname: mock(() => {}),
   setContactNote: mock(() => ({ contactId: 'c-1', scope: 'private', content: 'test note' })),
   findContactByIdentifier: mock(() => null as any),
   // Stubs for exports used by other modules (bun mock.module is global)
@@ -19,6 +20,11 @@ const mockContacts = {
   removeContactIdentifier: mock(() => false),
   updateContactIdentifier: mock(() => null as any),
   listContactIdentifiers: mock(() => []),
+  replaceContactIdentifiers: mock(() => []),
+  listContactNicknames: mock(() => []),
+  updateContactNickname: mock(() => null as any),
+  removeContactNickname: mock(() => false),
+  replaceContactNicknames: mock(() => []),
   listContactsForPrompt: mock(() => Promise.resolve([])),
   ensureUserContactsExist: mock(() => Promise.resolve()),
   deleteContactNote: mock(() => {}),
@@ -101,18 +107,19 @@ describe('contact-tools', () => {
       expect(mockContacts.getContactWithDetails).toHaveBeenCalledWith('nonexistent', 'kin-test')
     })
 
-    it('returns formatted contact with identifiers and notes', async () => {
+    it('returns formatted contact with nicknames, identifiers and notes', async () => {
       mockContacts.getContactWithDetails.mockResolvedValue({
         id: 'c-1',
-        name: 'Alice',
-        type: 'human',
+        firstName: 'Alice',
+        lastName: 'Dupont',
+        displayName: 'Alice Dupont',
+        nicknames: [{ id: 'nk1', nickname: 'ali' }, { id: 'nk2', nickname: 'lily' }],
         identifiers: [{ label: 'email', value: 'alice@example.com' }],
         notes: [
           { kinId: 'kin-test', scope: 'private', content: 'My friend' },
           { kinId: 'kin-other', scope: 'global', content: 'VIP customer' },
         ],
         linkedUserId: null,
-        linkedKinId: null,
         createdAt: new Date('2026-01-01'),
         updatedAt: new Date('2026-01-02'),
       })
@@ -120,31 +127,34 @@ describe('contact-tools', () => {
       const result = await execute(getContactTool, { contact_id: 'c-1' })
 
       expect(result.id).toBe('c-1')
-      expect(result.name).toBe('Alice')
-      expect(result.type).toBe('human')
+      expect(result.firstName).toBe('Alice')
+      expect(result.lastName).toBe('Dupont')
+      expect(result.displayName).toBe('Alice Dupont')
+      expect(result.nicknames).toEqual(['ali', 'lily'])
       expect(result.identifiers).toHaveLength(1)
       expect(result.identifiers[0].value).toBe('alice@example.com')
       expect(result.notes).toHaveLength(2)
       expect(result.notes[0].scope).toBe('private')
       expect(result.notes[1].content).toBe('VIP customer')
       expect(result.linkedUserId).toBeNull()
-      expect(result.linkedKinId).toBeNull()
     })
 
-    it('returns contact with empty identifiers and notes', async () => {
+    it('returns contact with empty arrays', async () => {
       mockContacts.getContactWithDetails.mockResolvedValue({
         id: 'c-2',
-        name: 'Bob',
-        type: 'kin',
+        firstName: 'Bob',
+        lastName: null,
+        displayName: 'Bob',
+        nicknames: [],
         identifiers: [],
         notes: [],
         linkedUserId: 'u-1',
-        linkedKinId: null,
         createdAt: new Date('2026-01-01'),
         updatedAt: new Date('2026-01-01'),
       })
 
       const result = await execute(getContactTool, { contact_id: 'c-2' })
+      expect(result.nicknames).toEqual([])
       expect(result.identifiers).toEqual([])
       expect(result.notes).toEqual([])
       expect(result.linkedUserId).toBe('u-1')
@@ -165,15 +175,19 @@ describe('contact-tools', () => {
       mockContacts.searchContacts.mockResolvedValue([
         {
           id: 'c-1',
-          name: 'Alice',
-          type: 'human',
+          firstName: 'Alice',
+          lastName: null,
+          displayName: 'Alice',
+          nicknames: [{ id: 'nk1', nickname: 'ali' }],
           identifiers: [{ label: 'phone', value: '+33612345678' }],
           notes: [{ kinId: 'kin-test', scope: 'global', content: 'Friend' }],
         },
         {
           id: 'c-2',
-          name: 'Alice Corp',
-          type: 'human',
+          firstName: 'Alice',
+          lastName: 'Corp',
+          displayName: 'Alice Corp',
+          nicknames: [],
           identifiers: [],
           notes: [],
         },
@@ -181,7 +195,8 @@ describe('contact-tools', () => {
 
       const result = await execute(searchContactsTool, { query: 'alice' })
       expect(result.contacts).toHaveLength(2)
-      expect(result.contacts[0].name).toBe('Alice')
+      expect(result.contacts[0].displayName).toBe('Alice')
+      expect(result.contacts[0].nicknames).toEqual(['ali'])
       expect(result.contacts[0].identifiers[0].value).toBe('+33612345678')
       expect(result.contacts[1].notes).toEqual([])
     })
@@ -190,19 +205,31 @@ describe('contact-tools', () => {
   // ── create_contact ──────────────────────────────────────────────────────
 
   describe('create_contact', () => {
-    it('creates a contact without identifiers', async () => {
-      mockContacts.createContact.mockResolvedValue({ id: 'c-new', name: 'Bob', type: 'human' })
-      const result = await execute(createContactTool, { name: 'Bob', type: 'human' })
-      expect(result).toEqual({ id: 'c-new', name: 'Bob', type: 'human' })
-      expect(mockContacts.createContact).toHaveBeenCalledWith({ name: 'Bob', type: 'human', identifiers: undefined })
+    it('creates a contact with firstName + lastName', async () => {
+      mockContacts.createContact.mockResolvedValue({ id: 'c-new', firstName: 'Bob', lastName: 'Smith' })
+      const result = await execute(createContactTool, { firstName: 'Bob', lastName: 'Smith' })
+      expect(result.id).toBe('c-new')
+      expect(result.displayName).toBe('Bob Smith')
+      expect(mockContacts.createContact).toHaveBeenCalledWith({
+        firstName: 'Bob',
+        lastName: 'Smith',
+        nicknames: undefined,
+        identifiers: undefined,
+      })
     })
 
-    it('creates a contact with identifiers', async () => {
-      mockContacts.createContact.mockResolvedValue({ id: 'c-new', name: 'Eve', type: 'kin' })
+    it('creates a contact with nicknames and identifiers', async () => {
+      mockContacts.createContact.mockResolvedValue({ id: 'c-new', firstName: 'Eve', lastName: null })
       const identifiers = [{ label: 'email', value: 'eve@test.com' }]
-      const result = await execute(createContactTool, { name: 'Eve', type: 'kin', identifiers })
+      const nicknames = ['evie']
+      const result = await execute(createContactTool, { firstName: 'Eve', nicknames, identifiers })
       expect(result.id).toBe('c-new')
-      expect(mockContacts.createContact).toHaveBeenCalledWith({ name: 'Eve', type: 'kin', identifiers })
+      expect(mockContacts.createContact).toHaveBeenCalledWith({
+        firstName: 'Eve',
+        lastName: undefined,
+        nicknames,
+        identifiers,
+      })
     })
   })
 
@@ -211,38 +238,47 @@ describe('contact-tools', () => {
   describe('update_contact', () => {
     it('returns error when contact not found', async () => {
       mockContacts.updateContact.mockResolvedValue(null)
-      const result = await execute(updateContactTool, { contact_id: 'bad-id', name: 'New Name' })
+      const result = await execute(updateContactTool, { contact_id: 'bad-id', firstName: 'New Name' })
       expect(result).toEqual({ error: 'Contact not found' })
     })
 
     it('returns error when user is already linked to another contact', async () => {
       mockContacts.updateContact.mockResolvedValue({ error: true, linkedContactName: 'Other Person' })
-      const result = await execute(updateContactTool, { contact_id: 'c-1', name: 'Renamed' })
+      const result = await execute(updateContactTool, { contact_id: 'c-1', firstName: 'Renamed' })
       expect(result).toEqual({ error: 'Cannot update: user is already linked to contact "Other Person"' })
     })
 
-    it('updates contact name and type without identifiers', async () => {
-      mockContacts.updateContact.mockResolvedValue({ id: 'c-1', name: 'Renamed', type: 'kin' })
-      const result = await execute(updateContactTool, { contact_id: 'c-1', name: 'Renamed', type: 'kin' })
-      expect(result).toEqual({ id: 'c-1', name: 'Renamed', type: 'kin' })
+    it('updates contact names without nicknames or identifiers', async () => {
+      mockContacts.updateContact.mockResolvedValue({ id: 'c-1', firstName: 'Renamed', lastName: null })
+      const result = await execute(updateContactTool, { contact_id: 'c-1', firstName: 'Renamed' })
+      expect(result.id).toBe('c-1')
+      expect(result.firstName).toBe('Renamed')
       expect(mockContacts.addContactIdentifier).not.toHaveBeenCalled()
+      expect(mockContacts.addContactNickname).not.toHaveBeenCalled()
+    })
+
+    it('adds nicknames when provided', async () => {
+      mockContacts.updateContact.mockResolvedValue({ id: 'c-1', firstName: 'Alice', lastName: null })
+      await execute(updateContactTool, { contact_id: 'c-1', nicknames: ['ali', 'lily'] })
+      expect(mockContacts.addContactNickname).toHaveBeenCalledTimes(2)
+      expect(mockContacts.addContactNickname).toHaveBeenCalledWith('c-1', 'ali')
+      expect(mockContacts.addContactNickname).toHaveBeenCalledWith('c-1', 'lily')
     })
 
     it('adds identifiers when provided', async () => {
-      mockContacts.updateContact.mockResolvedValue({ id: 'c-1', name: 'Alice', type: 'human' })
+      mockContacts.updateContact.mockResolvedValue({ id: 'c-1', firstName: 'Alice', lastName: null })
       const identifiers = [
         { label: 'email', value: 'alice@new.com' },
         { label: 'phone', value: '+1234567890' },
       ]
-      const result = await execute(updateContactTool, { contact_id: 'c-1', identifiers })
-      expect(result.id).toBe('c-1')
+      await execute(updateContactTool, { contact_id: 'c-1', identifiers })
       expect(mockContacts.addContactIdentifier).toHaveBeenCalledTimes(2)
       expect(mockContacts.addContactIdentifier).toHaveBeenCalledWith('c-1', 'email', 'alice@new.com')
       expect(mockContacts.addContactIdentifier).toHaveBeenCalledWith('c-1', 'phone', '+1234567890')
     })
 
     it('does not add identifiers when empty array', async () => {
-      mockContacts.updateContact.mockResolvedValue({ id: 'c-1', name: 'Alice', type: 'human' })
+      mockContacts.updateContact.mockResolvedValue({ id: 'c-1', firstName: 'Alice', lastName: null })
       await execute(updateContactTool, { contact_id: 'c-1', identifiers: [] })
       expect(mockContacts.addContactIdentifier).not.toHaveBeenCalled()
     })
@@ -321,8 +357,8 @@ describe('contact-tools', () => {
     it('returns contact when found', async () => {
       mockContacts.findContactByIdentifier.mockReturnValue({
         id: 'c-1',
-        name: 'Alice',
-        type: 'human',
+        firstName: 'Alice',
+        lastName: 'Dupont',
       })
       const result = await execute(findContactByIdentifierTool, {
         label: 'phone',
@@ -330,8 +366,9 @@ describe('contact-tools', () => {
       })
       expect(result.found).toBe(true)
       expect(result.id).toBe('c-1')
-      expect(result.name).toBe('Alice')
-      expect(result.type).toBe('human')
+      expect(result.firstName).toBe('Alice')
+      expect(result.lastName).toBe('Dupont')
+      expect(result.displayName).toBe('Alice Dupont')
     })
   })
 })

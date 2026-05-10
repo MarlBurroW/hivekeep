@@ -5,12 +5,17 @@ import { Card, CardContent } from '@/client/components/ui/card'
 import { ConfirmDeleteButton } from '@/client/components/common/ConfirmDeleteButton'
 import { ContactNotes } from './ContactNotes'
 import { ContactPlatformIds } from './ContactPlatformIds'
-import { Pencil, User, Bot } from 'lucide-react'
+import { Pencil, User } from 'lucide-react'
 
 export interface ContactIdentifierData {
   id: string
   label: string
   value: string
+}
+
+export interface ContactNicknameData {
+  id: string
+  nickname: string
 }
 
 export interface ContactNoteData {
@@ -32,11 +37,12 @@ export interface ContactPlatformIdData {
 
 export interface ContactData {
   id: string
-  name: string
-  type: 'human' | 'kin'
+  firstName: string | null
+  lastName: string | null
+  displayName: string
   linkedUserId: string | null
-  linkedKinId: string | null
   linkedUserName: string | null
+  nicknames: ContactNicknameData[]
   identifiers: ContactIdentifierData[]
   notes: ContactNoteData[]
   platformIds?: ContactPlatformIdData[]
@@ -59,9 +65,7 @@ interface ContactCardProps {
 
 export function ContactCard({ contact, kinInfo, onEdit, onDelete, onRefresh }: ContactCardProps) {
   const { t } = useTranslation()
-  const Icon = contact.type === 'kin' ? Bot : User
 
-  // Build delete confirmation with cascade warning
   const platformCount = contact.platformIds?.length ?? 0
   const platformNames = contact.platformIds?.map((p) => p.platform).join(', ')
   let deleteDescription = t('settings.contacts.deleteConfirm')
@@ -78,14 +82,11 @@ export function ContactCard({ contact, kinInfo, onEdit, onDelete, onRefresh }: C
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="shrink-0">
-              <Icon className="size-5 text-primary" />
+              <User className="size-5 text-primary" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium truncate">{contact.name}</p>
-                <Badge variant="secondary" size="xs" className="shrink-0">
-                  {contact.type === 'kin' ? t('settings.contacts.typeKin') : t('settings.contacts.typeHuman')}
-                </Badge>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-medium truncate">{contact.displayName}</p>
                 {contact.linkedUserName && (
                   <Badge variant="outline" size="xs" className="shrink-0 gap-1">
                     <User className="size-2.5" />
@@ -93,6 +94,15 @@ export function ContactCard({ contact, kinInfo, onEdit, onDelete, onRefresh }: C
                   </Badge>
                 )}
               </div>
+              {contact.nicknames.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {contact.nicknames.map((nick) => (
+                    <Badge key={nick.id} variant="secondary" size="xs" className="font-normal">
+                      {nick.nickname}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               {contact.identifiers.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   {contact.identifiers.map((ident) => (

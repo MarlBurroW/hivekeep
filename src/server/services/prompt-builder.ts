@@ -3,9 +3,10 @@ import { generateWorkspaceTree } from '@/server/services/workspace-tree'
 
 interface ContactSummary {
   id: string
-  name: string
-  type: string
-  linkedKinSlug?: string | null
+  displayName: string
+  firstName: string | null
+  lastName: string | null
+  nicknames: string[]
   linkedUserName?: string | null
   identifierSummary?: string
 }
@@ -676,17 +677,19 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     const contactLines = params.contacts
       .map((c) => {
         const parts: string[] = []
-        if (c.type === 'kin' && c.linkedKinSlug) {
-          parts.push(`slug: ${c.linkedKinSlug}`)
+        // When displayName already comes from a nickname (no first/last name), skip it in the aka list
+        const otherNicknames = c.nicknames.filter((n) => n !== c.displayName)
+        if (otherNicknames.length > 0) {
+          parts.push(`aka ${otherNicknames.map((n) => `"${n}"`).join(', ')}`)
         }
-        parts.push(c.type)
         if (c.linkedUserName) {
           parts.push(`system user "${c.linkedUserName}"`)
         }
         if (c.identifierSummary) {
           parts.push(c.identifierSummary)
         }
-        return `- ${c.name} (${parts.join(', ')}) [id: ${c.id}]`
+        const suffix = parts.length > 0 ? ` (${parts.join('; ')})` : ''
+        return `- ${c.displayName}${suffix} [id: ${c.id}]`
       })
       .join('\n')
     volatileBlocks.push(

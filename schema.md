@@ -256,23 +256,41 @@ Mémoire long terme des Kins (faits, préférences, décisions, connaissances).
 
 ### `contacts`
 
-Registre de contacts partagé entre tous les Kins.
+Registre de contacts partagé entre tous les Kins. Le nom affiché est calculé : `firstName lastName`, ou à défaut le premier pseudo, ou « Unnamed contact ».
 
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|
 | `id` | text PK | UUID | |
-| `name` | text | NOT NULL | Nom/pseudonyme du contact |
-| `type` | text | NOT NULL | 'human' ou 'kin' |
+| `first_name` | text | nullable | Prénom |
+| `last_name` | text | nullable | Nom de famille |
 | `linked_user_id` | text | FK → user.id | Si c'est un utilisateur de la plateforme |
-| `linked_kin_id` | text | FK → kins.id | Si c'est un autre Kin |
 | `created_at` | integer | NOT NULL | |
 | `updated_at` | integer | NOT NULL | |
+
+Au moins un de `first_name`, `last_name` ou un pseudo (table `contact_nicknames`) doit être renseigné — la couche API rejette une création sans aucun de ces champs.
+
+---
+
+### `contact_nicknames`
+
+Pseudos / alias d'un contact (plusieurs possibles).
+
+| Colonne | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | text PK | UUID | |
+| `contact_id` | text | FK → contacts.id, ON DELETE CASCADE, NOT NULL | |
+| `nickname` | text | NOT NULL | Pseudo, handle, surnom |
+| `created_at` | integer | NOT NULL | |
+| `updated_at` | integer | NOT NULL | |
+
+**Index** :
+- `idx_contact_nicknames_contact` sur `contact_id`
 
 ---
 
 ### `contact_identifiers`
 
-Identifiants d'un contact (email, téléphone, Discord, etc.).
+Champs personnalisés d'un contact (email, mobile, Twitter, LinkedIn, Discord, etc.).
 
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|

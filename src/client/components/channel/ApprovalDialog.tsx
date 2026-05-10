@@ -28,8 +28,7 @@ import type { ChannelPendingUser, ChannelPlatform } from '@/shared/types'
 
 interface ContactOption {
   id: string
-  name: string
-  type: string
+  displayName: string
 }
 
 interface ApprovalDialogProps {
@@ -74,7 +73,7 @@ export function ApprovalDialog({
       api
         .get<{ contacts: ContactOption[] }>('/contacts')
         .then((data) => {
-          setContacts(data.contacts.map((c) => ({ id: c.id, name: c.name, type: c.type })))
+          setContacts(data.contacts.map((c) => ({ id: c.id, displayName: c.displayName })))
         })
         .catch(() => {})
         .finally(() => setLoadingContacts(false))
@@ -176,11 +175,11 @@ export function ApprovalDialog({
                     {contacts.map((c) => (
                       <CommandItem
                         key={c.id}
-                        value={c.name}
+                        value={c.displayName}
                         onSelect={() => setSelectedContactId(c.id)}
                         className="cursor-pointer"
                       >
-                        <span className="flex-1 truncate">{c.name}</span>
+                        <span className="flex-1 truncate">{c.displayName}</span>
                         {selectedContactId === c.id && (
                           <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
                         )}

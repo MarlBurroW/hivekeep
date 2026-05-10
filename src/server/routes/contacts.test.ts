@@ -13,6 +13,10 @@ let mockAddContactIdentifier: ReturnType<typeof mock>
 let mockUpdateContactIdentifier: ReturnType<typeof mock>
 let mockRemoveContactIdentifier: ReturnType<typeof mock>
 let mockReplaceContactIdentifiers: ReturnType<typeof mock>
+let mockAddContactNickname: ReturnType<typeof mock>
+let mockUpdateContactNickname: ReturnType<typeof mock>
+let mockRemoveContactNickname: ReturnType<typeof mock>
+let mockReplaceContactNicknames: ReturnType<typeof mock>
 let mockSetContactNote: ReturnType<typeof mock>
 let mockUpdateContactNote: ReturnType<typeof mock>
 let mockDeleteContactNote: ReturnType<typeof mock>
@@ -28,6 +32,10 @@ mock.module('@/server/services/contacts', () => ({
   updateContactIdentifier: (...args: unknown[]) => mockUpdateContactIdentifier(...args),
   removeContactIdentifier: (...args: unknown[]) => mockRemoveContactIdentifier(...args),
   replaceContactIdentifiers: (...args: unknown[]) => mockReplaceContactIdentifiers(...args),
+  addContactNickname: (...args: unknown[]) => mockAddContactNickname(...args),
+  updateContactNickname: (...args: unknown[]) => mockUpdateContactNickname(...args),
+  removeContactNickname: (...args: unknown[]) => mockRemoveContactNickname(...args),
+  replaceContactNicknames: (...args: unknown[]) => mockReplaceContactNicknames(...args),
   setContactNote: (...args: unknown[]) => mockSetContactNote(...args),
   updateContactNote: (...args: unknown[]) => mockUpdateContactNote(...args),
   deleteContactNote: (...args: unknown[]) => mockDeleteContactNote(...args),
@@ -117,14 +125,18 @@ function req(method: string, path: string, body?: unknown) {
 beforeEach(() => {
   mockListContactsWithDetails = mock(() => [])
   mockGetContactWithDetails = mock(() => null)
-  mockGetContact = mock(() => ({ id: 'c1', name: 'Alice', type: 'human' }))
-  mockCreateContact = mock(() => ({ id: 'c1', name: 'Alice', type: 'human' }))
-  mockUpdateContact = mock(() => ({ id: 'c1', name: 'Alice Updated', type: 'human' }))
+  mockGetContact = mock(() => ({ id: 'c1', firstName: 'Alice', lastName: null }))
+  mockCreateContact = mock(() => ({ id: 'c1', firstName: 'Alice', lastName: null }))
+  mockUpdateContact = mock(() => ({ id: 'c1', firstName: 'Alice', lastName: 'Updated' }))
   mockDeleteContact = mock(() => true)
   mockAddContactIdentifier = mock(() => ({ id: 'i1', contactId: 'c1', label: 'email', value: 'a@b.com' }))
   mockUpdateContactIdentifier = mock(() => ({ id: 'i1', contactId: 'c1', label: 'phone', value: '123' }))
   mockRemoveContactIdentifier = mock(() => true)
   mockReplaceContactIdentifiers = mock(() => [])
+  mockAddContactNickname = mock(() => ({ id: 'nk1', contactId: 'c1', nickname: 'ali' }))
+  mockUpdateContactNickname = mock(() => ({ id: 'nk1', contactId: 'c1', nickname: 'lily' }))
+  mockRemoveContactNickname = mock(() => true)
+  mockReplaceContactNicknames = mock(() => [])
   mockSetContactNote = mock(() => ({ id: 'n1', contactId: 'c1', kinId: 'k1', scope: 'global', content: 'note' }))
   mockUpdateContactNote = mock(() => ({ id: 'n1', content: 'updated' }))
   mockDeleteContactNote = mock(() => true)
@@ -144,7 +156,7 @@ describe('GET /api/contacts', () => {
   })
 
   itMocked('returns contacts from service', async () => {
-    const contacts = [{ id: 'c1', name: 'Alice', type: 'human' }]
+    const contacts = [{ id: 'c1', firstName: 'Alice', lastName: null, displayName: 'Alice' }]
     mockListContactsWithDetails = mock(() => contacts)
     const res = await req('GET', '/')
     const json = await res.json()
@@ -163,7 +175,7 @@ describe('GET /api/contacts/:id', () => {
   })
 
   itMocked('returns contact details', async () => {
-    const contact = { id: 'c1', name: 'Alice', type: 'human', identifiers: [], notes: [], platformIds: [] }
+    const contact = { id: 'c1', firstName: 'Alice', lastName: null, displayName: 'Alice', nicknames: [], identifiers: [], notes: [], platformIds: [] }
     mockGetContactWithDetails = mock(() => contact)
     const res = await req('GET', '/c1')
     expect(res.status).toBe(200)
@@ -175,62 +187,71 @@ describe('GET /api/contacts/:id', () => {
 // ─── POST /api/contacts ────────────────────────────────────────────────────
 
 describe('POST /api/contacts', () => {
-  itMocked('creates a contact', async () => {
-    const res = await req('POST', '/', { name: 'Alice', type: 'human' })
+  itMocked('creates a contact with firstName + lastName', async () => {
+    const res = await req('POST', '/', { firstName: 'Alice', lastName: 'Dupont' })
     expect(res.status).toBe(201)
-    const json = await res.json()
-    expect(json.contact.name).toBe('Alice')
-    expect(mockCreateContact).toHaveBeenCalledWith({
-      name: 'Alice',
-      type: 'human',
-      linkedUserId: undefined,
-      linkedKinId: undefined,
-      identifiers: undefined,
-    })
+    expect(mockCreateContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firstName: 'Alice',
+        lastName: 'Dupont',
+        nicknames: [],
+      }),
+    )
   })
 
-  itMocked('returns 400 when name is missing', async () => {
-    const res = await req('POST', '/', { type: 'human' })
+  itMocked('creates a contact with only a nickname', async () => {
+    const res = await req('POST', '/', { nicknames: ['ali'] })
+    expect(res.status).toBe(201)
+    expect(mockCreateContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firstName: null,
+        lastName: null,
+        nicknames: ['ali'],
+      }),
+    )
+  })
+
+  itMocked('returns 400 when no name nor nickname provided', async () => {
+    const res = await req('POST', '/', {})
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error.code).toBe('INVALID_INPUT')
   })
 
-  itMocked('returns 400 when name is empty string', async () => {
-    const res = await req('POST', '/', { name: '   ', type: 'human' })
+  itMocked('returns 400 when all fields are whitespace', async () => {
+    const res = await req('POST', '/', { firstName: '   ', lastName: '   ', nicknames: ['   '] })
     expect(res.status).toBe(400)
   })
 
-  itMocked('returns 400 when type is missing', async () => {
-    const res = await req('POST', '/', { name: 'Alice' })
-    expect(res.status).toBe(400)
-  })
-
-  itMocked('returns 400 when type is invalid', async () => {
-    const res = await req('POST', '/', { name: 'Alice', type: 'robot' })
+  itMocked('returns 400 when firstName exceeds 100 characters', async () => {
+    const res = await req('POST', '/', { firstName: 'x'.repeat(101) })
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error.message).toContain('human')
+    expect(json.error.message).toContain('100')
   })
 
-  itMocked('returns 400 when name exceeds 200 characters', async () => {
-    const res = await req('POST', '/', { name: 'x'.repeat(201), type: 'human' })
+  itMocked('returns 400 when nickname exceeds 100 characters', async () => {
+    const res = await req('POST', '/', { firstName: 'Alice', nicknames: ['x'.repeat(101)] })
     expect(res.status).toBe(400)
-    const json = await res.json()
-    expect(json.error.message).toContain('200')
   })
 
-  itMocked('trims whitespace from name', async () => {
-    const res = await req('POST', '/', { name: '  Alice  ', type: 'human' })
-    expect(res.status).toBe(201)
+  itMocked('trims whitespace from firstName and lastName', async () => {
+    await req('POST', '/', { firstName: '  Alice  ', lastName: '  Dupont  ' })
     expect(mockCreateContact).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Alice' }),
+      expect.objectContaining({ firstName: 'Alice', lastName: 'Dupont' }),
+    )
+  })
+
+  itMocked('filters out empty nicknames', async () => {
+    await req('POST', '/', { firstName: 'Alice', nicknames: ['ali', '   ', 'lily'] })
+    expect(mockCreateContact).toHaveBeenCalledWith(
+      expect.objectContaining({ nicknames: ['ali', 'lily'] }),
     )
   })
 
   itMocked('returns 409 when user is already linked', async () => {
     mockCreateContact = mock(() => ({ error: 'USER_ALREADY_LINKED', linkedContactName: 'Bob' }))
-    const res = await req('POST', '/', { name: 'Alice', type: 'human', linkedUserId: 'u1' })
+    const res = await req('POST', '/', { firstName: 'Alice', linkedUserId: 'u1' })
     expect(res.status).toBe(409)
     const json = await res.json()
     expect(json.error.code).toBe('USER_ALREADY_LINKED')
@@ -238,22 +259,14 @@ describe('POST /api/contacts', () => {
 
   itMocked('passes identifiers to service', async () => {
     const identifiers = [{ label: 'email', value: 'a@b.com' }]
-    await req('POST', '/', { name: 'Alice', type: 'human', identifiers })
+    await req('POST', '/', { firstName: 'Alice', identifiers })
     expect(mockCreateContact).toHaveBeenCalledWith(
       expect.objectContaining({ identifiers }),
     )
   })
 
-  itMocked('accepts type "kin"', async () => {
-    const res = await req('POST', '/', { name: 'MyKin', type: 'kin' })
-    expect(res.status).toBe(201)
-    expect(mockCreateContact).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'kin' }),
-    )
-  })
-
-  itMocked('accepts name at exactly 200 characters', async () => {
-    const res = await req('POST', '/', { name: 'x'.repeat(200), type: 'human' })
+  itMocked('accepts firstName at exactly 100 characters', async () => {
+    const res = await req('POST', '/', { firstName: 'x'.repeat(100) })
     expect(res.status).toBe(201)
   })
 })
@@ -261,31 +274,31 @@ describe('POST /api/contacts', () => {
 // ─── PATCH /api/contacts/:id ───────────────────────────────────────────────
 
 describe('PATCH /api/contacts/:id', () => {
-  itMocked('updates a contact', async () => {
-    const res = await req('PATCH', '/c1', { name: 'Alice Updated' })
+  itMocked('updates a contact firstName', async () => {
+    const res = await req('PATCH', '/c1', { firstName: 'Alice' })
     expect(res.status).toBe(200)
     expect(mockUpdateContact).toHaveBeenCalled()
   })
 
   itMocked('returns 404 when contact not found', async () => {
     mockUpdateContact = mock(() => null)
-    const res = await req('PATCH', '/c1', { name: 'Alice' })
+    const res = await req('PATCH', '/c1', { firstName: 'Alice' })
     expect(res.status).toBe(404)
   })
 
-  itMocked('returns 400 when name is empty', async () => {
-    const res = await req('PATCH', '/c1', { name: '   ' })
+  itMocked('returns 400 when firstName exceeds 100 characters', async () => {
+    const res = await req('PATCH', '/c1', { firstName: 'x'.repeat(101) })
     expect(res.status).toBe(400)
   })
 
-  itMocked('returns 400 when name exceeds 200 characters', async () => {
-    const res = await req('PATCH', '/c1', { name: 'x'.repeat(201) })
+  itMocked('returns 400 when lastName exceeds 100 characters', async () => {
+    const res = await req('PATCH', '/c1', { lastName: 'x'.repeat(101) })
     expect(res.status).toBe(400)
   })
 
-  itMocked('trims name whitespace', async () => {
-    await req('PATCH', '/c1', { name: '  Updated  ' })
-    expect(mockUpdateContact).toHaveBeenCalledWith('c1', expect.objectContaining({ name: 'Updated' }))
+  itMocked('trims firstName whitespace and treats empty as null', async () => {
+    await req('PATCH', '/c1', { firstName: '   ' })
+    expect(mockUpdateContact).toHaveBeenCalledWith('c1', expect.objectContaining({ firstName: null }))
   })
 
   itMocked('returns 409 when user already linked', async () => {
@@ -294,19 +307,86 @@ describe('PATCH /api/contacts/:id', () => {
     expect(res.status).toBe(409)
   })
 
-  itMocked('passes type update', async () => {
-    await req('PATCH', '/c1', { type: 'kin' })
-    expect(mockUpdateContact).toHaveBeenCalledWith('c1', expect.objectContaining({ type: 'kin' }))
-  })
-
-  itMocked('passes linkedKinId update', async () => {
-    await req('PATCH', '/c1', { linkedKinId: 'k1' })
-    expect(mockUpdateContact).toHaveBeenCalledWith('c1', expect.objectContaining({ linkedKinId: 'k1' }))
-  })
-
   itMocked('passes null linkedUserId to unlink', async () => {
     await req('PATCH', '/c1', { linkedUserId: null })
     expect(mockUpdateContact).toHaveBeenCalledWith('c1', expect.objectContaining({ linkedUserId: null }))
+  })
+})
+
+// ─── Nicknames ─────────────────────────────────────────────────────────────
+
+describe('PUT /api/contacts/:id/nicknames', () => {
+  itMocked('replaces all nicknames atomically', async () => {
+    mockReplaceContactNicknames = mock(() => [{ id: 'nk1', nickname: 'ali' }])
+    const res = await req('PUT', '/c1/nicknames', { nicknames: ['ali', 'lily'] })
+    expect(res.status).toBe(200)
+    expect(mockReplaceContactNicknames).toHaveBeenCalledWith('c1', ['ali', 'lily'])
+  })
+
+  itMocked('returns 400 when nicknames is not an array', async () => {
+    const res = await req('PUT', '/c1/nicknames', { nicknames: 'ali' })
+    expect(res.status).toBe(400)
+  })
+
+  itMocked('filters out whitespace-only entries', async () => {
+    await req('PUT', '/c1/nicknames', { nicknames: ['ali', '   ', 'lily'] })
+    expect(mockReplaceContactNicknames).toHaveBeenCalledWith('c1', ['ali', 'lily'])
+  })
+
+  itMocked('returns 404 when contact not found', async () => {
+    mockReplaceContactNicknames = mock(() => null)
+    const res = await req('PUT', '/c1/nicknames', { nicknames: [] })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /api/contacts/:id/nicknames', () => {
+  itMocked('adds a nickname', async () => {
+    const res = await req('POST', '/c1/nicknames', { nickname: 'ali' })
+    expect(res.status).toBe(201)
+    expect(mockAddContactNickname).toHaveBeenCalledWith('c1', 'ali')
+  })
+
+  itMocked('returns 400 when nickname is empty', async () => {
+    const res = await req('POST', '/c1/nicknames', { nickname: '   ' })
+    expect(res.status).toBe(400)
+  })
+
+  itMocked('trims whitespace', async () => {
+    await req('POST', '/c1/nicknames', { nickname: '  ali  ' })
+    expect(mockAddContactNickname).toHaveBeenCalledWith('c1', 'ali')
+  })
+})
+
+describe('PATCH /api/contacts/:id/nicknames/:nickId', () => {
+  itMocked('updates a nickname', async () => {
+    const res = await req('PATCH', '/c1/nicknames/nk1', { nickname: 'lily' })
+    expect(res.status).toBe(200)
+    expect(mockUpdateContactNickname).toHaveBeenCalledWith('nk1', 'lily', 'c1')
+  })
+
+  itMocked('returns 404 when nickname not found', async () => {
+    mockUpdateContactNickname = mock(() => null)
+    const res = await req('PATCH', '/c1/nicknames/nk1', { nickname: 'lily' })
+    expect(res.status).toBe(404)
+  })
+
+  itMocked('returns 400 when empty', async () => {
+    const res = await req('PATCH', '/c1/nicknames/nk1', { nickname: '   ' })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('DELETE /api/contacts/:id/nicknames/:nickId', () => {
+  itMocked('removes a nickname', async () => {
+    const res = await req('DELETE', '/c1/nicknames/nk1')
+    expect(res.status).toBe(200)
+  })
+
+  itMocked('returns 404 when not found', async () => {
+    mockRemoveContactNickname = mock(() => false)
+    const res = await req('DELETE', '/c1/nicknames/nk1')
+    expect(res.status).toBe(404)
   })
 })
 

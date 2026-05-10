@@ -82,7 +82,7 @@ describe('buildSystemPrompt', () => {
   it('includes contacts when provided', () => {
     const result = buildSystemPrompt(makeParams({
       contacts: [
-        { id: 'c1', name: 'Alice', type: 'human', identifierSummary: 'email: alice@test.com' },
+        { id: 'c1', displayName: 'Alice', firstName: 'Alice', lastName: null, nicknames: [], identifierSummary: 'email: alice@test.com' },
       ],
     }))
     expect(result).toContain('## Known contacts')
@@ -261,7 +261,7 @@ describe('buildSystemPrompt', () => {
   it('quick session skips contacts, kin directory, and internal instructions', () => {
     const result = buildSystemPrompt(makeParams({
       isQuickSession: true,
-      contacts: [{ id: 'c1', name: 'Alice', type: 'human' }],
+      contacts: [{ id: 'c1', displayName: 'Alice', firstName: 'Alice', lastName: null, nicknames: [] }],
       kinDirectory: [{ slug: 'helper', name: 'Helper', role: 'assistant' }],
     }))
     expect(result).toContain('## Quick session')
@@ -281,19 +281,20 @@ describe('buildSystemPrompt', () => {
 
   // --- Contact formatting ---
 
-  it('formats kin contacts with linked slug', () => {
+  it('formats contacts with nicknames as aka list', () => {
     const result = buildSystemPrompt(makeParams({
       contacts: [
-        { id: 'c1', name: 'HelperBot', type: 'kin', linkedKinSlug: 'helper' },
+        { id: 'c1', displayName: 'Alice Dupont', firstName: 'Alice', lastName: 'Dupont', nicknames: ['ali', 'lily'] },
       ],
     }))
-    expect(result).toContain('slug: helper, kin')
+    expect(result).toContain('Alice Dupont')
+    expect(result).toContain('aka "ali", "lily"')
   })
 
   it('formats contacts with linked user name', () => {
     const result = buildSystemPrompt(makeParams({
       contacts: [
-        { id: 'c1', name: 'Admin', type: 'human', linkedUserName: 'admin_user' },
+        { id: 'c1', displayName: 'Admin', firstName: 'Admin', lastName: null, nicknames: [], linkedUserName: 'admin_user' },
       ],
     }))
     expect(result).toContain('system user "admin_user"')
@@ -685,7 +686,7 @@ describe('buildSystemPrompt', () => {
 
     it('places date, language, contacts, memories and current speaker in the volatile segment', () => {
       const { stable, volatile } = buildSystemPromptSegmented(makeParams({
-        contacts: [{ id: 'c1', name: 'Alice', type: 'human' }],
+        contacts: [{ id: 'c1', displayName: 'Alice', firstName: 'Alice', lastName: null, nicknames: [] }],
         relevantMemories: [{ category: 'fact', content: 'Likes cats', subject: 'Alice' }],
         currentSpeaker: { firstName: 'Alice', lastName: null, pseudonym: 'alice', role: 'user' },
       }))

@@ -28,8 +28,6 @@ import { Check, ChevronsUpDown, Loader2, Plus, X } from 'lucide-react'
 import { InfoTip } from '@/client/components/common/InfoTip'
 import { api, getErrorMessage } from '@/client/lib/api'
 import { CONTACT_IDENTIFIER_SUGGESTIONS } from '@/shared/constants'
-import { KinSelector } from '@/client/components/common/KinSelector'
-import { useKins } from '@/client/hooks/useKins'
 import type { ContactData } from '@/client/components/contacts/ContactCard'
 
 interface UserOption {
@@ -42,6 +40,11 @@ interface IdentifierRow {
   existingId?: string
   label: string
   value: string
+}
+
+interface NicknameRow {
+  existingId?: string
+  nickname: string
 }
 
 interface ContactFormDialogProps {
@@ -146,13 +149,12 @@ export function ContactFormDialog({
 
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
-  const [name, setName] = useState('')
-  const [type, setType] = useState<'human' | 'kin'>('human')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [nicknames, setNicknames] = useState<NicknameRow[]>([])
   const [linkedUserId, setLinkedUserId] = useState<string | null>(null)
-  const [linkedKinId, setLinkedKinId] = useState<string | null>(null)
   const [users, setUsers] = useState<UserOption[]>([])
   const [identifiers, setIdentifiers] = useState<IdentifierRow[]>([])
-  const { kins } = useKins()
 
   useEffect(() => {
     if (open) {
@@ -164,19 +166,19 @@ export function ContactFormDialog({
 
   useEffect(() => {
     if (open && contact) {
-      setName(contact.name)
-      setType(contact.type as 'human' | 'kin')
+      setFirstName(contact.firstName ?? '')
+      setLastName(contact.lastName ?? '')
+      setNicknames(contact.nicknames.map((n) => ({ existingId: n.id, nickname: n.nickname })))
       setLinkedUserId(contact.linkedUserId ?? null)
-      setLinkedKinId(contact.linkedKinId ?? null)
       setIdentifiers(
         contact.identifiers.map((i) => ({ existingId: i.id, label: i.label, value: i.value })),
       )
       setError('')
     } else if (open) {
-      setName('')
-      setType('human')
+      setFirstName('')
+      setLastName('')
+      setNicknames([])
       setLinkedUserId(null)
-      setLinkedKinId(null)
       setIdentifiers([])
       setError('')
     }
@@ -184,6 +186,18 @@ export function ContactFormDialog({
 
   const handleClose = () => {
     onOpenChange(false)
+  }
+
+  const addNickname = () => {
+    setNicknames((prev) => [...prev, { nickname: '' }])
+  }
+
+  const removeNickname = (index: number) => {
+    setNicknames((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateNickname = (index: number, val: string) => {
+    setNicknames((prev) => prev.map((row, i) => (i === index ? { ...row, nickname: val } : row)))
   }
 
   const addIdentifier = () => {
@@ -204,26 +218,29 @@ export function ContactFormDialog({
     setError('')
     setIsSaving(true)
     try {
+      const validNicknames = nicknames.map((n) => n.nickname.trim()).filter(Boolean)
       const validIdentifiers = identifiers.filter((i) => i.label && i.value.trim())
 
       if (isEditing) {
         await api.patch(`/contacts/${contact.id}`, {
-          name,
-          type,
-          linkedUserId: type === 'human' ? linkedUserId : null,
-          linkedKinId: type === 'kin' ? linkedKinId : null,
+          firstName: firstName.trim() || null,
+          lastName: lastName.trim() || null,
+          linkedUserId,
         })
 
-        // Atomically replace all identifiers in a single request
+        await api.put(`/contacts/${contact.id}/nicknames`, {
+          nicknames: validNicknames,
+        })
+
         await api.put(`/contacts/${contact.id}/identifiers`, {
           identifiers: validIdentifiers.map((i) => ({ label: i.label, value: i.value })),
         })
       } else {
         await api.post('/contacts', {
-          name,
-          type,
-          linkedUserId: type === 'human' ? (linkedUserId || undefined) : undefined,
-          linkedKinId: type === 'kin' ? (linkedKinId || undefined) : undefined,
+          firstName: firstName.trim() || null,
+          lastName: lastName.trim() || null,
+          nicknames: validNicknames.length > 0 ? validNicknames : undefined,
+          linkedUserId: linkedUserId || undefined,
           identifiers: validIdentifiers.length > 0
             ? validIdentifiers.map((i) => ({ label: i.label, value: i.value }))
             : undefined,
@@ -238,7 +255,8 @@ export function ContactFormDialog({
     }
   }
 
-  const canSave = name.trim() !== ''
+  const hasName = firstName.trim() !== '' || lastName.trim() !== '' ||
+    nicknames.some((n) => n.nickname.trim() !== '')
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
@@ -255,32 +273,63 @@ export function ContactFormDialog({
         <div className="space-y-4">
           <FormErrorAlert error={error} />
 
-          <div className="space-y-2">
-            <Label htmlFor="contact-name">{t('settings.contacts.name')}</Label>
-            <Input
-              id="contact-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('settings.contacts.namePlaceholder')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="contact-type" className="inline-flex items-center gap-1.5">{t('settings.contacts.type')} <InfoTip content={t('settings.contacts.typeTip')} /></Label>
-            <Select value={type} onValueChange={(v) => setType(v as 'human' | 'kin')}>
-              <SelectTrigger id="contact-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="human">{t('settings.contacts.typeHuman')}</SelectItem>
-                <SelectItem value="kin">{t('settings.contacts.typeKin')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {type === 'human' && users.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="contact-linked-user" className="inline-flex items-center gap-1.5">{t('settings.contacts.linkToUser')} <InfoTip content={t('settings.contacts.linkToUserTip')} /></Label>
+              <Label htmlFor="contact-first-name">{t('settings.contacts.firstName')}</Label>
+              <Input
+                id="contact-first-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder={t('settings.contacts.firstNamePlaceholder')}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-last-name">{t('settings.contacts.lastName')}</Label>
+              <Input
+                id="contact-last-name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={t('settings.contacts.lastNamePlaceholder')}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="inline-flex items-center gap-1.5">
+              {t('settings.contacts.nicknames')}{' '}
+              <InfoTip content={t('settings.contacts.nicknamesTip')} />
+            </Label>
+            <div className="space-y-2">
+              {nicknames.map((row, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    value={row.nickname}
+                    onChange={(e) => updateNickname(index, e.target.value)}
+                    placeholder={t('settings.contacts.nicknamePlaceholder')}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => removeNickname(index)}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={addNickname} className="w-full">
+                <Plus className="size-3.5" />
+                {t('settings.contacts.addNickname')}
+              </Button>
+            </div>
+          </div>
+
+          {users.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="contact-linked-user" className="inline-flex items-center gap-1.5">
+                {t('settings.contacts.linkToUser')}{' '}
+                <InfoTip content={t('settings.contacts.linkToUserTip')} />
+              </Label>
               <Select
                 value={linkedUserId ?? '_none'}
                 onValueChange={(v) => setLinkedUserId(v === '_none' ? null : v)}
@@ -300,22 +349,11 @@ export function ContactFormDialog({
             </div>
           )}
 
-          {type === 'kin' && kins.length > 0 && (
-            <div className="space-y-2">
-              <Label className="inline-flex items-center gap-1.5">{t('settings.contacts.linkToKin')} <InfoTip content={t('settings.contacts.linkToKinTip')} /></Label>
-              <KinSelector
-                value={linkedKinId ?? '_none'}
-                onValueChange={(v) => setLinkedKinId(v === '_none' ? null : v)}
-                kins={kins.map((k) => ({ id: k.id, name: k.name, avatarUrl: k.avatarUrl }))}
-                noneLabel={t('settings.contacts.noKinLink')}
-                noneValue="_none"
-                placeholder={t('settings.contacts.selectKin')}
-              />
-            </div>
-          )}
-
           <div className="space-y-2">
-            <Label className="inline-flex items-center gap-1.5">{t('settings.contacts.identifiers')} <InfoTip content={t('settings.contacts.identifiersTip')} /></Label>
+            <Label className="inline-flex items-center gap-1.5">
+              {t('settings.contacts.identifiers')}{' '}
+              <InfoTip content={t('settings.contacts.identifiersTip')} />
+            </Label>
             <div className="space-y-2">
               {identifiers.map((ident, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -352,7 +390,7 @@ export function ContactFormDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isSaving || !canSave}
+            disabled={isSaving || !hasName}
             className="btn-shine"
           >
             {isSaving ? (

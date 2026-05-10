@@ -28,27 +28,33 @@ async function openAddContactDialog(page: Page) {
 async function createContact(
   page: Page,
   opts: {
-    name: string
-    type?: 'kin'
+    firstName?: string
+    lastName?: string
+    nicknames?: string[]
     identifiers?: Array<{ label: string; value: string }>
   },
 ) {
   await openAddContactDialog(page)
 
-  // Fill name
-  const nameInput = page.locator('#contact-name')
-  await nameInput.fill(opts.name)
+  if (opts.firstName) {
+    await page.locator('#contact-first-name').fill(opts.firstName)
+  }
+  if (opts.lastName) {
+    await page.locator('#contact-last-name').fill(opts.lastName)
+  }
 
-  // Change type if needed
-  if (opts.type === 'kin') {
-    await page.locator('#contact-type').click()
-    await page.getByRole('option', { name: /kin/i }).click()
+  if (opts.nicknames?.length) {
+    for (const nick of opts.nicknames) {
+      await page.getByRole('button', { name: /add nickname/i }).click()
+      const inputs = page.getByPlaceholder(/handle.*pseudonym|pseudo.*alias|spitzname|apodo/i)
+      await inputs.last().fill(nick)
+    }
   }
 
   // Add identifiers
   if (opts.identifiers) {
     for (const ident of opts.identifiers) {
-      await page.getByRole('button', { name: /add identifier/i }).click()
+      await page.getByRole('button', { name: /add field|add identifier|añadir campo|feld hinzufügen|ajouter un champ/i }).click()
 
       // The last combobox is the label selector for the new identifier
       const comboboxes = page.getByRole('combobox')
@@ -130,73 +136,68 @@ test.describe.serial('Contact management', () => {
     await openContactsSettings(page)
     await openAddContactDialog(page)
 
-    await expect(page.locator('#contact-name')).toBeVisible()
-    await expect(page.locator('#contact-type')).toBeVisible()
-    await expect(page.getByText('Identifiers', { exact: true })).toBeVisible()
+    await expect(page.locator('#contact-first-name')).toBeVisible()
+    await expect(page.locator('#contact-last-name')).toBeVisible()
+    await expect(page.getByText(/^Nicknames$/i)).toBeVisible()
 
     // Close dialog
     await page.keyboard.press('Escape')
   })
 
-  test('should create a human contact with email identifier', async ({ page }) => {
+  test('should create a contact with first/last name and email field', async ({ page }) => {
     await openContactsSettings(page)
 
     await createContact(page, {
-      name: 'Alice Smith',
+      firstName: 'Alice',
+      lastName: 'Smith',
       identifiers: [{ label: 'email', value: 'alice@example.com' }],
     })
 
-    // Verify contact card appears
     await expect(page.getByText('Alice Smith')).toBeVisible({ timeout: 5_000 })
     await expect(page.getByText('email: alice@example.com')).toBeVisible()
   })
 
-  test('should create a second contact without identifiers', async ({ page }) => {
+  test('should create a second contact with only a nickname', async ({ page }) => {
     await openContactsSettings(page)
 
     await createContact(page, {
-      name: 'Bob Jones',
+      nicknames: ['Bobby'],
     })
 
-    await expect(page.getByText('Bob Jones')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('Bobby')).toBeVisible({ timeout: 5_000 })
     await expect(page.getByText('Alice Smith')).toBeVisible()
   })
 
-  test('should edit a contact name', async ({ page }) => {
+  test('should edit a contact first name', async ({ page }) => {
     await openContactsSettings(page)
     await expect(page.getByText('Alice Smith')).toBeVisible({ timeout: 5_000 })
 
-    // Click pencil icon on Alice's card
     const aliceCard = page.locator('.surface-card', { hasText: 'Alice Smith' }).first()
     await aliceCard.locator('button:has(.lucide-pencil)').first().click()
 
-    // Edit dialog should open
-    await expect(page.getByText('Update contact information')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText(/update contact information/i)).toBeVisible({ timeout: 5_000 })
 
-    // Change name
-    const nameInput = page.locator('#contact-name')
-    await nameInput.clear()
-    await nameInput.fill('Alice Updated')
+    const firstNameInput = page.locator('#contact-first-name')
+    await firstNameInput.clear()
+    await firstNameInput.fill('Alicia')
 
-    // Save
     await page.getByRole('button', { name: /save/i }).click()
 
-    // Verify updated name
-    await expect(page.getByText('Alice Updated')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('Alicia Smith')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('should delete Bob with confirmation', async ({ page }) => {
+  test('should delete Bobby with confirmation', async ({ page }) => {
     await openContactsSettings(page)
-    await expect(page.getByText('Bob Jones')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('Bobby')).toBeVisible({ timeout: 5_000 })
 
-    await deleteContact(page, 'Bob Jones')
+    await deleteContact(page, 'Bobby')
   })
 
-  test('should delete Alice for cleanup', async ({ page }) => {
+  test('should delete Alicia for cleanup', async ({ page }) => {
     await openContactsSettings(page)
-    await expect(page.getByText('Alice Updated')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('Alicia Smith')).toBeVisible({ timeout: 5_000 })
 
-    await deleteContact(page, 'Alice Updated')
+    await deleteContact(page, 'Alicia Smith')
 
     // Test User (from onboarding) should still be visible
     await expect(page.getByText('Test User').first()).toBeVisible({ timeout: 5_000 })

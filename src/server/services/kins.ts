@@ -11,7 +11,6 @@ import {
   compactingSummaries,
   memories,
   messages,
-  contacts,
   contactNotes,
   customTools,
   tasks,
@@ -278,7 +277,6 @@ export async function deleteKin(kinId: string): Promise<boolean> {
   const kinMiniAppIds = db.select({ id: miniApps.id }).from(miniApps).where(eq(miniApps.kinId, kinId)).all().map((a) => a.id)
 
   // Gather cross-kin entities whose FK references will be nullified (for SSE notifications)
-  const affectedContactIds = db.select({ id: contacts.id }).from(contacts).where(eq(contacts.linkedKinId, kinId)).all().map((c) => c.id)
   const affectedCronIds = db.select({ id: crons.id, cronKinId: crons.kinId }).from(crons).where(eq(crons.targetKinId, kinId)).all()
   const affectedMcpServerIds = db.select({ id: mcpServers.id }).from(mcpServers).where(eq(mcpServers.createdByKinId, kinId)).all().map((m) => m.id)
 
@@ -324,7 +322,6 @@ export async function deleteKin(kinId: string): Promise<boolean> {
     stopJob(cronId)
   }
   await db.delete(crons).where(eq(crons.kinId, kinId))
-  await db.update(contacts).set({ linkedKinId: null }).where(eq(contacts.linkedKinId, kinId))
   await db.delete(contactNotes).where(eq(contactNotes.kinId, kinId))
   await db.delete(customTools).where(eq(customTools.kinId, kinId))
   await db.delete(webhooks).where(eq(webhooks.kinId, kinId))
@@ -402,9 +399,6 @@ export async function deleteKin(kinId: string): Promise<boolean> {
   }
 
   // Notify about cross-kin entities whose FK references were nullified
-  for (const contactId of affectedContactIds) {
-    sseManager.broadcast({ type: 'contact:updated', data: { contactId, linkedKinId: null } })
-  }
   for (const cron of affectedCronIds) {
     sseManager.broadcast({ type: 'cron:updated', kinId: cron.cronKinId, data: { cronId: cron.id, kinId: cron.cronKinId, targetKinId: null } })
   }

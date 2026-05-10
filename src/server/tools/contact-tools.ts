@@ -7,16 +7,18 @@ import {
   updateContact,
   deleteContact,
   addContactIdentifier,
+  addContactNickname,
   setContactNote,
   findContactByIdentifier,
 } from '@/server/services/contacts'
 import { createLogger } from '@/server/logger'
+import { getContactDisplayName } from '@/shared/contact-display'
 import type { ToolRegistration } from '@/server/tools/types'
 
 const log = createLogger('tools:contacts')
 
 /**
- * get_contact — retrieve full details of a contact (identifiers + visible notes).
+ * get_contact — retrieve full details of a contact.
  */
 export const getContactTool: ToolRegistration = {
   availability: ['main'],
@@ -24,7 +26,7 @@ export const getContactTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Retrieve full details of a contact including identifiers and notes.',
+        'Retrieve full details of a contact including identifiers, nicknames, and notes.',
       inputSchema: z.object({
         contact_id: z.string(),
       }),
@@ -35,8 +37,10 @@ export const getContactTool: ToolRegistration = {
         }
         return {
           id: contact.id,
-          name: contact.name,
-          type: contact.type,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          displayName: contact.displayName,
+          nicknames: contact.nicknames.map((n) => n.nickname),
           identifiers: contact.identifiers,
           notes: contact.notes.map((n) => ({
             kinId: n.kinId,
@@ -44,7 +48,6 @@ export const getContactTool: ToolRegistration = {
             content: n.content,
           })),
           linkedUserId: contact.linkedUserId,
-          linkedKinId: contact.linkedKinId,
           createdAt: contact.createdAt.toISOString(),
           updatedAt: contact.updatedAt.toISOString(),
         }
@@ -53,7 +56,7 @@ export const getContactTool: ToolRegistration = {
 }
 
 /**
- * search_contacts — search all contacts by name, identifier value, or note content.
+ * search_contacts — search contacts by name, nickname, identifier or note content.
  */
 export const searchContactsTool: ToolRegistration = {
   availability: ['main'],
@@ -61,7 +64,7 @@ export const searchContactsTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Search contacts by name, identifier value, or keywords in notes.',
+        'Search contacts by first/last name, nickname, identifier value, or keywords in notes.',
       inputSchema: z.object({
         query: z.string(),
       }),
@@ -70,8 +73,10 @@ export const searchContactsTool: ToolRegistration = {
         return {
           contacts: results.map((c) => ({
             id: c.id,
-            name: c.name,
-            type: c.type,
+            displayName: c.displayName,
+            firstName: c.firstName,
+            lastName: c.lastName,
+            nicknames: c.nicknames.map((n) => n.nickname),
             identifiers: c.identifiers,
             notes: c.notes.map((n) => ({
               kinId: n.kinId,
@@ -85,54 +90,68 @@ export const searchContactsTool: ToolRegistration = {
 }
 
 /**
- * create_contact — create a new global contact with optional identifiers.
+ * create_contact — create a new global contact with optional nicknames + identifiers.
  */
 export const createContactTool: ToolRegistration = {
   availability: ['main'],
   create: (ctx) =>
     tool({
       description:
-        'Create a new contact in the shared registry. All Kins will see this contact.',
+        'Create a new contact in the shared registry. All Kins will see this contact. ' +
+        'At least one of firstName, lastName, or a nickname must be provided.',
       inputSchema: z.object({
-        name: z.string(),
-        type: z.enum(['human', 'kin']),
+        firstName: z.string().optional().describe('Given name'),
+        lastName: z.string().optional().describe('Family name'),
+        nicknames: z
+          .array(z.string())
+          .optional()
+          .describe('Alternative names / handles / pseudonyms the contact goes by'),
         identifiers: z
           .array(
             z.object({
-              label: z.string().describe('e.g. "email", "phone", "WhatsApp", "Discord"'),
+              label: z.string().describe('e.g. "email", "phone", "WhatsApp", "Twitter"'),
               value: z.string(),
             }),
           )
           .optional(),
       }),
-      execute: async ({ name, type, identifiers }) => {
-        log.debug({ kinId: ctx.kinId, contactName: name, contactType: type }, 'Contact creation requested')
-        const result = await createContact({ name, type, identifiers })
+      execute: async ({ firstName, lastName, nicknames, identifiers }) => {
+        log.debug({ kinId: ctx.kinId, firstName, lastName }, 'Contact creation requested')
+        const result = await createContact({ firstName, lastName, nicknames, identifiers })
         if ('error' in result) {
           return { error: `User is already linked to contact "${result.linkedContactName}"` }
         }
         return {
           id: result.id,
-          name: result.name,
-          type: result.type,
+          firstName: result.firstName,
+          lastName: result.lastName,
+          displayName: getContactDisplayName({
+            firstName: result.firstName,
+            lastName: result.lastName,
+            nicknames,
+          }),
         }
       },
     }),
 }
 
 /**
- * update_contact — update basic info and/or add identifiers (additive).
+ * update_contact — update names and/or add nicknames + identifiers (additive).
  */
 export const updateContactTool: ToolRegistration = {
   availability: ['main'],
   create: (ctx) =>
     tool({
       description:
-        'Update a contact\'s name/type and/or add identifiers. Identifiers are additive only.',
+        "Update a contact's first/last name and/or append nicknames and identifiers. Nicknames and identifiers are additive only.",
       inputSchema: z.object({
         contact_id: z.string(),
-        name: z.string().optional(),
-        type: z.enum(['human', 'kin']).optional(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        nicknames: z
+          .array(z.string())
+          .optional()
+          .describe('Nicknames to append (existing nicknames are preserved)'),
         identifiers: z
           .array(
             z.object({
@@ -142,15 +161,20 @@ export const updateContactTool: ToolRegistration = {
           )
           .optional(),
       }),
-      execute: async ({ contact_id, name, type, identifiers }) => {
-        const updated = await updateContact(contact_id, { name, type })
+      execute: async ({ contact_id, firstName, lastName, nicknames, identifiers }) => {
+        const updated = await updateContact(contact_id, { firstName, lastName })
         if (!updated) {
           return { error: 'Contact not found' }
         }
         if ('error' in updated) {
           return { error: `Cannot update: user is already linked to contact "${updated.linkedContactName}"` }
         }
-        // Add identifiers
+        if (nicknames?.length) {
+          for (const nick of nicknames) {
+            const trimmed = nick.trim()
+            if (trimmed) addContactNickname(contact_id, trimmed)
+          }
+        }
         if (identifiers?.length) {
           for (const ident of identifiers) {
             addContactIdentifier(contact_id, ident.label, ident.value)
@@ -158,22 +182,26 @@ export const updateContactTool: ToolRegistration = {
         }
         return {
           id: updated.id,
-          name: updated.name,
-          type: updated.type,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          displayName: getContactDisplayName({
+            firstName: updated.firstName,
+            lastName: updated.lastName,
+          }),
         }
       },
     }),
 }
 
 /**
- * delete_contact — permanently delete a contact and all its identifiers and notes.
+ * delete_contact — permanently delete a contact and all its identifiers, nicknames and notes.
  */
 export const deleteContactTool: ToolRegistration = {
   availability: ['main'],
   create: (ctx) =>
     tool({
       description:
-        'Permanently delete a contact and all its identifiers and notes. Only use when explicitly asked.',
+        'Permanently delete a contact and all its identifiers, nicknames and notes. Only use when explicitly asked.',
       inputSchema: z.object({
         contact_id: z.string(),
       }),
@@ -216,7 +244,6 @@ export const setContactNoteTool: ToolRegistration = {
 
 /**
  * find_contact_by_identifier — look up a contact by identifier label and value.
- * Key tool for cross-channel identification.
  */
 export const findContactByIdentifierTool: ToolRegistration = {
   availability: ['main'],
@@ -237,8 +264,12 @@ export const findContactByIdentifierTool: ToolRegistration = {
         return {
           found: true,
           id: contact.id,
-          name: contact.name,
-          type: contact.type,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          displayName: getContactDisplayName({
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+          }),
         }
       },
     }),

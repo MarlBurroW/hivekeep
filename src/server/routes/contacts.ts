@@ -10,6 +10,10 @@ import {
   updateContactIdentifier,
   removeContactIdentifier,
   replaceContactIdentifiers,
+  addContactNickname,
+  updateContactNickname,
+  removeContactNickname,
+  replaceContactNicknames,
   setContactNote,
   updateContactNote,
   deleteContactNote,
@@ -40,47 +44,73 @@ contactRoutes.get('/:id', async (c) => {
   return c.json({ contact })
 })
 
+const NAME_FIELD_MAX = 100
+
+function validateNameField(value: unknown, field: string) {
+  if (value === undefined || value === null) return { ok: true as const, value: null }
+  if (typeof value !== 'string') {
+    return { ok: false as const, message: `${field} must be a string` }
+  }
+  const trimmed = value.trim()
+  if (trimmed.length > NAME_FIELD_MAX) {
+    return { ok: false as const, message: `${field} must be ${NAME_FIELD_MAX} characters or less` }
+  }
+  return { ok: true as const, value: trimmed || null }
+}
+
 // POST /api/contacts — create a new contact
 contactRoutes.post('/', async (c) => {
-  const { name, type, linkedUserId, linkedKinId, identifiers } = (await c.req.json()) as {
-    name: string
-    type: string
+  const { firstName, lastName, nicknames, linkedUserId, identifiers } = (await c.req.json()) as {
+    firstName?: string | null
+    lastName?: string | null
+    nicknames?: string[]
     linkedUserId?: string
-    linkedKinId?: string
     identifiers?: Array<{ label: string; value: string }>
   }
 
-  const trimmedName = name?.trim()
+  const firstCheck = validateNameField(firstName, 'firstName')
+  if (!firstCheck.ok) {
+    return c.json({ error: { code: 'INVALID_INPUT', message: firstCheck.message } }, 400)
+  }
+  const lastCheck = validateNameField(lastName, 'lastName')
+  if (!lastCheck.ok) {
+    return c.json({ error: { code: 'INVALID_INPUT', message: lastCheck.message } }, 400)
+  }
 
-  if (!trimmedName || !type) {
+  const cleanNicknames = Array.isArray(nicknames)
+    ? nicknames.map((n) => (typeof n === 'string' ? n.trim() : '')).filter((n) => n.length > 0)
+    : []
+
+  for (const nick of cleanNicknames) {
+    if (nick.length > NAME_FIELD_MAX) {
+      return c.json(
+        { error: { code: 'INVALID_INPUT', message: `Nickname must be ${NAME_FIELD_MAX} characters or less` } },
+        400,
+      )
+    }
+  }
+
+  if (!firstCheck.value && !lastCheck.value && cleanNicknames.length === 0) {
     return c.json(
-      { error: { code: 'INVALID_INPUT', message: 'Name and type are required' } },
+      { error: { code: 'INVALID_INPUT', message: 'At least one of firstName, lastName, or a nickname is required' } },
       400,
     )
   }
 
-  if (trimmedName.length > 200) {
-    return c.json(
-      { error: { code: 'INVALID_INPUT', message: 'Name must be 200 characters or less' } },
-      400,
-    )
-  }
-
-  if (type !== 'human' && type !== 'kin') {
-    return c.json(
-      { error: { code: 'INVALID_INPUT', message: 'Type must be "human" or "kin"' } },
-      400,
-    )
-  }
-
-  const result = await createContact({ name: trimmedName, type, linkedUserId, linkedKinId, identifiers })
+  const result = await createContact({
+    firstName: firstCheck.value,
+    lastName: lastCheck.value,
+    nicknames: cleanNicknames,
+    linkedUserId,
+    identifiers,
+  })
   if ('error' in result) {
     return c.json(
       { error: { code: 'USER_ALREADY_LINKED', message: `This user is already linked to contact "${result.linkedContactName}"` } },
       409,
     )
   }
-  log.info({ contactId: result.id, name }, 'Contact created')
+  log.info({ contactId: result.id }, 'Contact created')
   return c.json({ contact: result }, 201)
 })
 
@@ -88,24 +118,34 @@ contactRoutes.post('/', async (c) => {
 contactRoutes.patch('/:id', async (c) => {
   const id = c.req.param('id')
   const body = (await c.req.json()) as {
-    name?: string
-    type?: 'human' | 'kin'
+    firstName?: string | null
+    lastName?: string | null
     linkedUserId?: string | null
-    linkedKinId?: string | null
   }
 
-  if (body.name !== undefined) {
-    const trimmed = body.name.trim()
-    if (!trimmed) {
-      return c.json({ error: { code: 'INVALID_INPUT', message: 'Name cannot be empty' } }, 400)
+  const updates: { firstName?: string | null; lastName?: string | null; linkedUserId?: string | null } = {}
+
+  if (body.firstName !== undefined) {
+    const check = validateNameField(body.firstName, 'firstName')
+    if (!check.ok) {
+      return c.json({ error: { code: 'INVALID_INPUT', message: check.message } }, 400)
     }
-    if (trimmed.length > 200) {
-      return c.json({ error: { code: 'INVALID_INPUT', message: 'Name must be 200 characters or less' } }, 400)
-    }
-    body.name = trimmed
+    updates.firstName = check.value
   }
 
-  const result = await updateContact(id, body)
+  if (body.lastName !== undefined) {
+    const check = validateNameField(body.lastName, 'lastName')
+    if (!check.ok) {
+      return c.json({ error: { code: 'INVALID_INPUT', message: check.message } }, 400)
+    }
+    updates.lastName = check.value
+  }
+
+  if (body.linkedUserId !== undefined) {
+    updates.linkedUserId = body.linkedUserId
+  }
+
+  const result = await updateContact(id, updates)
   if (!result) {
     return c.json({ error: { code: 'CONTACT_NOT_FOUND', message: 'Contact not found' } }, 404)
   }
@@ -116,7 +156,7 @@ contactRoutes.patch('/:id', async (c) => {
   return c.json({ contact: result })
 })
 
-// DELETE /api/contacts/:id — delete a contact (cascades identifiers + notes)
+// DELETE /api/contacts/:id — delete a contact (cascades identifiers + nicknames + notes)
 contactRoutes.delete('/:id', async (c) => {
   const id = c.req.param('id')
 
@@ -126,6 +166,103 @@ contactRoutes.delete('/:id', async (c) => {
   }
 
   log.info({ contactId: id }, 'Contact deleted')
+  return c.json({ success: true })
+})
+
+// ─── Nicknames ───────────────────────────────────────────────────────────────
+
+// PUT /api/contacts/:id/nicknames — atomically replace all nicknames
+contactRoutes.put('/:id/nicknames', async (c) => {
+  const contactId = c.req.param('id')
+  const { nicknames } = (await c.req.json()) as { nicknames: string[] }
+
+  if (!Array.isArray(nicknames)) {
+    return c.json(
+      { error: { code: 'INVALID_INPUT', message: 'nicknames must be an array' } },
+      400,
+    )
+  }
+
+  const cleaned: string[] = []
+  for (const raw of nicknames) {
+    if (typeof raw !== 'string') {
+      return c.json(
+        { error: { code: 'INVALID_INPUT', message: 'Each nickname must be a string' } },
+        400,
+      )
+    }
+    const trimmed = raw.trim()
+    if (!trimmed) continue
+    if (trimmed.length > NAME_FIELD_MAX) {
+      return c.json(
+        { error: { code: 'INVALID_INPUT', message: `Nickname must be ${NAME_FIELD_MAX} characters or less` } },
+        400,
+      )
+    }
+    cleaned.push(trimmed)
+  }
+
+  const result = replaceContactNicknames(contactId, cleaned)
+  if (result === null) {
+    return c.json({ error: { code: 'CONTACT_NOT_FOUND', message: 'Contact not found' } }, 404)
+  }
+
+  return c.json({ nicknames: result })
+})
+
+// POST /api/contacts/:id/nicknames — add a nickname
+contactRoutes.post('/:id/nicknames', async (c) => {
+  const contactId = c.req.param('id')
+  const { nickname } = (await c.req.json()) as { nickname: string }
+  const trimmed = nickname?.trim()
+
+  if (!trimmed) {
+    return c.json(
+      { error: { code: 'INVALID_INPUT', message: 'Nickname is required' } },
+      400,
+    )
+  }
+  if (trimmed.length > NAME_FIELD_MAX) {
+    return c.json(
+      { error: { code: 'INVALID_INPUT', message: `Nickname must be ${NAME_FIELD_MAX} characters or less` } },
+      400,
+    )
+  }
+
+  const added = addContactNickname(contactId, trimmed)
+  return c.json({ nickname: added }, 201)
+})
+
+// PATCH /api/contacts/:id/nicknames/:nickId — update a nickname
+contactRoutes.patch('/:id/nicknames/:nickId', async (c) => {
+  const contactId = c.req.param('id')
+  const nickId = c.req.param('nickId')
+  const { nickname } = (await c.req.json()) as { nickname: string }
+  const trimmed = nickname?.trim()
+
+  if (!trimmed) {
+    return c.json({ error: { code: 'INVALID_INPUT', message: 'Nickname cannot be empty' } }, 400)
+  }
+  if (trimmed.length > NAME_FIELD_MAX) {
+    return c.json({ error: { code: 'INVALID_INPUT', message: `Nickname must be ${NAME_FIELD_MAX} characters or less` } }, 400)
+  }
+
+  const updated = updateContactNickname(nickId, trimmed, contactId)
+  if (!updated) {
+    return c.json({ error: { code: 'NICKNAME_NOT_FOUND', message: 'Nickname not found' } }, 404)
+  }
+  return c.json({ nickname: updated })
+})
+
+// DELETE /api/contacts/:id/nicknames/:nickId — remove a nickname
+contactRoutes.delete('/:id/nicknames/:nickId', async (c) => {
+  const contactId = c.req.param('id')
+  const nickId = c.req.param('nickId')
+
+  const removed = removeContactNickname(nickId, contactId)
+  if (!removed) {
+    return c.json({ error: { code: 'NICKNAME_NOT_FOUND', message: 'Nickname not found' } }, 404)
+  }
   return c.json({ success: true })
 })
 
@@ -145,7 +282,6 @@ contactRoutes.put('/:id/identifiers', async (c) => {
     )
   }
 
-  // Validate each identifier
   for (const ident of identifiers) {
     const trimmedLabel = ident.label?.trim()
     const trimmedValue = ident.value?.trim()
@@ -293,7 +429,6 @@ contactRoutes.post('/:id/platform-ids', async (c) => {
     )
   }
 
-  // Verify the contact exists before inserting
   const contact = await getContact(contactId)
   if (!contact) {
     return c.json(

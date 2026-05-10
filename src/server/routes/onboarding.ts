@@ -162,8 +162,9 @@ onboardingRoutes.post('/profile', async (c) => {
   if (!existingContact) {
     const userEmail = session.user.email
     const result = await createContact({
-      name: `${trimmedFirstName} ${trimmedLastName}`,
-      type: 'human',
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      nicknames: trimmedPseudonym ? [trimmedPseudonym] : undefined,
       linkedUserId: userId,
       identifiers: userEmail ? [{ label: 'email', value: userEmail }] : undefined,
     })

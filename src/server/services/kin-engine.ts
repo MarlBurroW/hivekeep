@@ -16,6 +16,7 @@ import {
   queueItems,
 } from '@/server/db/schema'
 import { guessProviderType } from '@/shared/model-ref'
+import { getContactDisplayName } from '@/shared/contact-display'
 import { decrypt } from '@/server/services/encryption'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
 import {
@@ -1200,10 +1201,15 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
           if (!currentSpeaker) {
             const channelContact = findContactByPlatformId(ch.platform, meta.platformUserId)
             if (channelContact) {
-              const senderName = currentMessageSource.senderName ?? channelContact.name
+              const contactDisplay = getContactDisplayName({
+                firstName: channelContact.firstName,
+                lastName: channelContact.lastName,
+              })
+              const senderName = currentMessageSource.senderName
+                ?? (contactDisplay !== 'Unnamed contact' ? contactDisplay : 'Unknown')
               const speakerData = {
-                firstName: null as string | null,
-                lastName: null as string | null,
+                firstName: channelContact.firstName,
+                lastName: channelContact.lastName,
                 pseudonym: senderName,
                 role: 'external',
               }

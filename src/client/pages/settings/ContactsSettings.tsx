@@ -26,7 +26,10 @@ export function ContactsSettings() {
   const filteredContacts = contacts.filter((contact) => {
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase()
-    if (contact.name.toLowerCase().includes(q)) return true
+    if (contact.displayName.toLowerCase().includes(q)) return true
+    if (contact.firstName?.toLowerCase().includes(q)) return true
+    if (contact.lastName?.toLowerCase().includes(q)) return true
+    if (contact.nicknames?.some((n) => n.nickname.toLowerCase().includes(q))) return true
     if (contact.identifiers?.some((id) => id.value.toLowerCase().includes(q) || id.label.toLowerCase().includes(q))) return true
     if (contact.platformIds?.some((p) => p.platform.toLowerCase().includes(q) || p.platformId.toLowerCase().includes(q))) return true
     if (contact.notes?.some((n) => n.content.toLowerCase().includes(q))) return true

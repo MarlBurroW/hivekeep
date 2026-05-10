@@ -1,5 +1,6 @@
 import { describe, it, expect, mock, beforeEach } from 'bun:test'
 import { fullMockSchema, fullMockDrizzleOrm, fullMockDbIndex } from '../../test-helpers'
+import { getContactDisplayName } from '@/shared/contact-display'
 
 // ─── Re-implement private helpers from contacts.ts for isolated testing ─────
 // These mirror the exact logic in the source. No DB mocking needed.
@@ -81,24 +82,26 @@ describe('contacts service — data contracts', () => {
     it('should include all required fields', () => {
       const contact = {
         id: 'c1',
-        name: 'Test User',
-        type: 'human',
+        firstName: 'Test',
+        lastName: 'User',
+        displayName: 'Test User',
         linkedUserId: null,
-        linkedKinId: null,
         linkedUserName: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        nicknames: [],
         identifiers: [],
         notes: [],
         platformIds: [],
       }
 
       expect(contact).toHaveProperty('id')
-      expect(contact).toHaveProperty('name')
-      expect(contact).toHaveProperty('type')
+      expect(contact).toHaveProperty('firstName')
+      expect(contact).toHaveProperty('lastName')
+      expect(contact).toHaveProperty('displayName')
       expect(contact).toHaveProperty('linkedUserId')
-      expect(contact).toHaveProperty('linkedKinId')
       expect(contact).toHaveProperty('linkedUserName')
+      expect(contact).toHaveProperty('nicknames')
       expect(contact).toHaveProperty('identifiers')
       expect(contact).toHaveProperty('notes')
       expect(contact).toHaveProperty('platformIds')
@@ -147,33 +150,28 @@ describe('contacts service — data contracts', () => {
     it('has required fields for prompt context', () => {
       const summary = {
         id: 'c1',
-        name: 'Alice',
-        type: 'human',
-        linkedKinSlug: null,
+        displayName: 'Alice Dupont',
+        firstName: 'Alice',
+        lastName: 'Dupont',
+        nicknames: ['ali'],
         linkedUserName: 'alice',
         identifierSummary: 'email, phone',
       }
       expect(summary.id).toBeTruthy()
-      expect(summary.name).toBeTruthy()
-      expect(['human', 'kin']).toContain(summary.type)
+      expect(summary.displayName).toBeTruthy()
+      expect(Array.isArray(summary.nicknames)).toBe(true)
     })
 
     it('identifierSummary can be undefined when no identifiers', () => {
       const summary = {
         id: 'c1',
-        name: 'Bob',
-        type: 'kin',
+        displayName: 'Bob',
+        firstName: 'Bob',
+        lastName: null,
+        nicknames: [],
         identifierSummary: undefined,
       }
       expect(summary.identifierSummary).toBeUndefined()
-    })
-  })
-
-  describe('contact type values', () => {
-    it('type must be human or kin', () => {
-      const validTypes = ['human', 'kin']
-      expect(validTypes).toContain('human')
-      expect(validTypes).toContain('kin')
     })
   })
 
@@ -210,20 +208,20 @@ describe('contacts service — data contracts', () => {
   describe('duplicate user link prevention', () => {
     it('detects when a user is already linked to a contact', () => {
       const existingContacts = [
-        { id: 'c1', name: 'Alice', linkedUserId: 'user-1' },
-        { id: 'c2', name: 'Bob', linkedUserId: 'user-2' },
-        { id: 'c3', name: 'Charlie', linkedUserId: null },
+        { id: 'c1', firstName: 'Alice', lastName: null, linkedUserId: 'user-1' },
+        { id: 'c2', firstName: 'Bob', lastName: null, linkedUserId: 'user-2' },
+        { id: 'c3', firstName: 'Charlie', lastName: null, linkedUserId: null },
       ]
 
       const newLinkedUserId = 'user-1'
       const existing = existingContacts.find((c) => c.linkedUserId === newLinkedUserId)
       expect(existing).toBeDefined()
-      expect(existing!.name).toBe('Alice')
+      expect(existing!.firstName).toBe('Alice')
     })
 
     it('allows linking when user is not yet linked', () => {
       const existingContacts = [
-        { id: 'c1', name: 'Alice', linkedUserId: 'user-1' },
+        { id: 'c1', firstName: 'Alice', lastName: null, linkedUserId: 'user-1' },
       ]
 
       const newLinkedUserId = 'user-99'
@@ -308,6 +306,40 @@ describe('contacts service — data contracts', () => {
       const converted = new Date(raw.createdAt).getTime()
       expect(converted).toBe(1700000000000)
       expect(typeof converted).toBe('number')
+    })
+  })
+
+  describe('getContactDisplayName', () => {
+    it('joins firstName and lastName when both present', () => {
+      expect(getContactDisplayName({ firstName: 'Alice', lastName: 'Dupont' })).toBe('Alice Dupont')
+    })
+
+    it('returns firstName alone when lastName is missing', () => {
+      expect(getContactDisplayName({ firstName: 'Alice', lastName: null })).toBe('Alice')
+    })
+
+    it('returns lastName alone when firstName is missing', () => {
+      expect(getContactDisplayName({ firstName: null, lastName: 'Dupont' })).toBe('Dupont')
+    })
+
+    it('falls back to first nickname (string form) when names absent', () => {
+      expect(getContactDisplayName({ firstName: null, lastName: null, nicknames: ['lily', 'ali'] })).toBe('lily')
+    })
+
+    it('falls back to first nickname (object form) when names absent', () => {
+      expect(getContactDisplayName({
+        firstName: null,
+        lastName: null,
+        nicknames: [{ nickname: 'lily' }],
+      })).toBe('lily')
+    })
+
+    it('returns Unnamed contact when nothing is provided', () => {
+      expect(getContactDisplayName({ firstName: null, lastName: null })).toBe('Unnamed contact')
+    })
+
+    it('trims whitespace-only names', () => {
+      expect(getContactDisplayName({ firstName: '   ', lastName: null, nicknames: ['ali'] })).toBe('ali')
     })
   })
 })

@@ -2,7 +2,7 @@ import { eq, and, desc, count } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
-import { channels, channelUserMappings, channelMessageLinks, contactPlatformIds, kins, contacts } from '@/server/db/schema'
+import { channels, channelUserMappings, channelMessageLinks, contactPlatformIds, contactNicknames, kins, contacts } from '@/server/db/schema'
 import { enqueueMessage } from '@/server/services/queue'
 import { downloadChannelAttachments } from '@/server/services/files'
 import { createSecret, deleteSecret, getSecretValue, getSecretByKey } from '@/server/services/vault'
@@ -10,6 +10,7 @@ import { createContact } from '@/server/services/contacts'
 import { channelAdapters } from '@/server/channels/index'
 import { sseManager } from '@/server/sse/index'
 import { config } from '@/server/config'
+import { getContactDisplayName } from '@/shared/contact-display'
 import type { IncomingMessage, OutboundAttachment } from '@/server/channels/adapter'
 import type { ChannelPlatform, ChannelStatus } from '@/shared/types'
 
@@ -322,7 +323,27 @@ export async function handleIncomingChannelMessage(channelId: string, incoming: 
 
   // Resolve contact via contactPlatformIds or create pending mapping
   const { contact, pendingMappingId } = await resolveChannelContact(channel, incoming)
-  const senderName = contact?.name ?? incoming.platformDisplayName ?? incoming.platformUsername ?? 'Unknown'
+  let contactDisplayName: string | null = null
+  if (contact) {
+    // If firstName/lastName both missing, look up the first nickname as fallback
+    let firstNickname: string | undefined
+    if (!contact.firstName && !contact.lastName) {
+      const nick = db
+        .select({ nickname: contactNicknames.nickname })
+        .from(contactNicknames)
+        .where(eq(contactNicknames.contactId, contact.id))
+        .limit(1)
+        .get()
+      firstNickname = nick?.nickname
+    }
+    const name = getContactDisplayName({
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      nicknames: firstNickname ? [firstNickname] : undefined,
+    })
+    contactDisplayName = name === 'Unnamed contact' ? null : name
+  }
+  const senderName = contactDisplayName ?? incoming.platformDisplayName ?? incoming.platformUsername ?? 'Unknown'
 
   // ─── Approval gate ────────────────────────────────────────────────────────
   if (pendingMappingId) {
@@ -694,15 +715,18 @@ export async function approveChannelUser(mappingId: string, params: ApproveParam
   let contactId: string
 
   if (params.action === 'create') {
-    // Create a new contact with the platform ID pre-filled
-    const displayName = params.name ?? mapping.platformDisplayName ?? mapping.platformUsername ?? `${channel.platform}:${mapping.platformUserId}`
-    const result = await createContact({
-      name: displayName,
-      type: 'human',
-    })
+    // Create a new contact with the platform ID pre-filled.
+    // Use the user-provided name as firstName, falling back to platform metadata as a nickname.
+    const rawName = params.name?.trim()
+    const fallbackNick = mapping.platformDisplayName ?? mapping.platformUsername ?? `${channel.platform}:${mapping.platformUserId}`
+    const result = await createContact(
+      rawName
+        ? { firstName: rawName }
+        : { nicknames: [fallbackNick] },
+    )
     if ('error' in result) throw new Error(`User already linked to "${result.linkedContactName}"`)
     contactId = result.id
-    log.info({ mappingId, contactId, displayName }, 'Created contact on approval')
+    log.info({ mappingId, contactId, firstName: rawName ?? null }, 'Created contact on approval')
   } else {
     // Link to an existing contact — verify it exists
     const existing = await db.select().from(contacts).where(eq(contacts.id, params.contactId)).get()
@@ -851,7 +875,8 @@ export async function listChannelConversations(channelId: string) {
     .select({
       platformId: contactPlatformIds.platformId,
       contactId: contactPlatformIds.contactId,
-      contactName: contacts.name,
+      firstName: contacts.firstName,
+      lastName: contacts.lastName,
     })
     .from(contactPlatformIds)
     .innerJoin(contacts, eq(contactPlatformIds.contactId, contacts.id))
@@ -886,7 +911,7 @@ export async function listChannelConversations(channelId: string) {
       platformUserId: u.platformId,
       chatId: u.platformId, // For Telegram DMs, chatId = userId
       username: null as string | null,
-      displayName: u.contactName,
+      displayName: getContactDisplayName({ firstName: u.firstName, lastName: u.lastName }),
     })),
     ...pendingUsers.map((m) => ({
       platformUserId: m.platformUserId,

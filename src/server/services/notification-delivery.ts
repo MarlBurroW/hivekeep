@@ -5,6 +5,7 @@ import { notificationChannels, channels, kins, contacts, contactPlatformIds } fr
 import { channelAdapters } from '@/server/channels/index'
 import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
+import { getContactDisplayName } from '@/shared/contact-display'
 import type { NotificationType, NotificationChannelSummary, AvailableNotificationChannel, ContactForNotification } from '@/shared/types'
 
 const log = createLogger('notification-delivery')
@@ -351,7 +352,8 @@ export async function listContactsForPlatform(platform: string): Promise<Contact
   const rows = await db
     .select({
       contactId: contacts.id,
-      contactName: contacts.name,
+      firstName: contacts.firstName,
+      lastName: contacts.lastName,
       platformId: contactPlatformIds.platformId,
     })
     .from(contactPlatformIds)
@@ -362,5 +364,9 @@ export async function listContactsForPlatform(platform: string): Promise<Contact
     ))
     .all()
 
-  return rows
+  return rows.map((r) => ({
+    contactId: r.contactId,
+    contactName: getContactDisplayName({ firstName: r.firstName, lastName: r.lastName }),
+    platformId: r.platformId,
+  }))
 }

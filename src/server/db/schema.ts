@@ -191,13 +191,22 @@ export const memories = sqliteTable('memories', {
 
 export const contacts = sqliteTable('contacts', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  type: text('type').notNull(), // 'human' | 'kin'
+  firstName: text('first_name'),
+  lastName: text('last_name'),
   linkedUserId: text('linked_user_id').references(() => user.id),
-  linkedKinId: text('linked_kin_id').references(() => kins.id),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
+
+export const contactNicknames = sqliteTable('contact_nicknames', {
+  id: text('id').primaryKey(),
+  contactId: text('contact_id').notNull().references(() => contacts.id, { onDelete: 'cascade' }),
+  nickname: text('nickname').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('idx_contact_nicknames_contact').on(table.contactId),
+])
 
 export const contactIdentifiers = sqliteTable('contact_identifiers', {
   id: text('id').primaryKey(),
