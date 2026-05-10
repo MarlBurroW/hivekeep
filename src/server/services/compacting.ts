@@ -241,13 +241,7 @@ export async function runCompacting(
 
   const effectiveConfig = await getEffectiveCompactingConfig(kinId)
   const ctxWindow = contextWindow ?? getModelContextWindow(kin.model)
-  // When the user explicitly clicks force-compact, halve the keep budget so
-  // we summarize more aggressively. Without this, the user gets "nothing to
-  // compact" anytime recent messages already fit the regular keep window —
-  // even though they wanted relief from a bloated context.
-  const keepPercent = options?.aggressive
-    ? Math.max(5, effectiveConfig.keepPercent / 2)
-    : effectiveConfig.keepPercent
+  const keepPercent = effectiveConfig.keepPercent
 
   // Get the latest summary to determine the cutoff point
   const activeSummaries = await getActiveSummaries(kinId)
@@ -266,7 +260,22 @@ export async function runCompacting(
   // empty, every message fits in the keep window, messagesToSummarize ends
   // up empty, and runCompacting silently returns null every time. The Kin
   // then accumulates context unboundedly until the main turn itself crashes.
-  const keepBudget = Math.floor((keepPercent / 100) * ctxWindow)
+  // Two budget modes:
+  //  - regular: keepPercent of ctxWindow (e.g. 25% of 1M = 250k)
+  //  - aggressive (force-compact): min(regular, half of CURRENT non-compacted
+  //    total). Halving relative to current-state guarantees the algo always
+  //    finds something to summarize when the user explicitly asks, even when
+  //    the recent tail already fits the regular budget. Without the relative
+  //    cap, a Kin sitting at 90k of messages with 250k budget got "nothing to
+  //    compact" forever despite the user wanting more relief.
+  const totalNonCompactedTokens = nonCompacted.reduce(
+    (sum, m) => sum + estimateTokens(m.content ?? '') + estimateTokens((m.toolCalls as string | null) ?? ''),
+    0,
+  )
+  const regularBudget = Math.floor((keepPercent / 100) * ctxWindow)
+  const keepBudget = options?.aggressive
+    ? Math.min(regularBudget, Math.floor(totalNonCompactedTokens / 2))
+    : regularBudget
   let keepTokens = 0
   let keepStartIndex = nonCompacted.length
   for (let i = nonCompacted.length - 1; i >= 0; i--) {
