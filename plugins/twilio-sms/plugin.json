@@ -1,0 +1,42 @@
+{
+  "name": "twilio-sms",
+  "version": "0.1.0",
+  "description": "Send and receive SMS via the Twilio REST API and webhooks. Adds a 'twilio-sms' channel adapter (outbound via Twilio Messages API, inbound via signed Twilio webhooks).",
+  "author": "KinBot",
+  "license": "AGPL-3.0",
+  "main": "index.ts",
+  "icon": "✉️",
+  "kinbot": ">=0.40.0",
+  "tags": ["twilio", "sms", "channel", "webhook"],
+  "channels": {
+    "twilio-sms": {
+      "configSchema": {
+        "fields": [
+          {
+            "name": "accountSid",
+            "label": "Account SID",
+            "type": "text",
+            "required": true,
+            "placeholder": "AC...",
+            "description": "Your Twilio Account SID (starts with AC, visible on the Twilio Console dashboard)."
+          },
+          {
+            "name": "authToken",
+            "label": "Auth Token",
+            "type": "password",
+            "required": true,
+            "description": "Your Twilio Auth Token. Used both for the REST API and to verify inbound webhook signatures."
+          },
+          {
+            "name": "fromNumber",
+            "label": "From Number",
+            "type": "text",
+            "required": true,
+            "placeholder": "+15551234567",
+            "description": "The Twilio phone number that sends SMS. Must be E.164 format with a leading +."
+          }
+        ]
+      }
+    }
+  }
+}
