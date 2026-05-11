@@ -240,10 +240,28 @@ const slackConfigSchema: ChannelConfigSchema = {
   ],
 }
 
+// Per-channel identity overrides for Slack. Slack has no global "set bot
+// identity" endpoint, but chat.postMessage accepts a per-message username
+// and icon_url. We stash the latest identity here keyed by channelId and
+// read it on every outbound to inject those fields. Lost on restart, which
+// is fine: after a restart, the identity reverts to the bot's default Slack
+// app config until the next transfer_channel call.
+interface SlackIdentityOverride {
+  username: string
+  iconUrl?: string
+}
+const slackIdentityOverrides = new Map<string, SlackIdentityOverride>()
+
 export class SlackAdapter implements ChannelAdapter {
   readonly platform = 'slack'
   readonly meta: ChannelAdapterMeta = { displayName: 'Slack', brandColor: '#4A154B' }
   readonly configSchema = slackConfigSchema
+  // Slack has no global identity endpoint; we encode the identity per-message
+  // via chat.postMessage's username + icon_url fields. onIdentityChange just
+  // updates the per-channel override map. Mode is 'native' because there is
+  // no global flip we could do, and the per-message override is the proper
+  // platform-supported path (the prefix fallback would be redundant).
+  readonly identitySwitchMode = 'native' as const
 
   async start(channelId: string, cfg: Record<string, unknown>, onMessage: IncomingMessageHandler): Promise<void> {
     const token = await resolveToken(cfg)
@@ -280,6 +298,12 @@ export class SlackAdapter implements ChannelAdapter {
     params: OutboundMessageParams,
   ): Promise<{ platformMessageId: string }> {
     const token = await resolveToken(cfg)
+
+    // Identity override: when transfer_channel flipped the bound Kin, we
+    // surface the new identity here on each chat.postMessage. Slack files
+    // uploads do not accept username/icon_url, so attachment-only messages
+    // still appear under the bot app's default identity (documented).
+    const identity = slackIdentityOverrides.get(_channelId)
 
     let lastMessageTs = ''
 
@@ -330,6 +354,12 @@ export class SlackAdapter implements ChannelAdapter {
           body.thread_ts = params.replyToMessageId
         }
 
+        // Apply per-channel identity override when set (post-transfer).
+        if (identity) {
+          body.username = identity.username
+          if (identity.iconUrl) body.icon_url = identity.iconUrl
+        }
+
         const result = await slackApi(token, 'chat.postMessage', body)
         lastMessageTs = result.ts as string
       }
@@ -377,5 +407,21 @@ export class SlackAdapter implements ChannelAdapter {
     // Slack doesn't have a direct "typing" API for bots.
     // Bot typing indicators are not supported via the Web API.
     // This is a no-op.
+  }
+
+  async onIdentityChange(
+    channelId: string,
+    _cfg: Record<string, unknown>,
+    newIdentity: { kinSlug: string; kinName: string; avatarUrl?: string },
+  ): Promise<void> {
+    // No Slack API call: Slack only supports per-message identity via the
+    // chat.postMessage `username` + `icon_url` fields. We stash the override
+    // here and sendMessage injects it on every outbound (text messages only;
+    // files.upload does not accept those fields, see sendMessage comments).
+    slackIdentityOverrides.set(channelId, {
+      username: newIdentity.kinName,
+      iconUrl: newIdentity.avatarUrl,
+    })
+    log.info({ channelId, kinSlug: newIdentity.kinSlug }, 'Slack identity override updated for channel')
   }
 }

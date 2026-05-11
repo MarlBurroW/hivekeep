@@ -102,6 +102,13 @@ export class TelegramAdapter implements ChannelAdapter {
   readonly platform = 'telegram'
   readonly meta: ChannelAdapterMeta = { displayName: 'Telegram', brandColor: '#26A5E4' }
   readonly configSchema = telegramConfigSchema
+  // Bot API exposes setMyName (display name) but NOT setMyDescription for the
+  // bot picture: avatars can only be set via BotFather. We declare 'native'
+  // because the name does flip globally on transfer; avatar swap is skipped.
+  // NB: this changes the bot identity globally across all chats the bot is in,
+  // which is a Telegram limitation (no per-chat bot identity). Accepted as a
+  // known trade-off; documented in docs/channel-transfers.md.
+  readonly identitySwitchMode = 'native' as const
   private pollers = new Map<string, TelegramPollingState>()
 
   async start(channelId: string, cfg: Record<string, unknown>, onMessage?: IncomingMessageHandler): Promise<void> {
@@ -304,6 +311,26 @@ export class TelegramAdapter implements ChannelAdapter {
   async sendTypingIndicator(_channelId: string, cfg: Record<string, unknown>, chatId: string): Promise<void> {
     const token = await resolveToken(cfg)
     await telegramApi(token, 'sendChatAction', { chat_id: chatId, action: 'typing' })
+  }
+
+  async onIdentityChange(
+    _channelId: string,
+    cfg: Record<string, unknown>,
+    newIdentity: { kinSlug: string; kinName: string; avatarUrl?: string },
+  ): Promise<void> {
+    const token = await resolveToken(cfg)
+    // Telegram setMyName caps the name at 64 chars (Bot API spec).
+    const name = newIdentity.kinName.slice(0, 64)
+    await telegramApi(token, 'setMyName', { name })
+    // Telegram bot avatars are NOT settable via Bot API: BotFather is the only
+    // entry point. Log a debug note when an avatar was provided so operators
+    // know it was intentionally skipped.
+    if (newIdentity.avatarUrl) {
+      log.debug(
+        { kinSlug: newIdentity.kinSlug, avatarUrl: newIdentity.avatarUrl },
+        'Telegram avatar swap skipped: setMyName is the only identity API the Bot API exposes; avatars require BotFather.',
+      )
+    }
   }
 }
 

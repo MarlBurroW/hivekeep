@@ -357,6 +357,11 @@ export class DiscordAdapter implements ChannelAdapter {
   readonly platform = 'discord'
   readonly meta: ChannelAdapterMeta = { displayName: 'Discord', brandColor: '#5865F2' }
   readonly configSchema = discordConfigSchema
+  // PATCH /users/@me lets us change the bot's username and avatar globally.
+  // Like Telegram, this affects the bot identity everywhere it is present
+  // (the bot user has one global username, not per-guild). Accepted trade-off,
+  // documented in docs/channel-transfers.md.
+  readonly identitySwitchMode = 'native' as const
   private gateways = new Map<string, GatewayState>()
 
   async start(channelId: string, cfg: Record<string, unknown>, onMessage: IncomingMessageHandler): Promise<void> {
@@ -493,5 +498,40 @@ export class DiscordAdapter implements ChannelAdapter {
   async sendTypingIndicator(_channelId: string, cfg: Record<string, unknown>, chatId: string): Promise<void> {
     const token = await resolveToken(cfg)
     await discordApi(token, 'POST', `/channels/${chatId}/typing`)
+  }
+
+  async onIdentityChange(
+    _channelId: string,
+    cfg: Record<string, unknown>,
+    newIdentity: { kinSlug: string; kinName: string; avatarUrl?: string },
+  ): Promise<void> {
+    const token = await resolveToken(cfg)
+    // Discord usernames are capped at 32 chars and must avoid certain
+    // characters; truncate defensively. Slugs are always ASCII so this
+    // mostly affects long Kin display names.
+    const username = newIdentity.kinName.slice(0, 32).trim() || newIdentity.kinSlug
+    const body: Record<string, unknown> = { username }
+
+    // Avatar is optional: PATCH /users/@me accepts a data: URI in the
+    // "avatar" field. We fetch the URL the core built, convert to base64,
+    // and include it. If the fetch fails, send the username only rather
+    // than failing the whole identity switch.
+    if (newIdentity.avatarUrl) {
+      try {
+        const resp = await fetch(newIdentity.avatarUrl)
+        if (resp.ok) {
+          const contentType = resp.headers.get('content-type') ?? 'image/png'
+          const buf = await resp.arrayBuffer()
+          const base64 = Buffer.from(buf).toString('base64')
+          body.avatar = `data:${contentType};base64,${base64}`
+        } else {
+          log.warn({ status: resp.status, url: newIdentity.avatarUrl }, 'Discord avatar fetch returned non-OK; skipping avatar')
+        }
+      } catch (err) {
+        log.warn({ err: String(err), url: newIdentity.avatarUrl }, 'Discord avatar fetch failed; skipping avatar')
+      }
+    }
+
+    await discordApi(token, 'PATCH', '/users/@me', body)
   }
 }

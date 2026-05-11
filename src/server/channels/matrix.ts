@@ -118,6 +118,12 @@ export class MatrixAdapter implements ChannelAdapter {
   readonly platform = 'matrix'
   readonly meta: ChannelAdapterMeta = { displayName: 'Matrix', brandColor: '#0DBD8B' }
   readonly configSchema = matrixConfigSchema
+  // Matrix exposes profile.set_displayname + profile.set_avatar_url on the
+  // homeserver. The change is global to the bot account (its display name in
+  // every room), which mirrors Telegram/Discord. Per-room overrides exist on
+  // the Matrix spec but require admin power, so we stick with the global
+  // profile API. Documented in docs/channel-transfers.md.
+  readonly identitySwitchMode = 'native' as const
 
   private syncAbortControllers = new Map<string, AbortController>()
   private handlers = new Map<string, { onMessage: IncomingMessageHandler; cfg: MatrixChannelConfig }>()
@@ -298,6 +304,57 @@ export class MatrixAdapter implements ChannelAdapter {
       })
     } catch (err) {
       log.debug({ err }, 'Failed to send Matrix typing indicator')
+    }
+  }
+
+  async onIdentityChange(
+    _channelId: string,
+    cfg: Record<string, unknown>,
+    newIdentity: { kinSlug: string; kinName: string; avatarUrl?: string },
+  ): Promise<void> {
+    const homeserver = getHomeserverUrl(cfg)
+    const token = await resolveToken(cfg)
+
+    // Resolve bot user ID (Matrix profile endpoints are keyed by it).
+    const whoami = await matrixApi(homeserver, token, 'GET', '/account/whoami') as { user_id: string }
+    const userId = encodeURIComponent(whoami.user_id)
+
+    // 1) Display name (always attempted).
+    await matrixApi(homeserver, token, 'PUT', `/profile/${userId}/displayname`, {
+      displayname: newIdentity.kinName,
+    })
+
+    // 2) Avatar: fetch the URL the core provided, upload to the Matrix media
+    //    repo to obtain an mxc:// URI, then point the profile at it. If any
+    //    step fails, log a warning and keep the display name change.
+    if (newIdentity.avatarUrl) {
+      try {
+        const resp = await fetch(newIdentity.avatarUrl)
+        if (!resp.ok) throw new Error(`avatar fetch returned ${resp.status}`)
+        const contentType = resp.headers.get('content-type') ?? 'image/png'
+        const blob = await resp.blob()
+        const uploadResp = await fetch(
+          `${homeserver}/_matrix/media/v3/upload?filename=avatar`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': contentType,
+            },
+            body: blob,
+          },
+        )
+        if (!uploadResp.ok) throw new Error(`media upload returned ${uploadResp.status}`)
+        const uploadData = await uploadResp.json() as { content_uri: string }
+        await matrixApi(homeserver, token, 'PUT', `/profile/${userId}/avatar_url`, {
+          avatar_url: uploadData.content_uri,
+        })
+      } catch (err) {
+        log.warn(
+          { err: String(err), kinSlug: newIdentity.kinSlug, avatarUrl: newIdentity.avatarUrl },
+          'Matrix avatar update skipped: fetch or upload failed; display name was still updated',
+        )
+      }
     }
   }
 

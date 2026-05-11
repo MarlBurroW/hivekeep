@@ -325,6 +325,93 @@ describe('MatrixAdapter', () => {
     })
   })
 
+  // ─── onIdentityChange (native identity switch) ──────────────────────────
+
+  describe('onIdentityChange', () => {
+    it('declares identitySwitchMode "native"', () => {
+      expect(adapter.identitySwitchMode).toBe('native')
+    })
+
+    it('PUTs the new displayname on the homeserver profile API', async () => {
+      const sentRequests: { url: string; method: string; body: unknown }[] = []
+      mockFetch(async (url, init) => {
+        sentRequests.push({
+          url,
+          method: init?.method ?? 'GET',
+          body: init?.body && typeof init.body === 'string' ? JSON.parse(init.body) : null,
+        })
+        if (url.includes('/account/whoami')) return jsonResponse({ user_id: '@bot:matrix.org' })
+        if (url.includes('/displayname')) return jsonResponse({})
+        return new Response('Not found', { status: 404 })
+      })
+
+      await adapter.onIdentityChange!(
+        'ch1',
+        { accessTokenVaultKey: 'valid-token-key', homeserverUrl: 'https://matrix.example.com' },
+        { kinSlug: 'kube-master', kinName: 'Kube Master' },
+      )
+
+      const displaynameReq = sentRequests.find((r) => r.url.includes('/displayname'))
+      expect(displaynameReq).toBeDefined()
+      expect(displaynameReq!.method).toBe('PUT')
+      expect(displaynameReq!.body).toMatchObject({ displayname: 'Kube Master' })
+    })
+
+    it('uploads and points the avatar when avatarUrl is provided', async () => {
+      const sentRequests: { url: string; method: string }[] = []
+      mockFetch(async (url, init) => {
+        sentRequests.push({ url, method: init?.method ?? 'GET' })
+        if (url.includes('/account/whoami')) return jsonResponse({ user_id: '@bot:matrix.org' })
+        if (url.includes('/displayname')) return jsonResponse({})
+        if (url.startsWith('https://kinbot.example.com/api/uploads/')) {
+          return new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/png' } })
+        }
+        if (url.includes('/_matrix/media/v3/upload')) {
+          return jsonResponse({ content_uri: 'mxc://matrix.example.com/abc123' })
+        }
+        if (url.includes('/avatar_url')) return jsonResponse({})
+        return new Response('Not found', { status: 404 })
+      })
+
+      await adapter.onIdentityChange!(
+        'ch1',
+        { accessTokenVaultKey: 'valid-token-key', homeserverUrl: 'https://matrix.example.com' },
+        {
+          kinSlug: 'kube-master',
+          kinName: 'Kube Master',
+          avatarUrl: 'https://kinbot.example.com/api/uploads/kins/abc/avatar.png',
+        },
+      )
+
+      // Avatar was uploaded then pointed at
+      expect(sentRequests.some((r) => r.url.includes('/_matrix/media/v3/upload') && r.method === 'POST')).toBe(true)
+      expect(sentRequests.some((r) => r.url.includes('/avatar_url') && r.method === 'PUT')).toBe(true)
+    })
+
+    it('does not throw when avatar fetch fails (display name still updated)', async () => {
+      const sentRequests: { url: string; method: string }[] = []
+      mockFetch(async (url, init) => {
+        sentRequests.push({ url, method: init?.method ?? 'GET' })
+        if (url.includes('/account/whoami')) return jsonResponse({ user_id: '@bot:matrix.org' })
+        if (url.includes('/displayname')) return jsonResponse({})
+        if (url.startsWith('https://broken/')) return new Response('not found', { status: 404 })
+        if (url.includes('/avatar_url')) return jsonResponse({})
+        return new Response('Not found', { status: 404 })
+      })
+
+      // Should not throw
+      await adapter.onIdentityChange!(
+        'ch1',
+        { accessTokenVaultKey: 'valid-token-key', homeserverUrl: 'https://matrix.example.com' },
+        { kinSlug: 'kube-master', kinName: 'Kube Master', avatarUrl: 'https://broken/avatar.png' },
+      )
+
+      // Display name was still updated, avatar_url was NOT (fetch failed)
+      expect(sentRequests.some((r) => r.url.includes('/displayname') && r.method === 'PUT')).toBe(true)
+      expect(sentRequests.some((r) => r.url.includes('/avatar_url'))).toBe(false)
+    })
+  })
+
   // ─── start / stop lifecycle ─────────────────────────────────────────────
 
   describe('start', () => {
