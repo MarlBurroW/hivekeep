@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import createPlugin from './index'
+import createPlugin, { buildOutboundContextLine } from './index'
 import { normalizeUid } from './wsClient'
 
 function makeCtx(overrides?: Partial<Record<string, unknown>>) {
@@ -90,6 +90,61 @@ describe('teamspeak plugin export shape', () => {
     expect(typeof adapter.sendMessage).toBe('function')
     expect(typeof adapter.validateConfig).toBe('function')
     expect(typeof adapter.getBotInfo).toBe('function')
+  })
+})
+
+describe('buildOutboundContextLine', () => {
+  it('falls back to "session #<id>" (never the literal "user") when the presence cache misses for a DM', () => {
+    // Reproduces the bug: outbound private message lands while state.clients
+    // is still empty (initial get_status ack window). recipientName is null,
+    // and the line must surface the session id so it stays informative.
+    const lineFr = buildOutboundContextLine({
+      mode: 'text-private',
+      locale: 'fr',
+      channelName: 'whatever',
+      voice: null,
+      recipientName: null,
+      recipientSessionId: 42,
+    })
+    expect(lineFr).toContain('session #42')
+    expect(lineFr).not.toMatch(/\buser\b/)
+
+    const lineEn = buildOutboundContextLine({
+      mode: 'text-private',
+      locale: 'en',
+      channelName: 'whatever',
+      voice: null,
+      recipientName: null,
+      recipientSessionId: 42,
+    })
+    expect(lineEn).toContain('session #42')
+    expect(lineEn).not.toMatch(/\buser\b/)
+  })
+
+  it('uses the resolved recipient name when the cache hit succeeds', () => {
+    const line = buildOutboundContextLine({
+      mode: 'text-private',
+      locale: 'en',
+      channelName: 'whatever',
+      voice: null,
+      recipientName: 'Nicolas',
+      recipientSessionId: 42,
+    })
+    expect(line).toContain('Nicolas')
+    expect(line).not.toContain('session #')
+  })
+
+  it('renders the TTS voice when set in public mode', () => {
+    const line = buildOutboundContextLine({
+      mode: 'tts',
+      locale: 'fr',
+      channelName: 'Gaming',
+      voice: 'Kartal',
+      recipientName: null,
+      recipientSessionId: null,
+    })
+    expect(line).toContain('Gaming')
+    expect(line).toContain('Kartal')
   })
 })
 

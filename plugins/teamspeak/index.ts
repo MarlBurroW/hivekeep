@@ -198,6 +198,41 @@ function tt(locale: SupportedLocale, key: ContextKey, vars: Record<string, strin
   return s
 }
 
+export type OutboundMode = 'text-private' | 'text-public' | 'tts' | 'tts-too-long'
+
+/**
+ * Compose the localized context line that surfaces under a kin's channel reply
+ * ("Sent on TeamSpeak via TTS in #Gaming with voice Kartal", etc.). Exported
+ * for unit testing — the adapter's sendMessage calls this with the values it
+ * just computed. When the recipient's name is unknown (presence cache miss in
+ * the brief window after plugin start), falls back to `session #<id>` so the
+ * line never shows the meaningless placeholder "user".
+ */
+export function buildOutboundContextLine(args: {
+  mode: OutboundMode
+  locale: string
+  channelName: string
+  voice: string | null
+  recipientName: string | null
+  recipientSessionId: number | null
+}): string {
+  const locale = pickLocale(args.locale)
+  switch (args.mode) {
+    case 'text-private': {
+      const name = args.recipientName ?? (args.recipientSessionId != null ? `session #${args.recipientSessionId}` : 'unknown')
+      return tt(locale, 'outboundTextPrivate', { name })
+    }
+    case 'text-public':
+      return tt(locale, 'outboundTextPublic', { channel: args.channelName })
+    case 'tts':
+      return args.voice
+        ? tt(locale, 'outboundTtsPublic', { channel: args.channelName, voice: args.voice })
+        : tt(locale, 'outboundTtsPublicDefaultVoice', { channel: args.channelName })
+    case 'tts-too-long':
+      return tt(locale, 'outboundTtsTooLong', { channel: args.channelName })
+  }
+}
+
 // ─── Chat ID encoding ───────────────────────────────────────────────────────
 // We encode the platformChatId as `channel:<id>` for public channels and
 // `private:<sender_id>` for private messages. The adapter parses this back
@@ -586,31 +621,23 @@ export default function (ctx: PluginCtx) {
 
       // Resolve display names for the context line. Public modes use the bot's
       // current channel; private mode uses the recipient client name from the
-      // local state cache (best-effort, falls back to "user").
+      // local presence cache (best-effort — the helper falls back to
+      // `session #<id>` if the cache hasn't been populated yet).
       const botLoc = botLocation(state)
       const channelName = botLoc.channel_name ?? 'channel'
       const recipientName = isPrivate
-        ? (state.clients.get(parsed.id)?.name ?? 'user')
+        ? (state.clients.get(parsed.id)?.name ?? null)
         : null
       const voice = cfg.defaultVoice ?? null
 
-      let contextLine: string
-      switch (mode) {
-        case 'text-private':
-          contextLine = tt(locale, 'outboundTextPrivate', { name: recipientName ?? 'user' })
-          break
-        case 'text-public':
-          contextLine = tt(locale, 'outboundTextPublic', { channel: channelName })
-          break
-        case 'tts':
-          contextLine = voice
-            ? tt(locale, 'outboundTtsPublic', { channel: channelName, voice })
-            : tt(locale, 'outboundTtsPublicDefaultVoice', { channel: channelName })
-          break
-        case 'tts-too-long':
-          contextLine = tt(locale, 'outboundTtsTooLong', { channel: channelName })
-          break
-      }
+      const contextLine = buildOutboundContextLine({
+        mode,
+        locale,
+        channelName,
+        voice,
+        recipientName,
+        recipientSessionId: isPrivate ? parsed.id : null,
+      })
 
       const deliveryMeta: Record<string, unknown> = {
         mode,

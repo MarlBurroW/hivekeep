@@ -162,9 +162,14 @@ interface PendingCommand {
   resolve: (response: CommandResponseEvent) => void
   reject: (err: Error) => void
   timeout: ReturnType<typeof setTimeout>
-  /** Some commands emit a placeholder ack first ("Moving channel...") then the real result. */
-  acceptIntermediate: boolean
-  /** When acceptIntermediate=false, ignore the first ack response and wait for the next one with same command_id. */
+  /**
+   * When true, the command is known to emit a placeholder ack
+   * ("Moving channel...", get_status's empty initial response, etc.)
+   * before the real result — skip the first ack-looking response and
+   * resolve on the next one carrying the same command_id.
+   */
+  skipAck: boolean
+  /** Set once we've consumed the placeholder ack while waiting for the real response. */
   ackSeen: boolean
 }
 
@@ -303,7 +308,7 @@ export class TsBotWsClient {
         resolve: (resp) => resolve(resp as CommandResponseEvent & { data?: TData }),
         reject,
         timeout,
-        acceptIntermediate: !expectIntermediate,
+        skipAck: expectIntermediate,
         ackSeen: false,
       })
 
@@ -468,13 +473,13 @@ export class TsBotWsClient {
             resp.data === undefined &&
             (resp.message === undefined || resp.message === null)
 
-          // For commands that don't expect intermediate, always resolve immediately
-          // unless we explicitly know there's a follow-up (use ackSeen).
-          if (pending.acceptIntermediate) {
-            // Wait for the "final" response: skip a placeholder ack once
+          // When the caller passed expectIntermediate=true (mapped to skipAck=true),
+          // discard the first ack-looking response and wait for the real one.
+          // Otherwise resolve on the first response.
+          if (pending.skipAck) {
             if (!pending.ackSeen && (looksLikeAck || looksLikeAckEmpty)) {
               pending.ackSeen = true
-              // keep waiting
+              // keep waiting for the real response
             } else {
               clearTimeout(pending.timeout)
               this.pending.delete(id)
