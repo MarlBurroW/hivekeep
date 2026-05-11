@@ -481,7 +481,38 @@ export default function (ctx: PluginCtx) {
       brandColor: '#2580C3',
     },
 
+    // ts-bot exposes a `set_nickname` command, so we can natively follow the
+    // bound Kin's display name on transfer. TeamSpeak avatars are per-client
+    // files uploaded via TS3 file transfer; ts-bot does not expose that path,
+    // so we update the nickname only and leave the avatar to whatever the
+    // operator configured on the bot's TS3 identity.
+    identitySwitchMode: 'native' as const,
+
     formatInboundContext,
+
+    async onIdentityChange(
+      _channelId: string,
+      _channelConfig: Record<string, unknown>,
+      newIdentity: { kinSlug: string; kinName: string; avatarUrl?: string },
+    ): Promise<void> {
+      const c = ensureClient()
+      // TeamSpeak nicknames are bounded by the server config (default 30
+      // chars). Truncate defensively to stay well below.
+      const nickname = newIdentity.kinName.slice(0, 30)
+      const resp = await c.sendCommand(
+        { type: 'set_nickname', nickname },
+        { expectIntermediate: false },
+      )
+      if (!resp.success) {
+        throw new Error(`ts-bot set_nickname failed: ${resp.message ?? 'unknown error'}`)
+      }
+      if (newIdentity.avatarUrl) {
+        ctx.log.debug(
+          { kinSlug: newIdentity.kinSlug, avatarUrl: newIdentity.avatarUrl },
+          'TeamSpeak avatar swap skipped: ts-bot has no file-transfer endpoint for client avatars; nickname only.',
+        )
+      }
+    },
 
     async start(
       channelId: string,

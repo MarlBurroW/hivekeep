@@ -100,6 +100,23 @@ the `<channel-context>` prompt block:
 
 Voice messages additionally include `transcription = { confidence, language, duration_ms }`.
 
+## Channel transfers and identity
+
+The adapter declares `identitySwitchMode: 'native'` and implements
+`onIdentityChange`. When a KinBot user invokes the core `transfer_channel`
+tool to re-bind the TeamSpeak channel to a different Kin, KinBot calls the
+adapter with the new Kin's slug, display name, and avatar URL. The adapter
+issues a `set_nickname` command to ts-bot with the new display name
+(truncated to 30 chars to stay within typical TS3 server limits), so the
+bot's nickname on the TeamSpeak server immediately reflects the bound Kin.
+
+Avatar switching is not supported: TS3 client avatars live in the server's
+file-transfer subsystem and ts-bot does not currently expose an upload
+endpoint for them. The provided `avatarUrl` is logged at debug level and
+skipped. The nickname-only flip is enough for users in the channel to see
+which Kin is now talking; outbound chat copies do NOT receive a
+`[Kin Name] ` prefix (the native switch handles that side).
+
 ## Known limitations / POC scope
 
 - **No automatic contact creation.** When the plugin sees a new sender it just
