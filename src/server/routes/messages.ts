@@ -201,6 +201,55 @@ messageRoutes.get('/', async (c) => {
     return meta
   }
 
+  // ─── Transfer system-event enrichment ────────────────────────────────────
+  // For channel_transferred_in/out audit rows, surface a fully-resolved
+  // `systemEvent` blob with the OTHER Kin's name + avatar and the channel's
+  // current platform meta, so MessageBubble can render the dedicated cards
+  // without an extra round trip.
+  const transferOtherKinIds = new Set<string>()
+  const transferChannelIds = new Set<string>()
+  const transferMetaByMessageId = new Map<string, Record<string, unknown>>()
+  for (const m of messageList) {
+    if (!m.metadata) continue
+    try {
+      const meta = JSON.parse(m.metadata as string)
+      const ev = meta?.systemEvent
+      if (ev !== 'channel_transferred_out' && ev !== 'channel_transferred_in') continue
+      transferMetaByMessageId.set(m.id, meta as Record<string, unknown>)
+      const otherKinId = (ev === 'channel_transferred_out' ? meta.targetKinId : meta.fromKinId) as string | undefined
+      if (otherKinId) transferOtherKinIds.add(otherKinId)
+      if (typeof meta.channelId === 'string') transferChannelIds.add(meta.channelId)
+    } catch { /* corrupted, skip */ }
+  }
+
+  const transferKinInfoMap = new Map<string, { id: string; slug: string | null; name: string; avatarUrl: string | null }>()
+  if (transferOtherKinIds.size > 0) {
+    const rows = await db
+      .select({ id: kins.id, slug: kins.slug, name: kins.name, avatarPath: kins.avatarPath })
+      .from(kins)
+      .where(inArray(kins.id, Array.from(transferOtherKinIds)))
+      .all()
+    for (const k of rows) {
+      const ext = k.avatarPath?.split('.').pop() ?? 'png'
+      transferKinInfoMap.set(k.id, {
+        id: k.id,
+        slug: k.slug ?? null,
+        name: k.name,
+        avatarUrl: k.avatarPath ? `/api/uploads/kins/${k.id}/avatar.${ext}` : null,
+      })
+    }
+  }
+
+  const transferChannelPlatformMap = new Map<string, string>()
+  if (transferChannelIds.size > 0) {
+    const rows = await db
+      .select({ id: channels.id, platform: channels.platform })
+      .from(channels)
+      .where(inArray(channels.id, Array.from(transferChannelIds)))
+      .all()
+    for (const r of rows) transferChannelPlatformMap.set(r.id, r.platform)
+  }
+
   return c.json({
     messages: messageList.map((m) => {
       const kinInfo = (m.sourceType === 'kin' || m.sourceType === 'task') && m.sourceId ? kinInfoMap.get(m.sourceId) : null
@@ -218,6 +267,40 @@ messageRoutes.get('/', async (c) => {
 
       const platform = platformByMessageId.get(m.id) ?? null
       const channelMeta = platform ? getPlatformMeta(platform) : null
+
+      // Resolve the transfer system-event blob (if any). The card needs the
+      // OTHER Kin's name/slug/avatar, plus the channel's current platform
+      // info so we can paint the platform icon next to the channel name.
+      let systemEvent: Record<string, unknown> | null = null
+      const transferMeta = transferMetaByMessageId.get(m.id)
+      if (transferMeta) {
+        const evType = transferMeta.systemEvent as 'channel_transferred_out' | 'channel_transferred_in'
+        const otherKinId = (evType === 'channel_transferred_out' ? transferMeta.targetKinId : transferMeta.fromKinId) as string | undefined
+        const otherKinSlugInMeta = (evType === 'channel_transferred_out' ? transferMeta.targetKinSlug : transferMeta.fromKinSlug) as string | null | undefined
+        const otherKinNameInMeta = (evType === 'channel_transferred_out' ? transferMeta.targetKinName : transferMeta.fromKinName) as string | undefined
+        const otherKinInfo = otherKinId ? transferKinInfoMap.get(otherKinId) : undefined
+        const channelIdRef = transferMeta.channelId as string | undefined
+        const channelPlatform = channelIdRef ? transferChannelPlatformMap.get(channelIdRef) ?? null : null
+        const channelPlatformMeta = channelPlatform ? getPlatformMeta(channelPlatform) : null
+        systemEvent = {
+          type: evType,
+          channelId: channelIdRef ?? null,
+          channelName: (transferMeta.channelName as string | undefined) ?? null,
+          channelPlatform,
+          channelBrandColor: channelPlatformMeta?.brandColor ?? null,
+          otherKin: {
+            // Prefer the row data (current) but fall back to whatever the
+            // audit-trail snapshot recorded if the Kin row has since been
+            // deleted.
+            id: otherKinId ?? null,
+            slug: otherKinInfo?.slug ?? otherKinSlugInMeta ?? null,
+            name: otherKinInfo?.name ?? otherKinNameInMeta ?? 'Unknown Kin',
+            avatarUrl: otherKinInfo?.avatarUrl ?? null,
+          },
+          reason: (transferMeta.reason as string | null | undefined) ?? null,
+          at: (transferMeta.at as number | undefined) ?? null,
+        }
+      }
 
       return {
         id: m.id,
@@ -240,6 +323,7 @@ messageRoutes.get('/', async (c) => {
         reactions: reactionMap.get(m.id) ?? [],
         channelContextLine,
         channelMeta,
+        systemEvent,
         createdAt: m.createdAt,
       }
     }),

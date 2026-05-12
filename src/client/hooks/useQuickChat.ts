@@ -98,6 +98,7 @@ export function useQuickChat(sessionId: string | null, kinId: string | null) {
         reasoning: null,
         channelContextLine: null,
         channelMeta: null,
+        systemEvent: null,
         createdAt: new Date(data.createdAt as number).toISOString(),
       }
       setMessages((prev) => [...prev, message])
@@ -133,6 +134,7 @@ export function useQuickChat(sessionId: string | null, kinId: string | null) {
         reasoning: null,
         channelContextLine: null,
         channelMeta: null,
+        systemEvent: null,
         createdAt: new Date().toISOString(),
       }
 

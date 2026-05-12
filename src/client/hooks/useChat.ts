@@ -19,6 +19,30 @@ export interface ChannelMeta {
   brandColor: string | null
 }
 
+/**
+ * Structured payload attached to system messages whose metadata.systemEvent
+ * is set. The server resolves the OTHER Kin's name/slug/avatar and the
+ * channel's current platform meta so the UI can render the dedicated
+ * transfer cards without an extra round trip. Pre-existing system messages
+ * (sourceType==='system' with no systemEvent discriminator) keep
+ * systemEvent === null and fall through to the generic centered banner.
+ */
+export interface ChannelTransferSystemEvent {
+  type: 'channel_transferred_out' | 'channel_transferred_in'
+  channelId: string | null
+  channelName: string | null
+  channelPlatform: string | null
+  channelBrandColor: string | null
+  otherKin: {
+    id: string | null
+    slug: string | null
+    name: string
+    avatarUrl: string | null
+  }
+  reason: string | null
+  at: number | null
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -43,6 +67,8 @@ export interface ChatMessage {
   channelContextLine: string | null
   /** Platform identity for channel messages (used to render brand accent). */
   channelMeta: ChannelMeta | null
+  /** Structured channel-transfer event for sourceType='system' rows. */
+  systemEvent: ChannelTransferSystemEvent | null
   createdAt: string
 }
 
@@ -356,6 +382,7 @@ export function useChat(kinId: string | null) {
         reasoning: null,
         channelContextLine: (data.channelContextLine as string) ?? null,
         channelMeta: (data.channelMeta as ChatMessage['channelMeta']) ?? null,
+        systemEvent: (data.systemEvent as ChatMessage['systemEvent']) ?? null,
         createdAt: new Date(data.createdAt as number).toISOString(),
       }
       setMessages((prev) => [...prev, message])
@@ -473,6 +500,17 @@ export function useChat(kinId: string | null) {
       resetStreaming()
     },
 
+    'channel:transferred': (data) => {
+      // A channel was re-bound. If the current Kin is either side of the
+      // transfer (source or target), refetch the conversation so the new
+      // audit-trail row appears inline immediately. Skip when the current
+      // Kin is unrelated to avoid pointless work.
+      if (!kinId) return
+      if (data.fromKinId === kinId || data.toKinId === kinId) {
+        fetchMessages()
+      }
+    },
+
     'channel:message-sent': (data) => {
       if (data.kinId !== kinId) return
       // The kin response has just been delivered to the external platform; the
@@ -556,6 +594,7 @@ export function useChat(kinId: string | null) {
         reasoning: null,
         channelContextLine: null,
         channelMeta: null,
+        systemEvent: null,
         createdAt: new Date().toISOString(),
       }
 

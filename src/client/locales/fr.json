@@ -548,6 +548,12 @@
     "send": "Envoyer",
     "stop": "Arrêter la génération",
     "selectKin": "Sélectionnez un Kin pour commencer",
+    "transfer": {
+      "outTitle": "Channel transféré vers {{kinName}}",
+      "outSubtext": "Ce Kin n'a plus ce channel.",
+      "inTitle": "Channel reçu de {{kinName}}",
+      "inSubtext": "Ce Kin a maintenant ce channel."
+    },
     "empty": "Aucun message. Dites bonjour !",
     "streaming": "Réflexion...",
     "contextUsage": "Contexte : ~{{tokens}} / {{max}} tokens ({{percent}} %), inclut prompt système, historique et outils",

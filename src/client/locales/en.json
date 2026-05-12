@@ -549,6 +549,12 @@
     "stop": "Stop generating",
     "selectKin": "Select a Kin to start chatting",
     "empty": "No messages yet. Say hello!",
+    "transfer": {
+      "outTitle": "Channel transferred to {{kinName}}",
+      "outSubtext": "This Kin no longer has this channel.",
+      "inTitle": "Channel received from {{kinName}}",
+      "inSubtext": "This Kin now has this channel."
+    },
     "streaming": "Thinking...",
     "contextUsage": "Context: ~{{tokens}} / {{max}} tokens ({{percent}}%), includes system prompt, history & tools",
     "contextNoData": "Context usage will appear after the first message is processed",

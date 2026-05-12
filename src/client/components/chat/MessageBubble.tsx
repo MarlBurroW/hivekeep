@@ -23,8 +23,9 @@ import { FileIcon, Download, Brain, ChevronDown, Copy, Check, RefreshCw, Quote, 
 import type { ToolCallViewItem } from '@/client/hooks/useToolCalls'
 import { RelativeTimestamp } from '@/client/components/chat/RelativeTimestamp'
 import type { MessageFile, MessageTokenUsage } from '@/shared/types'
-import type { MessageReaction } from '@/client/hooks/useChat'
+import type { MessageReaction, ChannelTransferSystemEvent } from '@/client/hooks/useChat'
 import { PRESET_EMOJIS } from '@/client/hooks/useReactions'
+import { ArrowLeftFromLine, ArrowRightFromLine } from 'lucide-react'
 
 interface InjectedMemory {
   id: string
@@ -76,6 +77,14 @@ interface MessageBubbleProps {
   /** Channel platform identifier (e.g. "teamspeak", "telegram"). When provided,
    *  takes precedence over the legacy regex extraction from message content. */
   channelPlatformOverride?: string | null
+  /** Structured channel-transfer event for sourceType='system' rows. When
+   *  set, the bubble renders a dedicated handoff card instead of the
+   *  generic gray banner used for other system messages. */
+  systemEvent?: ChannelTransferSystemEvent | null
+  /** Current Kin's avatar URL (for the "self" side of the transfer card). */
+  currentKinAvatarUrl?: string | null
+  /** Current Kin's display name (for the "self" side of the transfer card). */
+  currentKinName?: string | null
 }
 
 /** A content part is either a text segment, a group of tool calls, or a reasoning block at the same offset. */
@@ -705,6 +714,152 @@ function MessageContextMenu({
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
+/** A small avatar tile rendered inside the transfer card. Small when the
+ *  Kin is the "other" side of the handoff, big when it's the current Kin
+ *  (the one whose history the user is viewing). */
+function TransferAvatar({ name, avatarUrl, size }: { name: string; avatarUrl: string | null; size: 'big' | 'small' }) {
+  const dim = size === 'big' ? 'size-10' : 'size-7'
+  const txt = size === 'big' ? 'text-sm' : 'text-[10px]'
+  const initials = name?.slice(0, 2).toUpperCase() || 'K'
+  return (
+    <div className={cn(dim, 'shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center font-semibold text-muted-foreground/80', txt)}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={name} className="size-full object-cover" />
+      ) : (
+        <span>{initials}</span>
+      )}
+    </div>
+  )
+}
+
+/** Dedicated card for channel_transferred_in / channel_transferred_out
+ *  system events. The two variants share the same structure (paired
+ *  avatars, platform icon + channel name, optional reason, timestamp)
+ *  but differ in accent color, directional arrow, verb, and the relative
+ *  sizes of the two avatars so the user perceives the state in one
+ *  glance (out: this Kin LOST the channel, in: this Kin GAINED it). */
+function ChannelTransferCard({
+  event,
+  currentName,
+  currentAvatarUrl,
+  timestamp,
+}: {
+  event: ChannelTransferSystemEvent
+  currentName: string | null
+  currentAvatarUrl: string | null
+  timestamp?: string
+}) {
+  const { t } = useTranslation()
+  const isOut = event.type === 'channel_transferred_out'
+  // Tone tokens: warm/destructive on out, primary/success-ish on in. The
+  // exact tokens used here exist on every palette (semantic colors) so
+  // the cards stay readable on all 8 design-system themes without
+  // per-palette tuning.
+  const accent = isOut
+    ? {
+        border: 'border-warning/50',
+        bg: 'bg-warning/5',
+        chipBg: 'bg-warning/15',
+        chipText: 'text-warning',
+        iconColor: 'text-warning',
+        indicator: 'OUT',
+      }
+    : {
+        border: 'border-success/50',
+        bg: 'bg-success/5',
+        chipBg: 'bg-success/15',
+        chipText: 'text-success',
+        iconColor: 'text-success',
+        indicator: 'IN',
+      }
+  const DirectionalIcon = isOut ? ArrowRightFromLine : ArrowLeftFromLine
+  // Avatar sizing reflects who "owns" the action in this row:
+  //   out: current Kin (left, big) handed off to other Kin (right, small)
+  //   in:  current Kin (right, big) received from other Kin (left, small)
+  const leftIsCurrent = isOut
+  const titleKey = isOut ? 'chat.transfer.outTitle' : 'chat.transfer.inTitle'
+  const titleDefault = isOut
+    ? 'Channel transferred to {{kinName}}'
+    : 'Channel received from {{kinName}}'
+  const subKey = isOut ? 'chat.transfer.outSubtext' : 'chat.transfer.inSubtext'
+  const subDefault = isOut
+    ? 'This Kin no longer has this channel.'
+    : 'This Kin now has this channel.'
+
+  return (
+    <div className={cn('flex justify-center px-4 py-2', 'animate-fade-in')}>
+      <div
+        className={cn(
+          'w-full max-w-md rounded-xl border bg-card/40 shadow-sm overflow-hidden',
+          accent.border,
+          accent.bg,
+        )}
+        role="article"
+        aria-label={t(titleKey, titleDefault, { kinName: event.otherKin.name })}
+      >
+        {/* Top accent chip */}
+        <div className={cn('flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-wider', accent.chipBg, accent.chipText)}>
+          <span className="flex items-center gap-1.5">
+            <DirectionalIcon className="size-3" />
+            {accent.indicator}
+          </span>
+          {event.at && (
+            <span className="text-[10px] font-normal opacity-80 normal-case tracking-normal">
+              {new Date(event.at).toLocaleString()}
+            </span>
+          )}
+        </div>
+
+        <div className="p-3 space-y-2">
+          {/* Avatars row with directional arrow */}
+          <div className="flex items-center gap-2">
+            <TransferAvatar
+              name={leftIsCurrent ? (currentName ?? 'Kin') : event.otherKin.name}
+              avatarUrl={leftIsCurrent ? currentAvatarUrl ?? null : event.otherKin.avatarUrl}
+              size={leftIsCurrent ? 'big' : 'small'}
+            />
+            <DirectionalIcon className={cn('size-4 shrink-0', accent.iconColor)} />
+            <TransferAvatar
+              name={leftIsCurrent ? event.otherKin.name : (currentName ?? 'Kin')}
+              avatarUrl={leftIsCurrent ? event.otherKin.avatarUrl : currentAvatarUrl ?? null}
+              size={leftIsCurrent ? 'small' : 'big'}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">
+                {t(titleKey, titleDefault, { kinName: event.otherKin.name })}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {t(subKey, subDefault)}
+              </p>
+            </div>
+          </div>
+
+          {/* Channel pill */}
+          {event.channelName && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {event.channelPlatform && (
+                <PlatformIcon platform={event.channelPlatform} variant="color" className="size-3.5 shrink-0" />
+              )}
+              <span className="truncate">{event.channelName}</span>
+            </div>
+          )}
+
+          {/* Reason block */}
+          {event.reason && (
+            <blockquote className={cn('border-l-2 pl-2 text-xs italic text-muted-foreground', isOut ? 'border-warning/60' : 'border-success/60')}>
+              {event.reason}
+            </blockquote>
+          )}
+
+          {!event.at && timestamp && (
+            <RelativeTimestamp timestamp={timestamp} className="text-[10px] text-muted-foreground/70" />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Small, discreet line under a channel-routed message that surfaces the
  *  adapter-supplied transport context (TTS vs text, voice, target channel…). */
 function ChannelContextLine({ platform, text }: { platform: string | null; text: string }) {
@@ -746,6 +901,9 @@ export const MessageBubble = memo(function MessageBubble({
   channelContextLine,
   channelBrandColor,
   channelPlatformOverride,
+  systemEvent,
+  currentKinAvatarUrl,
+  currentKinName,
 }: MessageBubbleProps) {
   const handleToggleReaction = useCallback((emoji: string) => {
     if (onToggleReaction && messageId) onToggleReaction(messageId, emoji)
@@ -808,8 +966,20 @@ export const MessageBubble = memo(function MessageBubble({
     return <WebhookMessageCard content={content} timestamp={timestamp} />
   }
 
-  // System messages centered
+  // System messages centered. Channel-transfer audit events (out/in) get
+  // a dedicated colored card to make the handoff direction perceivable at
+  // a glance; everything else falls through to the generic gray banner.
   if (isSystem) {
+    if (systemEvent && (systemEvent.type === 'channel_transferred_out' || systemEvent.type === 'channel_transferred_in')) {
+      return (
+        <ChannelTransferCard
+          event={systemEvent}
+          currentName={currentKinName ?? null}
+          currentAvatarUrl={currentKinAvatarUrl ?? null}
+          timestamp={timestamp}
+        />
+      )
+    }
     return (
       <div className={cn('flex justify-center px-4 py-2', isNew && 'animate-fade-in')}>
         <div className="rounded-lg bg-muted/50 px-4 py-2 text-xs text-muted-foreground">

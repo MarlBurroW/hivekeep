@@ -95,6 +95,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         reasoning: null,
         channelContextLine: null,
         channelMeta: null,
+        systemEvent: null,
         createdAt: new Date().toISOString(),
       })
     } else {
@@ -144,6 +145,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         reasoning: null,
         channelContextLine: null,
         channelMeta: null,
+        systemEvent: null,
         createdAt: new Date().toISOString(),
       })
     }
@@ -212,6 +214,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         reasoning: streamingReasoningRef.current ? [{ offset: 0, text: streamingReasoningRef.current }] : null,
         channelContextLine: null,
         channelMeta: null,
+        systemEvent: null,
         createdAt: new Date().toISOString(),
       }
     }

@@ -939,6 +939,9 @@ export function ChatPanel({ kin, llmModels, modelUnavailable = false, queueState
                       channelContextLine={msg.channelContextLine}
                       channelBrandColor={msg.channelMeta?.brandColor ?? null}
                       channelPlatformOverride={msg.channelMeta?.platform ?? null}
+                      systemEvent={msg.systemEvent}
+                      currentKinName={kin.name}
+                      currentKinAvatarUrl={kin.avatarUrl}
                     />
                     </div>
                     </React.Fragment>
