@@ -922,34 +922,6 @@ export function abortQuickSessionStream(sessionId: string): boolean {
   return true
 }
 
-/**
- * Strip pre-tool-call text emitted in the same streaming step as a tool call.
- *
- * When the LLM streams text and then a tool call in the same step, the text
- * is by construction a prediction of the tool's result (the model has not
- * seen the result yet). We drop the step's text from `fullContent` and
- * collapse the step's tool-call offsets to the step start, so the persisted
- * content and offsets stay consistent.
- *
- * No-op when the step has no tool calls (the text is the legitimate final
- * answer) or no text (nothing to strip). Mutates `stepToolCalls[].offset`
- * in place when stripping.
- */
-export function applyPreToolTextStripping(args: {
-  fullContent: string
-  stepText: string
-  stepStartLength: number
-  stepToolCalls: Array<{ offset: number }>
-}): { fullContent: string; stripped: boolean; strippedLength: number } {
-  const { fullContent, stepText, stepStartLength, stepToolCalls } = args
-  if (stepToolCalls.length === 0 || stepText.length === 0) {
-    return { fullContent, stripped: false, strippedLength: 0 }
-  }
-  const newFullContent = fullContent.slice(0, stepStartLength)
-  for (const tc of stepToolCalls) tc.offset = stepStartLength
-  return { fullContent: newFullContent, stripped: true, strippedLength: stepText.length }
-}
-
 /** Determines whether a follow-up queue item should be auto-delivered to the originating channel */
 function shouldAutoDeliverToChannel(queueItem: { messageType: string }): boolean {
   return ['kin_reply', 'task_result', 'wakeup'].includes(queueItem.messageType)
@@ -1548,12 +1520,6 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
       })
       stepResults.push(result)
 
-      // Track text emitted in this step only, so we can strip it if the step
-      // also produces a tool call (pre-narration of a result the model has
-      // not yet seen).
-      const stepStartLength = fullContent.length
-      let stepText = ''
-
       // Collect tool call intents from this step
       const stepToolCalls: Array<{ id: string; name: string; args: unknown; offset: number }> = []
 
@@ -1606,7 +1572,6 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
           switch (part.type) {
             case 'text-delta': {
               const isFirstToken = fullContent.length === 0
-              stepText += part.text
               fullContent += part.text
               sseManager.sendToKin(kinId, {
                 type: 'chat:token',
@@ -1673,28 +1638,6 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
 
       // No tool calls this step → LLM is done, exit loop
       if (stepToolCalls.length === 0 || wasAborted) break
-
-      // Strip pre-tool-call text emitted in this step: it is a prediction of
-      // the tool's result, not a description of it. The strip is local to
-      // this step. Text from prior tool-less steps (intermediate "OK, now
-      // I'll check X" between tool batches) stays in fullContent.
-      const stripResult = applyPreToolTextStripping({
-        fullContent,
-        stepText,
-        stepStartLength,
-        stepToolCalls,
-      })
-      if (stripResult.stripped) {
-        fullContent = stripResult.fullContent
-        sseManager.sendToKin(kinId, {
-          type: 'chat:text-strip',
-          kinId,
-          data: {
-            messageId: assistantMessageId,
-            length: stripResult.strippedLength,
-          },
-        })
-      }
 
       // Build assistant content for history
       const assistantContent: Array<
@@ -2262,11 +2205,6 @@ export async function processQuickMessage(kinId: string): Promise<boolean> {
       })
       stepResults.push(result)
 
-      // Track text emitted in this step only, so we can strip it if the step
-      // also produces a tool call (pre-narration of an unreceived result).
-      const stepStartLength = fullContent.length
-      let stepText = ''
-
       // Collect tool call intents from this step
       const stepToolCalls: Array<{ id: string; name: string; args: unknown; offset: number }> = []
 
@@ -2313,7 +2251,6 @@ export async function processQuickMessage(kinId: string): Promise<boolean> {
 
           switch (part.type) {
             case 'text-delta': {
-              stepText += part.text
               fullContent += part.text
               sseManager.sendToKin(kinId, {
                 type: 'chat:token',
@@ -2351,27 +2288,6 @@ export async function processQuickMessage(kinId: string): Promise<boolean> {
 
       // No tool calls this step → LLM is done, exit loop
       if (stepToolCalls.length === 0 || wasAborted) break
-
-      // Strip pre-tool-call text emitted in this step (see processNextMessage
-      // for rationale).
-      const stripResult = applyPreToolTextStripping({
-        fullContent,
-        stepText,
-        stepStartLength,
-        stepToolCalls,
-      })
-      if (stripResult.stripped) {
-        fullContent = stripResult.fullContent
-        sseManager.sendToKin(kinId, {
-          type: 'chat:text-strip',
-          kinId,
-          data: {
-            messageId: assistantMessageId,
-            length: stripResult.strippedLength,
-            sessionId,
-          },
-        })
-      }
 
       // Build assistant content for history
       const assistantContent: Array<
