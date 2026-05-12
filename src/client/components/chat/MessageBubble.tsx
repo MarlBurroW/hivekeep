@@ -23,7 +23,8 @@ import { FileIcon, Download, Brain, ChevronDown, Copy, Check, RefreshCw, Quote, 
 import type { ToolCallViewItem } from '@/client/hooks/useToolCalls'
 import { RelativeTimestamp } from '@/client/components/chat/RelativeTimestamp'
 import type { MessageFile, MessageTokenUsage } from '@/shared/types'
-import type { MessageReaction, ChannelTransferSystemEvent } from '@/client/hooks/useChat'
+import type { MessageReaction, ChannelTransferSystemEvent, SystemEvent } from '@/client/hooks/useChat'
+import { PluginCardRenderer } from '@/client/components/chat/plugin-card/PluginCardRenderer'
 import { PRESET_EMOJIS } from '@/client/hooks/useReactions'
 import { ArrowRightFromLine, ArrowRightToLine } from 'lucide-react'
 
@@ -80,7 +81,7 @@ interface MessageBubbleProps {
   /** Structured channel-transfer event for sourceType='system' rows. When
    *  set, the bubble renders a dedicated handoff card instead of the
    *  generic gray banner used for other system messages. */
-  systemEvent?: ChannelTransferSystemEvent | null
+  systemEvent?: SystemEvent | null
   /** Current Kin's avatar URL (for the "self" side of the transfer card). */
   currentKinAvatarUrl?: string | null
   /** Current Kin's display name (for the "self" side of the transfer card). */
@@ -982,6 +983,13 @@ export const MessageBubble = memo(function MessageBubble({
           currentAvatarUrl={currentKinAvatarUrl ?? null}
           timestamp={timestamp}
         />
+      )
+    }
+    if (systemEvent && systemEvent.type === 'plugin-card') {
+      return (
+        <div className={cn('px-4 py-1', isNew && 'animate-fade-in')}>
+          <PluginCardRenderer card={systemEvent.pluginCard} />
+        </div>
       )
     }
     return (

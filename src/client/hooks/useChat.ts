@@ -5,6 +5,7 @@ import { api } from '@/client/lib/api'
 import { useSSE } from '@/client/hooks/useSSE'
 import { useChatStreaming } from '@/client/hooks/useChatStreaming'
 import type { ToolCallEntry, TaskStatus, MessageFile, MessageTokenUsage } from '@/shared/types'
+import type { PluginCard } from '@/shared/types/plugin-cards'
 
 export interface MessageReaction {
   id: string
@@ -43,6 +44,16 @@ export interface ChannelTransferSystemEvent {
   at: number | null
 }
 
+/** Plugin-emitted card surfaced inline in the conversation. The full layout
+ *  + state blob is carried in the systemEvent so the renderer never needs to
+ *  refetch the message just to know what to draw. */
+export interface PluginCardSystemEvent {
+  type: 'plugin-card'
+  pluginCard: PluginCard
+}
+
+export type SystemEvent = ChannelTransferSystemEvent | PluginCardSystemEvent
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -67,8 +78,9 @@ export interface ChatMessage {
   channelContextLine: string | null
   /** Platform identity for channel messages (used to render brand accent). */
   channelMeta: ChannelMeta | null
-  /** Structured channel-transfer event for sourceType='system' rows. */
-  systemEvent: ChannelTransferSystemEvent | null
+  /** Structured event payload for sourceType='system' rows. Covers
+   *  channel-transfer audit rows and plugin-emitted cards. */
+  systemEvent: SystemEvent | null
   createdAt: string
 }
 
