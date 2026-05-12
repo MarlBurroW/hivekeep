@@ -874,9 +874,14 @@ class PluginManager {
         channels: plugin.registeredChannels.length,
       }, 'Plugin activated')
     } catch (err) {
-      plugin.error = err instanceof Error ? err.message : 'Activation failed'
+      // Extract structured error info to avoid pino circular-reference issues
+      // when err carries SDK objects (AbortController, sockets, etc.) on its stack.
+      const errMessage = err instanceof Error ? err.message : (typeof err === 'string' ? err : 'Activation failed')
+      const errStack = err instanceof Error ? err.stack : undefined
+      const causeMessage = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined
+      plugin.error = errMessage
       plugin.enabled = false
-      log.error({ plugin: name, err }, 'Plugin activation failed')
+      log.error({ plugin: name, errMessage, errStack, causeMessage }, 'Plugin activation failed')
 
       // Clean up any partial registrations (tools/hooks/providers/channels
       // that were registered before the error occurred)
