@@ -1,0 +1,50 @@
+{
+  "name": "claude-code",
+  "version": "0.1.0",
+  "description": "Spawn and monitor Claude Code coding sessions from Kins with live progress cards in the conversation",
+  "author": "KinBot",
+  "license": "AGPL-3.0",
+  "kinbot": "^0.41.0",
+  "main": "index.ts",
+  "config": {
+    "authMode": {
+      "type": "select",
+      "label": "Authentication mode",
+      "options": ["subscription", "apiKey"],
+      "default": "subscription",
+      "required": true,
+      "description": "subscription reads ~/.claude/.credentials.json (Claude Max OAuth). apiKey requires an Anthropic API key and bills pay-per-token."
+    },
+    "apiKey": {
+      "type": "password",
+      "label": "Anthropic API key",
+      "required": false,
+      "secret": true,
+      "description": "Used only when authMode is apiKey. Leave empty for subscription mode."
+    },
+    "defaultWorkingDir": {
+      "type": "text",
+      "label": "Default working directory",
+      "default": "",
+      "required": false,
+      "placeholder": "/home/you/projects",
+      "description": "Base directory under which sessions run when the caller does not specify one. Leave empty to require an explicit workingDir on every call."
+    },
+    "defaultMaxTurns": {
+      "type": "number",
+      "label": "Default max turns",
+      "default": 50,
+      "min": 1,
+      "required": false,
+      "description": "Hard cap on the number of agentic turns per session. Prevents runaway loops."
+    },
+    "permissionMode": {
+      "type": "select",
+      "label": "Permission mode",
+      "options": ["bypassPermissions", "acceptEdits", "plan"],
+      "default": "bypassPermissions",
+      "required": true,
+      "description": "bypassPermissions skips all prompts (full autonomy). acceptEdits auto-accepts file edits only. plan creates a plan without executing."
+    }
+  }
+}
