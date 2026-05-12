@@ -3,40 +3,35 @@ import { fullMockSchema, fullMockDrizzleOrm } from '../../test-helpers'
 import type { ToolRegistration } from '@/server/tools/types'
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
+//
+// The tool is now a thin wrapper around the transferChannel() service: it
+// resolves channelId (from the explicit arg or from ctx.channelOriginId),
+// resolves the target Kin slug to a UUID, and forwards everything to the
+// service. The service owns the DB mutation, audit rows, sideband hint,
+// SSE broadcast, and adapter.onIdentityChange. Those side effects belong to
+// the service test surface (services/channels.ts), not this file.
 
-const mockGetChannel = mock(() => Promise.resolve(null as any))
 const mockGetChannelOriginMeta = mock(() => undefined as any)
-const mockSetChannelTransferHint = mock(() => undefined)
 const mockResolveKinId = mock(() => null as string | null)
-const mockBroadcast = mock(() => undefined)
 
-// Capture inserts and updates so tests can assert on them
-const insertedRows: any[] = []
-const updates: any[] = []
+type TransferResult =
+  | { ok: true; noop?: false; transferredAt: number; previousKinSlug: string; newKinSlug: string; fromKinId: string; fromKinName: string; toKinId: string; toKinName: string }
+  | { ok: true; noop: true; message: string }
+  | { ok: false; error: string }
 
-// dbSelectQueue: each call to dbChain.get() returns the next item in this
-// queue. transfer_channel.execute() performs two kin lookups (source then
-// target); the tests pre-seed both rows in the order they will be consumed.
-let dbSelectQueue: any[] = []
-const dbChain: any = {
-  select: mock(() => dbChain),
-  from: mock(() => dbChain),
-  where: mock(() => dbChain),
-  get: mock(() => (dbSelectQueue.length > 0 ? dbSelectQueue.shift() : null)),
-  insert: mock(() => dbChain),
-  values: mock((row: any) => {
-    insertedRows.push(row)
-    return dbChain
-  }),
-  update: mock(() => ({
-    set: mock((vals: any) => ({
-      where: mock(() => {
-        updates.push(vals)
-        return Promise.resolve()
-      }),
-    })),
-  })),
-}
+// transferChannel spy — the heart of the wrapper test. Configure per case.
+const mockTransferChannel = mock<(...args: any[]) => Promise<TransferResult>>(() =>
+  Promise.resolve({
+    ok: true,
+    transferredAt: 1700000000000,
+    previousKinSlug: 'kinbot-master',
+    newKinSlug: 'kube-master',
+    fromKinId: 'kin-source',
+    fromKinName: 'KinBot Master',
+    toKinId: 'kin-target',
+    toKinName: 'Kube Master',
+  } as TransferResult),
+)
 
 // Pure in-memory queue meta stubs so other test files that load
 // @/server/services/channels through the poisoned module cache still find
@@ -47,10 +42,12 @@ const _transferHints = new Map<string, any>()
 
 mock.module('@/server/services/channels', () => ({
   // Used by transfer_channel under test
-  getChannel: mockGetChannel,
+  transferChannel: mockTransferChannel,
   getChannelOriginMeta: mockGetChannelOriginMeta,
-  setChannelTransferHint: mockSetChannelTransferHint,
-  // Pure in-memory sideband helpers (mirror the real implementation)
+  getChannel: mock(() => Promise.resolve(null)),
+  // Pure in-memory sideband helpers (mirror the real implementation) so
+  // other test files importing from channels.ts via the poisoned cache
+  // still get something usable.
   setChannelQueueMeta: (id: string, meta: any) => { _queueMeta.set(id, meta) },
   getChannelQueueMeta: (id: string) => _queueMeta.get(id),
   popChannelQueueMeta: (id: string) => {
@@ -59,6 +56,7 @@ mock.module('@/server/services/channels', () => ({
     return meta
   },
   setChannelOriginMeta: (id: string, meta: any) => { _originMeta.set(id, meta) },
+  setChannelTransferHint: () => undefined,
   popChannelTransferHint: (id: string) => {
     const h = _transferHints.get(id)
     if (h) _transferHints.delete(id)
@@ -93,28 +91,36 @@ mock.module('@/server/services/kin-resolver', () => ({
   resolveKinByIdOrSlug: mock(() => null),
 }))
 
-mock.module('@/server/db/index', () => ({ db: dbChain }))
+mock.module('@/server/db/index', () => ({ db: {} }))
 
 mock.module('@/server/db/schema', () => ({
   ...fullMockSchema,
   kins: { id: 'id', slug: 'slug', name: 'name' },
-  messages: { id: 'id', kinId: 'kinId', role: 'role', sourceType: 'sourceType', metadata: 'metadata' },
-  channels: { id: 'id', kinId: 'kinId', updatedAt: 'updatedAt' },
+  messages: { id: 'id' },
+  channels: { id: 'id' },
 }))
 
-// Controllable adapter registry. Tests assign `mockAdapterByPlatform.set(...)`
-// to inject an adapter with an onIdentityChange spy and assert it was called.
-const mockAdapterByPlatform = new Map<string, any>()
+// Full ChannelAdapterRegistry surface so other test files that import the
+// poisoned module still find the methods they need.
+const _adapters = new Map<string, any>()
+const _pluginAdapters = new Set<string>()
 mock.module('@/server/channels/index', () => ({
   channelAdapters: {
-    get: (platform: string) => mockAdapterByPlatform.get(platform),
-    has: (platform: string) => mockAdapterByPlatform.has(platform),
-    list: () => Array.from(mockAdapterByPlatform.keys()),
+    get: (p: string) => _adapters.get(p),
+    has: (p: string) => _adapters.has(p),
+    list: () => Array.from(_adapters.keys()),
+    listWithMeta: () => [],
+    register: (a: any) => { _adapters.set(a.platform, a) },
+    registerPlugin: (a: any) => { _adapters.set(a.platform, a); _pluginAdapters.add(a.platform) },
+    unregisterPlugin: (p: string) => {
+      if (_pluginAdapters.has(p)) { _adapters.delete(p); _pluginAdapters.delete(p) }
+    },
+    isPluginAdapter: (p: string) => _pluginAdapters.has(p),
   },
 }))
 
 mock.module('@/server/sse/index', () => ({
-  sseManager: { broadcast: mockBroadcast, sendToKin: () => undefined },
+  sseManager: { broadcast: () => undefined, sendToKin: () => undefined },
 }))
 
 mock.module('@/server/logger', () => ({
@@ -154,28 +160,27 @@ function executeTool(registration: ToolRegistration, input: Record<string, unkno
 }
 
 beforeEach(() => {
-  mockGetChannel.mockReset()
   mockGetChannelOriginMeta.mockReset()
-  mockSetChannelTransferHint.mockReset()
   mockResolveKinId.mockReset()
-  mockBroadcast.mockReset()
-  insertedRows.length = 0
-  updates.length = 0
-  dbSelectQueue = []
-  mockAdapterByPlatform.clear()
+  mockTransferChannel.mockReset()
+  // Default: happy path, returns a successful transfer payload.
+  mockTransferChannel.mockResolvedValue({
+    ok: true,
+    transferredAt: 1700000000000,
+    previousKinSlug: 'kinbot-master',
+    newKinSlug: 'kube-master',
+    fromKinId: 'kin-source',
+    fromKinName: 'KinBot Master',
+    toKinId: 'kin-target',
+    toKinName: 'Kube Master',
+  } as TransferResult)
 })
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('transferChannelTool', () => {
-  itMocked('happy path: mutates binding, inserts two audit rows, sets hint, broadcasts SSE', async () => {
-    mockGetChannel.mockResolvedValue({ id: 'ch-1', name: 'WhatsApp main', kinId: 'kin-source' })
+describe('transferChannelTool (wrapper around transferChannel service)', () => {
+  itMocked('forwards explicit channelId + resolved Kin UUID + reason + initiatedBy="tool" to the service', async () => {
     mockResolveKinId.mockReturnValue('kin-target')
-    // First get() = source Kin row, second get() = target Kin row
-    dbSelectQueue = [
-      { id: 'kin-source', slug: 'kinbot-master', name: 'KinBot Master' },
-      { id: 'kin-target', slug: 'kube-master', name: 'Kube Master' },
-    ]
 
     const result = await executeTool(transferChannelTool, {
       channelId: 'ch-1',
@@ -184,57 +189,25 @@ describe('transferChannelTool', () => {
     })
 
     expect(result.ok).toBe(true)
-    expect(result.noop).toBeUndefined()
     expect(result.previousKinSlug).toBe('kinbot-master')
     expect(result.newKinSlug).toBe('kube-master')
 
-    // Binding was mutated to target
-    expect(updates).toHaveLength(1)
-    expect(updates[0]!.kinId).toBe('kin-target')
-
-    // Two audit rows, one per Kin, with the right systemEvent discriminator
-    expect(insertedRows).toHaveLength(2)
-    const fromRow = insertedRows.find((r) => r.kinId === 'kin-source')!
-    const toRow = insertedRows.find((r) => r.kinId === 'kin-target')!
-    expect(fromRow).toBeDefined()
-    expect(toRow).toBeDefined()
-    expect(fromRow.role).toBe('system')
-    expect(fromRow.sourceType).toBe('system')
-    expect(toRow.role).toBe('system')
-    expect(toRow.sourceType).toBe('system')
-    const fromMeta = JSON.parse(fromRow.metadata)
-    const toMeta = JSON.parse(toRow.metadata)
-    expect(fromMeta.systemEvent).toBe('channel_transferred_out')
-    expect(fromMeta.targetKinSlug).toBe('kube-master')
-    expect(fromMeta.reason).toBe('Nicolas wants to talk to Kube Master about the cluster')
-    expect(toMeta.systemEvent).toBe('channel_transferred_in')
-    expect(toMeta.fromKinSlug).toBe('kinbot-master')
-    expect(toMeta.reason).toBe('Nicolas wants to talk to Kube Master about the cluster')
-
-    // Sideband hint was set with the source Kin info
-    expect(mockSetChannelTransferHint).toHaveBeenCalledTimes(1)
-    // Bun's mock typings narrow `calls` to `[]` for variadic mocks; cast to any
-    // for argument inspection.
-    const hintCall = (mockSetChannelTransferHint.mock.calls as any[])[0]
-    expect(hintCall[0]).toBe('ch-1')
-    const hint = hintCall[1] as { fromKinSlug: string; fromKinName: string; reason?: string }
-    expect(hint.fromKinSlug).toBe('kinbot-master')
-    expect(hint.fromKinName).toBe('KinBot Master')
-    expect(hint.reason).toBe('Nicolas wants to talk to Kube Master about the cluster')
-
-    // SSE broadcast fired with the full transfer payload
-    expect(mockBroadcast).toHaveBeenCalledTimes(1)
-    const event = (mockBroadcast.mock.calls as any[])[0][0] as { type: string; data: Record<string, unknown> }
-    expect(event.type).toBe('channel:transferred')
-    expect(event.data.channelId).toBe('ch-1')
-    expect(event.data.fromKinSlug).toBe('kinbot-master')
-    expect(event.data.toKinSlug).toBe('kube-master')
-    expect(event.data.reason).toBe('Nicolas wants to talk to Kube Master about the cluster')
+    expect(mockTransferChannel).toHaveBeenCalledTimes(1)
+    const args = (mockTransferChannel.mock.calls as any[])[0][0]
+    expect(args.channelId).toBe('ch-1')
+    expect(args.targetKinId).toBe('kin-target')
+    expect(args.reason).toBe('Nicolas wants to talk to Kube Master about the cluster')
+    expect(args.initiatedBy).toBe('tool')
+    expect(args.calledByKinId).toBe('caller-kin')
   })
 
-  itMocked('returns a no-op when the target Kin is already the bound Kin', async () => {
-    mockGetChannel.mockResolvedValue({ id: 'ch-1', name: 'WhatsApp main', kinId: 'kin-target' })
+  itMocked('propagates the service no-op result to the caller', async () => {
     mockResolveKinId.mockReturnValue('kin-target')
+    mockTransferChannel.mockResolvedValue({
+      ok: true,
+      noop: true,
+      message: 'Channel is already bound to this Kin.',
+    })
 
     const result = await executeTool(transferChannelTool, {
       channelId: 'ch-1',
@@ -243,14 +216,15 @@ describe('transferChannelTool', () => {
 
     expect(result.ok).toBe(true)
     expect(result.noop).toBe(true)
-    expect(insertedRows).toHaveLength(0)
-    expect(updates).toHaveLength(0)
-    expect(mockSetChannelTransferHint).not.toHaveBeenCalled()
-    expect(mockBroadcast).not.toHaveBeenCalled()
+    expect(result.message).toContain('already bound')
   })
 
-  itMocked('returns an error when the channel does not exist', async () => {
-    mockGetChannel.mockResolvedValue(null)
+  itMocked('returns the service error verbatim when transferChannel fails', async () => {
+    mockResolveKinId.mockReturnValue('kin-target')
+    mockTransferChannel.mockResolvedValue({
+      ok: false,
+      error: 'Channel "ch-missing" not found.',
+    })
 
     const result = await executeTool(transferChannelTool, {
       channelId: 'ch-missing',
@@ -258,12 +232,9 @@ describe('transferChannelTool', () => {
     })
 
     expect(result.error).toContain('Channel "ch-missing" not found')
-    expect(insertedRows).toHaveLength(0)
-    expect(updates).toHaveLength(0)
   })
 
-  itMocked('returns an error when the target Kin cannot be resolved', async () => {
-    mockGetChannel.mockResolvedValue({ id: 'ch-1', name: 'WhatsApp main', kinId: 'kin-source' })
+  itMocked('returns an error and does NOT call the service when the target Kin slug is unknown', async () => {
     mockResolveKinId.mockReturnValue(null)
 
     const result = await executeTool(transferChannelTool, {
@@ -272,16 +243,16 @@ describe('transferChannelTool', () => {
     })
 
     expect(result.error).toContain('Kin "no-such-kin" not found')
-    expect(updates).toHaveLength(0)
+    expect(mockTransferChannel).not.toHaveBeenCalled()
   })
 
-  itMocked('errors out when channelId is missing and cannot be inferred from the context', async () => {
+  itMocked('errors out when channelId is missing and cannot be inferred from context', async () => {
     const result = await executeTool(transferChannelTool, {
       targetKinSlug: 'kube-master',
     })
 
     expect(result.error).toContain('channelId could not be inferred')
-    expect(mockGetChannel).not.toHaveBeenCalled()
+    expect(mockTransferChannel).not.toHaveBeenCalled()
   })
 
   itMocked('infers channelId from ctx.channelOriginId when not passed explicitly', async () => {
@@ -293,12 +264,7 @@ describe('transferChannelTool', () => {
       createdAt: Date.now(),
       ttlMs: 60000,
     })
-    mockGetChannel.mockResolvedValue({ id: 'ch-from-context', name: 'Discord main', kinId: 'kin-source' })
     mockResolveKinId.mockReturnValue('kin-target')
-    dbSelectQueue = [
-      { id: 'kin-source', slug: 'kinbot-master', name: 'KinBot Master' },
-      { id: 'kin-target', slug: 'kube-master', name: 'Kube Master' },
-    ]
 
     const result = await executeTool(
       transferChannelTool,
@@ -307,90 +273,14 @@ describe('transferChannelTool', () => {
     )
 
     expect(result.ok).toBe(true)
-    expect(mockGetChannel).toHaveBeenCalledWith('ch-from-context')
-    expect(updates[0]!.kinId).toBe('kin-target')
+    expect(mockTransferChannel).toHaveBeenCalledTimes(1)
+    expect((mockTransferChannel.mock.calls as any[])[0][0].channelId).toBe('ch-from-context')
   })
 
-  // Zod-level validation: reason over 200 chars rejected by the schema. The
-  // Vercel AI SDK exposes the parsed schema as `inputSchema`. Validate
-  // directly so the assertion is independent of how the SDK wires up
-  // runtime validation under .execute().
-  itMocked('rejects a reason longer than 200 characters via the Zod schema', async () => {
+  itMocked('rejects a reason longer than 200 characters via the Zod schema (before reaching the service)', async () => {
     const tooLong = 'x'.repeat(201)
     const t = transferChannelTool.create({ kinId: 'caller-kin', isSubKin: false })
     const parsed = t.inputSchema.safeParse({ channelId: 'ch-1', targetKinSlug: 's', reason: tooLong })
     expect(parsed.success).toBe(false)
-  })
-
-  itMocked('calls adapter.onIdentityChange with the new Kin identity when declared on the adapter', async () => {
-    const onIdentityChange = mock(() => Promise.resolve())
-    mockAdapterByPlatform.set('telegram', {
-      platform: 'telegram',
-      identitySwitchMode: 'native',
-      onIdentityChange,
-    })
-    mockGetChannel.mockResolvedValue({
-      id: 'ch-1',
-      name: 'Telegram main',
-      platform: 'telegram',
-      platformConfig: '{"botTokenVaultKey":"k"}',
-      kinId: 'kin-source',
-    })
-    mockResolveKinId.mockReturnValue('kin-target')
-    dbSelectQueue = [
-      { id: 'kin-source', slug: 'kinbot-master', name: 'KinBot Master', avatarPath: null, updatedAt: null },
-      { id: 'kin-target', slug: 'kube-master', name: 'Kube Master', avatarPath: 'kube.png', updatedAt: new Date(1234567890) },
-    ]
-
-    const result = await executeTool(transferChannelTool, {
-      channelId: 'ch-1',
-      targetKinSlug: 'kube-master',
-    })
-
-    expect(result.ok).toBe(true)
-    expect(onIdentityChange).toHaveBeenCalledTimes(1)
-    const [calledChannelId, calledCfg, calledIdentity] = (onIdentityChange.mock.calls as any[])[0]
-    expect(calledChannelId).toBe('ch-1')
-    expect(calledCfg).toEqual({ botTokenVaultKey: 'k' })
-    expect(calledIdentity.kinSlug).toBe('kube-master')
-    expect(calledIdentity.kinName).toBe('Kube Master')
-    // Avatar URL is absolute (publicUrl + relative /api/uploads/... built by
-    // kinAvatarUrl). We only assert structure, not the env-dependent host.
-    expect(typeof calledIdentity.avatarUrl).toBe('string')
-    expect(calledIdentity.avatarUrl).toContain('/api/uploads/kins/kin-target/avatar.png')
-  })
-
-  itMocked('swallows onIdentityChange errors so the transfer itself still succeeds', async () => {
-    const onIdentityChange = mock(() => Promise.reject(new Error('platform timed out')))
-    mockAdapterByPlatform.set('discord', {
-      platform: 'discord',
-      identitySwitchMode: 'native',
-      onIdentityChange,
-    })
-    mockGetChannel.mockResolvedValue({
-      id: 'ch-1',
-      name: 'Discord main',
-      platform: 'discord',
-      platformConfig: '{}',
-      kinId: 'kin-source',
-    })
-    mockResolveKinId.mockReturnValue('kin-target')
-    dbSelectQueue = [
-      { id: 'kin-source', slug: 'kinbot-master', name: 'KinBot Master', avatarPath: null, updatedAt: null },
-      { id: 'kin-target', slug: 'kube-master', name: 'Kube Master', avatarPath: null, updatedAt: null },
-    ]
-
-    const result = await executeTool(transferChannelTool, {
-      channelId: 'ch-1',
-      targetKinSlug: 'kube-master',
-    })
-
-    expect(result.ok).toBe(true)
-    expect(result.newKinSlug).toBe('kube-master')
-    expect(onIdentityChange).toHaveBeenCalledTimes(1)
-    // Binding mutation, SSE broadcast, and audit rows still happened.
-    expect(updates).toHaveLength(1)
-    expect(mockBroadcast).toHaveBeenCalledTimes(1)
-    expect(insertedRows).toHaveLength(2)
   })
 })

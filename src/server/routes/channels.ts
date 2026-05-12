@@ -16,7 +16,9 @@ import {
   countPendingApprovals,
   countPendingApprovalsForChannel,
   handleIncomingChannelMessage,
+  transferChannel,
 } from '@/server/services/channels'
+import { resolveKinId } from '@/server/services/kin-resolver'
 import type { AppVariables } from '@/server/app'
 import { channelAdapters } from '@/server/channels/index'
 import {
@@ -247,8 +249,29 @@ channelRoutes.patch('/:id', async (c) => {
     autoCreateContacts?: boolean
   }>()
 
+  // Block silent kinId mutations: re-binding a channel triggers system
+  // events, the sideband hint, the SSE broadcast, and onIdentityChange.
+  // Any caller that bypassed this and PATCHed kinId directly would skip
+  // all of that and leave the system in a half-state. Route them to the
+  // transfer endpoint (or the transfer_channel tool).
+  if (body.kinId !== undefined && body.kinId !== existing.kinId) {
+    return c.json(
+      {
+        error: {
+          code: 'KINID_NOT_PATCHABLE',
+          message: 'To change the bound Kin, use POST /api/channels/:id/transfer or the transfer_channel tool.',
+        },
+      },
+      400,
+    )
+  }
+
+  // Strip kinId from the patch even when it matches (no-op) so updateChannel
+  // never sees a kinId at all on this code path.
+  const { kinId: _ignoreKinId, ...patch } = body
+
   try {
-    const updated = await updateChannel(channelId, body)
+    const updated = await updateChannel(channelId, patch)
     if (!updated) {
       return c.json({ error: { code: 'NOT_FOUND', message: 'Channel not found' } }, 404)
     }
@@ -261,6 +284,85 @@ channelRoutes.patch('/:id', async (c) => {
       400,
     )
   }
+})
+
+// POST /api/channels/:id/transfer — re-bind a channel to a different Kin
+//
+// Shared entry point for UI driven transfers. Calls the same
+// transferChannel() service that the transfer_channel tool uses, so the
+// audit-trail rows, sideband hint, SSE broadcast, and adapter identity
+// switch all fire consistently regardless of who initiated the action.
+channelRoutes.post('/:id/transfer', async (c) => {
+  const channelId = c.req.param('id')
+  const existing = await getChannel(channelId)
+  if (!existing) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Channel not found' } }, 404)
+  }
+
+  const body = await c.req.json<{
+    targetKinId?: string
+    targetKinSlug?: string
+    reason?: string
+  }>()
+
+  if (!body.targetKinId && !body.targetKinSlug) {
+    return c.json(
+      { error: { code: 'VALIDATION_ERROR', message: 'targetKinId or targetKinSlug is required.' } },
+      400,
+    )
+  }
+
+  if (body.reason !== undefined && body.reason.length > 200) {
+    return c.json(
+      { error: { code: 'VALIDATION_ERROR', message: 'reason must be 200 characters or fewer.' } },
+      400,
+    )
+  }
+
+  // Resolve to a UUID; accept either targetKinId (UUID expected) or
+  // targetKinSlug (slug or UUID, normalized via the resolver).
+  const targetKinId = body.targetKinId ?? (body.targetKinSlug ? resolveKinId(body.targetKinSlug) : null)
+  if (!targetKinId) {
+    return c.json(
+      { error: { code: 'NOT_FOUND', message: `Target Kin "${body.targetKinId ?? body.targetKinSlug}" not found.` } },
+      404,
+    )
+  }
+
+  const result = await transferChannel({
+    channelId,
+    targetKinId,
+    reason: body.reason,
+    initiatedBy: 'ui',
+  })
+
+  if (result.ok === false) {
+    // transferChannel returns dangling-row / unknown-channel errors that map
+    // to 404; the only other failure here is the no-op case (ok:true, noop)
+    // which is handled below.
+    return c.json({ error: { code: 'TRANSFER_ERROR', message: result.error } }, 404)
+  }
+
+  if (result.noop) {
+    return c.json({ ok: true, noop: true, message: result.message })
+  }
+
+  // On success, return the updated channel envelope plus the transfer info
+  // so the caller can update its local state without an extra GET.
+  const updated = await getChannel(channelId)
+  const kin = updated
+    ? await db.select({ name: kins.name, avatarPath: kins.avatarPath }).from(kins).where(eq(kins.id, updated.kinId)).get()
+    : undefined
+
+  return c.json({
+    ok: true,
+    transferredAt: result.transferredAt,
+    previousKinSlug: result.previousKinSlug,
+    newKinSlug: result.newKinSlug,
+    fromKinName: result.fromKinName,
+    toKinName: result.toKinName,
+    channel: updated ? serializeChannel(updated, kin ?? undefined) : null,
+  })
 })
 
 // DELETE /api/channels/:id — delete a channel

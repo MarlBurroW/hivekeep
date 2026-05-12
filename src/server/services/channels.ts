@@ -10,6 +10,7 @@ import { createContact } from '@/server/services/contacts'
 import { channelAdapters } from '@/server/channels/index'
 import { sseManager } from '@/server/sse/index'
 import { config } from '@/server/config'
+import { kinAvatarUrl } from '@/server/services/field-validator'
 import { getContactDisplayName } from '@/shared/contact-display'
 import type { IncomingMessage, OutboundAttachment } from '@/server/channels/adapter'
 import type { ChannelPlatform, ChannelStatus } from '@/shared/types'
@@ -762,6 +763,208 @@ export async function deliverChannelResponse(
     log.info({ channelId: meta.channelId, kinId: channel.kinId, platform: channel.platform }, 'Channel response delivered')
   } catch (err) {
     log.error({ channelId: meta.channelId, err }, 'Failed to deliver channel response')
+  }
+}
+
+// ─── Channel transfer (UI + tool share this single entry point) ─────────────
+
+export interface TransferChannelParams {
+  channelId: string
+  targetKinId: string
+  reason?: string
+  /** Surfaced in the log line only; useful for ops traceability. */
+  initiatedBy: 'tool' | 'ui'
+  /** Calling Kin ID (tool flow). Logged for audit, not persisted. */
+  calledByKinId?: string
+}
+
+export type TransferChannelResult =
+  | { ok: true; noop: true; message: string }
+  | {
+      ok: true
+      noop?: false
+      transferredAt: number
+      previousKinSlug: string
+      newKinSlug: string
+      fromKinId: string
+      fromKinName: string
+      toKinId: string
+      toKinName: string
+    }
+  | { ok: false; error: string }
+
+/**
+ * Re-bind a channel to a different Kin at runtime. Single source of truth for
+ * both the transfer_channel tool and the REST endpoint
+ * POST /api/channels/:id/transfer. Wraps:
+ *
+ *   1. Validation: channel exists, target Kin exists, no-op detection.
+ *   2. channels.kinId mutation.
+ *   3. Two role='system' audit-trail messages (one per Kin, with
+ *      metadata.systemEvent set so buildMessageHistory can filter them out
+ *      of the LLM prompt and the UI can render them as handoff banners).
+ *   4. Sideband channelTransferHint for the next inbound's <channel-context>.
+ *   5. SSE 'channel:transferred' broadcast.
+ *   6. Best-effort adapter.onIdentityChange (warn on failure).
+ *
+ * Callers should never re-implement any of these steps directly; the only
+ * place channels.kinId is mutated should be here.
+ */
+export async function transferChannel(params: TransferChannelParams): Promise<TransferChannelResult> {
+  const channel = await getChannel(params.channelId)
+  if (!channel) {
+    return { ok: false, error: `Channel "${params.channelId}" not found.` }
+  }
+
+  if (channel.kinId === params.targetKinId) {
+    return { ok: true, noop: true, message: 'Channel is already bound to this Kin.' }
+  }
+
+  const fromKinRow = db
+    .select({ id: kins.id, slug: kins.slug, name: kins.name })
+    .from(kins)
+    .where(eq(kins.id, channel.kinId))
+    .get()
+  if (!fromKinRow) {
+    return { ok: false, error: `Source Kin "${channel.kinId}" not found; refusing to transfer from a dangling binding.` }
+  }
+  const toKinRow = db
+    .select({ id: kins.id, slug: kins.slug, name: kins.name, avatarPath: kins.avatarPath, updatedAt: kins.updatedAt })
+    .from(kins)
+    .where(eq(kins.id, params.targetKinId))
+    .get()
+  if (!toKinRow) {
+    return { ok: false, error: `Target Kin "${params.targetKinId}" not found; refusing to transfer to a dangling binding.` }
+  }
+
+  const fromKinId = fromKinRow.id
+  const fromKinSlug = fromKinRow.slug ?? fromKinRow.id
+  const fromKinName = fromKinRow.name
+  const toKinId = toKinRow.id
+  const toKinSlug = toKinRow.slug ?? toKinRow.id
+  const toKinName = toKinRow.name
+
+  const at = Date.now()
+  const now = new Date(at)
+
+  // (2) Mutate the binding.
+  await db
+    .update(channels)
+    .set({ kinId: toKinId, updatedAt: now })
+    .where(eq(channels.id, channel.id))
+
+  // (3) Audit-trail rows. Same content/shape as before the extraction so the
+  //     UI rendering and prompt filtering continue to work unchanged.
+  const reasonOrNull = params.reason ?? null
+  const outMetaJson = JSON.stringify({
+    systemEvent: 'channel_transferred_out',
+    channelId: channel.id,
+    channelName: channel.name,
+    targetKinId: toKinId,
+    targetKinSlug: toKinSlug,
+    targetKinName: toKinName,
+    reason: reasonOrNull,
+    at,
+  })
+  const inMetaJson = JSON.stringify({
+    systemEvent: 'channel_transferred_in',
+    channelId: channel.id,
+    channelName: channel.name,
+    fromKinId,
+    fromKinSlug,
+    fromKinName,
+    reason: reasonOrNull,
+    at,
+  })
+  await db.insert(messages).values({
+    id: uuid(),
+    kinId: fromKinId,
+    role: 'system',
+    content: null,
+    sourceType: 'system',
+    sourceId: null,
+    metadata: outMetaJson,
+    createdAt: now,
+  })
+  await db.insert(messages).values({
+    id: uuid(),
+    kinId: toKinId,
+    role: 'system',
+    content: null,
+    sourceType: 'system',
+    sourceId: null,
+    metadata: inMetaJson,
+    createdAt: now,
+  })
+
+  // (4) One-shot sideband hint for the next inbound.
+  setChannelTransferHint(channel.id, {
+    fromKinId,
+    fromKinSlug,
+    fromKinName,
+    reason: params.reason,
+    at,
+  })
+
+  // (5) Live UI broadcast.
+  sseManager.broadcast({
+    type: 'channel:transferred',
+    data: {
+      channelId: channel.id,
+      channelName: channel.name,
+      platform: channel.platform,
+      fromKinId,
+      fromKinSlug,
+      fromKinName,
+      toKinId,
+      toKinSlug,
+      toKinName,
+      reason: reasonOrNull,
+      at,
+    },
+  })
+
+  // (6) Best-effort native identity switch on the external platform.
+  const adapter = channelAdapters.get(channel.platform)
+  if (adapter && typeof adapter.onIdentityChange === 'function') {
+    try {
+      const cfg = JSON.parse(channel.platformConfig) as Record<string, unknown>
+      const relAvatar = kinAvatarUrl(toKinId, toKinRow.avatarPath, toKinRow.updatedAt)
+      const avatarUrl = relAvatar ? `${config.publicUrl}${relAvatar}` : undefined
+      await adapter.onIdentityChange(channel.id, cfg, {
+        kinSlug: toKinSlug,
+        kinName: toKinName,
+        avatarUrl,
+      })
+    } catch (err) {
+      log.warn(
+        { err: err instanceof Error ? err.message : String(err), channelId: channel.id, newKinSlug: toKinSlug },
+        'onIdentityChange failed (non-fatal); the prefix fallback (if any) still applies',
+      )
+    }
+  }
+
+  log.info(
+    {
+      initiatedBy: params.initiatedBy,
+      calledByKinId: params.calledByKinId ?? null,
+      channelId: channel.id,
+      fromKinId,
+      toKinId,
+      reason: reasonOrNull,
+    },
+    'Channel transferred',
+  )
+
+  return {
+    ok: true,
+    transferredAt: at,
+    previousKinSlug: fromKinSlug,
+    newKinSlug: toKinSlug,
+    fromKinId,
+    fromKinName,
+    toKinId,
+    toKinName,
   }
 }
 

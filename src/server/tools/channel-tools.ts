@@ -1,7 +1,5 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
-import { v4 as uuid } from 'uuid'
 import {
   listChannels,
   getChannel,
@@ -11,16 +9,11 @@ import {
   deleteChannel,
   activateChannel,
   deactivateChannel,
-  setChannelTransferHint,
   getChannelOriginMeta,
+  transferChannel,
 } from '@/server/services/channels'
-import { db } from '@/server/db/index'
-import { channels, kins, messages } from '@/server/db/schema'
 import { resolveKinId } from '@/server/services/kin-resolver'
-import { kinAvatarUrl } from '@/server/services/field-validator'
 import { channelAdapters } from '@/server/channels/index'
-import { sseManager } from '@/server/sse/index'
-import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
 import type { ToolRegistration } from '@/server/tools/types'
 import type { OutboundAttachment } from '@/server/channels/adapter'
@@ -336,184 +329,43 @@ export const transferChannelTool: ToolRegistration = {
         reason: z.string().max(200).optional().describe('Optional human-readable explanation, shown in the audit trail and surfaced to the new Kin as context.'),
       }),
       execute: async ({ channelId, targetKinSlug, reason }) => {
-        // 1. Resolve channelId (explicit > inferred from current channel turn).
+        // Resolve channelId (explicit > inferred from the current channel turn).
         let resolvedChannelId = channelId
-        if (!resolvedChannelId) {
-          if (ctx.channelOriginId) {
-            const origin = getChannelOriginMeta(ctx.channelOriginId)
-            if (origin) resolvedChannelId = origin.channelId
-          }
+        if (!resolvedChannelId && ctx.channelOriginId) {
+          const origin = getChannelOriginMeta(ctx.channelOriginId)
+          if (origin) resolvedChannelId = origin.channelId
         }
         if (!resolvedChannelId) {
           return { error: 'channelId could not be inferred from the current context; please pass it explicitly.' }
         }
 
-        // 2. Load the channel.
-        const channel = await getChannel(resolvedChannelId)
-        if (!channel) {
-          return { error: `Channel "${resolvedChannelId}" not found.` }
-        }
-
-        // 3. Resolve the target Kin (slug or UUID → UUID, then load the full row).
+        // Resolve the target Kin slug/UUID to a UUID; the service does the
+        // rest (channel + Kin row loads, mutation, audit rows, sideband hint,
+        // SSE broadcast, onIdentityChange).
         const toKinId = resolveKinId(targetKinSlug)
         if (!toKinId) {
           return { error: `Kin "${targetKinSlug}" not found (unknown slug or UUID).` }
         }
 
-        // 4. No-op if already bound to the target.
-        if (channel.kinId === toKinId) {
-          return { ok: true, noop: true, message: 'Channel is already bound to this Kin.' }
-        }
-
-        // 5. Capture both Kin rows (source for audit + sideband, target for the
-        //    audit trail row and the SSE event). Two separate queries keep the
-        //    mock surface in tests narrow (same dbChain.get pattern used by
-        //    sibling tool tests).
-        const fromKinRow = db
-          .select({ id: kins.id, slug: kins.slug, name: kins.name })
-          .from(kins)
-          .where(eq(kins.id, channel.kinId))
-          .get()
-        if (!fromKinRow) {
-          return { error: `Source Kin "${channel.kinId}" not found; refusing to transfer from a dangling binding.` }
-        }
-        const toKinRow = db
-          .select({ id: kins.id, slug: kins.slug, name: kins.name, avatarPath: kins.avatarPath, updatedAt: kins.updatedAt })
-          .from(kins)
-          .where(eq(kins.id, toKinId))
-          .get()
-        if (!toKinRow) {
-          return { error: `Target Kin "${toKinId}" not found after resolution; refusing to transfer to a dangling binding.` }
-        }
-        const fromKinId = fromKinRow.id
-        const fromKinSlug = fromKinRow.slug ?? fromKinRow.id
-        const fromKinName = fromKinRow.name
-        const toKinSlug = toKinRow.slug ?? toKinRow.id
-        const toKinName = toKinRow.name
-        const toKinAvatarPath = toKinRow.avatarPath
-        const toKinUpdatedAt = toKinRow.updatedAt
-
-        const at = Date.now()
-        const now = new Date(at)
-
-        // 6. Mutate the binding.
-        await db
-          .update(channels)
-          .set({ kinId: toKinId, updatedAt: now })
-          .where(eq(channels.id, channel.id))
-
-        // 7. Insert two audit-trail rows, one in each Kin's history.
-        //    role='system' + sourceType='system' renders as a centered banner
-        //    in the chat UI. metadata.systemEvent discriminates the row type
-        //    for the UI; buildMessageHistory filters both out of the LLM prompt.
-        const outMetaJson = JSON.stringify({
-          systemEvent: 'channel_transferred_out',
-          channelId: channel.id,
-          channelName: channel.name,
+        const result = await transferChannel({
+          channelId: resolvedChannelId,
           targetKinId: toKinId,
-          targetKinSlug: toKinSlug,
-          targetKinName: toKinName,
-          reason: reason ?? null,
-          at,
-        })
-        const inMetaJson = JSON.stringify({
-          systemEvent: 'channel_transferred_in',
-          channelId: channel.id,
-          channelName: channel.name,
-          fromKinId,
-          fromKinSlug,
-          fromKinName,
-          reason: reason ?? null,
-          at,
-        })
-        await db.insert(messages).values({
-          id: uuid(),
-          kinId: fromKinId,
-          role: 'system',
-          content: null,
-          sourceType: 'system',
-          sourceId: null,
-          metadata: outMetaJson,
-          createdAt: now,
-        })
-        await db.insert(messages).values({
-          id: uuid(),
-          kinId: toKinId,
-          role: 'system',
-          content: null,
-          sourceType: 'system',
-          sourceId: null,
-          metadata: inMetaJson,
-          createdAt: now,
-        })
-
-        // 8. Stash the one-shot hint for the next inbound.
-        setChannelTransferHint(channel.id, {
-          fromKinId,
-          fromKinSlug,
-          fromKinName,
           reason,
-          at,
+          initiatedBy: 'tool',
+          calledByKinId: ctx.kinId,
         })
 
-        // 9. Broadcast SSE so live UI tabs refresh the sidebar binding.
-        sseManager.broadcast({
-          type: 'channel:transferred',
-          data: {
-            channelId: channel.id,
-            channelName: channel.name,
-            fromKinId,
-            fromKinSlug,
-            fromKinName,
-            toKinId,
-            toKinSlug,
-            toKinName,
-            reason: reason ?? null,
-            at,
-          },
-        })
-
-        // 10. Best-effort native identity switch on the external platform.
-        //     Adapters that declare identitySwitchMode: 'native' implement
-        //     onIdentityChange and update their bot's display name and
-        //     avatar on the platform. Errors are non-fatal: the binding is
-        //     already mutated, and adapters with mode 'prefix' (or no
-        //     declared mode) rely on the deliverChannelResponse prefix
-        //     fallback added in the previous commit, so the user-visible
-        //     side stays correct either way.
-        const adapter = channelAdapters.get(channel.platform)
-        if (adapter && typeof adapter.onIdentityChange === 'function') {
-          try {
-            const cfg = JSON.parse(channel.platformConfig) as Record<string, unknown>
-            // Build an absolute avatar URL when the target Kin has one.
-            // kinAvatarUrl returns a relative '/api/uploads/...' path; we
-            // prefix it with config.publicUrl so external platforms (Discord
-            // CDN fetch, Matrix media upload, etc.) can resolve it.
-            const relAvatar = kinAvatarUrl(toKinId, toKinAvatarPath, toKinUpdatedAt)
-            const avatarUrl = relAvatar ? `${config.publicUrl}${relAvatar}` : undefined
-            await adapter.onIdentityChange(channel.id, cfg, {
-              kinSlug: toKinSlug,
-              kinName: toKinName,
-              avatarUrl,
-            })
-          } catch (err) {
-            log.warn(
-              { err: err instanceof Error ? err.message : String(err), channelId: channel.id, newKinSlug: toKinSlug },
-              'onIdentityChange failed (non-fatal); the prefix fallback (if any) still applies',
-            )
-          }
+        if (result.ok === false) {
+          return { error: result.error }
         }
-
-        log.info(
-          { calledByKinId: ctx.kinId, channelId: channel.id, fromKinId, toKinId, reason: reason ?? null },
-          'Channel transferred',
-        )
-
+        if (result.noop) {
+          return { ok: true, noop: true, message: result.message }
+        }
         return {
           ok: true,
-          transferredAt: at,
-          previousKinSlug: fromKinSlug,
-          newKinSlug: toKinSlug,
+          transferredAt: result.transferredAt,
+          previousKinSlug: result.previousKinSlug,
+          newKinSlug: result.newKinSlug,
         }
       },
     }),
