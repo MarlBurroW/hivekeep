@@ -354,6 +354,106 @@ export default function claudeCodePlugin(ctx: PluginCtx) {
     return completion
   }
 
+  // ─── Inspection helpers + tools ──────────────────────────────────────────
+  // Both list_sessions and get_session derive their output from the same
+  // session shape, so we share a serializer to keep formats in sync.
+
+  type SerializedStatus = 'running' | 'completed' | 'failed' | 'aborted'
+
+  function statusFromPhase(phase: RunPhase): SerializedStatus {
+    switch (phase) {
+      case 'starting':
+      case 'running':
+        return 'running'
+      case 'completed':
+        return 'completed'
+      case 'error':
+        return 'failed'
+      case 'aborted':
+        return 'aborted'
+    }
+  }
+
+  function isRecentRun(run: ActiveRun | RecentRun): run is RecentRun {
+    return (run as RecentRun).completedAt !== undefined
+  }
+
+  function serializeSession(run: ActiveRun | RecentRun) {
+    const durationMs = isRecentRun(run)
+      ? run.durationMs
+      : Date.now() - run.startedAt
+    return {
+      cardInstanceId: run.cardInstanceId,
+      sessionId: run.sessionId,
+      status: statusFromPhase(run.phase),
+      workingDir: run.workingDir,
+      startedAt: run.startedAt,
+      durationMs,
+      numTurns: run.numTurns,
+      totalCostUsd: run.totalCostUsd,
+      logCount: run.logs.length,
+      lastLogLine: run.logs.length > 0 ? run.logs[run.logs.length - 1] ?? null : null,
+    }
+  }
+
+  const listSessionsTool: ToolRegistration = {
+    availability: ['main', 'sub-kin'],
+    readOnly: true,
+    concurrencySafe: true,
+    create: () => tool({
+      description:
+        'List Claude Code sessions known to this process, both currently running and recently completed. ' +
+        'Use this to discover cardInstanceIds for follow-up inspection or control via the other claude_code_* tools. ' +
+        'Recent sessions are kept in memory and lost on service restart.',
+      inputSchema: z.object({
+        status: z.enum(['running', 'completed', 'failed', 'aborted', 'all']).optional().default('all').describe('Filter by status. "all" (default) returns every known session.'),
+        limit: z.number().int().min(1).max(50).optional().default(20).describe('Max number of sessions to return (1-50, default 20).'),
+      }),
+      execute: async ({ status, limit }) => {
+        const all: Array<ReturnType<typeof serializeSession>> = []
+        for (const run of activeRuns.values()) all.push(serializeSession(run))
+        for (const run of recentRuns.values()) all.push(serializeSession(run))
+        all.sort((a, b) => b.startedAt - a.startedAt)
+        const filtered = status === 'all' ? all : all.filter((s) => s.status === status)
+        return {
+          sessions: filtered.slice(0, limit),
+          total: filtered.length,
+        }
+      },
+    }),
+  }
+
+  const getSessionTool: ToolRegistration = {
+    availability: ['main', 'sub-kin'],
+    readOnly: true,
+    concurrencySafe: true,
+    create: () => tool({
+      description:
+        'Return the full state of a single Claude Code session by cardInstanceId, including a tail of the most recent log lines, ' +
+        'current step, phase, final message and error if any. Works for both running and recently completed sessions.',
+      inputSchema: z.object({
+        cardInstanceId: z.string().min(1).describe('The cardInstanceId returned by claude_code_run or claude_code_list_sessions.'),
+        logTail: z.number().int().min(1).max(200).optional().default(20).describe('Number of trailing log lines to return (1-200, default 20).'),
+      }),
+      execute: async ({ cardInstanceId, logTail }) => {
+        const run = activeRuns.get(cardInstanceId) ?? recentRuns.get(cardInstanceId)
+        if (!run) {
+          return { ok: false, error: 'Session not found. It may have been evicted from the in-memory cache or never existed in this process.' }
+        }
+        const base = serializeSession(run)
+        return {
+          ok: true,
+          ...base,
+          currentStep: run.currentStep,
+          phase: run.phase,
+          logs: run.logs.slice(-logTail),
+          finalMessage: run.finalMessage,
+          error: run.error,
+        }
+      },
+    }),
+  }
+
   const claudeCodeRunTool: ToolRegistration = {
     availability: ['main', 'sub-kin'],
     defaultDisabled: true,
@@ -441,6 +541,8 @@ export default function claudeCodePlugin(ctx: PluginCtx) {
   return {
     tools: {
       claude_code_run: claudeCodeRunTool,
+      claude_code_list_sessions: listSessionsTool,
+      claude_code_get_session: getSessionTool,
     },
 
     onCardAction: async (action: PluginCardActionContext): Promise<PluginCardActionResult> => {
