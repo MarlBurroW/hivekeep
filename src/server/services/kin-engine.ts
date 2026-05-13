@@ -1505,6 +1505,7 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
 
     const maxSteps = hasTools ? (config.tools.maxSteps > 0 ? config.tools.maxSteps : 100) : 1
     let wasAborted = false
+    let silentStopAfterTools = false
     const stepResults: Array<ReturnType<typeof streamText>> = []
 
     let step = 0
@@ -1642,8 +1643,18 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
         }
       }
 
-      // No tool calls this step → LLM is done, exit loop
-      if (stepToolCalls.length === 0 || wasAborted) break
+      // No tool calls this step → LLM is done, exit loop.
+      // Silent-stop detection: provider closed the stream with no text and no
+      // tool calls at this step, AFTER at least one prior tool batch executed
+      // and the overall turn produced no text either. The model has effectively
+      // given up without a final answer (observed on very large contexts with
+      // thinking models). Flag here, write the fallback after the loop.
+      if (stepToolCalls.length === 0 || wasAborted) {
+        if (!wasAborted && toolCallsLog.length > 0 && fullContent.length === 0) {
+          silentStopAfterTools = true
+        }
+        break
+      }
 
       // Build assistant content for history
       const assistantContent: Array<
@@ -1720,7 +1731,28 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
       }, 'Prompt cache stats')
     }
 
-    log.info({ kinId, messageId: assistantMessageId, contentLength: fullContent.length, toolCalls: toolCallsLog.length, wasAborted }, 'LLM turn completed')
+    log.info({ kinId, messageId: assistantMessageId, contentLength: fullContent.length, toolCalls: toolCallsLog.length, wasAborted, silentStopAfterTools }, 'LLM turn completed')
+
+    // Surface silent-stop: the provider closed the stream with no text after
+    // tool execution. Produce a user-visible fallback so the row is not
+    // persisted as empty (Anthropic also rejects empty text content blocks
+    // on the next turn, which would block the conversation entirely).
+    if (silentStopAfterTools) {
+      log.warn(
+        { kinId, messageId: assistantMessageId, toolCalls: toolCallsLog.length, step },
+        'LLM closed stream with no text after tool execution (silent stop)',
+      )
+      fullContent = `*(J'ai exécuté ${toolCallsLog.length} tool call${toolCallsLog.length > 1 ? 's' : ''} mais le modèle n'a pas produit de réponse finale. Cela arrive parfois sur de très gros contextes. Demande-moi de continuer ou de résumer.)*`
+      sseManager.sendToKin(kinId, {
+        type: 'chat:token',
+        kinId,
+        data: {
+          messageId: assistantMessageId,
+          token: fullContent,
+          isFirst: true,
+        },
+      })
+    }
 
     // Detect truncated turns: tool calls executed but the step limit was hit before
     // the LLM could produce a final text-only response.
@@ -2196,6 +2228,7 @@ export async function processQuickMessage(kinId: string): Promise<boolean> {
 
     const maxSteps = hasTools ? (config.tools.maxSteps > 0 ? config.tools.maxSteps : 100) : 1
     let wasAborted = false
+    let silentStopAfterTools = false
     const stepResults: Array<ReturnType<typeof streamText>> = []
 
     let step = 0
@@ -2298,8 +2331,14 @@ export async function processQuickMessage(kinId: string): Promise<boolean> {
         }
       }
 
-      // No tool calls this step → LLM is done, exit loop
-      if (stepToolCalls.length === 0 || wasAborted) break
+      // No tool calls this step → LLM is done, exit loop.
+      // Silent-stop detection: see processNextMessage for rationale.
+      if (stepToolCalls.length === 0 || wasAborted) {
+        if (!wasAborted && toolCallsLog.length > 0 && fullContent.length === 0) {
+          silentStopAfterTools = true
+        }
+        break
+      }
 
       // Build assistant content for history
       const assistantContent: Array<
@@ -2353,6 +2392,20 @@ export async function processQuickMessage(kinId: string): Promise<boolean> {
           outputTokenDetails: { reasoningTokens: tokenUsage.reasoningTokens ?? 0 },
         },
         stepCount: stepResults.length,
+      })
+    }
+
+    // Surface silent-stop (same rationale as main path)
+    if (silentStopAfterTools) {
+      log.warn(
+        { kinId, sessionId, messageId: assistantMessageId, toolCalls: toolCallsLog.length, step },
+        'Quick session: LLM closed stream with no text after tool execution (silent stop)',
+      )
+      fullContent = `*(J'ai exécuté ${toolCallsLog.length} tool call${toolCallsLog.length > 1 ? 's' : ''} mais le modèle n'a pas produit de réponse finale. Cela arrive parfois sur de très gros contextes. Demande-moi de continuer ou de résumer.)*`
+      sseManager.sendToKin(kinId, {
+        type: 'chat:token',
+        kinId,
+        data: { messageId: assistantMessageId, token: fullContent, sessionId },
       })
     }
 

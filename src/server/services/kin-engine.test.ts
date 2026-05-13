@@ -931,3 +931,118 @@ describe('maskOldToolResults', () => {
     expect(result.estimatedTokensSaved).toBeGreaterThan(0)
   })
 })
+
+// ─── silent-stop detection (private, re-implement contract) ──────────────────
+
+// Mirrors the inline detection in processNextMessage/processQuickMessage:
+// when the custom loop is about to exit (no tool calls produced this step)
+// and it was not aborted, but tools ran in a previous step and the overall
+// turn produced no text, flag silentStopAfterTools so a fallback message
+// can be written before persistence.
+function detectSilentStop(opts: {
+  stepToolCallsLength: number
+  wasAborted: boolean
+  toolCallsLogLength: number
+  fullContentLength: number
+}): boolean {
+  // Only inspect when the loop would actually break
+  const wouldBreak = opts.stepToolCallsLength === 0 || opts.wasAborted
+  if (!wouldBreak) return false
+  return (
+    !opts.wasAborted &&
+    opts.toolCallsLogLength > 0 &&
+    opts.fullContentLength === 0
+  )
+}
+
+describe('detectSilentStop', () => {
+  it('flags step where model emits nothing after a prior tool batch', () => {
+    // Step N+1: stream closed with no text and no tools, prior steps ran tools,
+    // overall fullContent is still empty → silent stop.
+    expect(
+      detectSilentStop({
+        stepToolCallsLength: 0,
+        wasAborted: false,
+        toolCallsLogLength: 2,
+        fullContentLength: 0,
+      }),
+    ).toBe(true)
+  })
+
+  it('does not flag when the model produced text', () => {
+    // Step 1 text-only finish (no tools called, no tools run before): not silent.
+    expect(
+      detectSilentStop({
+        stepToolCallsLength: 0,
+        wasAborted: false,
+        toolCallsLogLength: 0,
+        fullContentLength: 42,
+      }),
+    ).toBe(false)
+    // Step N+1 with text from earlier step: not silent.
+    expect(
+      detectSilentStop({
+        stepToolCallsLength: 0,
+        wasAborted: false,
+        toolCallsLogLength: 3,
+        fullContentLength: 120,
+      }),
+    ).toBe(false)
+  })
+
+  it('does not flag when no tools have ever run (plain empty response)', () => {
+    expect(
+      detectSilentStop({
+        stepToolCallsLength: 0,
+        wasAborted: false,
+        toolCallsLogLength: 0,
+        fullContentLength: 0,
+      }),
+    ).toBe(false)
+  })
+
+  it('does not flag when the user aborted', () => {
+    expect(
+      detectSilentStop({
+        stepToolCallsLength: 0,
+        wasAborted: true,
+        toolCallsLogLength: 2,
+        fullContentLength: 0,
+      }),
+    ).toBe(false)
+  })
+
+  it('does not flag mid-loop iterations (tool calls still being produced)', () => {
+    expect(
+      detectSilentStop({
+        stepToolCallsLength: 1,
+        wasAborted: false,
+        toolCallsLogLength: 0,
+        fullContentLength: 0,
+      }),
+    ).toBe(false)
+  })
+})
+
+// ─── silent-stop fallback shape ──────────────────────────────────────────────
+
+// The fallback message is composed at the kin-engine and tasks call sites.
+// Re-implement the pluralization to lock the contract.
+function silentStopFallbackKinEngine(toolCallsCount: number): string {
+  return `*(J'ai exécuté ${toolCallsCount} tool call${toolCallsCount > 1 ? 's' : ''} mais le modèle n'a pas produit de réponse finale. Cela arrive parfois sur de très gros contextes. Demande-moi de continuer ou de résumer.)*`
+}
+
+describe('silent-stop fallback (kin-engine wording)', () => {
+  it('singular for 1 tool call', () => {
+    expect(silentStopFallbackKinEngine(1)).toContain('1 tool call ')
+    expect(silentStopFallbackKinEngine(1)).not.toContain('tool calls')
+  })
+
+  it('plural for >1 tool calls', () => {
+    expect(silentStopFallbackKinEngine(5)).toContain('5 tool calls')
+  })
+
+  it("mentions that the model did not produce a final response", () => {
+    expect(silentStopFallbackKinEngine(2)).toContain("n'a pas produit de réponse finale")
+  })
+})

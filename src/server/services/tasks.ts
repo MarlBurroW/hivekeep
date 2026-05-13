@@ -664,6 +664,7 @@ async function executeSubKin(taskId: string, isNudge = false) {
 
     const maxSteps = hasTools ? (config.tools.maxSteps > 0 ? config.tools.maxSteps : 100) : 1
     const stepResults: Array<ReturnType<typeof streamText>> = []
+    let silentStopAfterTools = false
 
     let step = 0
     for (; step < maxSteps; step++) {
@@ -792,8 +793,22 @@ async function executeSubKin(taskId: string, isNudge = false) {
         }
       }
 
-      // No tool calls this step or error/abort → exit loop
-      if (stepToolCalls.length === 0 || streamError || abortController.signal.aborted) break
+      // No tool calls this step or error/abort → exit loop.
+      // Silent-stop detection: provider closed the stream with no text and no
+      // tool calls at this step, AFTER at least one prior tool batch executed
+      // and the overall turn produced no text either. Surface a fallback below
+      // so the task doesn't end with an empty assistant row.
+      if (stepToolCalls.length === 0 || streamError || abortController.signal.aborted) {
+        if (
+          !streamError &&
+          !abortController.signal.aborted &&
+          toolCallsLog.length > 0 &&
+          fullContent.length === 0
+        ) {
+          silentStopAfterTools = true
+        }
+        break
+      }
 
       // Build assistant content for history
       const assistantContent: Array<
@@ -923,6 +938,24 @@ async function executeSubKin(taskId: string, isNudge = false) {
         await resolveTask(taskId, 'failed', undefined, streamError.message)
       }
       return
+    }
+
+    // Surface silent-stop: provider closed the stream with no text after
+    // tool execution. Produce a fallback so the task row is not persisted
+    // as empty (Anthropic also rejects empty text content blocks on the
+    // next turn, which would block the conversation entirely).
+    if (silentStopAfterTools) {
+      log.warn(
+        { taskId, messageId: assistantMessageId, toolCalls: toolCallsLog.length, step },
+        'Sub-Kin: LLM closed stream with no text after tool execution (silent stop)',
+      )
+      fullContent = `*(This task executed ${toolCallsLog.length} tool call${toolCallsLog.length > 1 ? 's' : ''} but the model did not produce a final response. This can happen on very large contexts. Retry with a tighter scope or ask the Kin to continue.)*`
+      streamSnapshot.content = fullContent
+      sseManager.sendToKin(task.parentKinId, {
+        type: 'chat:token',
+        kinId: task.parentKinId,
+        data: { messageId: assistantMessageId, token: fullContent, taskId, contentLength: fullContent.length },
+      })
     }
 
     // Detect silent provider failures: stream completed but produced no output at all
