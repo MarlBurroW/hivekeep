@@ -705,6 +705,10 @@ export interface TicketSummary {
   tags: ProjectTag[]
   taskCount: number
   runningTaskCount: number
+  /** Number of tasks on this ticket currently in `awaiting_human_input` —
+   *  i.e. a sub-Kin is suspended on a prompt_human / request_input call and
+   *  needs the user to answer before resuming. */
+  awaitingHumanInputCount: number
   /** Kins currently executing a task on this ticket (status queued/pending/in_progress).
    *  One entry per running task — same Kin can appear twice if it has multiple in flight. */
   runningKins: RunningKinOnTicket[]

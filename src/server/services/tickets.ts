@@ -65,7 +65,7 @@ async function fetchTagsForTickets(ticketIds: string[]): Promise<Map<string, Pro
 
 async function fetchTaskCountsForTickets(
   ticketIds: string[],
-): Promise<Map<string, { total: number; running: number }>> {
+): Promise<Map<string, { total: number; running: number; awaitingInput: number }>> {
   if (ticketIds.length === 0) return new Map()
   const rows = db
     .select({
@@ -78,13 +78,16 @@ async function fetchTaskCountsForTickets(
     .groupBy(tasks.ticketId, tasks.status)
     .all()
 
-  const result = new Map<string, { total: number; running: number }>()
+  const result = new Map<string, { total: number; running: number; awaitingInput: number }>()
   for (const row of rows) {
     if (!row.ticketId) continue
-    const entry = result.get(row.ticketId) ?? { total: 0, running: 0 }
+    const entry = result.get(row.ticketId) ?? { total: 0, running: 0, awaitingInput: 0 }
     entry.total += Number(row.n)
     if (row.status === 'pending' || row.status === 'in_progress' || row.status === 'queued') {
       entry.running += Number(row.n)
+    }
+    if (row.status === 'awaiting_human_input') {
+      entry.awaitingInput += Number(row.n)
     }
     result.set(row.ticketId, entry)
   }
@@ -189,7 +192,7 @@ async function fetchReporterForTicket(
 async function rowToTicketSummary(
   row: typeof tickets.$inferSelect,
   tags: ProjectTag[],
-  taskCounts: { total: number; running: number },
+  taskCounts: { total: number; running: number; awaitingInput: number },
   runningKins: RunningKinOnTicket[] = [],
   reporter: TicketReporter | null = null,
 ): Promise<TicketSummary> {
@@ -204,6 +207,7 @@ async function rowToTicketSummary(
     tags,
     taskCount: taskCounts.total,
     runningTaskCount: taskCounts.running,
+    awaitingHumanInputCount: taskCounts.awaitingInput,
     runningKins,
     reporter,
     createdAt: toMillis(row.createdAt),
@@ -748,7 +752,7 @@ export async function listTickets(
       rowToTicketSummary(
         row,
         tagsByTicket.get(row.id) ?? [],
-        taskCountsByTicket.get(row.id) ?? { total: 0, running: 0 },
+        taskCountsByTicket.get(row.id) ?? { total: 0, running: 0, awaitingInput: 0 },
         runningKinsByTicket.get(row.id) ?? [],
         await fetchReporterForTicket(row.reporterUserId, row.reporterKinId),
       ),
@@ -786,7 +790,7 @@ export async function getTicket(ticketId: string): Promise<Ticket | null> {
     fetchTaskCountsForTickets([ticketId]),
     fetchRunningKinsForTickets([ticketId]),
   ])
-  const counts = taskCountsMap.get(ticketId) ?? { total: 0, running: 0 }
+  const counts = taskCountsMap.get(ticketId) ?? { total: 0, running: 0, awaitingInput: 0 }
   const runningKins = runningKinsMap.get(ticketId) ?? []
   const reporter = await fetchReporterForTicket(row.reporterUserId, row.reporterKinId)
 
@@ -812,6 +816,7 @@ export async function getTicket(ticketId: string): Promise<Ticket | null> {
     tags,
     taskCount: counts.total,
     runningTaskCount: counts.running,
+    awaitingHumanInputCount: counts.awaitingInput,
     runningKins,
     reporter,
     tasks: ticketTasks,
@@ -926,6 +931,7 @@ export async function createTicket(input: CreateTicketInput): Promise<TicketSumm
     tags,
     taskCount: 0,
     runningTaskCount: 0,
+    awaitingHumanInputCount: 0,
     runningKins: [],
     reporter,
     createdAt: now.getTime(),
@@ -987,7 +993,7 @@ export async function updateTicket(
     fetchTaskCountsForTickets([ticketId]),
     fetchRunningKinsForTickets([ticketId]),
   ])
-  const counts = taskCountsMap.get(ticketId) ?? { total: 0, running: 0 }
+  const counts = taskCountsMap.get(ticketId) ?? { total: 0, running: 0, awaitingInput: 0 }
   const runningKins = runningKinsMap.get(ticketId) ?? []
   const reporter = await fetchReporterForTicket(refreshed.reporterUserId, refreshed.reporterKinId)
 
@@ -1048,7 +1054,7 @@ async function getTicketSummary(ticketId: string): Promise<TicketSummary | null>
     fetchTaskCountsForTickets([ticketId]),
     fetchRunningKinsForTickets([ticketId]),
   ])
-  const counts = taskCountsMap.get(ticketId) ?? { total: 0, running: 0 }
+  const counts = taskCountsMap.get(ticketId) ?? { total: 0, running: 0, awaitingInput: 0 }
   const runningKins = runningKinsMap.get(ticketId) ?? []
   const reporter = await fetchReporterForTicket(row.reporterUserId, row.reporterKinId)
   return rowToTicketSummary(row, tags, counts, runningKins, reporter)

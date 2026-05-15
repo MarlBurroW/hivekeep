@@ -1,7 +1,8 @@
-import { memo, useState } from 'react'
+import { memo, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/client/components/ui/button'
-import { HelpCircle, Check, Loader2 } from 'lucide-react'
+import { Textarea } from '@/client/components/ui/textarea'
+import { HelpCircle, Check, Loader2, Send } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { RelativeTimestamp } from '@/client/components/chat/RelativeTimestamp'
 import { MarkdownContent } from '@/client/components/chat/MarkdownContent'
@@ -51,6 +52,7 @@ export const HumanPromptCard = memo(function HumanPromptCard({
 }: HumanPromptCardProps) {
   const { t } = useTranslation()
   const [selectedValues, setSelectedValues] = useState<Set<string>>(new Set())
+  const [textValue, setTextValue] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
   const handleConfirm = async (value: string) => {
@@ -77,6 +79,13 @@ export const HumanPromptCard = memo(function HumanPromptCard({
     setSubmitted(true)
     await onRespond(prompt.id, Array.from(selectedValues))
   }
+
+  const handleTextSubmit = useCallback(async () => {
+    const trimmed = textValue.trim()
+    if (!trimmed) return
+    setSubmitted(true)
+    await onRespond(prompt.id, trimmed)
+  }, [textValue, onRespond, prompt.id])
 
   const disabled = submitted || isResponding
 
@@ -204,6 +213,44 @@ export const HumanPromptCard = memo(function HumanPromptCard({
             {disabled && <Loader2 className="size-3.5 animate-spin" />}
             {t('humanPrompt.submit')} ({selectedValues.size})
           </Button>
+        </div>
+      )}
+
+      {/* Text type — free-form textarea + submit. Submit on Cmd/Ctrl+Enter. */}
+      {!submitted && prompt.promptType === 'text' && (
+        <div className="flex flex-col gap-2">
+          <Textarea
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault()
+                void handleTextSubmit()
+              }
+            }}
+            placeholder={t('humanPrompt.textPlaceholder')}
+            rows={3}
+            disabled={disabled}
+            autoFocus
+            className="resize-y text-sm"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] text-muted-foreground/70">
+              {t('humanPrompt.textHint')}
+            </span>
+            <Button
+              size="sm"
+              disabled={disabled || textValue.trim().length === 0}
+              onClick={handleTextSubmit}
+            >
+              {disabled ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Send className="size-3.5" />
+              )}
+              {t('humanPrompt.submit')}
+            </Button>
+          </div>
         </div>
       )}
     </div>

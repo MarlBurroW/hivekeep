@@ -3,7 +3,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/client/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/client/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { Loader2, ListChecks, Clock } from 'lucide-react'
+import { Loader2, ListChecks, Clock, UserCheck } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { useTranslation } from 'react-i18next'
 import { formatRelativeTime } from '@/client/lib/time'
@@ -83,6 +83,8 @@ export function TicketCard({ ticket, onClick, isOverlay = false, highlightQuery,
   const description = ticket.description ?? ''
 
   const hasRunning = runningKins.length > 0
+  const awaitingInput = ticket.awaitingHumanInputCount ?? 0
+  const hasAwaitingInput = awaitingInput > 0
   const visibleRunning = runningKins.slice(0, 3)
   const overflowRunning = runningKins.length - visibleRunning.length
   const normalizedQuery = (highlightQuery ?? '').trim().toLowerCase()
@@ -127,8 +129,11 @@ export function TicketCard({ ticket, onClick, isOverlay = false, highlightQuery,
         // Drag overlay: slight tilt + stronger shadow + ring make the floating
         // card feel like it's been picked up off the board (Trello/Linear vibe).
         isOverlay && 'rotate-2 shadow-xl ring-1 ring-primary/30',
-        // Running emphasis: subtle pulse glow ring while a task is in flight
-        hasRunning && 'ring-1 ring-primary/40 shadow-primary/10 animate-running-pulse',
+        // Awaiting-input emphasis wins over running: the user needs to act before the
+        // task can resume, so we surface that more loudly with a warning-colored ring.
+        hasAwaitingInput && 'ring-1 ring-warning/60 shadow-warning/10 animate-running-pulse',
+        // Running emphasis (only when no awaiting-input on this ticket).
+        hasRunning && !hasAwaitingInput && 'ring-1 ring-primary/40 shadow-primary/10 animate-running-pulse',
       )}
       {...attributes}
       {...listeners}
@@ -222,8 +227,15 @@ export function TicketCard({ ticket, onClick, isOverlay = false, highlightQuery,
       )}
 
         <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-          {/* Left side: running indicator OR plain task count */}
-          {hasRunning ? (
+          {/* Left side: awaiting-input (most urgent) > running > plain task count */}
+          {hasAwaitingInput ? (
+            <span className="inline-flex items-center gap-1 text-warning">
+              <UserCheck className="size-3 animate-pulse" />
+              <span className="font-medium">
+                {t('projects.ticketCard.awaitingInput', { count: awaitingInput })}
+              </span>
+            </span>
+          ) : hasRunning ? (
             <span className="inline-flex items-center gap-1 text-primary">
               <Loader2 className="size-3 animate-spin" />
               <span className="font-medium">

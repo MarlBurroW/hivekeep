@@ -2203,6 +2203,8 @@
     "confirm": "Confirmer",
     "submit": "Soumettre",
     "submitted": "Réponse envoyée",
+    "textPlaceholder": "Écrivez votre réponse…",
+    "textHint": "⌘/Ctrl + Entrée pour envoyer",
     "expired": "Expirée",
     "cancelled": "Annulée",
     "yes": "Oui",
@@ -2528,6 +2530,8 @@
     "ticketCard": {
       "running_one": "{{count}} en cours",
       "running_other": "{{count}} en cours",
+      "awaitingInput_one": "{{count}} attend une réponse",
+      "awaitingInput_other": "{{count}} attendent une réponse",
       "taskCount_one": "{{count}} tâche",
       "taskCount_other": "{{count}} tâches",
       "kinRunning": "{{name}} travaille dessus",
