@@ -273,6 +273,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
                       model: selectedKin.model,
                       providerId: selectedKin.providerId ?? null,
                       avatarUrl: selectedKin.avatarUrl,
+                      activeProjectId: selectedKin.activeProjectId,
                       thinkingEnabled: selectedKin.thinkingEnabled,
                       thinkingEffort: selectedKin.thinkingEffort,
                     }}
