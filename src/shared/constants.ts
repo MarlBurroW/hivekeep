@@ -434,6 +434,21 @@ export const CONTACT_IDENTIFIER_SUGGESTIONS = [
 
 export const TICKET_STATUSES = ['backlog', 'todo', 'in_progress', 'blocked', 'done'] as const
 
+/** Validation regex for project slugs.
+ *  - lowercase alphanumeric + hyphens
+ *  - starts with a letter
+ *  - 2-32 chars total
+ *  - no leading hyphen (handled by leading-letter rule)
+ *  Examples: `kinbot`, `soupcon-de-magie`, `x-1`. */
+export const PROJECT_SLUG_REGEX = /^[a-z][a-z0-9-]{1,31}$/
+
+/** Regex to capture a ticket reference in free text. Two shapes:
+ *  - `slug#42` (qualified) — group 1 = slug, group 2 = number
+ *  - `#42` (bare) — group 1 = undefined, group 2 = number
+ *  Anchored as a token: preceded by start-of-string or non-word, followed by
+ *  end-of-string or non-word. Use with the `g` flag when scanning. */
+export const TICKET_MENTION_REGEX = /(?:^|(?<=[^\w-]))(?:([a-z][a-z0-9-]{1,31})#|#)(\d{1,10})(?=$|[^\w-])/g
+
 /** Tags applied to every newly created project. Editable by user/Kin afterward. */
 export const DEFAULT_PROJECT_TAGS: ReadonlyArray<{ label: string; color: string }> = [
   { label: 'bug', color: '#ef4444' },

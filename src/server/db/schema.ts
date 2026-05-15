@@ -815,6 +815,10 @@ export const kinReadState = sqliteTable('kin_read_state', {
 
 export const projects = sqliteTable('projects', {
   id: text('id').primaryKey(),
+  // Human-readable identifier used to qualify ticket numbers (e.g. kinbot#42).
+  // Nullable in the schema for migration purposes; backfilled at startup and
+  // enforced at the application layer (createProject always sets one).
+  slug: text('slug').unique(),
   title: text('title').notNull(),
   description: text('description').notNull().default(''),
   githubUrl: text('github_url'),
@@ -839,6 +843,10 @@ export const projectTags = sqliteTable('project_tags', {
 export const tickets = sqliteTable('tickets', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  // Per-project monotonic ticket number (GitHub-style #42). Nullable for
+  // migration purposes; backfilled at startup and enforced at the application
+  // layer (createTicket always assigns one).
+  number: integer('number'),
   title: text('title').notNull(),
   description: text('description').notNull().default(''),
   status: text('status').notNull().default('backlog'), // 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done'
@@ -852,6 +860,7 @@ export const tickets = sqliteTable('tickets', {
 }, (table) => [
   index('idx_tickets_project_status_position').on(table.projectId, table.status, table.position),
   index('idx_tickets_project_updated').on(table.projectId, table.updatedAt),
+  uniqueIndex('uniq_tickets_project_number').on(table.projectId, table.number),
 ])
 
 export const ticketTags = sqliteTable('ticket_tags', {

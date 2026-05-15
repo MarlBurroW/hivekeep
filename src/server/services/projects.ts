@@ -4,7 +4,8 @@ import { db } from '@/server/db/index'
 import { projects, projectTags, tickets, ticketTags, kins } from '@/server/db/schema'
 import { sseManager } from '@/server/sse/index'
 import { config } from '@/server/config'
-import { DEFAULT_PROJECT_TAGS, TICKET_STATUSES } from '@/shared/constants'
+import { DEFAULT_PROJECT_TAGS, TICKET_STATUSES, PROJECT_SLUG_REGEX } from '@/shared/constants'
+import { generateSlug, ensureUniqueSlug } from '@/server/utils/slug'
 import type { Project, ProjectSummary, ProjectTag, TicketStatus } from '@/shared/types'
 import type { ActiveProjectPromptInfo } from '@/server/services/prompt-builder'
 
@@ -83,6 +84,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
     const t = totals.get(row.id) ?? { all: 0, open: 0 }
     return {
       id: row.id,
+      slug: row.slug ?? '',
       title: row.title,
       githubUrl: row.githubUrl,
       ticketCount: t.all,
@@ -104,6 +106,7 @@ export async function getProject(projectId: string): Promise<Project | null> {
 
   return {
     id: row.id,
+    slug: row.slug ?? '',
     title: row.title,
     description: row.description,
     githubUrl: row.githubUrl,
@@ -114,19 +117,55 @@ export async function getProject(projectId: string): Promise<Project | null> {
   }
 }
 
+/** Lookup a project by its slug (case-insensitive on the input).
+ *  Returns null when no row matches. Useful for tools that accept
+ *  `slug#number` references. */
+export async function getProjectBySlug(slug: string): Promise<Project | null> {
+  const normalized = slug.toLowerCase().trim()
+  if (!normalized) return null
+  const row = db.select({ id: projects.id }).from(projects).where(eq(projects.slug, normalized)).get()
+  if (!row) return null
+  return getProject(row.id)
+}
+
 export interface CreateProjectInput {
   title: string
   description?: string
   githubUrl?: string | null
+  /** Optional explicit slug. If omitted, slug is auto-generated from title.
+   *  Must match `PROJECT_SLUG_REGEX` when provided. */
+  slug?: string
 }
 
 export async function createProject(input: CreateProjectInput): Promise<Project> {
   const id = uuid()
   const now = new Date()
 
+  // Resolve slug: explicit value (validated) or auto-generated from title.
+  let baseSlug: string
+  if (input.slug !== undefined && input.slug !== null && input.slug !== '') {
+    const candidate = input.slug.trim().toLowerCase()
+    if (!PROJECT_SLUG_REGEX.test(candidate)) {
+      throw new Error('INVALID_PROJECT_SLUG')
+    }
+    baseSlug = candidate
+  } else {
+    const auto = generateSlug(input.title)
+    baseSlug = auto && PROJECT_SLUG_REGEX.test(auto) ? auto : 'project'
+    // Guard the 32-char cap (generateSlug truncates at 50).
+    if (baseSlug.length > 32) baseSlug = baseSlug.substring(0, 32).replace(/-+$/, '')
+  }
+  const existingSlugs = new Set(
+    db.select({ slug: projects.slug }).from(projects).all()
+      .map((r) => r.slug)
+      .filter((s): s is string => typeof s === 'string'),
+  )
+  const slug = ensureUniqueSlug(baseSlug, existingSlugs)
+
   db.insert(projects)
     .values({
       id,
+      slug,
       title: input.title,
       description: input.description ?? '',
       githubUrl: input.githubUrl ?? null,
@@ -166,6 +205,9 @@ export interface UpdateProjectInput {
   title?: string
   description?: string
   githubUrl?: string | null
+  /** New slug. Editable only while the project has zero tickets (avoids
+   *  breaking any external reference like `kinbot#42`). */
+  slug?: string
 }
 
 export async function updateProject(
@@ -180,6 +222,35 @@ export async function updateProject(
   if (input.title !== undefined) update.title = input.title
   if (input.description !== undefined) update.description = input.description
   if (input.githubUrl !== undefined) update.githubUrl = input.githubUrl
+
+  if (input.slug !== undefined) {
+    const candidate = input.slug.trim().toLowerCase()
+    if (!PROJECT_SLUG_REGEX.test(candidate)) {
+      throw new Error('INVALID_PROJECT_SLUG')
+    }
+    if (candidate !== existing.slug) {
+      // Lock-down rule: slug is editable only while no ticket exists. Any
+      // outstanding ticket may already be referenced as `slug#N` somewhere
+      // (commit message, mini-app, chat history), so we refuse the rename.
+      const ticketCountRow = db
+        .select({ n: count() })
+        .from(tickets)
+        .where(eq(tickets.projectId, projectId))
+        .get()
+      if (Number(ticketCountRow?.n ?? 0) > 0) {
+        throw new Error('SLUG_LOCKED')
+      }
+      const taken = db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.slug, candidate))
+        .get()
+      if (taken && taken.id !== projectId) {
+        throw new Error('SLUG_TAKEN')
+      }
+      update.slug = candidate
+    }
+  }
 
   db.update(projects).set(update).where(eq(projects.id, projectId)).run()
 
@@ -352,6 +423,7 @@ export async function buildActiveProjectInfo(projectId: string): Promise<ActiveP
 
   return {
     id: row.id,
+    slug: row.slug ?? '',
     title: row.title,
     description,
     descriptionTruncated,
@@ -359,6 +431,7 @@ export async function buildActiveProjectInfo(projectId: string): Promise<ActiveP
     tags: tagRows.map((t) => ({ label: t.label, color: t.color })),
     openTickets: cappedTickets.map((t) => ({
       idShort: t.id.slice(0, 8),
+      number: t.number ?? null,
       title: t.title,
       status: t.status,
       tagLabels: tagsByTicket.get(t.id) ?? [],
@@ -376,6 +449,7 @@ function toProjectSummary(p: Project): ProjectSummary {
     .reduce((acc, s) => acc + (p.ticketCounts[s] ?? 0), 0)
   return {
     id: p.id,
+    slug: p.slug,
     title: p.title,
     githubUrl: p.githubUrl,
     ticketCount: total,

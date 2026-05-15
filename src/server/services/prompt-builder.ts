@@ -117,12 +117,16 @@ interface PromptParams {
 
 export interface ActiveProjectPromptInfo {
   id: string
+  slug: string
   title: string
   description: string
   githubUrl: string | null
   tags: Array<{ label: string; color: string }>
   openTickets: Array<{
     idShort: string
+    /** Per-project ticket number (e.g. 42 → rendered as `#42`).
+     *  Null only on legacy rows that pre-date the backfill. */
+    number: number | null
     title: string
     status: string
     tagLabels: string[]
@@ -134,11 +138,13 @@ export interface ActiveProjectPromptInfo {
 
 export interface TicketAssignmentInfo {
   ticketId: string
+  ticketNumber: number | null
   ticketTitle: string
   ticketDescription: string
   ticketStatus: string
   ticketTags: string[]
   projectId: string
+  projectSlug: string
   projectTitle: string
   projectDescription: string
   projectGithubUrl: string | null
@@ -496,6 +502,7 @@ function buildActiveProjectBlock(info: ActiveProjectPromptInfo): string {
   )
 
   let header = `Title: ${info.title}`
+  if (info.slug) header += `\nSlug: ${info.slug} (use as 'projectSlug#number' to qualify tickets across projects)`
   if (info.githubUrl) header += `\nGitHub: ${info.githubUrl}`
   sections.push(header)
 
@@ -515,7 +522,10 @@ function buildActiveProjectBlock(info: ActiveProjectPromptInfo): string {
     const ticketLines = info.openTickets
       .map((t) => {
         const tagPart = t.tagLabels.length > 0 ? ` — ${t.tagLabels.join(', ')}` : ''
-        return `- [${t.status}] [#${t.idShort}] ${t.title}${tagPart}`
+        // Prefer the human-readable number when available; fall back to the
+        // short UUID prefix for legacy rows still awaiting backfill.
+        const idLabel = t.number !== null ? `#${t.number}` : `#${t.idShort}`
+        return `- [${t.status}] [${idLabel}] ${t.title}${tagPart}`
       })
       .join('\n')
     let body = ticketLines
