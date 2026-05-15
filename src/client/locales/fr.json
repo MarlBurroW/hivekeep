@@ -2462,7 +2462,9 @@
       "running_other": "{{count}} en cours",
       "taskCount_one": "{{count}} tâche",
       "taskCount_other": "{{count}} tâches",
-      "kinRunning": "{{name}} travaille dessus"
+      "kinRunning": "{{name}} travaille dessus",
+      "createdAt": "Créé le {{date}}",
+      "updatedAt": "Modifié le {{date}}"
     },
     "reporter": {
       "label": "Rapporté par",

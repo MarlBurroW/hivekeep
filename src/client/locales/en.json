@@ -2461,7 +2461,9 @@
       "running_other": "{{count}} running",
       "taskCount_one": "{{count}} task",
       "taskCount_other": "{{count}} tasks",
-      "kinRunning": "{{name}} is working on this"
+      "kinRunning": "{{name}} is working on this",
+      "createdAt": "Created {{date}}",
+      "updatedAt": "Updated {{date}}"
     },
     "reporter": {
       "label": "Reported by",

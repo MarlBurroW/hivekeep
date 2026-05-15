@@ -3,9 +3,10 @@ import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/client/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/client/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { Loader2, ListChecks } from 'lucide-react'
+import { Loader2, ListChecks, Clock } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { useTranslation } from 'react-i18next'
+import { formatRelativeTime } from '@/client/lib/time'
 import { TicketReporterBadge } from '@/client/components/project/TicketReporterBadge'
 import type { TicketSummary } from '@/shared/types'
 
@@ -37,6 +38,12 @@ export function TicketCard({ ticket, onClick, isOverlay = false }: TicketCardPro
   const hasRunning = ticket.runningKins.length > 0
   const visibleRunning = ticket.runningKins.slice(0, 3)
   const overflowRunning = ticket.runningKins.length - visibleRunning.length
+
+  // Distinguish created vs. updated: if updated more than 1 minute after creation
+  // we treat it as a meaningful edit and prefer surfacing that timestamp.
+  const wasEdited = ticket.updatedAt - ticket.createdAt > 60_000
+  const displayedTs = wasEdited ? ticket.updatedAt : ticket.createdAt
+  const fullDate = new Date(displayedTs).toLocaleString()
 
   return (
     <article
@@ -111,8 +118,11 @@ export function TicketCard({ ticket, onClick, isOverlay = false }: TicketCardPro
             <span />
           )}
 
-          {/* Right side: running Kins avatar stack */}
-          {hasRunning && (
+          {/* Right side: running Kins avatar stack OR timestamp.
+              When a task is running, the avatars win the slot — the running
+              signal is more relevant than age. Otherwise we surface the
+              creation/update timestamp with a tooltip carrying the full date. */}
+          {hasRunning ? (
             <div
               className="flex items-center -space-x-1.5"
               onClick={(e) => e.stopPropagation()}
@@ -143,6 +153,25 @@ export function TicketCard({ ticket, onClick, isOverlay = false }: TicketCardPro
                 </span>
               )}
             </div>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground/70">
+                  <Clock className="size-3" aria-hidden />
+                  {formatRelativeTime(displayedTs)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <span className="text-xs">
+                  {t(
+                    wasEdited
+                      ? 'projects.ticketCard.updatedAt'
+                      : 'projects.ticketCard.createdAt',
+                    { date: fullDate },
+                  )}
+                </span>
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
       </button>
