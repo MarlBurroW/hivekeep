@@ -20,6 +20,11 @@ export interface ProviderData {
   slug: string
   name: string
   type: string
+  /** Provider family — 'llm' | 'embedding' | 'image'. Each row serves
+   *  exactly one family; multi-capability provider types (OpenAI) are
+   *  stored as N sibling rows. May be absent on legacy GET responses
+   *  served from a stale client cache. */
+  family?: string
   capabilities: string[]
   isValid: boolean
   lastError?: string | null

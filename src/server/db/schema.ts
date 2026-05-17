@@ -66,6 +66,12 @@ export const providers = sqliteTable('providers', {
   slug: text('slug').notNull().unique(),
   name: text('name').notNull(),
   type: text('type').notNull(),
+  /** Provider family: 'llm', 'embedding', or 'image'. Each row serves
+   *  exactly one family. Multi-capability providers (OpenAI) are stored as
+   *  N rows sharing the same `type` + `configEncrypted` but a different
+   *  family — keeping the dispatcher simple (one row → one registry) and
+   *  letting the user enable/rename/disable each family independently. */
+  family: text('family').notNull().default('llm'),
   configEncrypted: text('config_encrypted').notNull(),
   capabilities: text('capabilities').notNull(), // JSON array
   isValid: integer('is_valid', { mode: 'boolean' }).notNull().default(true),

@@ -28,6 +28,7 @@ providerRoutes.get('/', async (c) => {
       slug: p.slug,
       name: p.name,
       type: p.type,
+      family: p.family,
       capabilities: JSON.parse(p.capabilities),
       isValid: p.isValid,
       lastError: p.lastError ?? null,
@@ -86,6 +87,12 @@ providerRoutes.get('/types', async (c) => {
 })
 
 // POST /api/providers — create a new provider
+//
+// One row per family. When the provider type advertises multiple
+// capabilities (e.g. OpenAI = llm + embedding + image) we create N rows
+// sharing the same encrypted config; each is named/slugged with its
+// family suffix so the user can enable/disable/rename them independently
+// without touching the other families.
 providerRoutes.post('/', async (c) => {
   const body = await c.req.json()
   const { name, type, config: providerConfig } = body as {
@@ -97,37 +104,76 @@ providerRoutes.post('/', async (c) => {
   // Test connection
   const testResult = await testProviderConnection(type, providerConfig)
 
-  const id = uuid()
-  const slug = generateProviderSlug(name)
-  const capabilities = testResult.valid
+  const allCaps = testResult.valid
     ? getCapabilitiesForType(type)
-    : []
+    : (getCapabilitiesForType(type).length > 0 ? getCapabilitiesForType(type) : [])
 
   const configEncrypted = await encrypt(JSON.stringify(providerConfig))
 
-  await db.insert(providers).values({
-    id,
-    slug,
-    name,
-    type,
-    configEncrypted,
-    capabilities: JSON.stringify(capabilities),
-    isValid: testResult.valid,
-    lastError: testResult.valid ? null : (testResult.error ?? null),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })
+  // Family preference: llm first (so its slug stays the base name when
+  // the user adds an "OpenAI" provider), then embedding, then image.
+  const FAMILY_ORDER = ['llm', 'embedding', 'image'] as const
+  type Family = (typeof FAMILY_ORDER)[number]
+  const FAMILY_LABEL: Record<Family, string> = { llm: 'LLM', embedding: 'Embedding', image: 'Image' }
+  const familiesToCreate = FAMILY_ORDER.filter((f) =>
+    (allCaps as readonly string[]).includes(f),
+  ) as Family[]
 
-  log.info({ providerId: id, slug, name, type, capabilities, isValid: testResult.valid }, 'Provider created')
+  const createdRows: Array<{ id: string; slug: string; name: string; family: Family; capabilities: string[] }> = []
+  const baseSlug = generateProviderSlug(name)
 
-  sseManager.broadcast({
-    type: 'provider:created',
-    data: { providerId: id, slug, name, providerType: type, capabilities, isValid: testResult.valid },
-  })
+  for (let i = 0; i < familiesToCreate.length; i++) {
+    const family = familiesToCreate[i]!
+    const id = uuid()
+    // Single-family providers (anthropic, codex, …) keep the base slug/name.
+    // Multi-family ones get a "(LLM)" / "(Embedding)" / "(Image)" suffix.
+    const rowName = familiesToCreate.length === 1 ? name : `${name} (${FAMILY_LABEL[family]})`
+    const rowSlug = familiesToCreate.length === 1
+      ? baseSlug
+      : generateProviderSlug(`${baseSlug}-${family}`)
+    const capabilities = [family]
+
+    await db.insert(providers).values({
+      id,
+      slug: rowSlug,
+      name: rowName,
+      type,
+      family,
+      configEncrypted,
+      capabilities: JSON.stringify(capabilities),
+      isValid: testResult.valid,
+      lastError: testResult.valid ? null : (testResult.error ?? null),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+
+    createdRows.push({ id, slug: rowSlug, name: rowName, family, capabilities })
+
+    log.info({ providerId: id, slug: rowSlug, name: rowName, type, family, capabilities, isValid: testResult.valid }, 'Provider created')
+
+    sseManager.broadcast({
+      type: 'provider:created',
+      data: { providerId: id, slug: rowSlug, name: rowName, providerType: type, capabilities, isValid: testResult.valid },
+    })
+  }
 
   return c.json(
     {
-      provider: { id, slug, name, type, capabilities, isValid: testResult.valid },
+      // Primary row (LLM if present, else first created) — kept for the
+      // existing AddProviderDialog flow which expects a single response.
+      provider: createdRows[0]
+        ? { id: createdRows[0].id, slug: createdRows[0].slug, name: createdRows[0].name, type, capabilities: createdRows[0].capabilities, isValid: testResult.valid }
+        : { id: null, slug: null, name, type, capabilities: [], isValid: false },
+      // All rows created in this call so a future UI can show "X rows created" feedback.
+      providers: createdRows.map((r) => ({
+        id: r.id,
+        slug: r.slug,
+        name: r.name,
+        type,
+        family: r.family,
+        capabilities: r.capabilities,
+        isValid: testResult.valid,
+      })),
     },
     201,
   )

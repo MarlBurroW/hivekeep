@@ -54,6 +54,11 @@ log.info('Virtual tables initialized')
 import { migrateModelProviders } from '@/server/services/migrate-model-providers'
 await migrateModelProviders()
 
+// One-time split: any provider row carrying multiple capabilities is broken
+// out into one row per family (LLM / Embedding / Image). Idempotent.
+import { splitMultiCapabilityProviders } from '@/server/services/split-multi-capability-providers'
+await splitMultiCapabilityProviders()
+
 // Backfill placeholder provider slugs left by migration 0071 (idempotent)
 import { backfillProviderSlugs } from '@/server/services/provider-slug'
 await backfillProviderSlugs()

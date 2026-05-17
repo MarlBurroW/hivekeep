@@ -505,6 +505,13 @@
       "when": 1779465600000,
       "tag": "0071_provider_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "6",
+      "when": 1779638400000,
+      "tag": "0072_provider_family",
+      "breakpoints": true
     }
   ]
 }
