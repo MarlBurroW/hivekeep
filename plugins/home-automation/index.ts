@@ -14,27 +14,34 @@ interface HAState {
   last_changed: string
 }
 
-async function haFetch(
-  baseUrl: string,
-  token: string,
-  path: string,
-  method = 'GET',
-  body?: unknown,
-): Promise<any> {
-  const url = `${baseUrl.replace(/\/$/, '')}/api${path}`
-  const res = await fetch(url, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`Home Assistant API error ${res.status}: ${text}`)
+/**
+ * Build a Home Assistant fetch helper bound to `ctx.http.fetch`. Going
+ * through ctx is what enforces the plugin's `http:*` permission and feeds
+ * KinBot's per-plugin network-call audit log.
+ */
+function buildHaFetch(httpFetch: PluginContext['http']['fetch']) {
+  return async function haFetch(
+    baseUrl: string,
+    token: string,
+    path: string,
+    method = 'GET',
+    body?: unknown,
+  ): Promise<any> {
+    const url = `${baseUrl.replace(/\/$/, '')}/api${path}`
+    const res = await httpFetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText)
+      throw new Error(`Home Assistant API error ${res.status}: ${text}`)
+    }
+    return res.json()
   }
-  return res.json()
 }
 
 function friendlyName(state: HAState): string {
@@ -65,6 +72,10 @@ interface HomeAutomationConfig {
 }
 
 export default function (ctx: PluginContext<HomeAutomationConfig>) {
+  // Bind the HA fetch helper to ctx.http so every call goes through the
+  // plugin permission check + per-plugin audit log.
+  const haFetch = buildHaFetch(ctx.http.fetch)
+
   const getConfig = () => {
     const { haUrl, haToken } = ctx.config
     if (!haUrl || !haToken) {

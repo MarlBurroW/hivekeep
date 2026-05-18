@@ -1,6 +1,6 @@
 {
   "name": "@kinbot-developer/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Plugin SDK for KinBot — declare tools, channels, providers, and hooks without depending on KinBot internals.",
   "license": "AGPL-3.0-only",
   "author": "KinBot Team",

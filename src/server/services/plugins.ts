@@ -45,6 +45,56 @@ export type { PluginCardActionContext, PluginCardActionResult }
 const log = createLogger('plugins')
 
 /**
+ * Returns true when `hostname` is allowed by the `permissions` array (a
+ * subset of plugin.manifest.permissions). Recognized patterns:
+ *
+ *   - `http:*`              — any hostname (use sparingly).
+ *   - `http:example.com`    — exact match.
+ *   - `http:*.example.com`  — any subdomain of example.com, plus the
+ *                             apex `example.com` itself.
+ *
+ * Anything not matching one of those forms is ignored. Used by
+ * `ctx.http.fetch` and exported for unit testing.
+ */
+export function isHostAllowed(
+  hostname: string,
+  permissions: readonly string[],
+): boolean {
+  for (const perm of permissions) {
+    if (!perm.startsWith('http:')) continue
+    const pattern = perm.slice(5)
+    if (pattern === '*') return true
+    if (pattern.startsWith('*.')) {
+      const suffix = pattern.slice(1) // ".example.com"
+      const apex = pattern.slice(2)   // "example.com"
+      if (hostname === apex || hostname.endsWith(suffix)) return true
+      continue
+    }
+    if (hostname === pattern) return true
+  }
+  return false
+}
+
+/**
+ * Thrown by `ctx.http.fetch()` when the plugin's manifest doesn't grant
+ * access to the target hostname. Carries a stable `code` so callers can
+ * branch on the kind of failure without sniffing message strings.
+ */
+export class PluginPermissionError extends Error {
+  readonly code = 'PLUGIN_PERMISSION_DENIED'
+  constructor(
+    public readonly pluginName: string,
+    public readonly hostname: string,
+  ) {
+    super(
+      `Plugin "${pluginName}" does not have permission to access "${hostname}". ` +
+        `Declare "http:${hostname}" (or "http:*.${hostname.replace(/^[^.]+\./, '')}", or "http:*") in the plugin's manifest permissions.`,
+    )
+    this.name = 'PluginPermissionError'
+  }
+}
+
+/**
  * Detect which native provider family a plugin-exported provider implements,
  * based on the chat/embed/generate method it carries. Returns null when the
  * shape doesn't match any of the three native interfaces.
@@ -1029,27 +1079,19 @@ class PluginManager {
       },
     }
 
-    // HTTP client with permission checking
-    const allowedHosts = (manifest.permissions ?? [])
-      .filter(p => p.startsWith('http:'))
-      .map(p => p.slice(5))
-
+    // HTTP client with permission enforcement. The plugin can reach a
+    // hostname only when its manifest declares the matching `http:<host>`
+    // permission. Raw `fetch()` from inside the plugin is not blocked here
+    // (we can't sandbox the runtime), so `ctx.http.fetch` is opt-in
+    // hardening for plugins that want their network footprint declared
+    // and audited.
+    const permissions = manifest.permissions ?? []
     const http: PluginHTTPClient = {
       async fetch(url: string, init?: RequestInit): Promise<Response> {
         const parsed = new URL(url)
-        const hostname = parsed.hostname
-
-        const allowed = allowedHosts.some(pattern => {
-          if (pattern.startsWith('*.')) {
-            return hostname.endsWith(pattern.slice(1)) || hostname === pattern.slice(2)
-          }
-          return hostname === pattern
-        })
-
-        if (!allowed) {
-          throw new Error(`Plugin "${manifest.name}" does not have permission to access "${hostname}". Declare "http:${hostname}" in permissions.`)
+        if (!isHostAllowed(parsed.hostname, permissions)) {
+          throw new PluginPermissionError(manifest.name, parsed.hostname)
         }
-
         return globalThis.fetch(url, init)
       },
     }

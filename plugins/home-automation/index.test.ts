@@ -16,6 +16,11 @@ function makeCtx(overrides?: { haUrl?: string; haToken?: string; areaFilter?: st
       error: () => {},
       debug: () => {},
     },
+    // The plugin now routes its Home Assistant calls through ctx.http.fetch
+    // so the manifest's `http:*` permission is enforced. In tests we hand
+    // the global fetch (which the test's global mocks intercept) straight
+    // through — no permission check, no auditing, just network IO.
+    http: { fetch: (url: any, init?: any) => fetch(url, init) },
   }
 }
 

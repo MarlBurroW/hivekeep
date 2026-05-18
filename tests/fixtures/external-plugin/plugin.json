@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/@kinbot-developer/sdk/schemas/plugin-manifest.schema.json",
+  "name": "external-fixture",
+  "version": "0.1.0",
+  "description": "Out-of-tree plugin fixture for the SDK contract E2E test.",
+  "author": "KinBot Team",
+  "license": "AGPL-3.0-only",
+  "main": "index.ts",
+  "kinbot": ">=0.40.0",
+  "icon": "🧪",
+  "permissions": ["http:api.example.com"],
+  "config": {
+    "greeting": {
+      "type": "string",
+      "label": "Greeting word",
+      "default": "Hello"
+    }
+  }
+}

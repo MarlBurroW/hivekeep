@@ -1,0 +1,10 @@
+{
+  "name": "kinbot-plugin-external-fixture",
+  "version": "0.1.0",
+  "description": "Test fixture simulating a third-party plugin published to npm that depends on @kinbot-developer/sdk as a peer dep. Loaded by src/server/services/plugins-e2e.test.ts.",
+  "private": true,
+  "main": "./index.ts",
+  "peerDependencies": {
+    "@kinbot-developer/sdk": "^0.1.0"
+  }
+}
