@@ -281,15 +281,6 @@ describe('Backend cache', () => {
     expect(cache.has('app-2')).toBe(true)
   })
 
-  it('invalidateAllBackends clears entire cache', () => {
-    cache.set('app-1', { handler: {}, version: 1, loadedAt: Date.now() })
-    cache.set('app-2', { handler: {}, version: 2, loadedAt: Date.now() })
-    cache.set('app-3', { handler: {}, version: 3, loadedAt: Date.now() })
-
-    cache.clear()
-
-    expect(cache.size).toBe(0)
-  })
 })
 
 // ─── MiniAppBackendContext storage contract ─────────────────────────────────

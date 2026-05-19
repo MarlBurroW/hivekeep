@@ -37,7 +37,7 @@ const techStack = [
   { name: 'SQLite', url: 'https://sqlite.org' },
   { name: 'Drizzle', url: 'https://orm.drizzle.team' },
   { name: 'Tailwind CSS', url: 'https://tailwindcss.com' },
-  { name: 'Vercel AI SDK', url: 'https://sdk.vercel.ai' },
+  { name: 'Better Auth', url: 'https://www.better-auth.com' },
 ]
 
 function FooterColumnHeading({ children }: { children: React.ReactNode }) {

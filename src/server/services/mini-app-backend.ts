@@ -129,11 +129,6 @@ export function invalidateBackend(appId: string): void {
   }
 }
 
-/** Clear all backends from cache */
-export function invalidateAllBackends(): void {
-  backendCache.clear()
-}
-
 // ─── Build context ──────────────────────────────────────────────────────────
 
 function buildContext(appId: string, kinId: string, appName: string): MiniAppBackendContext {
