@@ -33,7 +33,7 @@ describe('geminiProvider — metadata', () => {
 
 // ─── listModels: non-LLM modality filter ────────────────────────────────────
 
-async function stubListModelsResponse(payload: unknown): Promise<unknown[]> {
+async function stubListModelsResponse(payload: unknown): Promise<Array<{ id: string }>> {
   const original = globalThis.fetch
   ;(globalThis as any).fetch = async () =>
     new Response(JSON.stringify(payload), {
