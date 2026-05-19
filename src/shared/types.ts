@@ -349,22 +349,10 @@ export type ChannelUserMappingStatus = 'pending'
  * Mirrored to plugin manifests via `PluginChannelConfigField` in
  * `src/shared/types/plugin.ts`.
  */
-export interface ChannelConfigField {
-  name: string
-  label: string
-  type: 'text' | 'password' | 'number' | 'select' | 'switch'
-  default?: unknown
-  required?: boolean
-  placeholder?: string
-  description?: string
-  options?: string[] | { value: string; label: string }[]
-  min?: number
-  max?: number
-}
-
-export interface ChannelConfigSchema {
-  fields: ChannelConfigField[]
-}
+// ChannelConfigField + ChannelConfigSchema live in the SDK now (single
+// source of truth shared with plugin authors). Re-exported here so
+// existing imports from `@/shared/types` keep working unchanged.
+export type { ChannelConfigField, ChannelConfigSchema } from '@kinbot-developer/sdk'
 
 /** Channel summary as returned by GET /api/channels */
 export interface ChannelSummary {

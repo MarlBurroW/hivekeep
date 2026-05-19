@@ -19,8 +19,8 @@ Read these files **before starting any phase**. They are the source of truth.
 
 ## Tech stack
 
-**Backend**: Bun + Hono + SQLite (bun:sqlite) + Drizzle ORM + Vercel AI SDK + Better Auth + croner
-**Frontend**: React + Vite + Tailwind CSS + shadcn/ui + Vercel AI SDK (ai/react) + i18next
+**Backend**: Bun + Hono + SQLite (bun:sqlite) + Drizzle ORM + Better Auth + croner. LLM/Embedding/Image providers are native primitives in `src/server/llm/{llm,embedding,image}/`; plugins consume `@kinbot-developer/sdk`. (Vercel AI SDK was removed pre-2.0.)
+**Frontend**: React + Vite + Tailwind CSS + shadcn/ui + i18next
 **Single process, single DB file, single Docker container. Zero external infrastructure.**
 
 ## Key conventions
@@ -126,8 +126,8 @@ All API routes return JSON. Errors follow this format:
 bun run dev        # Start dev servers (Vite + Hono)
 bun run build      # Production build (Vite → dist/client/)
 bun run start      # Production server (Hono serves API + static)
-bun run db:push    # Push schema to SQLite
-bun run db:migrate # Run Drizzle migrations
+bun run db:generate # Generate a Drizzle migration from schema changes
+bun run db:migrate  # Apply pending migrations
 ```
 
 ## Project structure (overview)

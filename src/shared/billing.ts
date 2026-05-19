@@ -51,11 +51,6 @@ export const PROVIDER_CACHE_MULTIPLIERS: Record<string, CacheMultipliers> = {
  *  read estimate that won't UNDER-count what the user is paying). */
 export const DEFAULT_CACHE_MULTIPLIERS: CacheMultipliers = PROVIDER_CACHE_MULTIPLIERS.anthropic!
 
-/** Anthropic-only constants kept for legacy callers; new code should use
- *  `getCacheMultipliers(providerType)` instead. */
-export const CACHE_WRITE_MULTIPLIER = DEFAULT_CACHE_MULTIPLIERS.write
-export const CACHE_READ_MULTIPLIER = DEFAULT_CACHE_MULTIPLIERS.read
-
 export function getCacheMultipliers(providerType?: string | null): CacheMultipliers {
   if (!providerType) return DEFAULT_CACHE_MULTIPLIERS
   return PROVIDER_CACHE_MULTIPLIERS[providerType] ?? DEFAULT_CACHE_MULTIPLIERS
