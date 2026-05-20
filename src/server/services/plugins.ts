@@ -19,7 +19,7 @@ import { hookRegistry } from '@/server/hooks/index'
 import { sseManager } from '@/server/sse/index'
 import type { HookName, HookHandler } from '@/server/hooks/types'
 import type { PluginManifest, PluginConfigField, PluginSummary, PluginHealthStats, PluginProviderMeta, PluginChannelMeta, PluginInstallSource, PluginInstallMeta } from '@/shared/types/plugin'
-import { satisfiesSemver } from '@/shared/semver'
+import { satisfiesSemver, isVersionNewer } from '@/shared/semver'
 import { registerLLMProvider, unregisterLLMProvider } from '@/server/llm/llm/registry'
 import { registerEmbeddingProvider, unregisterEmbeddingProvider } from '@/server/llm/embedding/registry'
 import { registerImageProvider, unregisterImageProvider } from '@/server/llm/image/registry'
@@ -2145,7 +2145,12 @@ class PluginManager {
             })
             if (res.ok) {
               const data = await res.json() as { version?: string }
-              if (data.version && data.version !== plugin.manifest.version) {
+              // Only flag an update when npm's `latest` is STRICTLY
+              // NEWER than what's installed. `!==` would also trigger
+              // when the registry's CDN cache is briefly behind a
+              // fresh publish — making the just-updated UI flash
+              // "Update available" until the cache catches up.
+              if (data.version && isVersionNewer(data.version, plugin.manifest.version)) {
                 updates.push({
                   name,
                   currentVersion: plugin.manifest.version,

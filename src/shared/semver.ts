@@ -73,6 +73,16 @@ function matchesConstraint(ver: [number, number, number], c: Constraint): boolea
 }
 
 /**
+ * Strictly newer? Used by the update checker to avoid flagging an
+ * "update available" when the registry's `latest` is stale (CDN cache
+ * lag after a fresh publish) and actually points at an older version
+ * than what's already installed.
+ */
+export function isVersionNewer(candidate: string, baseline: string): boolean {
+  return compareSemver(parseSemver(candidate), parseSemver(baseline)) > 0
+}
+
+/**
  * Check if a version satisfies a semver range expression.
  * Tokens separated by spaces are AND-ed.
  * Returns true if range is empty/undefined.
