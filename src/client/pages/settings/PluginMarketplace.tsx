@@ -158,7 +158,8 @@ export function PluginMarketplace() {
         </div>
       )}
 
-      {/* Results */}
+      {/* Results — vertical list (modal width is ~672px, a 3-col grid
+          left each card too cramped to read description/metadata). */}
       {loading ? (
         <SettingsListSkeleton />
       ) : filteredResults.length === 0 ? (
@@ -168,7 +169,7 @@ export function PluginMarketplace() {
           description={t('settings.marketplace.npmEmpty.description')}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-3">
           {filteredResults.map((plugin) => (
             <NpmPluginCard
               key={plugin.name}
@@ -223,97 +224,95 @@ function NpmPluginCard({
   onUninstall: () => void
   t: (key: string, opts?: any) => string
 }) {
-  return (
-    <div className="flex flex-col rounded-lg border p-4 surface-card hover:border-primary/50 transition-colors">
-      <div className="flex items-center gap-1.5 mb-1">
-        {plugin.installed && (
-          <Badge variant="default" className="gap-1">
-            <Check className="size-3" />
-            {t('settings.marketplace.installed')}
-          </Badge>
-        )}
-        <Badge variant="outline" className="text-[10px] gap-1">
-          <Package className="size-3" />
-          npm
-        </Badge>
-      </div>
+  const userTags = plugin.keywords.filter((k) => k !== 'kinbot-plugin' && k !== 'kinbot').slice(0, 4)
 
-      <div className="flex items-start gap-3 min-w-0">
+  return (
+    <div className="flex items-start gap-4 rounded-lg border p-4 surface-card hover:border-primary/50 transition-colors">
+      {/* Logo (or empty slot to keep alignment consistent across cards) */}
+      <div className="shrink-0">
         {plugin.logoUrl ? (
           <img
             src={plugin.logoUrl}
             alt=""
-            className="size-10 shrink-0 rounded-md object-contain bg-muted/40 p-1"
+            className="size-14 rounded-md object-contain bg-muted/40 p-1.5"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
           />
-        ) : null}
-        <div className="min-w-0 flex-1">
+        ) : (
+          <div className="flex size-14 items-center justify-center rounded-md bg-muted/40 text-muted-foreground">
+            <Package className="size-6" />
+          </div>
+        )}
+      </div>
+
+      {/* Middle column — name, author, description, metadata */}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           <h4 className="font-medium truncate">{plugin.name}</h4>
-          {plugin.author && (
-            <p className="text-xs text-muted-foreground">
-              <User className="size-3 inline mr-1" />
-              {plugin.author}
-              {plugin.publisherUsername && plugin.publisherUsername !== plugin.author && (
-                <span className="opacity-60"> (@{plugin.publisherUsername})</span>
-              )}
-            </p>
+          <Badge variant="outline" className="text-xs">v{plugin.version}</Badge>
+          {plugin.installed && (
+            <Badge variant="default" className="text-xs gap-1">
+              <Check className="size-3" />
+              {t('settings.marketplace.installed')}
+            </Badge>
           )}
         </div>
-      </div>
 
-      <p className="text-sm text-muted-foreground mt-2 line-clamp-3">
-        {plugin.description || <span className="italic opacity-60">{t('settings.marketplace.noDescription')}</span>}
-      </p>
-
-      <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-        <Badge variant="outline" className="text-xs">v{plugin.version}</Badge>
-        {plugin.links?.repository && (
-          <a
-            href={plugin.links.repository}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 hover:text-foreground"
-          >
-            <ExternalLink className="size-3" />
-            {t('settings.marketplace.repository')}
-          </a>
+        {plugin.author && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            <User className="size-3 inline mr-1" />
+            {plugin.author}
+            {plugin.publisherUsername && plugin.publisherUsername !== plugin.author && (
+              <span className="opacity-60"> (@{plugin.publisherUsername})</span>
+            )}
+          </p>
         )}
-        {plugin.links?.npm && (
-          <a
-            href={plugin.links.npm}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 hover:text-foreground"
-          >
-            <ExternalLink className="size-3" />
-            npm
-          </a>
-        )}
-      </div>
 
-      {plugin.keywords.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {plugin.keywords
-            .filter((k) => k !== 'kinbot-plugin' && k !== 'kinbot')
-            .slice(0, 4)
-            .map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-            ))}
+        <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
+          {plugin.description || <span className="italic opacity-60">{t('settings.marketplace.noDescription')}</span>}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+          {plugin.links?.repository && (
+            <a
+              href={plugin.links.repository}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <ExternalLink className="size-3" />
+              {t('settings.marketplace.repository')}
+            </a>
+          )}
+          {plugin.links?.npm && (
+            <a
+              href={plugin.links.npm}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <ExternalLink className="size-3" />
+              npm
+            </a>
+          )}
+          {userTags.length > 0 && userTags.map((tag) => (
+            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+          ))}
         </div>
-      )}
+      </div>
 
-      <div className="mt-auto pt-3">
+      {/* Right column — action button, vertically centered */}
+      <div className="shrink-0 self-center">
         {plugin.installed ? (
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-destructive hover:text-destructive"
+            className="text-destructive hover:text-destructive"
             onClick={onUninstall}
           >
             {t('settings.marketplace.uninstall')}
           </Button>
         ) : (
-          <Button size="sm" className="w-full" onClick={onInstall} disabled={installing}>
+          <Button size="sm" onClick={onInstall} disabled={installing}>
             {installing ? (
               <><Loader2 className="size-4 mr-2 animate-spin" />{t('settings.marketplace.installing')}</>
             ) : (
