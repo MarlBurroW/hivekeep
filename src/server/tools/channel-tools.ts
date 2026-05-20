@@ -12,6 +12,7 @@ import {
   getChannelOriginMeta,
   transferChannel,
 } from '@/server/services/channels'
+import { searchContacts, getContactWithDetails } from '@/server/services/contacts'
 import { resolveKinId } from '@/server/services/kin-resolver'
 import { channelAdapters } from '@/server/channels/index'
 import { createLogger } from '@/server/logger'
@@ -79,14 +80,15 @@ export const listChannelConversationsTool: ToolRegistration = {
 
 /**
  * send_channel_message — proactively send a message to an external platform.
- * Opt-in tool (defaultDisabled). Available to main agents only.
+ * Enabled by default for main agents. Use `send_to_contact` when you want
+ * to address a contact by name without having to look up their chat_id.
  */
 export const sendChannelMessageTool: ToolRegistration = {
   availability: ['main'],
   create: (ctx) =>
     tool({
       description:
-        'Send a message to an external platform via a connected channel.',
+        'Send a message to an external platform via a connected channel. Requires a known platform chat/user id — use send_to_contact when you only know the contact by name.',
       inputSchema: z.object({
         channel_id: z.string(),
         chat_id: z.string().describe('Platform chat/user ID to send to'),
@@ -128,6 +130,104 @@ export const sendChannelMessageTool: ToolRegistration = {
             attachments: outboundAttachments?.length ? outboundAttachments : undefined,
           })
           return { success: true, platformMessageId: result.platformMessageId }
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : 'Unknown error' }
+        }
+      },
+    }),
+}
+
+/**
+ * send_to_contact — proactively message a contact on a specific platform.
+ *
+ * Higher-level wrapper around `send_channel_message`. Resolves the
+ * contact by name/id, looks up their platform identifier (e.g. their
+ * phone number for `twilio-sms`, Telegram user id, Matrix mxid, …),
+ * finds an active channel of the right platform owned by this Kin,
+ * and dispatches the message.
+ *
+ * Available to main agents — enabled by default since the resolution
+ * step is bounded and any ambiguity returns an error instead of
+ * picking blindly.
+ */
+export const sendToContactTool: ToolRegistration = {
+  availability: ['main'],
+  create: (ctx) =>
+    tool({
+      description:
+        'Proactively send a message to a known contact on a specific platform. Resolves the contact + platform id automatically — give the contact name (or id) and the platform slug (e.g. "twilio-sms", "telegram", "matrix"). Returns an error if the contact is ambiguous, has no identifier for that platform, or this Kin has no active channel for it.',
+      inputSchema: z.object({
+        contact: z.string().describe('Contact name, display name, nickname, or contact id'),
+        platform: z.string().describe('Platform slug, e.g. "twilio-sms", "telegram", "matrix", or a plugin platform like "plugin:kinbot-plugin-teamspeak:teamspeak"'),
+        message: z.string(),
+        attachments: z.array(z.object({
+          source: z.string().describe('Absolute file path or URL'),
+          mimeType: z.string(),
+          fileName: z.string().optional(),
+        })).optional(),
+      }),
+      execute: async ({ contact, platform, message, attachments }) => {
+        log.debug({ kinId: ctx.kinId, contact, platform }, 'send_to_contact requested')
+
+        // 1) Resolve the contact. Try id first, then a fuzzy search.
+        let contactRecord = await getContactWithDetails(contact, ctx.kinId)
+        if (!contactRecord) {
+          const matches = await searchContacts(contact, ctx.kinId)
+          if (matches.length === 0) {
+            return { error: `No contact matches "${contact}". Use search_contacts or create_contact first.` }
+          }
+          if (matches.length > 1) {
+            return {
+              error: `Ambiguous contact "${contact}" — ${matches.length} matches. Resolve by id.`,
+              candidates: matches.slice(0, 5).map((m) => ({ id: m.id, displayName: m.displayName })),
+            }
+          }
+          contactRecord = matches[0]!
+        }
+
+        // 2) Find the contact's platform identifier for the requested platform.
+        const platformLink = contactRecord.platformIds.find((p) => p.platform === platform)
+        if (!platformLink) {
+          return {
+            error: `Contact "${contactRecord.displayName}" has no identifier for platform "${platform}". Available platforms: ${contactRecord.platformIds.map((p) => p.platform).join(', ') || '(none)'}.`,
+          }
+        }
+
+        // 3) Find an active channel of this platform owned by the Kin.
+        //    listChannels is kinId-scoped; we filter to platform + active.
+        const channels = await listChannels(ctx.kinId)
+        const channel = channels.find((c) => c.platform === platform && c.status === 'active')
+        if (!channel) {
+          const platformChannels = channels.filter((c) => c.platform === platform)
+          if (platformChannels.length === 0) {
+            return { error: `No channel configured for platform "${platform}" on this Kin. Add one via create_channel.` }
+          }
+          return { error: `Channel for platform "${platform}" is not active (status: ${platformChannels[0]!.status}).` }
+        }
+
+        // 4) Dispatch via the adapter — same path as send_channel_message.
+        const adapter = channelAdapters.get(channel.platform)
+        if (!adapter) {
+          return { error: `No adapter for platform ${channel.platform}` }
+        }
+
+        try {
+          const cfg = JSON.parse(channel.platformConfig) as Record<string, unknown>
+          const outboundAttachments: OutboundAttachment[] | undefined = attachments?.map((a) => ({
+            source: a.source,
+            mimeType: a.mimeType,
+            fileName: a.fileName,
+          }))
+          const result = await adapter.sendMessage(channel.id, cfg, {
+            chatId: platformLink.platformId,
+            content: message,
+            attachments: outboundAttachments?.length ? outboundAttachments : undefined,
+          })
+          return {
+            success: true,
+            platformMessageId: result.platformMessageId,
+            sentTo: { contactId: contactRecord.id, displayName: contactRecord.displayName, platform, chatId: platformLink.platformId },
+          }
         } catch (err) {
           return { error: err instanceof Error ? err.message : 'Unknown error' }
         }
