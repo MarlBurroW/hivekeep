@@ -120,6 +120,7 @@ class ToolRegistry {
     readOnly: boolean
     concurrencySafe: boolean
     destructive: boolean
+    label?: string | Record<string, string>
   }> {
     return Array.from(this.tools.entries()).map(([name, entry]) => ({
       name,
@@ -129,6 +130,7 @@ class ToolRegistry {
       readOnly: entry.registration.readOnly ?? false,
       concurrencySafe: entry.registration.concurrencySafe ?? false,
       destructive: entry.registration.destructive ?? false,
+      ...(entry.registration.label !== undefined ? { label: entry.registration.label } : {}),
     }))
   }
 

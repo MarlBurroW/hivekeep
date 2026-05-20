@@ -2,14 +2,18 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/client/lib/api'
 import type { ToolDomain } from '@/shared/types'
 
+/** Author-supplied display label. Either a single string (every
+ *  locale gets the same text) or a `{ lang: text }` map. */
+export type ToolLabel = string | Record<string, string>
+
 export interface NativeToolGroup {
   domain: ToolDomain
-  tools: Array<{ name: string; enabled: boolean; defaultDisabled?: boolean }>
+  tools: Array<{ name: string; enabled: boolean; defaultDisabled?: boolean; label?: ToolLabel }>
 }
 
 export interface PluginToolGroup {
   pluginName: string
-  tools: Array<{ name: string; enabled: boolean; defaultDisabled?: boolean }>
+  tools: Array<{ name: string; enabled: boolean; defaultDisabled?: boolean; label?: ToolLabel }>
 }
 
 export interface McpToolGroup {

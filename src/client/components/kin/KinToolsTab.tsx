@@ -5,7 +5,7 @@ import { Label } from '@/client/components/ui/label'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/client/components/ui/collapsible'
 import { ToolDomainIcon } from '@/client/components/common/ToolDomainIcon'
 import { Badge } from '@/client/components/ui/badge'
-import { useKinTools, type NativeToolGroup, type McpToolGroup, type PluginToolGroup } from '@/client/hooks/useKinTools'
+import { useKinTools, type NativeToolGroup, type McpToolGroup, type PluginToolGroup, type ToolLabel } from '@/client/hooks/useKinTools'
 import { TOOL_DOMAIN_META } from '@/shared/constants'
 import { ChevronRight, Loader2, Plug, Puzzle } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
@@ -22,9 +22,35 @@ function getEffectiveConfig(config: KinToolConfig | null): KinToolConfig {
   return config ?? { disabledNativeTools: [], mcpAccess: {}, enabledOptInTools: [] }
 }
 
+/**
+ * Resolve a tool label for display:
+ *   - string label → use as-is
+ *   - locale map → user's lang, then `en`, then any first entry
+ *   - undefined → strip the `plugin_<plugin-name>_` prefix from the
+ *     raw tool name so we don't render `plugin_kinbot-plugin-…_x`
+ *     unless the plugin author explicitly opted out of providing a label
+ */
+function resolveToolLabel(name: string, label: ToolLabel | undefined, lang: string): string {
+  if (typeof label === 'string') return label
+  if (label && typeof label === 'object') {
+    return label[lang] ?? label.en ?? label[Object.keys(label)[0] ?? ''] ?? prettifyToolName(name)
+  }
+  return prettifyToolName(name)
+}
+
+function prettifyToolName(name: string): string {
+  // `plugin_<plugin-name>_<tool>` → `<tool>`. Plugin scope is already
+  // shown as the group header, no need to repeat it on every row.
+  // The plugin name uses dashes (npm convention) so `[^_]+` greedily
+  // matches it in one shot.
+  const match = name.match(/^plugin_[^_]+_(.+)$/)
+  return match ? match[1]! : name
+}
+
 export function KinToolsTab({ kinId, toolConfig, onToolConfigChange, isHub }: KinToolsTabProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { nativeTools, pluginTools, mcpTools, isLoading } = useKinTools(kinId)
+  const userLang = (i18n.language || 'en').split('-')[0]! // 'fr-FR' → 'fr'
 
   const config = getEffectiveConfig(toolConfig)
 
@@ -250,7 +276,7 @@ export function KinToolsTab({ kinId, toolConfig, onToolConfigChange, isHub }: Ki
                 {group.tools.map((tool) => (
                   <ToolRow
                     key={tool.name}
-                    label={tool.name}
+                    label={resolveToolLabel(tool.name, tool.label, userLang)}
                     enabled={isNativeToolEnabled(tool.name, true)}
                     onToggle={() => toggleNativeTool(tool.name, true)}
                   />

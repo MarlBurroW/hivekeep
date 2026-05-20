@@ -207,6 +207,23 @@ export interface ToolRegistration {
   /** Optional gating predicate evaluated at resolve time. Return false to omit
    *  the tool from the resolved toolset for a particular context. */
   condition?: (ctx: ToolExecutionContext) => boolean
+  /**
+   * Human-readable label rendered in the Kin's Tools settings list.
+   * Plugin tools without a label fall back to the bare tool name with
+   * the `plugin_<plugin-name>_` prefix stripped — readable but not as
+   * polished as a curated label.
+   *
+   * Accepts:
+   *   - A single string (`"Move to channel"`) — same label in every
+   *     locale, fine for English-only plugins
+   *   - A locale map (`{ en: "Move to channel", fr: "Changer de salon" }`)
+   *     — KinBot picks the user's UI locale, falls back to `en`, then
+   *     to any first entry
+   *
+   * Description (LLM-facing) stays on the tool factory itself; this
+   * `label` is purely for the human-facing settings UI.
+   */
+  label?: string | Record<string, string>
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -15,12 +15,18 @@ export interface ToolEntry {
   name: string
   domain: ToolDomain
   defaultDisabled: boolean
+  /** Author-supplied display label. May be locale-keyed. */
+  label?: string | Record<string, string>
 }
 
 export interface ToolListItem {
   name: string
   enabled: boolean
   defaultDisabled: boolean
+  /** Author-supplied display label, locale-keyed. The frontend
+   *  picks the user's locale, falls back to `en`, then to any first
+   *  entry, then to a prettified `name`. */
+  label?: string | Record<string, string>
 }
 
 export interface KinNativeToolGroup {
@@ -71,6 +77,7 @@ export function buildKinToolBuckets(input: BuildKinToolBucketsInput): BuildKinTo
       name: t.name,
       enabled: isEnabled(t, toolConfig),
       defaultDisabled: t.defaultDisabled,
+      ...(t.label !== undefined ? { label: t.label } : {}),
     })
   }
   const nativeTools: KinNativeToolGroup[] = Array.from(domainGroupsMap.entries()).map(([domain, tools]) => ({
@@ -92,6 +99,7 @@ export function buildKinToolBuckets(input: BuildKinToolBucketsInput): BuildKinTo
           name: reg.name,
           enabled: isEnabled(reg, toolConfig),
           defaultDisabled: reg.defaultDisabled,
+          ...(reg.label !== undefined ? { label: reg.label } : {}),
         })
       }
       return { pluginName, tools }
