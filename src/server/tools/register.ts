@@ -6,6 +6,10 @@ import {
   screenshotUrlTool,
 } from '@/server/tools/browse-tools'
 import {
+  listSearchProvidersTool,
+  webSearchTool,
+} from '@/server/tools/search-tools'
+import {
   browserOpenSessionTool,
   browserCloseSessionTool,
   browserListSessionsTool,
@@ -239,6 +243,10 @@ export function registerAllTools(): void {
   toolRegistry.register('browse_url', browseUrlTool, 'browse')
   toolRegistry.register('extract_links', extractLinksTool, 'browse')
   toolRegistry.register('screenshot_url', screenshotUrlTool, 'browse')
+
+  // Search tools — discovery + action. Use browse_url for follow-up fetch.
+  toolRegistry.register('list_search_providers', listSearchProvidersTool, 'search')
+  toolRegistry.register('web_search', webSearchTool, 'search')
 
   // Web browsing — stateful sessions (opt-in: enable via tool_config.enabledOptInTools)
   toolRegistry.register('browser_open_session', browserOpenSessionTool, 'browse')
