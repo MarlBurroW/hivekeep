@@ -1839,15 +1839,20 @@ class PluginManager {
       // add` in a fresh shell works fine, so the issue is specific to
       // the parent/child bun pair. npm has no such relationship with bun,
       // installs reliably from this context.
+      //
+      // `--loglevel error` (not `--silent`) so npm still prints its
+      // actual error text on failure; `--silent` swallowed everything
+      // including ENOSPC / EACCES / peer-dep errors and left users
+      // staring at '(no output)' with no way to diagnose.
       const { exitCode, stderr, stdout } = await this.runSpawn(
-        ['npm', 'install', packageName, '--no-audit', '--no-fund', '--silent'],
+        ['npm', 'install', packageName, '--no-audit', '--no-fund', '--loglevel', 'error'],
         {
           cwd: tempDir,
           timeoutMs: 90_000,
         },
       )
       if (exitCode !== 0) {
-        throw new Error(`npm install failed (exit ${exitCode}): ${stderr.trim() || stdout.trim() || '(no output)'}`)
+        throw new Error(`npm install failed (exit ${exitCode}): ${stderr.trim() || stdout.trim() || '(no output — try `npm install ' + packageName + '` manually to see the real error)'}`)
       }
       log.info({ package: packageName }, 'npm install: bun add done')
 
@@ -2102,15 +2107,18 @@ class PluginManager {
 
         // Same `npm install` (rather than `bun add`) trick as installFromNpm —
         // see the comment there for why we can't spawn bun from a bun parent.
+        // `--loglevel error` instead of `--silent` so npm's failure text
+        // actually surfaces in the thrown message; `--silent` left users
+        // looking at '(no output)' with nothing to debug from.
         const { exitCode, stderr, stdout } = await this.runSpawn(
-          ['npm', 'install', `${packageName}@latest`, '--no-audit', '--no-fund', '--silent'],
+          ['npm', 'install', `${packageName}@latest`, '--no-audit', '--no-fund', '--loglevel', 'error'],
           {
             cwd: tempDir,
             timeoutMs: 90_000,
           },
         )
         if (exitCode !== 0) {
-          throw new Error(`npm update failed (exit ${exitCode}): ${stderr.trim() || stdout.trim() || '(no output)'}`)
+          throw new Error(`npm update failed (exit ${exitCode}): ${stderr.trim() || stdout.trim() || '(no output — try `npm install ' + packageName + '@latest` manually to see the real error)'}`)
         }
         log.info({ plugin: name }, 'npm update: npm install done')
 
