@@ -55,6 +55,7 @@
     "back": "Retour",
     "next": "Suivant",
     "previous": "Précédent",
+    "dismiss": "Fermer",
     "or": "ou",
     "required": "Requis",
     "optional": "Optionnel",
@@ -2479,7 +2480,12 @@
     "knowledge": {
       "add": "Ajouter un savoir",
       "searchPlaceholder": "Rechercher dans le savoir projet…",
+      "clearSearch": "Effacer la recherche",
       "summary": "{{pinned}} épinglés · {{total}} au total",
+      "totalCount_one": "{{count}} entrée",
+      "totalCount_other": "{{count}} entrées",
+      "pinnedCount_one": "{{count}} épinglée",
+      "pinnedCount_other": "{{count}} épinglées",
       "searchResults": "{{count}} résultat(s) — {{total}} au total",
       "pagination": "{{from}}–{{to}} sur {{total}}",
       "pinnedBadge": "Épinglé",
@@ -2495,22 +2501,46 @@
         "pinned": "Épinglés",
         "unpinned": "Non épinglés"
       },
+      "help": {
+        "title": "Comment fonctionne le savoir projet",
+        "show": "Comment ça marche",
+        "pinnedLead": "Épinglées",
+        "pinned": "leur contenu complet est injecté dans le prompt de chaque Kin, automatiquement — aucun outil à appeler. À utiliser avec parcimonie (max 10 par projet).",
+        "unpinnedLead": "Les autres entrées",
+        "unpinned": "n'affichent que leur titre dans l'index du prompt. Les Kins récupèrent le contenu à la demande avec get_project_knowledge, ou recherchent par sujet avec search_project_knowledge.",
+        "scope": "Toutes les entrées sont partagées entre chaque Kin et chaque task de ticket sur ce projet — considérez ça comme un wiki collectif."
+      },
       "empty": {
         "title": "Aucun savoir pour l'instant",
-        "description": "Capturez ici les décisions d'architecture, conventions et pièges. Les entrées épinglées sont injectées dans le prompt de chaque Kin travaillant sur ce projet.",
+        "description": "Capturez ici les décisions d'architecture, conventions, pièges et règles métier. Chaque Kin travaillant sur ce projet verra les titres dans son prompt et pourra récupérer le contenu de n'importe quelle entrée à la demande.",
         "searchTitle": "Aucun résultat",
         "searchDescription": "Essayez une autre requête — la recherche combine similarité sémantique et mots-clés."
       },
       "dialog": {
         "createTitle": "Ajouter un savoir projet",
         "editTitle": "Modifier le savoir projet",
-        "description": "Visible par chaque Kin travaillant sur ce projet. Les entrées épinglées sont injectées dans le prompt système (max 10 par projet).",
-        "contentLabel": "Contenu",
-        "contentPlaceholder": "Un fait, une décision ou une convention clair et autonome…",
+        "description": "Visible par chaque Kin travaillant sur ce projet. Le titre de chaque entrée apparaît dans le prompt du Kin ; le contenu markdown n'est injecté que si l'entrée est épinglée.",
+        "titleLabel": "Titre",
+        "titlePlaceholder": "Un titre court et explicite (ex. « Utiliser Drizzle ORM, pas Prisma »)",
+        "titleHint": "C'est ce que chaque Kin verra par défaut dans son prompt — fais en sorte qu'il raconte toute l'histoire en une ligne.",
+        "contentLabel": "Contenu (Markdown)",
+        "contentPlaceholder": "## Contexte\nPourquoi c'est important…\n\n## Détails\nExemples de code, liens, raisonnement…",
+        "contentHint": "Markdown libre — aussi long que nécessaire. Injecté dans le prompt des Kins seulement si épinglé ; sinon récupéré à la demande.",
         "categoryLabel": "Catégorie (optionnel)",
         "categoryPlaceholder": "ex. arch, décision, piège, convention",
-        "pinnedLabel": "Épingler au prompt",
-        "pinnedHint": "Les entrées épinglées apparaissent dans le prompt système de chaque Kin agissant sur ce projet."
+        "pinnedLabel": "Épingler au prompt système",
+        "pinnedOnHint": "Épinglé : le contenu markdown complet sera injecté dans le prompt système de chaque Kin sur ce projet. Le Kin pourra l'utiliser instantanément sans appel d'outil. Limite : 10 entrées épinglées par projet.",
+        "pinnedOffHint": "Non épinglé : seul le titre apparaît dans le prompt du Kin. Le Kin récupèrera le contenu via l'outil get_project_knowledge si le titre semble pertinent."
+      },
+      "metadata": {
+        "created": "Créé {{time}}",
+        "updated": "Modifié {{time}}",
+        "createdAt": "Créé le {{date}}",
+        "updatedAt": "Modifié le {{date}}",
+        "chars_one": "{{count}} car.",
+        "chars_other": "{{count}} car.",
+        "copyId": "Copier l'id",
+        "idCopied": "ID copié dans le presse-papier."
       },
       "toast": {
         "created": "Savoir ajouté.",

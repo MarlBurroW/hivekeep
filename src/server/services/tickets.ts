@@ -1176,19 +1176,23 @@ export async function buildTicketAssignmentInfo(
   // stability — newly pinned entries appear only at the next ticket task spawn
   // (or via live `search_project_knowledge` calls from inside the sub-Kin).
   let pinnedKnowledge: TicketAssignmentInfo['pinnedKnowledge'] = []
+  let knowledgeIndex: TicketAssignmentInfo['knowledgeIndex'] = []
   let totalKnowledgeCount = 0
   try {
-    const { getPinnedKnowledge, countProjectKnowledge } = await import('@/server/services/project-knowledge')
-    const [pinned, total] = await Promise.all([
+    const { getPinnedKnowledge, countProjectKnowledge, listKnowledgeIndex } = await import('@/server/services/project-knowledge')
+    const [pinned, index, total] = await Promise.all([
       getPinnedKnowledge(project.id),
+      listKnowledgeIndex(project.id),
       countProjectKnowledge(project.id),
     ])
     pinnedKnowledge = pinned.map((p) => ({
       id: p.id,
+      title: p.title,
       content: p.content,
       category: p.category,
       authorKinName: p.authorKinName,
     }))
+    knowledgeIndex = index
     totalKnowledgeCount = total
   } catch {
     // ignore — best-effort
@@ -1210,6 +1214,7 @@ export async function buildTicketAssignmentInfo(
     comments,
     runPrompt: options.runPrompt ?? null,
     pinnedKnowledge,
+    knowledgeIndex,
     totalKnowledgeCount,
   }
 }

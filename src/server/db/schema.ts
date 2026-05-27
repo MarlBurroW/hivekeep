@@ -992,9 +992,16 @@ export const ticketAttachments = sqliteTable('ticket_attachments', {
 export const projectKnowledge = sqliteTable('project_knowledge', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  /** Short human-readable title. Rendered in the system-prompt knowledge
+   *  index for every entry (pinned or not). Service layer rejects empty
+   *  or whitespace-only titles. */
+  title: text('title').notNull().default(''),
   content: text('content').notNull(),
   embedding: blob('embedding'), // nullable — FTS5 still works if embedding fails
   category: text('category'), // free-text (e.g. 'arch', 'decision', 'gotcha', 'convention')
+  /** When true, the full markdown content is injected inline in the system
+   *  prompt. When false, only the title appears in the index and the Kin
+   *  reads the body via get_project_knowledge(id). */
   pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   authorKinId: text('author_kin_id').references(() => kins.id, { onDelete: 'set null' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),

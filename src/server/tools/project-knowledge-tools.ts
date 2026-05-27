@@ -14,6 +14,7 @@ import {
   searchProjectKnowledge,
   getProjectKnowledge,
   PinCapExceededError,
+  InvalidKnowledgeTitleError,
 } from '@/server/services/project-knowledge'
 import type { ToolRegistration, ToolExecutionContext } from '@/server/tools/types'
 
@@ -90,10 +91,10 @@ function pinCapMessage(): string {
 const addDescription =
   'Capture a durable fact about the current project: an architectural decision, a convention, ' +
   'a gotcha, a domain rule. Visible to ALL Kins working on this project. ' +
-  'Set pinned=true to inject the entry into the system prompt (capped at ' +
-  '10 pins per project — unpin one first if full). Pinned entries are frozen ' +
-  'into ticket sub-Kin snapshots at spawn time; live search via ' +
-  'search_project_knowledge always reflects the latest state.'
+  'Every entry\'s title lands in your system-prompt knowledge index. ' +
+  'Set pinned=true to additionally inline the full markdown content in the prompt ' +
+  '(capped at 10 pins per project — unpin one first if full). Unpinned entries ' +
+  'show only their title; agents fetch the body via get_project_knowledge(id).'
 
 export const addProjectKnowledgeTool: ToolRegistration = {
   availability: ['main'],
@@ -102,7 +103,14 @@ export const addProjectKnowledgeTool: ToolRegistration = {
     tool({
       description: addDescription,
       inputSchema: z.object({
-        content: z.string().min(1).describe('A clear standalone fact or decision to remember.'),
+        title: z
+          .string()
+          .min(1)
+          .describe('Short, human-readable title. Lands in every Kin\'s prompt index so make it self-explanatory.'),
+        content: z
+          .string()
+          .min(1)
+          .describe('Full body. Markdown is supported and rendered as-is for users. Inlined in the prompt only when pinned=true.'),
         category: z
           .string()
           .optional()
@@ -110,15 +118,16 @@ export const addProjectKnowledgeTool: ToolRegistration = {
         pinned: z
           .boolean()
           .optional()
-          .describe('Default: false. Pinned entries appear in the system prompt for every Kin acting on this project.'),
+          .describe('Default: false. When true, the full content is also injected inline into every Kin\'s system prompt for this project (cap: 10).'),
       }),
-      execute: async ({ content, category, pinned }) => {
+      execute: async ({ title, content, category, pinned }) => {
         const resolved = resolveProjectContext(ctx)
         if (resolved.error) return { error: resolved.error }
 
         try {
           const created = await createProjectKnowledge({
             projectId: resolved.projectId!,
+            title,
             content,
             category: category ?? null,
             pinned: pinned ?? false,
@@ -128,6 +137,7 @@ export const addProjectKnowledgeTool: ToolRegistration = {
           return {
             knowledge: {
               id: created.id,
+              title: created.title,
               content: created.content,
               category: created.category,
               pinned: created.pinned,
@@ -136,6 +146,9 @@ export const addProjectKnowledgeTool: ToolRegistration = {
         } catch (e) {
           if (e instanceof PinCapExceededError) {
             return { error: 'PIN_CAP_EXCEEDED', message: pinCapMessage() }
+          }
+          if (e instanceof InvalidKnowledgeTitleError) {
+            return { error: 'INVALID_TITLE', message: e.message }
           }
           throw e
         }
@@ -152,8 +165,8 @@ export const searchProjectKnowledgeTool: ToolRegistration = {
     tool({
       description:
         'Search the current project\'s knowledge base by semantic similarity + keyword match. ' +
-        'Use this to retrieve facts/decisions/gotchas that are NOT already pinned in your prompt — ' +
-        'the pinned set is capped at 10 entries per project, so the rest lives here.',
+        'Returns title + full content for each hit. Use this when an entry\'s title in your ' +
+        'prompt index isn\'t enough to find what you need, or when you need to find entries by topic.',
       inputSchema: z.object({
         query: z.string().min(1),
         limit: z.number().int().min(1).max(20).optional().describe('Default: 10'),
@@ -165,6 +178,7 @@ export const searchProjectKnowledgeTool: ToolRegistration = {
         return {
           results: hits.map((h) => ({
             id: h.id,
+            title: h.title,
             content: h.content,
             category: h.category,
             pinned: h.pinned,
@@ -201,15 +215,57 @@ export const listProjectKnowledgeTool: ToolRegistration = {
           limit: limit ?? 50,
           offset: offset ?? 0,
         })
+        // Return titles only (no body) so the tool result stays light —
+        // the Kin can call get_project_knowledge(id) for any entry it wants
+        // to read in full.
         return {
           entries: entries.map((e) => ({
             id: e.id,
-            content: e.content,
+            title: e.title,
             category: e.category,
             pinned: e.pinned,
             authorKinName: e.authorKinName,
             updatedAt: e.updatedAt,
           })),
+        }
+      },
+    }),
+}
+
+export const getProjectKnowledgeTool: ToolRegistration = {
+  availability: ['main'],
+  readOnly: true,
+  concurrencySafe: true,
+  condition: mainOrTicketBoundCondition,
+  create: (ctx) =>
+    tool({
+      description:
+        'Read the full markdown content of a single project knowledge entry by id. Use this ' +
+        'when an entry in your prompt\'s knowledge index looks relevant — its title is in the ' +
+        'prompt but the body is not (unless pinned). For unknown ids, use search_project_knowledge first.',
+      inputSchema: z.object({
+        id: z.string().describe('Knowledge entry id (as shown in the prompt index or returned by other knowledge tools).'),
+      }),
+      execute: async ({ id }) => {
+        const resolved = resolveProjectContext(ctx)
+        if (resolved.error) return { error: resolved.error }
+        const entry = await getProjectKnowledge(id)
+        if (!entry) return { error: 'KNOWLEDGE_NOT_FOUND' }
+        // Same cross-project guardrail as update/delete — don't leak content
+        // from a project the caller isn't acting on.
+        if (entry.projectId !== resolved.projectId) {
+          return { error: 'WRONG_PROJECT', message: 'This knowledge entry belongs to a different project.' }
+        }
+        return {
+          knowledge: {
+            id: entry.id,
+            title: entry.title,
+            content: entry.content,
+            category: entry.category,
+            pinned: entry.pinned,
+            authorKinName: entry.authorKinName,
+            updatedAt: entry.updatedAt,
+          },
         }
       },
     }),
@@ -221,15 +277,16 @@ export const updateProjectKnowledgeTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Update an existing project knowledge entry — content, category, or pinned state. ' +
-        'Re-embeds the content if changed.',
+        'Update an existing project knowledge entry — title, content, category, or pinned state. ' +
+        'Re-embeds when title or content changes.',
       inputSchema: z.object({
         id: z.string(),
+        title: z.string().min(1).optional(),
         content: z.string().min(1).optional(),
         category: z.string().nullable().optional(),
         pinned: z.boolean().optional(),
       }),
-      execute: async ({ id, content, category, pinned }) => {
+      execute: async ({ id, title, content, category, pinned }) => {
         const resolved = resolveProjectContext(ctx)
         if (resolved.error) return { error: resolved.error }
 
@@ -244,6 +301,7 @@ export const updateProjectKnowledgeTool: ToolRegistration = {
 
         try {
           const updated = await updateProjectKnowledge(id, {
+            title,
             content,
             category: category === undefined ? undefined : category,
             pinned,
@@ -252,6 +310,7 @@ export const updateProjectKnowledgeTool: ToolRegistration = {
           return {
             knowledge: {
               id: updated.id,
+              title: updated.title,
               content: updated.content,
               category: updated.category,
               pinned: updated.pinned,
@@ -260,6 +319,9 @@ export const updateProjectKnowledgeTool: ToolRegistration = {
         } catch (e) {
           if (e instanceof PinCapExceededError) {
             return { error: 'PIN_CAP_EXCEEDED', message: pinCapMessage() }
+          }
+          if (e instanceof InvalidKnowledgeTitleError) {
+            return { error: 'INVALID_TITLE', message: e.message }
           }
           throw e
         }

@@ -533,6 +533,20 @@
       "when": 1779897600000,
       "tag": "0075_project_knowledge",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "6",
+      "when": 1779984000000,
+      "tag": "0076_project_knowledge_title",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "6",
+      "when": 1780070400000,
+      "tag": "0077_project_knowledge_fts_title",
+      "breakpoints": true
     }
   ]
 }

@@ -757,12 +757,19 @@ export interface Project {
 /**
  * A curated piece of durable knowledge attached to a project (architectural
  * decisions, conventions, gotchas, domain facts). Shared across Kins acting
- * on the project. Pinned entries are injected into the system prompt; the
- * rest is searchable via `search_project_knowledge`.
+ * on the project.
+ *
+ * Every entry's `title` always lands in the system-prompt knowledge index.
+ * When `pinned` is true, the full markdown `content` is also injected
+ * inline — no tool call needed to read it. When false, the Kin reads
+ * the content via `get_project_knowledge(id)`.
  */
 export interface ProjectKnowledge {
   id: string
   projectId: string
+  /** Short human-readable title (always shown in the prompt index). */
+  title: string
+  /** Markdown body. Inlined into the prompt only when `pinned` is true. */
   content: string
   /** Optional free-text bucket (e.g. 'arch', 'decision', 'gotcha'). */
   category: string | null
@@ -773,6 +780,16 @@ export interface ProjectKnowledge {
   authorKinName: string | null
   createdAt: number
   updatedAt: number
+}
+
+/** Lightweight projection used to render the system-prompt index without
+ *  shipping the full markdown body for every entry. */
+export interface ProjectKnowledgeIndexEntry {
+  id: string
+  title: string
+  category: string | null
+  pinned: boolean
+  authorKinName: string | null
 }
 
 /** A single hit returned by `searchProjectKnowledge`. */

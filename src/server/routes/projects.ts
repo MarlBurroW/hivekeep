@@ -23,6 +23,7 @@ import {
   getProjectKnowledge,
   countProjectKnowledge,
   PinCapExceededError,
+  InvalidKnowledgeTitleError,
 } from '@/server/services/project-knowledge'
 import {
   resolvePat,
@@ -412,6 +413,16 @@ projectRoutes.get('/:projectId/knowledge', async (c) => {
   return c.json({ entries, total, mode: 'list' as const })
 })
 
+projectRoutes.get('/:projectId/knowledge/:id', async (c) => {
+  const projectId = c.req.param('projectId')
+  const id = c.req.param('id')
+  const entry = await getProjectKnowledge(id)
+  if (!entry || entry.projectId !== projectId) {
+    return c.json({ error: { code: 'KNOWLEDGE_NOT_FOUND', message: 'Knowledge entry not found' } }, 404)
+  }
+  return c.json({ entry })
+})
+
 projectRoutes.post('/:projectId/knowledge', async (c) => {
   const projectId = c.req.param('projectId')
   const project = await getProject(projectId)
@@ -419,6 +430,10 @@ projectRoutes.post('/:projectId/knowledge', async (c) => {
     return c.json({ error: { code: 'PROJECT_NOT_FOUND', message: 'Project not found' } }, 404)
   }
   const body = await c.req.json().catch(() => ({}))
+  const title = typeof body.title === 'string' ? body.title.trim() : ''
+  if (!title) {
+    return c.json({ error: { code: 'INVALID_INPUT', message: 'title is required' } }, 400)
+  }
   const content = typeof body.content === 'string' ? body.content.trim() : ''
   if (!content) {
     return c.json({ error: { code: 'INVALID_INPUT', message: 'content is required' } }, 400)
@@ -427,11 +442,14 @@ projectRoutes.post('/:projectId/knowledge', async (c) => {
   const pinned = body.pinned === true
 
   try {
-    const entry = await createProjectKnowledge({ projectId, content, category, pinned, authorKinId: null })
+    const entry = await createProjectKnowledge({ projectId, title, content, category, pinned, authorKinId: null })
     return c.json({ entry }, 201)
   } catch (err) {
     if (err instanceof PinCapExceededError) {
       return c.json({ error: { code: 'PIN_CAP_EXCEEDED', message: err.message } }, 409)
+    }
+    if (err instanceof InvalidKnowledgeTitleError) {
+      return c.json({ error: { code: 'INVALID_TITLE', message: err.message } }, 400)
     }
     const msg = err instanceof Error ? err.message : 'Unknown error'
     log.warn({ err }, 'createProjectKnowledge failed')
@@ -448,7 +466,14 @@ projectRoutes.patch('/:projectId/knowledge/:id', async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({}))
-  const updates: { content?: string; category?: string | null; pinned?: boolean } = {}
+  const updates: { title?: string; content?: string; category?: string | null; pinned?: boolean } = {}
+  if (typeof body.title === 'string') {
+    const trimmed = body.title.trim()
+    if (!trimmed) {
+      return c.json({ error: { code: 'INVALID_INPUT', message: 'title cannot be empty' } }, 400)
+    }
+    updates.title = trimmed
+  }
   if (typeof body.content === 'string') {
     const trimmed = body.content.trim()
     if (!trimmed) {
@@ -469,6 +494,9 @@ projectRoutes.patch('/:projectId/knowledge/:id', async (c) => {
   } catch (err) {
     if (err instanceof PinCapExceededError) {
       return c.json({ error: { code: 'PIN_CAP_EXCEEDED', message: err.message } }, 409)
+    }
+    if (err instanceof InvalidKnowledgeTitleError) {
+      return c.json({ error: { code: 'INVALID_TITLE', message: err.message } }, 400)
     }
     const msg = err instanceof Error ? err.message : 'Unknown error'
     log.warn({ err }, 'updateProjectKnowledge failed')

@@ -55,6 +55,7 @@
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
+    "dismiss": "Dismiss",
     "or": "or",
     "required": "Required",
     "optional": "Optional",
@@ -2479,7 +2480,12 @@
     "knowledge": {
       "add": "Add knowledge",
       "searchPlaceholder": "Search project knowledge…",
+      "clearSearch": "Clear search",
       "summary": "{{pinned}} pinned · {{total}} total",
+      "totalCount_one": "{{count}} entry",
+      "totalCount_other": "{{count}} entries",
+      "pinnedCount_one": "{{count}} pinned",
+      "pinnedCount_other": "{{count}} pinned",
       "searchResults": "{{count}} match — {{total}} total",
       "pagination": "{{from}}–{{to}} of {{total}}",
       "pinnedBadge": "Pinned",
@@ -2495,22 +2501,46 @@
         "pinned": "Pinned",
         "unpinned": "Unpinned"
       },
+      "help": {
+        "title": "How project knowledge works",
+        "show": "How it works",
+        "pinnedLead": "Pinned",
+        "pinned": "entries have their full content injected into every Kin's prompt automatically — no tool call. Use sparingly (max 10 per project).",
+        "unpinnedLead": "Other entries",
+        "unpinned": "show only their title in the prompt index. Kins fetch the body on demand with get_project_knowledge, or search by topic with search_project_knowledge.",
+        "scope": "All entries are shared across every Kin and ticket task on this project — treat it as a collective wiki."
+      },
       "empty": {
         "title": "No knowledge yet",
-        "description": "Capture architectural decisions, conventions, and gotchas here. Pinned entries are injected into every Kin's prompt for this project.",
+        "description": "Capture architectural decisions, conventions, gotchas, and domain rules here. Every Kin working on this project will see the titles in its prompt and can fetch any entry's body on demand.",
         "searchTitle": "No matches",
         "searchDescription": "Try a different query — search uses both semantic similarity and keywords."
       },
       "dialog": {
         "createTitle": "Add project knowledge",
         "editTitle": "Edit project knowledge",
-        "description": "Visible to every Kin working on this project. Pinned entries are baked into the system prompt (max 10 per project).",
-        "contentLabel": "Content",
-        "contentPlaceholder": "A clear, standalone fact, decision, or convention…",
+        "description": "Visible to every Kin working on this project. Every entry's title lands in the Kin's prompt; the markdown body is injected only when pinned.",
+        "titleLabel": "Title",
+        "titlePlaceholder": "A short, self-explanatory headline (e.g. 'Use Drizzle ORM, not Prisma')",
+        "titleHint": "This is what every Kin will see by default in its prompt — make it tell the whole story in one line.",
+        "contentLabel": "Content (Markdown)",
+        "contentPlaceholder": "## Context\nWhy this matters…\n\n## Details\nCode samples, links, reasoning…",
+        "contentHint": "Free-form markdown — as long as you need. Only inlined into Kin prompts when pinned; otherwise fetched on demand.",
         "categoryLabel": "Category (optional)",
         "categoryPlaceholder": "e.g. arch, decision, gotcha, convention",
-        "pinnedLabel": "Pin to prompt",
-        "pinnedHint": "Pinned entries appear in the system prompt for every Kin acting on this project."
+        "pinnedLabel": "Pin to system prompt",
+        "pinnedOnHint": "Pinned: the full markdown content will be injected into every Kin's system prompt for this project. The Kin can use it instantly with no tool call. Cap: 10 pinned entries per project.",
+        "pinnedOffHint": "Not pinned: only the title appears in the Kin's prompt. The Kin will fetch the content via the get_project_knowledge tool when the title looks relevant."
+      },
+      "metadata": {
+        "created": "Created {{time}}",
+        "updated": "Updated {{time}}",
+        "createdAt": "Created on {{date}}",
+        "updatedAt": "Updated on {{date}}",
+        "chars_one": "{{count}} char",
+        "chars_other": "{{count}} chars",
+        "copyId": "Copy id",
+        "idCopied": "ID copied to clipboard."
       },
       "toast": {
         "created": "Knowledge entry added.",

@@ -85,12 +85,14 @@ export function useProjectKnowledge(
 }
 
 interface CreateInput {
+  title: string
   content: string
   category?: string | null
   pinned?: boolean
 }
 
 interface UpdateInput {
+  title?: string
   content?: string
   category?: string | null
   pinned?: boolean

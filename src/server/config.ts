@@ -344,10 +344,15 @@ export const config = {
 
   projectKnowledge: {
     /** Max number of entries that can be pinned per project. Pinned entries
-     *  are injected into the system prompt; the rest is searchable via the
-     *  search_project_knowledge tool. Without it, a single project could grow
-     *  an unbounded prompt-injected section. */
+     *  have their full markdown content injected into the system prompt
+     *  (inline, no tool call needed). The cap keeps prompt token cost
+     *  bounded — unpinned entries are still reachable via the title index
+     *  and get_project_knowledge(id). */
     pinCap: Number(process.env.PROJECT_KNOWLEDGE_PIN_CAP ?? 10),
+    /** Max titles shipped in the prompt's project-knowledge index. Above
+     *  this, the index renders an "... and N more" footer and the Kin must
+     *  use search_project_knowledge to surface the rest. */
+    maxIndexEntries: Number(process.env.PROJECT_KNOWLEDGE_MAX_INDEX_ENTRIES ?? 100),
     /** Max results returned by search_project_knowledge (used both for the
      *  Kin tool and the REST endpoint). */
     maxSearchResults: Number(process.env.PROJECT_KNOWLEDGE_MAX_SEARCH_RESULTS ?? 10),

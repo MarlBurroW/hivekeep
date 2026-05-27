@@ -133,6 +133,7 @@ import {
   addProjectKnowledgeTool,
   searchProjectKnowledgeTool,
   listProjectKnowledgeTool,
+  getProjectKnowledgeTool,
   updateProjectKnowledgeTool,
   deleteProjectKnowledgeTool,
   pinProjectKnowledgeTool,
@@ -400,11 +401,13 @@ export function registerAllTools(): void {
 
   // Project knowledge: curated facts/decisions/gotchas per project, available
   // to main Kins (active project) and ticket-bound sub-Kins (ticket's project).
-  // Pinned entries (max config.projectKnowledge.pinCap) are injected into the
-  // system prompt; the rest is reachable via search_project_knowledge.
+  // Every entry's title lands in the system-prompt index. Pinned entries
+  // (max config.projectKnowledge.pinCap) ALSO inline their markdown body in
+  // the prompt — unpinned ones are fetched on demand via get_project_knowledge.
   toolRegistry.register('add_project_knowledge', addProjectKnowledgeTool, 'projects')
   toolRegistry.register('search_project_knowledge', searchProjectKnowledgeTool, 'projects')
   toolRegistry.register('list_project_knowledge', listProjectKnowledgeTool, 'projects')
+  toolRegistry.register('get_project_knowledge', getProjectKnowledgeTool, 'projects')
   toolRegistry.register('update_project_knowledge', updateProjectKnowledgeTool, 'projects')
   toolRegistry.register('delete_project_knowledge', deleteProjectKnowledgeTool, 'projects')
   toolRegistry.register('pin_project_knowledge', pinProjectKnowledgeTool, 'projects')

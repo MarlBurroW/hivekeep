@@ -154,18 +154,31 @@ export interface ActiveProjectPromptInfo {
   totalOpenTickets: number
   /** True if description was truncated to fit `config.projects.maxDescriptionPromptTokens`. */
   descriptionTruncated: boolean
-  /** Pinned project knowledge entries injected into the prompt. Capped at
-   *  `config.projectKnowledge.pinCap` (default 10). Sorted by updatedAt DESC
-   *  for deterministic, cache-stable rendering. */
+  /** Pinned project knowledge entries — full title + markdown body inlined
+   *  in the prompt so the Kin can act on them without an extra tool call.
+   *  Capped at `config.projectKnowledge.pinCap` (default 10).
+   *  Sorted by updatedAt DESC for deterministic, cache-stable rendering. */
   pinnedKnowledge?: Array<{
     id: string
+    title: string
     content: string
     category: string | null
     authorKinName: string | null
   }>
-  /** Total entries in `project_knowledge` for this project (pinned + not).
-   *  Used to render the "N more entries — call search_project_knowledge"
-   *  footer beneath the pinned list. */
+  /** Lightweight index of every entry (titles only). Pinned entries also
+   *  appear in `pinnedKnowledge` above with their full body — they're
+   *  flagged here so the Kin can tell which titles already have inline
+   *  content and which need `get_project_knowledge(id)`. */
+  knowledgeIndex?: Array<{
+    id: string
+    title: string
+    category: string | null
+    pinned: boolean
+    authorKinName: string | null
+  }>
+  /** Total entries in `project_knowledge` for this project. Used to render
+   *  the "... and N more — use search_project_knowledge" footer when the
+   *  index is truncated to `config.projectKnowledge.maxIndexEntries`. */
   totalKnowledgeCount?: number
 }
 
@@ -212,15 +225,26 @@ export interface TicketAssignmentInfo {
    *  sub-task instructions, so the agent can scope its run to a slice of the
    *  ticket without conflating it with the ticket description itself. */
   runPrompt?: string | null
-  /** Pinned project knowledge captured at spawn time. Frozen into the
-   *  ticketAssignmentSnapshot to keep the sub-Kin prompt cache stable across
-   *  re-entries (request_input replies, sub-sub-task returns). Newly pinned
-   *  entries appear in the live `search_project_knowledge` results but not
-   *  in this list until the sub-Kin completes and the parent picks it up. */
+  /** Pinned project knowledge captured at spawn time — full title + body.
+   *  Frozen into the ticketAssignmentSnapshot to keep the sub-Kin prompt
+   *  cache stable across re-entries (request_input replies, sub-sub-task
+   *  returns). Newly pinned entries don't appear here until the sub-Kin
+   *  completes and the parent picks them up; the live `search_project_knowledge`
+   *  and `get_project_knowledge` tools always reflect the current state. */
   pinnedKnowledge?: Array<{
     id: string
+    title: string
     content: string
     category: string | null
+    authorKinName: string | null
+  }>
+  /** Lightweight knowledge index captured at spawn time (titles only). Same
+   *  freeze-at-spawn rationale as `pinnedKnowledge`. */
+  knowledgeIndex?: Array<{
+    id: string
+    title: string
+    category: string | null
+    pinned: boolean
     authorKinName: string | null
   }>
   /** Total entries in the project's knowledge store at spawn time. */
@@ -571,51 +595,81 @@ const LANGUAGE_NAMES: Record<string, string> = {
 // ─── Project blocks ──────────────────────────────────────────────────────────
 
 /**
- * Render the pinned project knowledge sub-section. Shared between the main
- * Kin's Active project block and the sub-Kin's Ticket assignment block —
- * pin curation is project-scoped, so both surfaces show the same list.
+ * Render the project knowledge sub-sections. Shared between the main Kin's
+ * Active project block and the sub-Kin's Ticket assignment block — knowledge
+ * is project-scoped, so both surfaces show the same content.
  *
- * Without it (no pins) the sub-section is skipped entirely, except a footer
- * hint is still emitted when the project has unpinned entries the Kin could
- * surface via the search tool.
+ * Two sub-sections rendered in this order:
+ *   1. **Pinned knowledge** — full markdown body inlined per entry. The Kin
+ *      can act on these without any tool call. Order = updatedAt DESC.
+ *   2. **Knowledge index** — every entry as a single line `[id] title — category`.
+ *      Pinned entries are flagged (✦) so the Kin knows their body is already
+ *      visible above. Order = pinned-first, then updatedAt DESC.
+ *
+ * Returns null when the project has zero knowledge entries — no point
+ * polluting the prompt with empty headers.
  */
-function renderPinnedKnowledgeBlock(
+function renderProjectKnowledgeBlock(
   pinned: ActiveProjectPromptInfo['pinnedKnowledge'],
+  index: ActiveProjectPromptInfo['knowledgeIndex'],
   total: number | undefined,
 ): string | null {
-  const items = pinned ?? []
-  const totalCount = total ?? items.length
-  if (items.length === 0 && totalCount === 0) return null
+  const pinnedItems = pinned ?? []
+  const indexItems = index ?? []
+  const totalCount = total ?? Math.max(pinnedItems.length, indexItems.length)
+  if (pinnedItems.length === 0 && indexItems.length === 0 && totalCount === 0) return null
 
-  const lines: string[] = []
-  if (items.length > 0) {
-    lines.push(`### Pinned knowledge (${items.length})`)
-    lines.push('')
-    for (const item of items) {
-      const categoryPart = item.category ? `[${item.category}] ` : ''
-      const authorPart = item.authorKinName ? ` (by ${item.authorKinName})` : ''
-      lines.push(`- ${categoryPart}${item.content}${authorPart}`)
+  const sections: string[] = []
+
+  // ── Pinned entries: full body inline ─────────────────────────────────────
+  if (pinnedItems.length > 0) {
+    const pinnedLines: string[] = [`### Pinned knowledge (${pinnedItems.length})`, '']
+    pinnedLines.push(
+      '_These entries are pinned — their full markdown content is included below so you can act on them immediately, no tool call needed._',
+    )
+    pinnedLines.push('')
+    for (const item of pinnedItems) {
+      const meta: string[] = []
+      if (item.category) meta.push(item.category)
+      if (item.authorKinName) meta.push(`by ${item.authorKinName}`)
+      const metaPart = meta.length > 0 ? ` _(${meta.join(' · ')})_` : ''
+      pinnedLines.push(`#### ${item.title}${metaPart}`)
+      pinnedLines.push('')
+      pinnedLines.push(item.content)
+      pinnedLines.push('')
     }
-  } else {
-    lines.push('### Pinned knowledge')
-    lines.push('')
-    lines.push('_No pinned entries — but the project has searchable knowledge below._')
+    sections.push(pinnedLines.join('\n').trimEnd())
   }
 
-  const remainder = Math.max(0, totalCount - items.length)
-  if (remainder > 0) {
-    lines.push('')
-    lines.push(
-      `> ${remainder} more knowledge ${remainder === 1 ? 'entry' : 'entries'} available — call \`search_project_knowledge(query)\` to retrieve relevant ones.`,
-    )
-  } else if (items.length > 0) {
-    lines.push('')
-    lines.push(
-      '> All project knowledge is pinned above. Use `add_project_knowledge` to capture new decisions, conventions, or gotchas.',
-    )
+  // ── Index: title only, pinned ones flagged ───────────────────────────────
+  if (indexItems.length > 0) {
+    const indexLines: string[] = [`### Knowledge index (${totalCount})`, '']
+    if (pinnedItems.length > 0) {
+      indexLines.push(
+        '_Full list of titles. ✦ marks entries whose body is already inlined above; for the others, call `get_project_knowledge(id)` to read the markdown body, or `search_project_knowledge(query)` for topic-based discovery._',
+      )
+    } else {
+      indexLines.push(
+        '_Full list of titles. Call `get_project_knowledge(id)` to read any entry\'s markdown body, or `search_project_knowledge(query)` for topic-based discovery._',
+      )
+    }
+    indexLines.push('')
+    for (const item of indexItems) {
+      const flag = item.pinned ? '✦ ' : ''
+      const categoryPart = item.category ? ` — _${item.category}_` : ''
+      indexLines.push(`- ${flag}[${item.id}] ${item.title}${categoryPart}`)
+    }
+    const remainder = Math.max(0, totalCount - indexItems.length)
+    if (remainder > 0) {
+      indexLines.push('')
+      indexLines.push(
+        `> ${remainder} more ${remainder === 1 ? 'entry' : 'entries'} not shown — use \`search_project_knowledge(query)\` to surface them.`,
+      )
+    }
+    sections.push(indexLines.join('\n'))
   }
 
-  return lines.join('\n')
+  return sections.join('\n\n')
 }
 
 function buildActiveProjectBlock(info: ActiveProjectPromptInfo): string {
@@ -643,7 +697,7 @@ function buildActiveProjectBlock(info: ActiveProjectPromptInfo): string {
     sections.push(`### Tags\n\n${tagLines}`)
   }
 
-  const knowledgeBlock = renderPinnedKnowledgeBlock(info.pinnedKnowledge, info.totalKnowledgeCount)
+  const knowledgeBlock = renderProjectKnowledgeBlock(info.pinnedKnowledge, info.knowledgeIndex, info.totalKnowledgeCount)
   if (knowledgeBlock) sections.push(knowledgeBlock)
 
   if (info.openTickets.length > 0) {
@@ -733,7 +787,7 @@ function buildTicketAssignmentBlock(info: TicketAssignmentInfo): string {
     : ''
   sections.push(`### Project context\n\n${projectHeader}${projectDesc}`)
 
-  const knowledgeBlock = renderPinnedKnowledgeBlock(info.pinnedKnowledge, info.totalKnowledgeCount)
+  const knowledgeBlock = renderProjectKnowledgeBlock(info.pinnedKnowledge, info.knowledgeIndex, info.totalKnowledgeCount)
   if (knowledgeBlock) sections.push(knowledgeBlock)
 
   const tagsLine = info.ticketTags.length > 0 ? `\nTags: ${info.ticketTags.join(', ')}` : ''
@@ -906,7 +960,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       constraintsLines.push(`- Communicate via the ticket. Use update_ticket() to update status/description/tags; use prompt_human() to ask the user a question (the task is suspended with a yellow "awaiting input" badge on the ticket until they answer). For structured choices use prompt_human's confirm/select/multi_select; for free-form answers use prompt_type="text" — or call request_input() which routes through the same human-prompt flow on ticket tasks.`)
       constraintsLines.push(`- Do NOT report intermediate progress to a parent Kin — there is none on ticket tasks. Your audience is the user reading the ticket.`)
       constraintsLines.push(
-        `- **Mine and feed the project knowledge base.** The pinned entries above (if any) are a snapshot frozen at spawn time — they are only the curated tip. At the start of your task, and whenever you enter an unfamiliar area, call search_project_knowledge(query) to retrieve relevant facts, decisions, conventions, and gotchas before assuming. When you discover something durable that future agents working on this project would need to know — an architectural decision you make, a non-obvious convention you uncover, a gotcha that cost you time — call add_project_knowledge(content, category?) to record it. Pin (pinned=true) only the few items every future agent must see up-front; leave the rest searchable. Knowledge is shared across all Kins and tasks on this project, so curate accordingly — no personal scratchpad, no transient task state.`,
+        `- **Mine and feed the project knowledge base.** The "Knowledge index" above lists every entry's title and id. Pinned entries (✦) have their full markdown body inlined above the index — read them; you have them for free. For unpinned entries, the title alone may already tell you what you need; if the title looks relevant, call get_project_knowledge(id) to read the body. Use search_project_knowledge(query) when no title matches your need or you're discovering by topic. The whole list is frozen at spawn time — newly added entries won't appear in your index until the next ticket task, but get/search always hit the live state. When you discover something durable that future agents working on this project would need to know — an architectural decision you make, a non-obvious convention you uncover, a gotcha that cost you time — call add_project_knowledge(title, content, category?) with a self-explanatory title (it lands in every future Kin's prompt) and a markdown body. Set pinned=true only when the content itself must be visible in-prompt for every Kin (cap: 10); otherwise leave it unpinned — the title alone surfaces it.`,
       )
     }
     constraintsLines.push(`- Be honest about uncertainty. Do not fabricate facts or details — use tools to verify when unsure.`)
@@ -1225,9 +1279,11 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       (params.activeProject
         ? `### Project knowledge (shared, durable facts about "${params.activeProject.title}")\n` +
           `- The active project has a dedicated knowledge base, distinct from your personal memories. It is **shared across every Kin and every sub-task that works on this project**, now and in the future. Treat it as a collective wiki you are co-authoring with future agents.\n` +
-          `- **Capture knowledge proactively with add_project_knowledge() when you learn something durable** that another agent — yourself in a week, a sub-Kin spawned tomorrow, a different Kin entirely — would otherwise have to rediscover. Good candidates: architectural decisions ("we use Drizzle, not Prisma"), conventions ("commits don't use Co-Authored-By"), gotchas ("Better Auth manages user/session tables — never edit"), domain rules, non-obvious constraints, deliberate trade-offs. Bad candidates: your own current-task scratchpad, transient debugging state, anything that only matters within a single task — those belong in memories or task_todos.\n` +
-          `- **Pin (pinned=true) only the entries every future agent must see up-front** — the small set that would change how you approach the project from the first turn. Pinned entries are injected into the system prompt (see the "Pinned knowledge" sub-section in the Active project block above); the cap is small on purpose. Everything else is reachable via search_project_knowledge.\n` +
-          `- **Search before assuming.** When you start work on an unfamiliar area, when you are about to make a non-trivial decision, or when you suspect a convention exists but is not in your prompt, call search_project_knowledge(query) — the pinned set is intentionally tiny, so most of the project's accumulated knowledge lives behind that search.\n` +
+          `- **How it shows up in your prompt.** The "Knowledge index" sub-section in the Active project block above lists every entry's id and title. Pinned entries (✦) also have their full markdown body inlined above the index — they are visible without any tool call. Unpinned entries appear only as a title in the index; read their body with get_project_knowledge(id).\n` +
+          `- **Capture knowledge proactively with add_project_knowledge(title, content) when you learn something durable** that another agent — yourself in a week, a sub-Kin spawned tomorrow, a different Kin entirely — would otherwise have to rediscover. Good candidates: architectural decisions ("we use Drizzle, not Prisma"), conventions ("commits don't use Co-Authored-By"), gotchas ("Better Auth manages user/session tables — never edit"), domain rules, non-obvious constraints, deliberate trade-offs. Bad candidates: your own current-task scratchpad, transient debugging state, anything that only matters within a single task — those belong in memories or task_todos.\n` +
+          `- **Write self-explanatory titles.** The title is what every future Kin sees by default. "Auth tokens" is useless; "Tokens are stored encrypted in the vault, never on disk" is great. The markdown body can be as detailed as you want — code samples, links, multi-paragraph reasoning — because it only enters a prompt when pinned or fetched.\n` +
+          `- **Pin (pinned=true) sparingly** — only when an entry's content itself must be visible in-prompt for every Kin from the first turn (cap: ${config.projectKnowledge.pinCap}). For most entries, the title-in-index is sufficient; the body is a get_project_knowledge call away when the title looks relevant.\n` +
+          `- **Discover with search_project_knowledge(query)** when no title in your index matches what you need, or for topic-based exploration (semantic + keyword hybrid). Use get_project_knowledge(id) to fetch a specific entry's body once you have its id.\n` +
           `- Knowledge is project-scoped: these tools act on **"${params.activeProject.title}"** as long as it stays your active project. set_active_project() swaps the entire knowledge base.\n` +
           `- Edit and prune: when a piece of knowledge is superseded, update or delete it. Stale knowledge is worse than no knowledge.\n\n`
         : '') +

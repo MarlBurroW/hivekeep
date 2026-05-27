@@ -15,6 +15,7 @@ import { CloneStatusBadge } from '@/client/components/project/CloneStatusBadge'
 import { ActiveKinsIndicator } from '@/client/components/project/ActiveKinsIndicator'
 import { EmptyState } from '@/client/components/common/EmptyState'
 import { Button } from '@/client/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
 import { cn } from '@/client/lib/utils'
 import { getErrorMessage } from '@/client/lib/api'
 import { toast } from 'sonner'
@@ -167,28 +168,18 @@ export function ProjectsPage() {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <div className="flex rounded-md border border-border p-0.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={view === 'kanban' ? 'default' : 'ghost'}
-                    onClick={() => setView('kanban')}
-                    className="h-7 px-2"
-                  >
-                    <Kanban className="size-4" />
-                    {t('projects.view.kanban')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={view === 'knowledge' ? 'default' : 'ghost'}
-                    onClick={() => setView('knowledge')}
-                    className="h-7 px-2"
-                  >
-                    <BookOpen className="size-4" />
-                    {t('projects.view.knowledge')}
-                  </Button>
-                </div>
+                <Tabs value={view} onValueChange={(v) => setView(v as ProjectView)}>
+                  <TabsList>
+                    <TabsTrigger value="kanban">
+                      <Kanban className="size-4" />
+                      {t('projects.view.kanban')}
+                    </TabsTrigger>
+                    <TabsTrigger value="knowledge">
+                      <BookOpen className="size-4" />
+                      {t('projects.view.knowledge')}
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
                 <ActiveKinsIndicator projectId={routeProjectId} size="size-7" maxVisible={5} />
               </div>
             </header>

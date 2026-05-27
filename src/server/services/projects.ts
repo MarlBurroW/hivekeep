@@ -13,7 +13,7 @@ import type { Project, ProjectSummary, ProjectTag, TicketStatus, KinThinkingConf
 
 const log = createLogger('projects')
 import type { ActiveProjectPromptInfo } from '@/server/services/prompt-builder'
-import { getPinnedKnowledge, countProjectKnowledge } from '@/server/services/project-knowledge'
+import { getPinnedKnowledge, countProjectKnowledge, listKnowledgeIndex } from '@/server/services/project-knowledge'
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -572,24 +572,28 @@ export async function buildActiveProjectInfo(projectId: string): Promise<ActiveP
     }
   }
 
-  // Fetch pinned project knowledge + total count for the prompt block.
-  // Failure here must not break prompt assembly — the project still loads.
+  // Fetch pinned bodies, lightweight title index, and total count for the
+  // prompt block. Failure here must not break prompt assembly.
   let pinnedKnowledge: ActiveProjectPromptInfo['pinnedKnowledge'] = []
+  let knowledgeIndex: ActiveProjectPromptInfo['knowledgeIndex'] = []
   let totalKnowledgeCount = 0
   try {
-    const [pinned, total] = await Promise.all([
+    const [pinned, index, total] = await Promise.all([
       getPinnedKnowledge(projectId),
+      listKnowledgeIndex(projectId),
       countProjectKnowledge(projectId),
     ])
     pinnedKnowledge = pinned.map((p) => ({
       id: p.id,
+      title: p.title,
       content: p.content,
       category: p.category,
       authorKinName: p.authorKinName,
     }))
+    knowledgeIndex = index
     totalKnowledgeCount = total
   } catch {
-    // ignore — pinned knowledge is best-effort
+    // ignore — knowledge fetch is best-effort
   }
 
   return {
@@ -609,6 +613,7 @@ export async function buildActiveProjectInfo(projectId: string): Promise<ActiveP
     })),
     totalOpenTickets,
     pinnedKnowledge,
+    knowledgeIndex,
     totalKnowledgeCount,
   }
 }

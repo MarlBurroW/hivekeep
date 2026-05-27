@@ -197,22 +197,33 @@ export function initVirtualTables() {
       )
     `)
 
+    // The fts5 `content` column stores `title || char(10) || body` so that
+    // FTS queries hit both title and body words. Trigger fires on any
+    // UPDATE (not OF content) so title-only edits also re-index.
+    //
+    // Drop-then-create on every boot — `CREATE TRIGGER IF NOT EXISTS` would
+    // silently keep a stale definition from an older codebase, which is
+    // exactly how the title-not-indexed bug shipped. Triggers are cheap;
+    // re-binding them at startup makes the DB definition match this file.
+    sqlite.run('DROP TRIGGER IF EXISTS project_knowledge_fts_insert')
+    sqlite.run('DROP TRIGGER IF EXISTS project_knowledge_fts_update')
+    sqlite.run('DROP TRIGGER IF EXISTS project_knowledge_fts_delete')
     sqlite.run(`
-      CREATE TRIGGER IF NOT EXISTS project_knowledge_fts_insert AFTER INSERT ON project_knowledge
+      CREATE TRIGGER project_knowledge_fts_insert AFTER INSERT ON project_knowledge
       WHEN new.content IS NOT NULL
       BEGIN
-        INSERT INTO project_knowledge_fts(rowid, content) VALUES (new.rowid, new.content);
+        INSERT INTO project_knowledge_fts(rowid, content) VALUES (new.rowid, new.title || char(10) || new.content);
       END
     `)
     sqlite.run(`
-      CREATE TRIGGER IF NOT EXISTS project_knowledge_fts_update AFTER UPDATE OF content ON project_knowledge
+      CREATE TRIGGER project_knowledge_fts_update AFTER UPDATE ON project_knowledge
       WHEN new.content IS NOT NULL
       BEGIN
-        UPDATE project_knowledge_fts SET content = new.content WHERE rowid = old.rowid;
+        UPDATE project_knowledge_fts SET content = new.title || char(10) || new.content WHERE rowid = old.rowid;
       END
     `)
     sqlite.run(`
-      CREATE TRIGGER IF NOT EXISTS project_knowledge_fts_delete AFTER DELETE ON project_knowledge
+      CREATE TRIGGER project_knowledge_fts_delete AFTER DELETE ON project_knowledge
       BEGIN
         DELETE FROM project_knowledge_fts WHERE rowid = old.rowid;
       END
