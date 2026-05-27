@@ -10,6 +10,9 @@ interface CreateProjectInput {
   githubPatVaultKey?: string | null
   githubRepo?: string | null
   defaultBranch?: string
+  model?: string | null
+  providerId?: string | null
+  thinkingConfig?: KinThinkingConfig | null
 }
 
 interface UpdateProjectInput {
