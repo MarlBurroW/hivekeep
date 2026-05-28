@@ -228,6 +228,23 @@ export function initVirtualTables() {
         DELETE FROM project_knowledge_fts WHERE rowid = old.rowid;
       END
     `)
+
+    // Rebuild the FTS index from the source table. This must live here (not in
+    // a Drizzle migration) because the virtual table only exists after this
+    // function runs. It is the migration path for two cases:
+    //   1. Rows created before the title column existed (migration 0076) were
+    //      indexed body-only — re-index them with title + body.
+    //   2. A fresh prod DB where the FTS table was just created above and the
+    //      triggers weren't around when the rows were inserted by migrations.
+    // The rebuild is idempotent and cheap (project knowledge is small), so we
+    // run it unconditionally rather than trying to detect staleness. Triggers
+    // fire on project_knowledge writes, not on FTS writes, so these statements
+    // don't recurse.
+    sqlite.run('DELETE FROM project_knowledge_fts')
+    sqlite.run(`
+      INSERT INTO project_knowledge_fts(rowid, content)
+      SELECT rowid, title || char(10) || content FROM project_knowledge WHERE content IS NOT NULL
+    `)
   } catch (e) {
     log.warn('project_knowledge FTS5 setup failed — project knowledge full-text search disabled: %s', e)
   }

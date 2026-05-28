@@ -1,21 +1,16 @@
--- Reindex project_knowledge_fts to include the title alongside the content.
+-- Make project_knowledge_fts cover the title in addition to the body.
 --
--- The original 0075 indexed only the markdown body, which made FTS5 search
--- miss any query that matched a title word but not a body word. With the
--- 0076 title field landing in every Kin's prompt, users are now searching
--- by title concepts more than by body keywords — they need title hits too.
+-- IMPORTANT: this migration must NOT reference project_knowledge_fts itself.
+-- That virtual table is created by initVirtualTables() at boot, which runs
+-- AFTER Drizzle migrations — so on a fresh prod DB the table does not exist
+-- yet when this migration runs. (An earlier version of this file did
+-- `DELETE FROM project_knowledge_fts` here and crashed boot with
+-- "no such table: project_knowledge_fts".)
 --
--- The fts5 column is still called `content`, but it now stores
--- `title || char(10) || body`. Renaming would require recreating the
--- virtual table, which isn't worth the migration risk.
---
--- Triggers are dropped here; init-time code re-creates them with the new
--- expression (and fires on UPDATE of *any* column instead of only content,
--- so a title-only edit re-indexes too).
+-- We only drop the FTS triggers here. They are recreated at boot by
+-- initVirtualTables() with the new `title || char(10) || content` expression,
+-- and the FTS index is rebuilt there too (where the table is guaranteed to
+-- exist). DROP TRIGGER IF EXISTS is safe whether or not the trigger exists.
 DROP TRIGGER IF EXISTS project_knowledge_fts_insert;--> statement-breakpoint
 DROP TRIGGER IF EXISTS project_knowledge_fts_update;--> statement-breakpoint
-DROP TRIGGER IF EXISTS project_knowledge_fts_delete;--> statement-breakpoint
--- Wipe existing FTS rows and rebuild from scratch with title + content.
-DELETE FROM project_knowledge_fts;--> statement-breakpoint
-INSERT INTO project_knowledge_fts(rowid, content)
-  SELECT rowid, title || char(10) || content FROM project_knowledge;
+DROP TRIGGER IF EXISTS project_knowledge_fts_delete;
