@@ -225,6 +225,7 @@ import {
   rollbackMiniAppTool,
   generateMiniAppIconTool,
   getMiniAppConsoleTool,
+  reloadMiniAppTool,
   editMiniAppFileTool,
   multiEditMiniAppFileTool,
 } from '@/server/tools/mini-app-tools'
@@ -514,6 +515,7 @@ export function registerAllTools(): void {
   toolRegistry.register('browse_mini_apps', browseMiniAppsTool, 'mini-apps')
   toolRegistry.register('generate_mini_app_icon', generateMiniAppIconTool, 'mini-apps')
   toolRegistry.register('get_mini_app_console', getMiniAppConsoleTool, 'mini-apps')
+  toolRegistry.register('reload_mini_app', reloadMiniAppTool, 'mini-apps')
   toolRegistry.register('edit_mini_app_file', editMiniAppFileTool, 'mini-apps')
   toolRegistry.register('multi_edit_mini_app_file', multiEditMiniAppFileTool, 'mini-apps')
 

@@ -23,7 +23,13 @@ import {
   generateMiniAppIcon,
 } from '@/server/services/mini-apps'
 import { ImageGenerationError } from '@/server/services/image-generation'
-import { getConsoleEntries, clearConsoleEntries } from '@/server/services/mini-app-console'
+import { getConsoleEntries, clearConsoleEntries, getServedAt } from '@/server/services/mini-app-console'
+import {
+  buildDefaultManifest,
+  findBareModuleImports,
+  htmlHasInlineImportMap,
+  mergeDependenciesIntoManifest,
+} from '@/server/services/mini-app-deps'
 import { getTemplateById } from '@/server/tools/mini-app-templates'
 import { sseManager } from '@/server/sse/index'
 import type { ToolRegistration } from '@/server/tools/types'
@@ -39,16 +45,29 @@ export const createMiniAppTool: ToolRegistration = {
       description:
         'Create a new mini web app displayed in the KinBot sidebar. ' +
         'Call get_mini_app_docs first for full SDK reference. ' +
-        'Use get_mini_app_templates to start from a template.',
+        'Use get_mini_app_templates to start from a template. ' +
+        'Bare ES imports (react, @kinbot/react, …) resolve ONLY via an app.json import map, ' +
+        'never via inline HTML tags — pass `dependencies` (shorthand import map) or a `files` ' +
+        'map that includes app.json so the app works in a single call. If you provide HTML with ' +
+        'bare imports but no app.json/dependencies, a default app.json (react stack) is created ' +
+        'automatically and reported back as a warning.',
       inputSchema: z.object({
         name: z.string().describe('Display name'),
         slug: z.string().regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/).describe('Unique kebab-case identifier'),
         description: z.string().optional(),
         icon: z.string().optional().describe('Single emoji'),
-        html: z.string().optional().describe('HTML for index.html (either html or template required)'),
+        html: z.string().optional().describe('HTML for index.html (one of html, files, or template required)'),
         template: z.string().optional().describe('Template name instead of html'),
+        files: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe('Map of relative path → file content, e.g. { "index.html": "...", "app.json": "...", "_server.js": "..." }. Created in one call. Takes precedence over `html`.'),
+        dependencies: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe('Import-map shorthand, e.g. { "react": "https://esm.sh/react@19" }. Written into app.json (merged if app.json is also provided).'),
       }),
-      execute: async ({ name, slug, description, icon, html, template }) => {
+      execute: async ({ name, slug, description, icon, html, template, files, dependencies }) => {
         log.debug({ kinId: ctx.kinId, name, slug }, 'create_mini_app invoked')
 
         try {
@@ -61,8 +80,42 @@ export const createMiniAppTool: ToolRegistration = {
             }
           }
 
-          if (!html && !templateData) {
-            return { error: 'Either html or template is required' }
+          // Assemble the file set in memory (precedence: template > files > html).
+          let fileset: Record<string, string> = {}
+          let warning: string | undefined
+
+          if (templateData) {
+            fileset = { ...templateData.files }
+          } else {
+            if (files) fileset = { ...files }
+            if (html && fileset['index.html'] === undefined) fileset['index.html'] = html
+
+            if (Object.keys(fileset).length === 0) {
+              return { error: 'One of html, files, or template is required' }
+            }
+
+            // Merge `dependencies` shorthand into app.json (create it if absent).
+            if (dependencies && Object.keys(dependencies).length > 0) {
+              fileset['app.json'] = mergeDependenciesIntoManifest(fileset['app.json'], dependencies)
+            }
+
+            // Auto-default: HTML uses bare ES imports but nothing resolves them → inject a
+            // default app.json so the app works, and report what we did.
+            const entryHtml = fileset['index.html']
+            const hasManifest = fileset['app.json'] !== undefined
+            if (
+              entryHtml !== undefined &&
+              !hasManifest &&
+              !htmlHasInlineImportMap(entryHtml) &&
+              findBareModuleImports(entryHtml).length > 0
+            ) {
+              fileset['app.json'] = buildDefaultManifest()
+              warning =
+                'No app.json or import map was provided, but your HTML imports bare ES modules. ' +
+                'A default app.json was created with: react, react-dom/client, @kinbot/react, ' +
+                '@kinbot/components. Edit it via write_mini_app_file if you need different ' +
+                "versions. See get_mini_app_docs('getting-started')."
+            }
           }
 
           const app = await createMiniApp({
@@ -73,13 +126,8 @@ export const createMiniAppTool: ToolRegistration = {
             icon: icon || templateData?.icon,
           })
 
-          // Write template files or provided HTML
-          if (templateData) {
-            for (const [filePath, content] of Object.entries(templateData.files)) {
-              await writeAppFile(app.id, filePath, content)
-            }
-          } else if (html) {
-            await writeAppFile(app.id, 'index.html', html)
+          for (const [filePath, content] of Object.entries(fileset)) {
+            await writeAppFile(app.id, filePath, content)
           }
 
           // Re-fetch to get updated version
@@ -91,6 +139,7 @@ export const createMiniAppTool: ToolRegistration = {
             name: app.name,
             slug: app.slug,
             template: template || undefined,
+            warning,
             message: `App "${name}" created successfully${template ? ` from template "${template}"` : ''}. It is now visible in the sidebar.`,
           }
         } catch (err) {
@@ -811,11 +860,16 @@ export const getMiniAppConsoleTool: ToolRegistration = {
   concurrencySafe: true,
   create: (ctx) =>
     tool({
-      description: 'Get recent console output (logs, warnings, errors) from a running mini app.',
+      description:
+        'Get recent console output (logs, warnings, errors) from a running mini app. ' +
+        'IMPORTANT: console output is only captured while the app is open in a browser tab — ' +
+        'in a headless context the buffer stays empty. `lastServedAt` tells you when the app ' +
+        'last (re)loaded; compare it to your last file write to know whether your changes have ' +
+        'taken effect (use reload_mini_app to force a reload). `clear:true` empties the server buffer after reading.',
       inputSchema: z.object({
         app_id: z.string(),
         level: z.enum(['log', 'warn', 'error']).optional(),
-        clear: z.boolean().optional().describe('Clear buffer after reading'),
+        clear: z.boolean().optional().describe('Empty the buffer after reading'),
       }),
       execute: async ({ app_id, level, clear }) => {
         const existing = await getMiniApp(app_id)
@@ -827,6 +881,7 @@ export const getMiniAppConsoleTool: ToolRegistration = {
 
         const errorCount = entries.filter((e) => e.level === 'error').length
         const warnCount = entries.filter((e) => e.level === 'warn').length
+        const servedAt = getServedAt(app_id)
 
         return {
           entries: entries.map((e) => ({
@@ -841,9 +896,41 @@ export const getMiniAppConsoleTool: ToolRegistration = {
             warnings: warnCount,
             logs: entries.length - errorCount - warnCount,
           },
+          lastServedAt: servedAt ? new Date(servedAt).toISOString() : null,
           note: entries.length === 0
-            ? 'No console entries. The app may not be open in any browser, or it has no console output yet.'
+            ? (servedAt
+                ? 'No console entries. The app loaded but produced no console output yet, or the buffer was cleared.'
+                : 'No console entries — the app is not open in any browser tab, so nothing is being captured. Ask the user to open it, or use reload_mini_app once it is open.')
             : undefined,
+        }
+      },
+    }),
+}
+
+// ─── reload_mini_app ─────────────────────────────────────────────────────────
+
+export const reloadMiniAppTool: ToolRegistration = {
+  availability: ['main'],
+  create: (ctx) =>
+    tool({
+      description:
+        'Force the mini app to reload in the browser (re-fetches the latest files). ' +
+        'Only takes effect while the app is open in a browser tab — it cannot wake a headless app. ' +
+        'Useful after writing files when auto-reload did not fire.',
+      inputSchema: z.object({
+        app_id: z.string(),
+      }),
+      execute: async ({ app_id }) => {
+        const existing = await getMiniApp(app_id)
+        if (!existing) return { error: 'App not found' }
+        if (existing.kinId !== ctx.kinId) return { error: 'You can only reload your own apps' }
+
+        sseManager.broadcast({ type: 'miniapp:reload', kinId: ctx.kinId, data: { appId: app_id } })
+
+        return {
+          appId: app_id,
+          message: 'Reload requested. The app will reload if it is currently open in a browser tab.',
+          note: 'If nobody has the app open, this has no effect — check get_mini_app_console lastServedAt to confirm a reload happened.',
         }
       },
     }),

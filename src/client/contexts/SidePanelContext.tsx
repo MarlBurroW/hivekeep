@@ -31,6 +31,8 @@ interface SidePanelContextValue {
   // Mini-app state
   activeAppId: string | null
   activeAppVersion: number
+  /** Bumped on a `miniapp:reload` SSE event to force the active iframe to reload. */
+  activeAppReloadSignal: number
   isFullPage: boolean
   customTitle: string | null
   badges: Record<string, string>
@@ -66,6 +68,7 @@ const SidePanelContext = createContext<SidePanelContextValue | null>(null)
 export function SidePanelProvider({ children }: { children: ReactNode }) {
   const [activeAppId, setActiveAppId] = useState<string | null>(null)
   const [activeAppVersion, setActiveAppVersion] = useState(0)
+  const [activeAppReloadSignal, setActiveAppReloadSignal] = useState(0)
   const [isFullPage, setIsFullPage] = useState(false)
   const [customTitle, setCustomTitle] = useState<string | null>(null)
   const [badges, setBadgesState] = useState<Record<string, string>>({})
@@ -178,6 +181,12 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
         setActiveAppVersion(version)
       }
     },
+    'miniapp:reload': (data) => {
+      const appId = data.appId as string
+      if (appId === activeAppId) {
+        setActiveAppReloadSignal((n) => n + 1)
+      }
+    },
     'miniapp:deleted': (data) => {
       const appId = data.appId as string
       if (appId === activeAppId) {
@@ -208,6 +217,7 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
         activeTab,
         activeAppId,
         activeAppVersion,
+        activeAppReloadSignal,
         isFullPage,
         customTitle,
         badges,

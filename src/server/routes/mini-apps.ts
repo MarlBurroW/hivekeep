@@ -28,7 +28,13 @@ import {
 } from '@/server/services/mini-apps'
 import { ImageGenerationError } from '@/server/services/image-generation'
 import { handleBackendRequest, invalidateBackend, getAppEmitter } from '@/server/services/mini-app-backend'
-import { pushConsoleEntry, getConsoleEntries, clearConsoleEntries } from '@/server/services/mini-app-console'
+import { pushConsoleEntry, getConsoleEntries, clearConsoleEntries, markServed } from '@/server/services/mini-app-console'
+import {
+  buildDefaultManifest,
+  findBareModuleImports,
+  htmlHasInlineImportMap,
+  mergeDependenciesIntoManifest,
+} from '@/server/services/mini-app-deps'
 import { searchMemories, createMemory } from '@/server/services/memory'
 import { sseManager } from '@/server/sse/index'
 
@@ -103,6 +109,8 @@ miniAppRoutes.post('/', async (c) => {
     description?: string
     icon?: string
     html?: string
+    files?: Record<string, string>
+    dependencies?: Record<string, string>
   }>()
 
   if (!body.kinId || !body.name || !body.slug) {
@@ -110,6 +118,28 @@ miniAppRoutes.post('/', async (c) => {
   }
 
   try {
+    // Assemble the file set in memory (precedence: files > html).
+    const fileset: Record<string, string> = { ...(body.files ?? {}) }
+    if (body.html && fileset['index.html'] === undefined) fileset['index.html'] = body.html
+
+    let warning: string | undefined
+    if (body.dependencies && Object.keys(body.dependencies).length > 0) {
+      fileset['app.json'] = mergeDependenciesIntoManifest(fileset['app.json'], body.dependencies)
+    }
+
+    const entryHtml = fileset['index.html']
+    if (
+      entryHtml !== undefined &&
+      fileset['app.json'] === undefined &&
+      !htmlHasInlineImportMap(entryHtml) &&
+      findBareModuleImports(entryHtml).length > 0
+    ) {
+      fileset['app.json'] = buildDefaultManifest()
+      warning =
+        'No app.json or import map was provided, but your HTML imports bare ES modules. ' +
+        'A default app.json (react, react-dom/client, @kinbot/react, @kinbot/components) was created automatically.'
+    }
+
     const app = await createMiniApp({
       kinId: body.kinId,
       name: body.name,
@@ -118,13 +148,12 @@ miniAppRoutes.post('/', async (c) => {
       icon: body.icon,
     })
 
-    // Write initial HTML if provided
-    if (body.html) {
-      await writeAppFile(app.id, 'index.html', body.html)
+    for (const [filePath, content] of Object.entries(fileset)) {
+      await writeAppFile(app.id, filePath, content)
     }
 
     sseManager.broadcast({ type: 'miniapp:created', kinId: body.kinId, data: { app } })
-    return c.json({ app }, 201)
+    return c.json({ app, warning }, 201)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create app'
     return c.json({ error: { code: 'CREATE_FAILED', message } }, 400)
@@ -852,8 +881,23 @@ miniAppRoutes.get('/:id/serve', async (c) => {
   const manifest = await readAppManifest(dir)
   const importMapTag = manifest ? buildImportMapTag(manifest) : ''
 
+  // If the app uses bare ES imports but no import map could be built, surface a clear,
+  // actionable error in the console (the cryptic "Failed to resolve module specifier" would
+  // otherwise be all the Kin sees). This message flows into the console buffer.
+  let moduleHelpTag = ''
+  if (!importMapTag && !htmlHasInlineImportMap(html) && findBareModuleImports(html).length > 0) {
+    const help =
+      "[KinBot] This mini-app imports ES modules (e.g. 'react') but no import map was found. " +
+      'Add an app.json with a "dependencies" map (or pass `dependencies` to create_mini_app). ' +
+      "See get_mini_app_docs('getting-started')."
+    moduleHelpTag = `<script>console.error(${JSON.stringify(help)})</script>`
+  }
+
+  // Track the (re)load so tools can tell whether the iframe picked up recent changes.
+  markServed(app.id)
+
   // Build injection: base tag first (for relative path resolution), then importmap before module scripts
-  const headInjection = [baseTag(app.id), SDK_LINK, importMapTag, SDK_SCRIPT, THEME_SYNC_SCRIPT].filter(Boolean).join('\n')
+  const headInjection = [baseTag(app.id), SDK_LINK, importMapTag, moduleHelpTag, SDK_SCRIPT, THEME_SYNC_SCRIPT].filter(Boolean).join('\n')
 
   // Inject SDK CSS and theme sync script into <head>
   if (html.includes('<head>')) {

@@ -28,19 +28,39 @@ Mini-apps are small web applications that live inside KinBot's sidebar. They use
     url: `${DOCS_BASE_URL}/mini-apps/getting-started/`,
     content: `# Getting Started with Mini-Apps
 
-## Minimum Setup
+## ⚠️ Import maps live in app.json — NOT in the HTML
 
-1. Call \`create_mini_app\` with name, slug, and html (or use a template)
-2. Write \`app.json\` via \`write_mini_app_file\`:
-\`\`\`json
-{
-  "dependencies": {
+Bare ES imports (\`react\`, \`@kinbot/react\`, …) only resolve through an import map that
+KinBot builds from the app's \`app.json\` manifest. An inline \`<script type="importmap">\`
+or config tag in your HTML is **ignored**. Without \`app.json\` you get the runtime error
+\`Failed to resolve module specifier "react"\`.
+
+## Recommended: create everything in one call
+
+Pass \`dependencies\` (an import-map shorthand) directly to \`create_mini_app\` — KinBot
+writes \`app.json\` for you:
+\`\`\`js
+create_mini_app({
+  name: "Hello", slug: "hello",
+  dependencies: {
     "react": "https://esm.sh/react@19",
     "react-dom/client": "https://esm.sh/react-dom@19/client",
-    "@kinbot/react": "/api/mini-apps/sdk/kinbot-react.js"
-  }
-}
+    "@kinbot/react": "/api/mini-apps/sdk/kinbot-react.js",
+    "@kinbot/components": "/api/mini-apps/sdk/kinbot-components.js"
+  },
+  html: "<div id=\\"root\\"></div><script type=\\"text/jsx\\"> ... </script>"
+})
 \`\`\`
+Or pass a full \`files\` map: \`{ "index.html": "...", "app.json": "...", "_server.js": "..." }\`.
+
+If you provide HTML with bare imports but omit \`dependencies\`/\`app.json\`, a default
+\`app.json\` (react, react-dom/client, @kinbot/react, @kinbot/components) is created
+automatically and reported back as a \`warning\`.
+
+## Alternative: two steps
+
+1. Call \`create_mini_app\` with name, slug, and html
+2. Write \`app.json\` via \`write_mini_app_file\` with the same \`dependencies\` map as above
 
 3. Use React app pattern:
 \`\`\`jsx

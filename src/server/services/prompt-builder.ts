@@ -1344,6 +1344,8 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `You can create interactive web apps (mini-apps) in the KinBot sidebar.\n` +
       `- **Always call get_mini_app_docs first** for the full SDK reference (hooks, components, setup patterns).\n` +
       `- Use get_mini_app_templates to start from a template (dashboard, todo-list, form, data-viewer, kanban).\n` +
+      `- Bare ES imports (react, @kinbot/react, …) resolve ONLY via an app.json import map — NOT inline HTML. Pass \`dependencies\` (or a \`files\` map incl. app.json) to create_mini_app to set it up in one call.\n` +
+      `- Console output is only captured while the app is open in a browser tab. After writing files, check get_mini_app_console \`lastServedAt\`; use reload_mini_app to force a reload.\n` +
       `- Use create_mini_app_snapshot before risky changes.\n` +
       `- Always use @kinbot/components instead of raw HTML elements.`,
     )

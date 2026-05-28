@@ -72,6 +72,16 @@ try {
   _mocksWorking = false
 }
 
+/** Find the content written to a given path via the writeAppFile mock (typed loosely for tests). */
+function writtenFile(path: string): string | undefined {
+  const call = (mockMiniApps.writeAppFile.mock.calls as unknown as unknown[][]).find((c) => c[1] === path)
+  return call ? (call[2] as string) : undefined
+}
+/** All paths passed to the writeAppFile mock. */
+function writtenPaths(): string[] {
+  return (mockMiniApps.writeAppFile.mock.calls as unknown as unknown[][]).map((c) => c[1] as string)
+}
+
 const ctx: ToolExecutionContext = { kinId: 'kin-1', isSubKin: false }
 const otherCtx: ToolExecutionContext = { kinId: 'kin-other', isSubKin: false }
 const execOpts = { toolCallId: 'tc', messages: [] as any[], abortSignal: new AbortController().signal }
@@ -136,6 +146,7 @@ describe('mini-app-tools', () => {
         mod.rollbackMiniAppTool,
         mod.generateMiniAppIconTool,
         mod.getMiniAppConsoleTool,
+        mod.reloadMiniAppTool,
         mod.editMiniAppFileTool,
         mod.multiEditMiniAppFileTool,
       ]
@@ -183,13 +194,13 @@ describe('mini-app-tools', () => {
       expect(result.error).toContain('not found')
     })
 
-    it('returns error when neither html nor template provided', async () => {
+    it('returns error when neither html, files, nor template provided', async () => {
       const tool = mod.createMiniAppTool.create(ctx)
       const result = await tool.execute(
         { name: 'Empty', slug: 'empty' },
         execOpts
       )
-      expect(result.error).toContain('Either html or template is required')
+      expect(result.error).toContain('One of html, files, or template is required')
     })
 
     it('handles creation error gracefully', async () => {
@@ -200,6 +211,91 @@ describe('mini-app-tools', () => {
         execOpts
       )
       expect(result.error).toBe('DB error')
+    })
+
+    it('writes app.json from the dependencies shorthand', async () => {
+      const tool = mod.createMiniAppTool.create(ctx)
+      const result = await tool.execute(
+        { name: 'Deps', slug: 'deps', html: '<div id="root"></div>', dependencies: { react: 'https://esm.sh/react@19' } },
+        execOpts
+      )
+      expect(result.appId).toBe('app-1')
+      const appJson = writtenFile('app.json')
+      expect(appJson).toBeDefined()
+      expect(JSON.parse(appJson!).dependencies.react).toBe('https://esm.sh/react@19')
+      // No auto-default warning when deps were explicitly provided
+      expect(result.warning).toBeUndefined()
+    })
+
+    it('writes every file from a files map', async () => {
+      const tool = mod.createMiniAppTool.create(ctx)
+      const result = await tool.execute(
+        {
+          name: 'Files', slug: 'files',
+          files: { 'index.html': '<div id="root"></div>', 'app.json': '{"dependencies":{}}', '_server.js': 'export default () => {}' },
+        },
+        execOpts
+      )
+      expect(result.appId).toBe('app-1')
+      const written = writtenPaths()
+      expect(written).toContain('index.html')
+      expect(written).toContain('app.json')
+      expect(written).toContain('_server.js')
+    })
+
+    it('auto-creates a default app.json and warns when HTML has bare imports but no deps', async () => {
+      const tool = mod.createMiniAppTool.create(ctx)
+      const html = '<div id="root"></div><script type="text/jsx">import { createRoot } from "react-dom/client";</script>'
+      const result = await tool.execute(
+        { name: 'Bare', slug: 'bare', html },
+        execOpts
+      )
+      expect(result.warning).toContain('default app.json')
+      const appJson = writtenFile('app.json')
+      expect(appJson).toBeDefined()
+      expect(JSON.parse(appJson!).dependencies['react-dom/client']).toBeDefined()
+    })
+
+    it('does not auto-default when an app.json is already provided', async () => {
+      const tool = mod.createMiniAppTool.create(ctx)
+      const html = '<script type="text/jsx">import React from "react";</script>'
+      const result = await tool.execute(
+        { name: 'HasJson', slug: 'has-json', files: { 'index.html': html, 'app.json': '{"dependencies":{"react":"x"}}' } },
+        execOpts
+      )
+      expect(result.warning).toBeUndefined()
+      const appJson = writtenFile('app.json')
+      expect(JSON.parse(appJson!).dependencies.react).toBe('x')
+    })
+
+    it('does not auto-default for plain HTML without module imports', async () => {
+      const tool = mod.createMiniAppTool.create(ctx)
+      const result = await tool.execute(
+        { name: 'Plain', slug: 'plain', html: '<h1>Hi</h1>' },
+        execOpts
+      )
+      expect(result.warning).toBeUndefined()
+      expect(writtenFile('app.json')).toBeUndefined()
+    })
+  })
+
+  // ─── reload_mini_app ──────────────────────────────────────────────────────
+
+  describe('reloadMiniAppTool', () => {
+    it('broadcasts a miniapp:reload event', async () => {
+      const tool = mod.reloadMiniAppTool.create(ctx)
+      const result = await tool.execute({ app_id: 'app-1' }, execOpts)
+      expect(result.message).toContain('Reload requested')
+      expect(mockSSE.sseManager.broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'miniapp:reload', kinId: 'kin-1', data: { appId: 'app-1' } })
+      )
+    })
+
+    it('blocks reload of other kin apps', async () => {
+      const tool = mod.reloadMiniAppTool.create(otherCtx)
+      const result = await tool.execute({ app_id: 'app-1' }, execOpts)
+      expect(result.error).toContain('your own apps')
+      expect(mockSSE.sseManager.broadcast).not.toHaveBeenCalled()
     })
   })
 
@@ -653,6 +749,17 @@ describe('mini-app-tools', () => {
       const tool = mod.getMiniAppConsoleTool.create(otherCtx)
       const result = await tool.execute({ app_id: 'app-1' }, execOpts)
       expect(result.error).toContain('only access your own')
+    })
+
+    it('reports lastServedAt once the app has been served', async () => {
+      const tool = mod.getMiniAppConsoleTool.create(ctx)
+      const before = await tool.execute({ app_id: 'app-1' }, execOpts)
+      expect(before.lastServedAt).toBeNull()
+
+      realConsole!.markServed('app-1')
+      const after = await tool.execute({ app_id: 'app-1' }, execOpts)
+      expect(after.lastServedAt).not.toBeNull()
+      expect(() => new Date(after.lastServedAt).toISOString()).not.toThrow()
     })
   })
 

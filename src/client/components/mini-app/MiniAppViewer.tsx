@@ -48,7 +48,7 @@ export function MiniAppViewer() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { panelOpen, activeAppId, activeAppVersion, isFullPage, customTitle, openApp, closePanel, toggleFullPage, setFullPage, setCustomTitle, setBadge } = useSidePanel()
+  const { panelOpen, activeAppId, activeAppVersion, activeAppReloadSignal, isFullPage, customTitle, openApp, closePanel, toggleFullPage, setFullPage, setCustomTitle, setBadge } = useSidePanel()
   const [app, setApp] = useState<MiniAppSummary | null>(null)
   const [iframeKey, setIframeKey] = useState(0)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -118,6 +118,13 @@ export function MiniAppViewer() {
       setIframeKey((k) => k + 1)
     }
   }, [activeAppVersion])
+
+  // Force-reload iframe on an explicit reload_mini_app request
+  useEffect(() => {
+    if (activeAppReloadSignal > 0) {
+      setIframeKey((k) => k + 1)
+    }
+  }, [activeAppReloadSignal])
 
   // Send app metadata to iframe when it loads
   const sendAppMeta = useCallback(() => {

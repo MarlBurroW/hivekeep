@@ -51,6 +51,7 @@ export type SSEEventType =
   | 'miniapp:updated'
   | 'miniapp:deleted'
   | 'miniapp:file-updated'
+  | 'miniapp:reload'
   | 'memory:created'
   | 'memory:updated'
   | 'memory:deleted'
