@@ -10,7 +10,11 @@ import { config } from '@/server/config'
 
 const log = createLogger('file-storage')
 
-const MAX_FILE_SIZE = config.fileStorage.maxFileSizeMb * 1024 * 1024
+// 0 (or negative) means "no limit" — uploads of any size are accepted.
+const MAX_FILE_SIZE =
+  config.fileStorage.maxFileSizeMb > 0
+    ? config.fileStorage.maxFileSizeMb * 1024 * 1024
+    : Infinity
 
 type FileStorageRow = typeof fileStorage.$inferSelect
 

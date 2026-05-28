@@ -9,6 +9,7 @@ Toutes les valeurs configurables de la plateforme, regroupées par domaine. Ces 
 | Clé | Env var | Default | Description |
 |---|---|---|---|
 | `port` | `PORT` | `3333` | Port du serveur HTTP |
+| `maxRequestBodyBytes` | `MAX_REQUEST_BODY_MB` | `0` (illimité) | Taille max du corps d'une requête HTTP (Mo) acceptée par `Bun.serve`. Bun applique sinon un cap par défaut (~128 Mo) qui bloque silencieusement les gros uploads. `0` = illimité (`Number.MAX_SAFE_INTEGER`) |
 | `dataDir` | `KINBOT_DATA_DIR` | `./data` | Répertoire des données persistantes (DB, uploads, workspaces) |
 | `encryptionKey` | `ENCRYPTION_KEY` | auto-generated | Clé de chiffrement pour les secrets du Vault et les configs provider. Auto-générée et persistée dans le répertoire data si absente |
 | `logLevel` | `LOG_LEVEL` | `info` | Niveau de log : 'debug', 'info', 'warn', 'error' |
@@ -251,7 +252,7 @@ Paramètres de réglage interne — la plupart des déploiements n'y touchent ja
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `FILE_STORAGE_DIR` | `{dataDir}/storage` | Répertoire du stockage de fichiers persistant. |
-| `FILE_STORAGE_MAX_SIZE` | `100` (Mo) | Taille max d'un fichier individuel. |
+| `FILE_STORAGE_MAX_SIZE` | `0` (illimité) | Taille max d'un fichier individuel (Mo). `0` ou négatif = aucune limite. |
 | `FILE_STORAGE_CLEANUP_INTERVAL` | `60` (min) | Intervalle du job de nettoyage des fichiers expirés. |
 | `UPLOAD_CHANNEL_RETENTION_DAYS` | `30` | Rétention des fichiers téléchargés par les channels ; 0 = jamais purger. |
 | `UPLOAD_CHANNEL_CLEANUP_INTERVAL` | `60` (min) | Intervalle du job de purge des fichiers channel. |

@@ -145,8 +145,13 @@ describe('config', () => {
     })
 
     it('fileStorage defaults', () => {
-      expect(config.fileStorage.maxFileSizeMb).toBe(100)
+      // 0 = unlimited file size by default
+      expect(config.fileStorage.maxFileSizeMb).toBe(0)
       expect(config.fileStorage.cleanupIntervalMin).toBe(60)
+    })
+
+    it('maxRequestBodyBytes defaults to effectively unlimited', () => {
+      expect(config.maxRequestBodyBytes).toBe(Number.MAX_SAFE_INTEGER)
     })
 
     it('webhooks defaults', () => {
@@ -420,6 +425,16 @@ describe('config', () => {
     it('FILE_STORAGE_MAX_SIZE override', async () => {
       const c = await loadConfigWithEnv({ FILE_STORAGE_MAX_SIZE: '200' })
       expect(c.fileStorage.maxFileSizeMb).toBe(200)
+    })
+
+    it('MAX_REQUEST_BODY_MB override sets a byte cap', async () => {
+      const c = await loadConfigWithEnv({ MAX_REQUEST_BODY_MB: '256' })
+      expect(c.maxRequestBodyBytes).toBe(256 * 1024 * 1024)
+    })
+
+    it('MAX_REQUEST_BODY_MB=0 means unlimited', async () => {
+      const c = await loadConfigWithEnv({ MAX_REQUEST_BODY_MB: '0' })
+      expect(c.maxRequestBodyBytes).toBe(Number.MAX_SAFE_INTEGER)
     })
 
     it('UPLOAD_CHANNEL_RETENTION_DAYS override', async () => {

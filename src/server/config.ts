@@ -161,6 +161,14 @@ function resolveServerTimezone(): string {
 export const config = {
   version: appVersion,
   port: Number(process.env.PORT ?? 3333),
+  /** Max HTTP request body size (bytes) accepted by Bun.serve. Bun's own
+   *  default is ~128 MB, which silently caps large file-storage uploads.
+   *  Set MAX_REQUEST_BODY_MB to a positive value to enforce a cap; 0 (default)
+   *  = effectively unlimited (Number.MAX_SAFE_INTEGER). */
+  maxRequestBodyBytes: (() => {
+    const mb = Number(process.env.MAX_REQUEST_BODY_MB ?? 0)
+    return mb > 0 ? mb * 1024 * 1024 : Number.MAX_SAFE_INTEGER
+  })(),
   dataDir,
   encryptionKey: resolveEncryptionKey(),
   logLevel: (process.env.LOG_LEVEL ?? 'info') as 'debug' | 'info' | 'warn' | 'error',
@@ -460,7 +468,8 @@ export const config = {
 
   fileStorage: {
     dir: process.env.FILE_STORAGE_DIR ?? `${dataDir}/storage`,
-    maxFileSizeMb: Number(process.env.FILE_STORAGE_MAX_SIZE ?? 100),
+    /** Max size (MB) of a single stored file. 0 (or negative) = unlimited. */
+    maxFileSizeMb: Number(process.env.FILE_STORAGE_MAX_SIZE ?? 0),
     cleanupIntervalMin: Number(process.env.FILE_STORAGE_CLEANUP_INTERVAL ?? 60),
   },
 

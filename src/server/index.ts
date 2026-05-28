@@ -184,6 +184,9 @@ Bun.serve({
   hostname: process.env.HOST ?? '127.0.0.1',
   fetch: app.fetch,
   idleTimeout: 255, // seconds — keep SSE connections alive (Bun default is 10s)
+  // Lift Bun's ~128 MB default body cap so large file-storage uploads succeed.
+  // Configurable via MAX_REQUEST_BODY_MB; defaults to effectively unlimited.
+  maxRequestBodySize: config.maxRequestBodyBytes,
 })
 
 // Graceful shutdown — cleanup browser pool
