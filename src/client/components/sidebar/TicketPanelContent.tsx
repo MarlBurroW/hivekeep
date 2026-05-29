@@ -6,13 +6,14 @@ import { useTicketComments } from '@/client/hooks/useTicketComments'
 import { useAuth } from '@/client/hooks/useAuth'
 import { Button } from '@/client/components/ui/button'
 import { Badge } from '@/client/components/ui/badge'
-import { MessageSquare, Play, ListChecks, Loader2, X, ChevronLeft, Pencil, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { MessageSquare, Play, ListChecks, Loader2, X, ChevronLeft, Pencil, Sparkles, ChevronDown, ChevronUp, Timer } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { EmptyState } from '@/client/components/common/EmptyState'
 import { MarkdownContent } from '@/client/components/chat/MarkdownContent'
 import { TaskTimelineItem } from '@/client/components/common/TaskTimelineItem'
 import { useSidePanel } from '@/client/contexts/SidePanelContext'
-import { formatRelativeTime } from '@/client/lib/time'
+import { formatRelativeTime, formatDurationMs, computeDurationMs } from '@/client/lib/time'
+import { useNow } from '@/client/hooks/useNow'
 import { StartTaskDialog } from '@/client/components/project/StartTaskDialog'
 import { EnrichTicketDialog } from '@/client/components/project/EnrichTicketDialog'
 import { EditTicketModal } from '@/client/components/project/EditTicketModal'
@@ -82,6 +83,17 @@ export function TicketPanelContent({ ticketId }: TicketPanelContentProps) {
   const enrichmentRunning = !!ticket?.tasks?.some(
     (tk) => tk.kind === 'enrich' && RUNNING_STATUSES.has(tk.status as string),
   )
+
+  // Shared 1s clock for live task-duration counters in the history list. Ticks
+  // only while at least one task on this ticket is still running, and while the
+  // ticket itself sits in the in_progress column (for the header timer).
+  const hasActiveTask = !!ticket?.tasks?.some((tk) => RUNNING_STATUSES.has(tk.status as string))
+  const ticketInProgress = ticket?.status === 'in_progress' && ticket?.inProgressAt != null
+  const nowMs = useNow(hasActiveTask || ticketInProgress)
+  const ticketInProgressMs = ticketInProgress
+    ? computeDurationMs(ticket?.inProgressAt ?? null, null, nowMs)
+    : null
+  const ticketInProgressDuration = ticketInProgressMs != null ? formatDurationMs(ticketInProgressMs) : null
 
   if (isLoading && !ticket) {
     return (
@@ -195,6 +207,20 @@ export function TicketPanelContent({ ticketId }: TicketPanelContentProps) {
           <Badge variant="outline" className="text-xs">
             {t(STATUS_LABEL_KEYS[ticket.status] ?? ticket.status)}
           </Badge>
+          {/* Live "in progress since" timer — only while the ticket sits in the
+              in_progress column, measured from when it last entered it. */}
+          {ticketInProgressDuration && (
+            <Badge
+              variant="outline"
+              className="gap-1 text-xs tabular-nums border-primary/40 bg-primary/10 text-primary"
+              title={t('projects.ticketCard.inProgressSince', {
+                date: new Date(ticket.inProgressAt as number).toLocaleString(),
+              })}
+            >
+              <Timer className="size-3 animate-pulse" />
+              {ticketInProgressDuration}
+            </Badge>
+          )}
           {ticket.tags.map((tag) => (
             <Badge
               key={tag.id}
@@ -298,18 +324,27 @@ export function TicketPanelContent({ ticketId }: TicketPanelContentProps) {
             />
           ) : (
             <ul className="space-y-0">
-              {ticket.tasks.map((task, i) => (
-                <li key={task.id}>
-                  <TaskTimelineItem
-                    status={task.status}
-                    primary={task.parentKinName}
-                    secondary={t(`projects.taskStatus.${task.status}`, { defaultValue: task.status })}
-                    time={formatRelativeTime(task.createdAt)}
-                    isLast={i === ticket.tasks.length - 1}
-                    onClick={() => handleTaskClick(task)}
-                  />
-                </li>
-              ))}
+              {ticket.tasks.map((task, i) => {
+                const isFinished = task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+                const runMs = computeDurationMs(
+                  task.startedAt,
+                  isFinished ? task.endedAt : null,
+                  nowMs,
+                )
+                const runDuration = runMs != null ? formatDurationMs(runMs) : null
+                return (
+                  <li key={task.id}>
+                    <TaskTimelineItem
+                      status={task.status}
+                      primary={task.parentKinName}
+                      secondary={t(`projects.taskStatus.${task.status}`, { defaultValue: task.status })}
+                      time={runDuration ?? formatRelativeTime(task.createdAt)}
+                      isLast={i === ticket.tasks.length - 1}
+                      onClick={() => handleTaskClick(task)}
+                    />
+                  </li>
+                )
+              })}
             </ul>
           )}
         </section>

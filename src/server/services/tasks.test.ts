@@ -330,6 +330,21 @@ describe('tasks service: pure helpers', () => {
     expect(svc.computeTaskDurationMs({ status: 'cancelled', createdAt: t0, updatedAt: t1 })).toBe(4000)
   })
 
+  itLoaded('computeTaskDurationMs prefers the started/ended window over created/updated', () => {
+    const created = new Date(1000)
+    const started = new Date(3000)
+    const ended = new Date(9000)
+    const updated = new Date(10_000)
+    // started → ended = 6000ms, not created → updated = 9000ms.
+    expect(
+      svc.computeTaskDurationMs({ status: 'completed', createdAt: created, updatedAt: updated, startedAt: started, endedAt: ended }),
+    ).toBe(6000)
+    // Falls back to created/updated when started/ended are null (legacy rows).
+    expect(
+      svc.computeTaskDurationMs({ status: 'completed', createdAt: created, updatedAt: updated, startedAt: null, endedAt: null }),
+    ).toBe(9000)
+  })
+
   itLoaded('buildMessagePreview truncates and appends ellipsis', () => {
     expect(svc.buildMessagePreview(null)).toEqual({ preview: '', length: 0 })
     expect(svc.buildMessagePreview('short')).toEqual({ preview: 'short', length: 5 })

@@ -995,6 +995,10 @@
     "modeAwait": "Await",
     "modeAsync": "Async",
     "depth": "Depth",
+    "duration": {
+      "runningTooltip": "Running for",
+      "finishedTooltip": "Total run time"
+    },
     "conversation": "Conversation",
     "conversationEmpty": "No messages yet",
     "result": "Result",
@@ -2748,6 +2752,7 @@
       "attachmentsTooltip_one": "{{count}} attachment on this ticket",
       "attachmentsTooltip_other": "{{count}} attachments on this ticket",
       "kinRunning": "{{name}} is working on this",
+      "inProgressSince": "In progress since {{date}}",
       "createdAt": "Created {{date}}",
       "updatedAt": "Updated {{date}}"
     },

@@ -3,10 +3,11 @@ import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/client/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/client/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { Loader2, ListChecks, Clock, UserCheck, Paperclip } from 'lucide-react'
+import { Loader2, ListChecks, Clock, UserCheck, Paperclip, Timer } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { useTranslation } from 'react-i18next'
-import { formatRelativeTime } from '@/client/lib/time'
+import { formatRelativeTime, formatDurationMs, computeDurationMs } from '@/client/lib/time'
+import { useNow } from '@/client/hooks/useNow'
 import { TicketReporterBadge } from '@/client/components/project/TicketReporterBadge'
 import type { TicketSummary } from '@/shared/types'
 
@@ -104,6 +105,18 @@ export function TicketCard({ ticket, onClick, isOverlay = false, highlightQuery,
   const wasEdited = ticket.updatedAt - ticket.createdAt > 60_000
   const displayedTs = wasEdited ? ticket.updatedAt : ticket.createdAt
   const fullDate = new Date(displayedTs).toLocaleString()
+
+  // "In progress since" duration. Live-ticking while the ticket sits in the
+  // in_progress column, measured from when it last entered that column
+  // (inProgressAt). The ticket can have zero, one, or many tasks running, so
+  // we key off the column transition rather than any single task (per the
+  // ticket spec). Hidden in every other column.
+  const isInProgress = ticket.status === 'in_progress' && ticket.inProgressAt != null
+  const nowMs = useNow(isInProgress)
+  const inProgressMs = isInProgress
+    ? computeDurationMs(ticket.inProgressAt, null, nowMs)
+    : null
+  const inProgressDuration = inProgressMs != null ? formatDurationMs(inProgressMs) : null
 
   // Click anywhere on the card (except interactive children that stop propagation)
   // opens the side panel. We don't wrap in a <button> anymore so we can render
@@ -274,10 +287,28 @@ export function TicketCard({ ticket, onClick, isOverlay = false, highlightQuery,
             <span />
           )}
 
-          {/* Right side: running Kins avatar stack OR timestamp.
-              When a task is running, the avatars win the slot — the running
-              signal is more relevant than age. Otherwise we surface the
-              creation/update timestamp with a tooltip carrying the full date. */}
+          {/* Right side: in-progress timer (if any) + running Kins avatar
+              stack OR timestamp. The "in progress since" timer is shown
+              whenever the ticket sits in the in_progress column, live-ticking
+              from when it last entered it. */}
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          {inProgressDuration && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 text-[10px] tabular-nums font-medium text-primary">
+                  <Timer className="size-3 animate-pulse" aria-hidden />
+                  {inProgressDuration}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <span className="text-xs">
+                  {t('projects.ticketCard.inProgressSince', {
+                    date: new Date(ticket.inProgressAt as number).toLocaleString(),
+                  })}
+                </span>
+              </TooltipContent>
+            </Tooltip>
+          )}
           {hasRunning ? (
             <div
               className="flex items-center -space-x-1.5"
@@ -329,6 +360,7 @@ export function TicketCard({ ticket, onClick, isOverlay = false, highlightQuery,
               </TooltipContent>
             </Tooltip>
           )}
+          </div>
         </div>
     </article>
   )

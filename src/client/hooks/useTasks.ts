@@ -107,6 +107,15 @@ export function useTasks() {
       const taskId = data.taskId as string
       const status = data.status as TaskStatus
       const now = new Date().toISOString()
+      const startedAt = typeof data.startedAt === 'number' ? new Date(data.startedAt).toISOString() : undefined
+      const endedAt = typeof data.endedAt === 'number' ? new Date(data.endedAt).toISOString() : undefined
+      const patchTimes = (t: TaskSummary): TaskSummary => ({
+        ...t,
+        status,
+        updatedAt: now,
+        ...(startedAt !== undefined && { startedAt }),
+        ...(endedAt !== undefined && { endedAt }),
+      })
 
       const isActiveStatus = status === 'pending' || status === 'in_progress' || status === 'paused' || status === 'awaiting_human_input' || status === 'awaiting_kin_response'
       const isQueued = status === 'queued'
@@ -134,10 +143,10 @@ export function useTasks() {
         const existing = prev.find((t) => t.id === taskId)
         if (existing) {
           if (isActiveStatus) {
-            return prev.map((t) => (t.id === taskId ? { ...t, status, updatedAt: now } : t))
+            return prev.map((t) => (t.id === taskId ? patchTimes(t) : t))
           }
           // Moved to terminal state — remove from active, save for history move
-          movedTask = { ...existing, status, updatedAt: now }
+          movedTask = patchTimes(existing)
           return prev.filter((t) => t.id !== taskId)
         }
         if (isActiveStatus) {
@@ -153,7 +162,7 @@ export function useTasks() {
         setHistoryTasks((prev) => {
           const exists = prev.some((t) => t.id === taskId)
           if (exists) {
-            return prev.map((t) => (t.id === taskId ? { ...t, status, updatedAt: now } : t))
+            return prev.map((t) => (t.id === taskId ? patchTimes(t) : t))
           }
           // Task was in activeTasks but not in history — prepend it
           if (movedTask) {
@@ -188,6 +197,15 @@ export function useTasks() {
       const status = data.status as TaskStatus
       const title = (data.title as string) ?? null
       const now = new Date().toISOString()
+      const startedAt = typeof data.startedAt === 'number' ? new Date(data.startedAt).toISOString() : undefined
+      const endedAt = typeof data.endedAt === 'number' ? new Date(data.endedAt).toISOString() : now
+      const patchDone = (t: TaskSummary): TaskSummary => ({
+        ...t,
+        status,
+        updatedAt: now,
+        endedAt,
+        ...(startedAt !== undefined && { startedAt }),
+      })
 
       let finishedTask: TaskSummary | null = null
 
@@ -222,11 +240,11 @@ export function useTasks() {
       setHistoryTasks((prev) => {
         const exists = prev.some((t) => t.id === taskId)
         if (exists) {
-          return prev.map((t) => (t.id === taskId ? { ...t, status, updatedAt: now } : t))
+          return prev.map((t) => (t.id === taskId ? patchDone(t) : t))
         }
         // Task was in activeTasks but not yet in history — prepend it
         if (finishedTask) {
-          return [{ ...finishedTask, status, updatedAt: now }, ...prev]
+          return [patchDone(finishedTask), ...prev]
         }
         return prev
       })

@@ -803,6 +803,10 @@
     "modeAwait": "Espera",
     "modeAsync": "Asíncrono",
     "depth": "Profundidad",
+    "duration": {
+      "runningTooltip": "En ejecución desde hace",
+      "finishedTooltip": "Tiempo total de ejecución"
+    },
     "conversation": "Conversación",
     "conversationEmpty": "Aún no hay mensajes",
     "result": "Resultado",

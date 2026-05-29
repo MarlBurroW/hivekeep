@@ -4,6 +4,7 @@ import {
   formatDurationBetween,
   formatElapsed,
   formatDurationMs,
+  computeDurationMs,
   timeAgo,
 } from './time'
 
@@ -180,6 +181,29 @@ describe('formatElapsed', () => {
     Date.now = () => now
     expect(formatElapsed('2024-01-01T00:00:00Z')).toBe('5m')
     expect(formatElapsed('2024-01-01T00:02:00Z')).toBe('3m')
+  })
+})
+
+// ─── computeDurationMs ──────────────────────────────────────────────────────
+
+describe('computeDurationMs', () => {
+  it('returns null when start is null/undefined', () => {
+    expect(computeDurationMs(null, null, 1000)).toBeNull()
+    expect(computeDurationMs(undefined, 500, 1000)).toBeNull()
+  })
+
+  it('returns the frozen span when end is set', () => {
+    expect(computeDurationMs(1000, 5000, 9999)).toBe(4000)
+  })
+
+  it('returns the live span (now - start) when end is null', () => {
+    expect(computeDurationMs(1000, null, 5000)).toBe(4000)
+    expect(computeDurationMs(1000, undefined, 3500)).toBe(2500)
+  })
+
+  it('clamps negative spans to 0', () => {
+    expect(computeDurationMs(5000, 1000)).toBe(0)
+    expect(computeDurationMs(5000, null, 1000)).toBe(0)
   })
 })
 

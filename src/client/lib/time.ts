@@ -61,3 +61,25 @@ export function formatDurationMs(ms: number): string {
 export function timeAgo(timestamp: number): string {
   return formatRelativeTime(timestamp)
 }
+
+/**
+ * Compute a task / ticket run duration in milliseconds from a start timestamp.
+ *
+ * - `start` null → returns null (work hasn't begun: queued / pending / never
+ *   moved to in_progress).
+ * - `end` set → frozen duration (end - start). Used once the task is terminal.
+ * - `end` null → live duration (now - start). `nowMs` lets callers pass a
+ *   shared ticking clock so a list of rows recomputes in lockstep.
+ *
+ * Returns 0 (not null) for the degenerate case where start is in the future
+ * relative to end/now, so callers can still render "<1s" instead of nothing.
+ */
+export function computeDurationMs(
+  start: number | null | undefined,
+  end: number | null | undefined,
+  nowMs: number = Date.now(),
+): number | null {
+  if (start == null) return null
+  const endpoint = end ?? nowMs
+  return Math.max(0, endpoint - start)
+}

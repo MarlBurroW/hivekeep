@@ -547,6 +547,13 @@
       "when": 1780070400000,
       "tag": "0077_project_knowledge_fts_title",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "6",
+      "when": 1780156800000,
+      "tag": "0078_task_ticket_durations",
+      "breakpoints": true
     }
   ]
 }

@@ -229,6 +229,7 @@ async function rowToTicketSummary(
     runningKins,
     reporter,
     attachmentCount,
+    inProgressAt: row.inProgressAt ? toMillis(row.inProgressAt) : null,
     createdAt: toMillis(row.createdAt),
     updatedAt: toMillis(row.updatedAt),
   }
@@ -799,6 +800,8 @@ export async function getTicket(ticketId: string): Promise<Ticket | null> {
         status: tasks.status,
         mode: tasks.mode,
         kind: tasks.kind,
+        startedAt: tasks.startedAt,
+        endedAt: tasks.endedAt,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
       })
@@ -829,6 +832,8 @@ export async function getTicket(ticketId: string): Promise<Ticket | null> {
     status: t.status as TicketTaskSummary['status'],
     mode: t.mode as TicketTaskSummary['mode'],
     kind: (t.kind as TicketTaskSummary['kind']) ?? 'execute',
+    startedAt: t.startedAt ? toMillis(t.startedAt) : null,
+    endedAt: t.endedAt ? toMillis(t.endedAt) : null,
     createdAt: toMillis(t.createdAt),
     updatedAt: toMillis(t.updatedAt),
   }))
@@ -848,6 +853,7 @@ export async function getTicket(ticketId: string): Promise<Ticket | null> {
     runningKins,
     reporter,
     attachmentCount,
+    inProgressAt: row.inProgressAt ? toMillis(row.inProgressAt) : null,
     tasks: ticketTasks,
     createdAt: toMillis(row.createdAt),
     updatedAt: toMillis(row.updatedAt),
@@ -936,6 +942,7 @@ export async function createTicket(input: CreateTicketInput): Promise<TicketSumm
         position,
         reporterUserId,
         reporterKinId,
+        inProgressAt: status === 'in_progress' ? now : null,
         createdAt: now,
         updatedAt: now,
       })
@@ -964,6 +971,7 @@ export async function createTicket(input: CreateTicketInput): Promise<TicketSumm
     runningKins: [],
     reporter,
     attachmentCount: 0,
+    inProgressAt: status === 'in_progress' ? now.getTime() : null,
     createdAt: now.getTime(),
     updatedAt: now.getTime(),
   }
@@ -1000,6 +1008,13 @@ export async function updateTicket(
     if (!isValidStatus(input.status)) throw new Error('INVALID_STATUS')
     newStatus = input.status
     update.status = input.status
+    // Stamp the moment the ticket (re)enters the in_progress column so the
+    // kanban card can show a live "in progress since" duration. Re-stamped on
+    // every fresh transition into in_progress (e.g. done → in_progress again)
+    // so the timer reflects the current work session, not a stale one.
+    if (input.status === 'in_progress' && existing.status !== 'in_progress') {
+      update.inProgressAt = new Date()
+    }
   }
 
   if (input.position !== undefined) {

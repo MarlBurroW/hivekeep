@@ -5,7 +5,8 @@ import {
 } from '@/client/components/ui/sidebar'
 import { Input } from '@/client/components/ui/input'
 import { cn } from '@/client/lib/utils'
-import { formatDurationBetween, formatElapsed } from '@/client/lib/time'
+import { formatDurationMs, computeDurationMs } from '@/client/lib/time'
+import { useNow } from '@/client/hooks/useNow'
 import { Loader2, Search, ListTodo, ChevronDown, Zap } from 'lucide-react'
 import { EmptyState } from '@/client/components/common/EmptyState'
 import { TaskTimelineItem } from '@/client/components/common/TaskTimelineItem'
@@ -76,20 +77,27 @@ function TokenChip({ headline }: { headline: number }) {
   )
 }
 
-function TimelineTaskCard({ task, onClick, isLast, queuePosition }: { task: TaskSummary; onClick: () => void; isLast: boolean; queuePosition?: number }) {
+function TimelineTaskCard({ task, onClick, isLast, queuePosition, nowMs }: { task: TaskSummary; onClick: () => void; isLast: boolean; queuePosition?: number; nowMs: number }) {
   const kinName = task.sourceKinName ?? task.parentKinName
   const isQueued = task.status === 'queued'
   const isActive = task.status === 'in_progress' || task.status === 'paused' || task.status === 'awaiting_human_input' || task.status === 'awaiting_kin_response' || task.status === 'pending'
   const isFinished = task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
-  const duration = isFinished
-    ? formatDurationBetween(task.createdAt, task.updatedAt)
-    : formatElapsed(task.createdAt)
+
+  // Run duration is measured from when the task actually started executing
+  // (startedAt), not when it was spawned/queued. While running it ticks live
+  // off the shared `nowMs` clock; once terminal it freezes at endedAt.
+  const startedMs = task.startedAt ? new Date(task.startedAt).getTime() : null
+  const endedMs = task.endedAt ? new Date(task.endedAt).getTime() : null
+  const runMs = computeDurationMs(startedMs, isFinished ? endedMs : null, nowMs)
+  const runDuration = runMs != null ? formatDurationMs(runMs) : null
 
   const primary = task.title ?? (task.description.length > 55
     ? task.description.slice(0, 55) + '…'
     : task.description)
   const secondary = isQueued && task.concurrencyGroup ? task.concurrencyGroup : kinName
-  const time = isQueued || isActive ? duration : formatTime(task.createdAt)
+  // Active/finished rows surface the run duration; queued rows have no
+  // execution window yet, so fall back to the spawn time.
+  const time = runDuration != null ? runDuration : formatTime(task.createdAt)
 
   // Token chip — billable input + output ≈ what the user actually paid for.
   // Hidden when no usage has been recorded (queued / immediate cancel).
@@ -144,6 +152,12 @@ export const TaskList = memo(function TaskList({ llmModels, taskData }: TaskList
   const [queueFilter, setQueueFilter] = useState<string | null>(null)
   const [queueFilterOpen, setQueueFilterOpen] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
+
+  // Shared 1s clock driving live duration counters. Only ticks while at least
+  // one task is actually running (active or queued) so we don't re-render the
+  // history list for nothing.
+  const hasLiveTasks = activeTasks.length > 0 || queuedTasks.length > 0
+  const nowMs = useNow(hasLiveTasks)
 
   // IntersectionObserver on sentinel for infinite scroll
   useEffect(() => {
@@ -270,6 +284,7 @@ export const TaskList = memo(function TaskList({ llmModels, taskData }: TaskList
                       task={task}
                       onClick={() => handleOpenTask(task)}
                       isLast={i === activeTasks.length - 1 && queuedTasks.length === 0 && deduplicatedHistory.length === 0}
+                      nowMs={nowMs}
                     />
                   ))}
                 </>
@@ -332,6 +347,7 @@ export const TaskList = memo(function TaskList({ llmModels, taskData }: TaskList
                       onClick={() => handleOpenTask(task)}
                       isLast={i === filteredQueuedTasks.length - 1 && deduplicatedHistory.length === 0}
                       queuePosition={queuePositions.get(task.id)}
+                      nowMs={nowMs}
                     />
                   ))}
                 </>
@@ -359,6 +375,7 @@ export const TaskList = memo(function TaskList({ llmModels, taskData }: TaskList
                         task={task}
                         onClick={() => handleOpenTask(task)}
                         isLast={isLastGroup && i === tasks.length - 1 && !hasMore}
+                        nowMs={nowMs}
                       />
                     ))}
                   </div>

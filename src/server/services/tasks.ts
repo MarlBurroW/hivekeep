@@ -98,8 +98,8 @@ export function recoverStaleTasks() {
   // Note: 'queued' IS recovered — the promotion mechanism is lost on restart
   // Note: 'paused' IS recovered — the user context is lost on restart
   const result = sqlite.run(
-    `UPDATE tasks SET status = 'failed', error = 'Interrupted by server restart', updated_at = ? WHERE status IN ('queued', 'pending', 'in_progress', 'paused', 'awaiting_kin_response')`,
-    [Date.now()],
+    `UPDATE tasks SET status = 'failed', error = 'Interrupted by server restart', ended_at = COALESCE(ended_at, ?), updated_at = ? WHERE status IN ('queued', 'pending', 'in_progress', 'paused', 'awaiting_kin_response')`,
+    [Date.now(), Date.now()],
   )
   if (result.changes > 0) {
     log.warn({ count: result.changes }, 'Recovered stale tasks → marked as failed')
@@ -650,11 +650,16 @@ async function executeSubKin(taskId: string, isNudge = false) {
     kinIdentity = { ...kinIdentity, ...promptSnapshot.kin }
   }
 
-  // Update status to in_progress
-  await db
-    .update(tasks)
-    .set({ status: 'in_progress', updatedAt: new Date() })
-    .where(eq(tasks.id, taskId))
+  // Update status to in_progress. `started_at` is set once via COALESCE so
+  // re-entries (resume, request_input replies, inter-Kin replies, nudges)
+  // never reset the original execution start used for the run duration.
+  sqlite.run(
+    `UPDATE tasks SET status = 'in_progress', started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?`,
+    [Date.now(), Date.now(), taskId],
+  )
+  const startedRow = sqlite
+    .query(`SELECT started_at AS startedAt FROM tasks WHERE id = ?`)
+    .get(taskId) as { startedAt: number | null } | null
 
   sseManager.sendToKin(task.parentKinId, {
     type: 'task:status',
@@ -664,6 +669,7 @@ async function executeSubKin(taskId: string, isNudge = false) {
       kinId: task.parentKinId,
       status: 'in_progress',
       title: task.title ?? task.description,
+      startedAt: startedRow?.startedAt ?? null,
       senderName: kinIdentity.name,
       senderAvatarUrl: kinAvatarUrl(kinIdentity.id, kinIdentity.avatarPath, kinIdentity.updatedAt),
     },
@@ -1504,13 +1510,15 @@ export async function resolveTask(
     .then(({ playwrightManager }) => playwrightManager.closeSessionsForTask(taskId))
     .catch((err) => log.warn({ taskId, err }, 'Failed to close browser sessions for task'))
 
+  const endedAt = new Date()
   await db
     .update(tasks)
     .set({
       status,
       result: result ?? null,
       error: error ?? null,
-      updatedAt: new Date(),
+      endedAt,
+      updatedAt: endedAt,
     })
     .where(eq(tasks.id, taskId))
 
@@ -1573,6 +1581,8 @@ export async function resolveTask(
       result: result ?? null,
       error: error ?? null,
       title: task.title ?? task.description,
+      startedAt: task.startedAt ? task.startedAt.getTime() : null,
+      endedAt: endedAt.getTime(),
       senderName: executingKin?.name ?? null,
       senderAvatarUrl: kinAvatarUrl(executingKinId, executingKin?.avatarPath ?? null, executingKin?.updatedAt),
     },
@@ -1741,9 +1751,10 @@ export async function cancelTask(taskId: string, kinId: string) {
     interKinTimeouts.delete(taskId)
   }
 
+  const cancelledAt = new Date()
   await db
     .update(tasks)
-    .set({ status: 'cancelled', pendingRequestId: null, updatedAt: new Date() })
+    .set({ status: 'cancelled', pendingRequestId: null, endedAt: cancelledAt, updatedAt: cancelledAt })
     .where(eq(tasks.id, taskId))
 
   sseManager.sendToKin(kinId, {
@@ -1754,6 +1765,8 @@ export async function cancelTask(taskId: string, kinId: string) {
       kinId,
       status: 'cancelled',
       title: task.title ?? task.description,
+      startedAt: task.startedAt ? task.startedAt.getTime() : null,
+      endedAt: cancelledAt.getTime(),
     },
   })
 
@@ -1993,6 +2006,8 @@ export interface ListTasksRow {
   depth: number
   createdAt: number
   updatedAt: number
+  startedAt: number | null
+  endedAt: number | null
   durationMs: number | null
 }
 
@@ -2021,9 +2036,17 @@ export function computeTaskDurationMs(row: {
   status: string
   createdAt: Date
   updatedAt: Date
+  startedAt?: Date | null
+  endedAt?: Date | null
 }): number | null {
   if (!TERMINAL_STATUSES.has(row.status)) return null
-  return row.updatedAt.getTime() - row.createdAt.getTime()
+  // Prefer the explicit execution window (started → ended). Fall back to the
+  // legacy created → updated span for rows predating those columns (the 0078
+  // migration backfills both, so this fallback only matters for in-flight
+  // upgrades and defensive safety).
+  const start = row.startedAt ?? row.createdAt
+  const end = row.endedAt ?? row.updatedAt
+  return end.getTime() - start.getTime()
 }
 
 function clampLimit(limit: number | undefined): number {
@@ -2156,6 +2179,8 @@ export async function listTasksFiltered(filters: ListTasksFilters): Promise<List
       depth: r.depth,
       createdAt: r.createdAt.getTime(),
       updatedAt: r.updatedAt.getTime(),
+      startedAt: r.startedAt ? r.startedAt.getTime() : null,
+      endedAt: r.endedAt ? r.endedAt.getTime() : null,
       durationMs: computeTaskDurationMs(r),
     })),
   }

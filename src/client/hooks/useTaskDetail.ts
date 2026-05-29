@@ -33,6 +33,11 @@ interface TaskDetail {
    *  records usage. Pushed live via `task:token-usage` SSE so the running
    *  counter updates without polling. */
   tokenUsage?: TaskTokenUsage | null
+  /** Unix-ms (string) when the task first entered in_progress. Null while
+   *  queued/pending. Drives the live + persisted run-duration chip. */
+  startedAt?: string | null
+  /** When the task reached a terminal status. Null while still active. */
+  endedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -411,8 +416,17 @@ export function useTaskDetail(taskId: string | null) {
     'task:status': (data) => {
       if (data.taskId !== taskId) return
       const status = data.status as TaskStatus
+      const startedAt = typeof data.startedAt === 'number' ? new Date(data.startedAt).toISOString() : undefined
+      const endedAt = typeof data.endedAt === 'number' ? new Date(data.endedAt).toISOString() : undefined
       setTask((prev) =>
-        prev ? { ...prev, status } : prev,
+        prev
+          ? {
+              ...prev,
+              status,
+              ...(startedAt !== undefined && { startedAt }),
+              ...(endedAt !== undefined && { endedAt }),
+            }
+          : prev,
       )
       // Terminal or paused status → clear streaming state (safety net if chat:done was missed)
       if (status === 'completed' || status === 'failed' || status === 'cancelled' || status === 'paused') {

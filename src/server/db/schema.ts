@@ -344,6 +344,16 @@ export const tasks = sqliteTable('tasks', {
    *  that buildTaskContextPreview produces. Null until the first turn lands. */
   lastApiContextTokens: integer('last_api_context_tokens'),
   queuedAt: integer('queued_at', { mode: 'timestamp_ms' }),
+  /** When the task first transitioned to 'in_progress' (actual execution start,
+   *  distinct from createdAt which is the spawn/queue time). Set once via
+   *  COALESCE so re-entries (resume, request_input replies) never reset it.
+   *  Null while queued/pending. Source of truth for the live + persisted run
+   *  duration shown in the UI. */
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+  /** When the task reached a terminal status (completed/failed/cancelled).
+   *  Together with startedAt this freezes the final run duration. Null while
+   *  the task is still active. */
+  endedAt: integer('ended_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (table) => [
@@ -918,6 +928,11 @@ export const tickets = sqliteTable('tickets', {
    *  reporter_kin_id is set (or both NULL for legacy/seeded rows). */
   reporterUserId: text('reporter_user_id').references(() => user.id, { onDelete: 'set null' }),
   reporterKinId: text('reporter_kin_id').references(() => kins.id, { onDelete: 'set null' }),
+  /** When the ticket last entered the 'in_progress' column. Updated on every
+   *  transition into 'in_progress' (and cleared when it leaves). Drives the
+   *  "in progress since" duration on the kanban card. Null for tickets that
+   *  have never been moved to in_progress. */
+  inProgressAt: integer('in_progress_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (table) => [

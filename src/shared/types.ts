@@ -211,6 +211,12 @@ export interface TaskSummary {
    *  recorded yet (queued / just-spawned). Updated live via the
    *  `task:token-usage` SSE event. */
   tokenUsage?: TaskTokenUsage | null
+  /** Unix-ms (as string, like createdAt/updatedAt) when the task first entered
+   *  in_progress. Null while queued/pending. Source of truth for the live +
+   *  persisted run duration shown in the tasks list. */
+  startedAt?: string | null
+  /** When the task reached a terminal status. Null while still active. */
+  endedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -836,6 +842,10 @@ export interface TicketSummary {
   /** Number of attachments on this ticket. Refreshes via SSE
    *  `ticket:updated` after each attachment mutation. */
   attachmentCount: number
+  /** Unix-ms when the ticket last entered the in_progress column. Drives the
+   *  live "in progress since" duration on the kanban card. Null when the
+   *  ticket has never been moved to in_progress. */
+  inProgressAt: number | null
   createdAt: number
   updatedAt: number
 }
@@ -852,6 +862,11 @@ export interface TicketTaskSummary {
   /** Task variant. 'execute' is a regular ticket task; 'enrich' is a
    *  ticket-enrichment pass that rewrites title/description/tags. */
   kind: 'execute' | 'enrich'
+  /** Unix-ms when the task first entered in_progress. Null while queued/pending.
+   *  Used (with endedAt / now) to show the run duration on the ticket panel. */
+  startedAt: number | null
+  /** Unix-ms when the task reached a terminal status. Null while still active. */
+  endedAt: number | null
   createdAt: number
   updatedAt: number
 }

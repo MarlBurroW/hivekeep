@@ -79,6 +79,8 @@ taskRoutes.get('/', async (c) => {
         concurrencyMax: t.concurrencyMax ?? null,
         queuePosition: null, // Computed on-demand for queued tasks
         tokenUsage: usageMap.get(t.id) ?? null,
+        startedAt: t.startedAt ?? null,
+        endedAt: t.endedAt ?? null,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
       }
@@ -151,6 +153,8 @@ taskRoutes.get('/:id', async (c) => {
       cronId: task.cronId ?? null,
       runPrompt: task.runPrompt ?? null,
       tokenUsage,
+      startedAt: task.startedAt ?? null,
+      endedAt: task.endedAt ?? null,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     },

@@ -19,7 +19,8 @@ import { useSSE } from '@/client/hooks/useSSE'
 import { useSidePanel } from '@/client/contexts/SidePanelContext'
 import { cn } from '@/client/lib/utils'
 import { ProviderIcon } from '@/client/components/common/ProviderIcon'
-import { formatRelativeTime, formatDurationBetween } from '@/client/lib/time'
+import { formatRelativeTime, formatDurationBetween, formatDurationMs, computeDurationMs } from '@/client/lib/time'
+import { useNow } from '@/client/hooks/useNow'
 import {
   Dialog,
   DialogContent,
@@ -230,6 +231,16 @@ export function TaskPanelContent({
   const initials = kinName?.slice(0, 2).toUpperCase() ?? 'K'
   const resolvedModel = task?.model ? llmModels.find((m) => m.id === task.model) : null
 
+  // Live + persisted run duration. Ticks every second while the task is active
+  // (measured from startedAt), then freezes at endedAt once terminal. Null for
+  // queued/pending tasks that haven't started executing yet.
+  const isTerminal = task?.status === 'completed' || task?.status === 'failed' || task?.status === 'cancelled'
+  const nowMs = useNow(isActive)
+  const startedMs = task?.startedAt ? new Date(task.startedAt).getTime() : null
+  const endedMs = task?.endedAt ? new Date(task.endedAt).getTime() : null
+  const runMs = computeDurationMs(startedMs, isTerminal ? endedMs : null, nowMs)
+  const runDuration = runMs != null ? formatDurationMs(runMs) : null
+
   const handleForceStart = useCallback(async () => {
     if (!task) return
     setIsForceStarting(true)
@@ -360,6 +371,28 @@ export function TaskPanelContent({
               <TooltipContent>{t('taskDetail.depth')}</TooltipContent>
             </Tooltip>
 
+            {/* Run duration — live while active, frozen once terminal. Hidden
+                for queued/pending tasks that haven't started executing. */}
+            {runDuration && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'h-5 gap-1 px-1.5 py-0 text-[10px] font-normal tabular-nums',
+                      isActive && 'border-primary/40 bg-primary/10 text-primary',
+                    )}
+                  >
+                    <Clock className={cn('size-2.5', isActive && 'animate-pulse')} />
+                    {runDuration}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isActive ? t('taskDetail.duration.runningTooltip') : t('taskDetail.duration.finishedTooltip')}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {/* Model */}
             {task.model && (
               <Tooltip>
@@ -453,7 +486,14 @@ export function TaskPanelContent({
                         const runStatusCfg = STATUS_CONFIG[run.status]
                         const RunStatusIcon = runStatusCfg.icon
                         const isFinished = run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled'
-                        const duration = isFinished ? formatDurationBetween(run.createdAt, run.updatedAt) : undefined
+                        const runStartMs = run.startedAt ? new Date(run.startedAt).getTime() : null
+                        const runEndMs = run.endedAt ? new Date(run.endedAt).getTime() : null
+                        const runDurationMs = isFinished ? computeDurationMs(runStartMs, runEndMs) : null
+                        const duration = runDurationMs != null
+                          ? formatDurationMs(runDurationMs)
+                          : isFinished
+                            ? formatDurationBetween(run.createdAt, run.updatedAt)
+                            : undefined
                         const isCurrent = run.id === taskId
                         return (
                           <button
