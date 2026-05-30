@@ -1,6 +1,6 @@
 import { eq, and } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
-import { db } from '@/server/db/index'
+import { db, sqlite } from '@/server/db/index'
 import { humanPrompts, tasks, messages } from '@/server/db/schema'
 import { sseManager } from '@/server/sse/index'
 import { enqueueMessage } from '@/server/services/queue'
@@ -169,8 +169,27 @@ export async function respondToHumanPrompt(promptId: string, response: unknown, 
   const formattedResponse = formatResponseForLLM(prompt.promptType, prompt.question, response, options)
 
   if (prompt.taskId) {
-    // ── Task context: inject into sub-Kin history and re-trigger ──
+    // ── Task context: atomically claim the resume, then inject + re-trigger ──
 
+    // Atomic race-winner claim: only the answer that flips the task OUT of
+    // `awaiting_human_input` proceeds. A concurrent answer, a cancel, a restart
+    // recovery, or the agent having moved on loses here and must NOT inject a
+    // duplicate response message or resume the task a second time. Mirrors the
+    // awaiting_kin_response / awaiting_subtask resume claims (tasks.ts).
+    const claim = sqlite.run(
+      `UPDATE tasks SET status = 'in_progress', updated_at = ? WHERE id = ? AND status = 'awaiting_human_input'`,
+      [Date.now(), prompt.taskId],
+    )
+    if (claim.changes === 0) {
+      const current = await db.select({ status: tasks.status }).from(tasks).where(eq(tasks.id, prompt.taskId)).get()
+      log.warn(
+        { promptId, taskId: prompt.taskId, taskStatus: current?.status },
+        'Human prompt answered but task is no longer awaiting_human_input — not injecting or resuming (lost the resume race)',
+      )
+      return { success: false as const, error: 'TASK_NOT_AWAITING', taskStatus: current?.status }
+    }
+
+    // Won the claim — inject the response into the sub-Kin history.
     await db.insert(messages).values({
       id: uuid(),
       kinId: prompt.kinId,
@@ -181,12 +200,6 @@ export async function respondToHumanPrompt(promptId: string, response: unknown, 
       sourceId: userId ?? null,
       createdAt: new Date(),
     })
-
-    // Reset task status to in_progress
-    await db
-      .update(tasks)
-      .set({ status: 'in_progress', updatedAt: new Date() })
-      .where(eq(tasks.id, prompt.taskId))
 
     sseManager.sendToKin(prompt.kinId, {
       type: 'task:status',
@@ -199,10 +212,9 @@ export async function respondToHumanPrompt(promptId: string, response: unknown, 
     })
 
     // Re-trigger sub-Kin execution (dynamic import to avoid circular deps).
-    // Gate the resume on a global exec-slot: awaiting_human_input released the
-    // slot, so the answer may have to wait if the cap is now full. The response
-    // message was already injected above; runOrQueueResumedTask either runs the
-    // sub-Kin now or demotes the row to 'queued' for later promotion.
+    // The claim above already performed the race-winner flip to in_progress that
+    // runOrQueueResumedTask expects; it either runs the sub-Kin now or demotes the
+    // row to 'queued' for later promotion if the global exec-slots are full.
     const { runOrQueueResumedTask } = await import('@/server/services/tasks')
     runOrQueueResumedTask(prompt.taskId).catch((err) =>
       log.error({ taskId: prompt.taskId, err }, 'Sub-Kin resume error after human prompt'),
