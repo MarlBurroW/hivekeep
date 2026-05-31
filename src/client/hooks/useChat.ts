@@ -162,6 +162,12 @@ export function useChat(kinId: string | null) {
   const messagesRef = useRef(messages)
   messagesRef.current = messages
 
+  // Pending "settle" clear for the live compacting card. The catch-up loop emits
+  // one compacting:done per cycle and we can't know here if another follows, so
+  // we debounce the refresh+clear; an incoming compacting:start (next cycle)
+  // cancels it, keeping the card continuous during catch-up.
+  const compactingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Fetch message history
   const fetchMessages = useCallback(async () => {
     if (!kinId) {
@@ -307,6 +313,10 @@ export function useChat(kinId: string | null) {
     resetStreaming()
     setLiveTasks([])
     setLiveCompacting(null)
+    if (compactingClearTimerRef.current) {
+      clearTimeout(compactingClearTimerRef.current)
+      compactingClearTimerRef.current = null
+    }
     setHasMore(false)
     setIsLoadingMore(false)
     taskIdByTitleRef.current.clear()
@@ -528,6 +538,12 @@ export function useChat(kinId: string | null) {
 
     'compacting:start': (data) => {
       if (data.kinId !== kinId) return
+      // A new catch-up cycle started — cancel any pending settle-clear from the
+      // previous cycle's done event so the card stays continuous.
+      if (compactingClearTimerRef.current) {
+        clearTimeout(compactingClearTimerRef.current)
+        compactingClearTimerRef.current = null
+      }
       setLiveCompacting({
         kinId: data.kinId as string,
         status: 'running',
@@ -543,21 +559,22 @@ export function useChat(kinId: string | null) {
       if (data.kinId !== kinId) return
       setLiveCompacting((prev) => {
         if (!prev) return null
-        const updated = {
+        return {
           ...prev,
           status: 'done' as const,
           summary: data.summary as string,
           memoriesExtracted: data.memoriesExtracted as number,
           messageCount: (data.messageCount as number | undefined) ?? prev.messageCount,
         }
-        // During catch-up, more cycles may follow — don't clear yet
-        if (prev.cycle && prev.estimatedTotal && prev.cycle < prev.estimatedTotal) {
-          return updated
-        }
-        // Last cycle or single cycle — refresh and clear
-        fetchMessages().then(() => setLiveCompacting(null))
-        return updated
       })
+      // One done fires per catch-up cycle; we can't tell here whether another
+      // follows. Debounce the refresh+clear — a follow-up compacting:start
+      // cancels it (catch-up continues), otherwise it settles after a beat.
+      if (compactingClearTimerRef.current) clearTimeout(compactingClearTimerRef.current)
+      compactingClearTimerRef.current = setTimeout(() => {
+        compactingClearTimerRef.current = null
+        fetchMessages().then(() => setLiveCompacting(null))
+      }, 1200)
     },
 
     'compacting:error': (data) => {

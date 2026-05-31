@@ -72,8 +72,8 @@ export const CompactingCard = memo(function CompactingCard({
               <div className="mt-0.5 flex items-center gap-1.5">
                 {isRunning ? (
                   <span className="text-xs font-medium text-primary">
-                    {cycle && estimatedTotal && estimatedTotal > 1
-                      ? t('chat.compacting.runningCycle', { cycle, total: estimatedTotal })
+                    {cycle != null && cycle > 1
+                      ? t('chat.compacting.runningCycle', { cycle })
                       : t('chat.compacting.running')}
                   </span>
                 ) : isError ? (

@@ -783,7 +783,7 @@
       "inputDisabled": "Please wait - compacting conversation history...",
       "nothingToCompact": "Not enough messages to compact",
       "error": "Compaction failed",
-      "runningCycle": "Compacting... (cycle {{cycle}}/{{total}})"
+      "runningCycle": "Compacting... (pass {{cycle}})"
     },
     "taskResult": {
       "showResult": "Show result",

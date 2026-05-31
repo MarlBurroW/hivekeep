@@ -783,7 +783,7 @@
       "inputDisabled": "Veuillez patienter - compaction de l'historique...",
       "nothingToCompact": "Pas assez de messages à compacter",
       "error": "Échec de la compaction",
-      "runningCycle": "Compaction... (cycle {{cycle}}/{{total}})"
+      "runningCycle": "Compaction... (passe {{cycle}})"
     },
     "taskResult": {
       "showResult": "Voir le résultat",
