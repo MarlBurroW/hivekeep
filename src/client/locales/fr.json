@@ -1708,6 +1708,30 @@
         "bullet3": "Les invitations peuvent être révoquées à tout moment avant utilisation"
       }
     },
+    "emailAccounts": {
+      "title": "Comptes email",
+      "description": "Connectez des comptes email pour que vos Kins puissent lire et envoyer des mails. Stockés comme comptes provider chiffrés.",
+      "help": {
+        "content": "Connectez un compte Gmail via OAuth. Configurez d'abord une app OAuth Google Cloud (client ID + secret), puis cliquez sur Connecter et autorisez l'accès.",
+        "bullet1": "Créez une app OAuth dans Google Cloud Console avec les scopes Gmail, et enregistrez le redirect URI affiché par votre hôte KinBot (…/api/email-accounts/oauth/callback).",
+        "bullet2": "Collez le client ID et le secret ci-dessous, puis Connecter pour autoriser la boîte mail.",
+        "bullet3": "Donnez la toolbox « email » à un Kin pour qu'il puisse lister, lire, chercher et envoyer des mails via les comptes connectés."
+      },
+      "empty": "Aucun compte email connecté",
+      "emptyDescription": "Configurez un provider ci-dessus et connectez une boîte mail pour commencer.",
+      "connect": "Connecter {{provider}}",
+      "connectedToast": "{{email}} connecté",
+      "editCreds": "Modifier les identifiants de l'app",
+      "credsSaved": "Identifiants de l'app enregistrés",
+      "oauthHelp": "Identifiants de l'app OAuth de votre projet Google Cloud. Le secret est stocké chiffré.",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "deleted": "Compte email déconnecté",
+      "delete": "Déconnecter le compte",
+      "deleteConfirm": "Déconnecter ce compte email ? Les Kins ne pourront plus l'utiliser.",
+      "sendModeDirect": "Envoi direct",
+      "sendModeApproval": "Validation requise"
+    },
     "channels": {
       "title": "Canaux",
       "description": "Connectez vos Kins à des plateformes de messagerie externes. Les messages seront routés vers le Kin sélectionné, et les réponses renvoyées automatiquement.",

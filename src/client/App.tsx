@@ -3,6 +3,7 @@ import { lazyWithRetry as lazy } from '@/client/lib/lazy-with-retry'
 import { useAuth } from '@/client/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { toast } from 'sonner'
 import { api } from '@/client/lib/api'
 import { SidePanelProvider } from '@/client/contexts/SidePanelContext'
 import { TicketMentionShell } from '@/client/contexts/TicketMentionShell'
@@ -161,6 +162,24 @@ function AuthenticatedShell() {
   }, [])
 
   const handleOpenAccount = useCallback(() => setAccountOpen(true), [])
+
+  // Surface the result of an email OAuth connect (the callback redirects back
+  // to "/?email_connected=<addr>" or "/?email_error=<msg>"). Toast, open the
+  // Email accounts settings on success, then strip the query params.
+  const { t } = useTranslation()
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get('email_connected')
+    const error = params.get('email_error')
+    if (!connected && !error) return
+    if (connected) {
+      toast.success(t('settings.emailAccounts.connectedToast', { email: connected }))
+      handleOpenSettings('emailAccounts')
+    } else if (error) {
+      toast.error(decodeURIComponent(error))
+    }
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash)
+  }, [t, handleOpenSettings])
 
   return (
     <TooltipProvider delayDuration={0}>

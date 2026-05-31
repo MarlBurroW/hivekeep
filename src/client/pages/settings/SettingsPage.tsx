@@ -30,6 +30,7 @@ import { FileStorageSettings } from '@/client/pages/settings/FileStorageSettings
 import { MemoriesSettings } from '@/client/pages/settings/MemoriesSettings'
 import { WebhooksSettings } from '@/client/pages/settings/WebhooksSettings'
 import { ChannelsSettings } from '@/client/pages/settings/ChannelsSettings'
+import { EmailAccountsSettings } from '@/client/pages/settings/EmailAccountsSettings'
 import { UsersSettings } from '@/client/pages/settings/UsersSettings'
 import { NotificationPreferences } from '@/client/components/notifications/NotificationPreferences'
 import { PluginsSettings } from '@/client/pages/settings/PluginsSettings'
@@ -59,6 +60,7 @@ import {
   ScrollText,
   Coins,
   Wrench,
+  Mail,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { api } from '@/client/lib/api'
@@ -99,6 +101,7 @@ const sectionGroups: SectionGroup[] = [
     groupKey: 'settings.groups.connections',
     items: [
       { id: 'channels', icon: Radio, labelKey: 'settings.channels.title' },
+      { id: 'emailAccounts', icon: Mail, labelKey: 'settings.emailAccounts.title' },
       { id: 'webhooks', icon: Webhook, labelKey: 'settings.webhooks.title' },
       { id: 'contacts', icon: Users, labelKey: 'settings.contacts.title' },
     ],
@@ -144,6 +147,7 @@ const sectionComponents: Record<string, React.FC> = {
   files: FileStorageSettings,
   webhooks: WebhooksSettings,
   channels: ChannelsSettings,
+  emailAccounts: EmailAccountsSettings,
   plugins: PluginsSettings,
   marketplace: PluginMarketplace,
   toolboxes: ToolboxesSettings,

@@ -1708,6 +1708,30 @@
         "bullet3": "Invitations can be revoked at any time before they are used"
       }
     },
+    "emailAccounts": {
+      "title": "Email Accounts",
+      "description": "Connect email accounts so your Kins can read and send email. Stored as encrypted provider accounts.",
+      "help": {
+        "content": "Connect a Gmail account via OAuth. First configure a Google Cloud OAuth app (client ID + secret), then click Connect and authorize access.",
+        "bullet1": "Create an OAuth app in Google Cloud Console with the Gmail scopes, and register the redirect URI shown by your KinBot host (…/api/email-accounts/oauth/callback).",
+        "bullet2": "Paste the client ID and secret below, then Connect to authorize the mailbox.",
+        "bullet3": "Grant a Kin the \"email\" toolbox to let it list, read, search and send mail through connected accounts."
+      },
+      "empty": "No email account connected",
+      "emptyDescription": "Configure a provider above and connect a mailbox to get started.",
+      "connect": "Connect {{provider}}",
+      "connectedToast": "{{email}} connected",
+      "editCreds": "Edit app credentials",
+      "credsSaved": "App credentials saved",
+      "oauthHelp": "OAuth app credentials from your Google Cloud project. The client secret is stored encrypted.",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "deleted": "Email account disconnected",
+      "delete": "Disconnect account",
+      "deleteConfirm": "Disconnect this email account? Kins will no longer be able to use it.",
+      "sendModeDirect": "Send directly",
+      "sendModeApproval": "Require approval"
+    },
     "channels": {
       "title": "Channels",
       "description": "Connect your Kins to external messaging platforms. Messages will be routed to the selected Kin, and responses sent back automatically.",
