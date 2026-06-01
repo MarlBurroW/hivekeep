@@ -6,6 +6,7 @@ import { getEmailProvider, listEmailProviders } from '@/server/email/registry'
 import {
   getOAuthClient,
   setOAuthClient,
+  setOAuthClientId,
   clearOAuthClient,
 } from '@/server/services/app-settings'
 import { buildAuthorizeUrl, exchangeCode, fetchAccountEmail } from '@/server/services/oauth'
@@ -88,10 +89,20 @@ emailAccountRoutes.get('/oauth-config/:type', async (c) => {
 emailAccountRoutes.put('/oauth-config/:type', async (c) => {
   const type = c.req.param('type')
   const body = await c.req.json<{ clientId?: string; clientSecret?: string }>()
-  if (!body.clientId || !body.clientSecret) {
-    return c.json({ error: { code: 'INVALID_INPUT', message: 'clientId and clientSecret are required' } }, 400)
+  if (!body.clientId) {
+    return c.json({ error: { code: 'INVALID_INPUT', message: 'clientId is required' } }, 400)
   }
-  await setOAuthClient(type, { clientId: body.clientId, clientSecret: body.clientSecret })
+  if (body.clientSecret) {
+    await setOAuthClient(type, { clientId: body.clientId, clientSecret: body.clientSecret })
+  } else {
+    // Editing an existing app without re-typing the (write-only) secret: keep
+    // the stored secret, update only the id. Reject if no secret is stored yet.
+    const existing = await getOAuthClient(type)
+    if (!existing) {
+      return c.json({ error: { code: 'INVALID_INPUT', message: 'clientSecret is required' } }, 400)
+    }
+    await setOAuthClientId(type, body.clientId)
+  }
   return c.json({ ok: true })
 })
 

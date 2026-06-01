@@ -1744,6 +1744,7 @@
       "copied": "Copié",
       "clientId": "Client ID",
       "clientSecret": "Client secret",
+      "secretKeep": "Laisser vide pour conserver le secret actuel",
       "deleted": "Compte email déconnecté",
       "delete": "Déconnecter le compte",
       "deleteConfirm": "Déconnecter ce compte email ? Les Kins ne pourront plus l'utiliser.",

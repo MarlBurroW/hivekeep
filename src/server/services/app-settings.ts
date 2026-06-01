@@ -37,6 +37,12 @@ export async function setOAuthClient(providerType: string, client: OAuthClient):
   }
 }
 
+/** Update only the client id, keeping the stored secret. Used when editing an
+ *  already-configured OAuth app without re-entering the (write-only) secret. */
+export async function setOAuthClientId(providerType: string, clientId: string): Promise<void> {
+  await setSetting(`oauth_client:${providerType}:client_id`, clientId)
+}
+
 export async function clearOAuthClient(providerType: string): Promise<void> {
   await deleteSetting(`oauth_client:${providerType}:client_id`)
   const vault = await import('@/server/services/vault')

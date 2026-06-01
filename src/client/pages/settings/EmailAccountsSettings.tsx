@@ -236,13 +236,22 @@ function OAuthAppCard({
             </div>
             <div className="space-y-1">
               <Label className="text-xs">{t('settings.emailAccounts.clientSecret')}</Label>
-              <PasswordInput value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} />
+              <PasswordInput
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                placeholder={
+                  provider.oauthConfigured ? t('settings.emailAccounts.secretKeep') : undefined
+                }
+              />
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="ghost" onClick={() => setOpen(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button onClick={saveCreds} disabled={saving || !clientId || !clientSecret}>
+              <Button
+                onClick={saveCreds}
+                disabled={saving || !clientId || (!provider.oauthConfigured && !clientSecret)}
+              >
                 {t('common.save')}
               </Button>
             </div>
@@ -330,6 +339,15 @@ function ConnectStep({
   useEffect(() => {
     setFields({})
   }, [provider.type])
+
+  // The OAuth connect navigates away via window.location; if the user comes
+  // back (browser Back / bfcache restore), the frozen `connecting=true` would
+  // leave the button stuck disabled. Reset it whenever the page is shown.
+  useEffect(() => {
+    const reset = () => setConnecting(false)
+    window.addEventListener('pageshow', reset)
+    return () => window.removeEventListener('pageshow', reset)
+  }, [])
 
   const connectOAuth = async () => {
     setConnecting(true)
