@@ -27,8 +27,9 @@ import { registerSearchProvider, unregisterSearchProvider } from '@/server/llm/s
 import { registerTTSProvider, unregisterTTSProvider } from '@/server/llm/tts/registry'
 import { registerSTTProvider, unregisterSTTProvider } from '@/server/llm/stt/registry'
 import { registerEmailProvider, unregisterEmailProvider } from '@/server/email/registry'
+import { registerContactsProvider, unregisterContactsProvider } from '@/server/contacts/registry'
 import { channelAdapters } from '@/server/channels/index'
-import type { LLMProvider, EmbeddingProvider, ImageProvider, SearchProvider, TTSProvider, STTProvider, EmailProvider, PluginProvider, ProviderCapability } from '@kinbot-developer/sdk'
+import type { LLMProvider, EmbeddingProvider, ImageProvider, SearchProvider, TTSProvider, STTProvider, EmailProvider, ContactsProvider, PluginProvider, ProviderCapability } from '@kinbot-developer/sdk'
 import { emitPluginCard, updatePluginCard } from '@/server/services/plugin-cards'
 import type {
   PluginContext,
@@ -105,7 +106,7 @@ export class PluginPermissionError extends Error {
  */
 function detectProviderFamily(
   p: PluginProvider,
-): 'llm' | 'embedding' | 'image' | 'search' | 'tts' | 'stt' | 'email' | null {
+): 'llm' | 'embedding' | 'image' | 'search' | 'tts' | 'stt' | 'email' | 'contacts' | null {
   if (typeof (p as { chat?: unknown }).chat === 'function') return 'llm'
   if (typeof (p as { embed?: unknown }).embed === 'function') return 'embedding'
   if (typeof (p as { generate?: unknown }).generate === 'function') return 'image'
@@ -117,6 +118,11 @@ function detectProviderFamily(
     typeof (p as { listMessages?: unknown }).listMessages === 'function'
   )
     return 'email'
+  if (
+    typeof (p as { listContacts?: unknown }).listContacts === 'function' &&
+    typeof (p as { getContact?: unknown }).getContact === 'function'
+  )
+    return 'contacts'
   return null
 }
 
@@ -1007,6 +1013,7 @@ class PluginManager {
             else if (family === 'tts') registerTTSProvider(wrapped as TTSProvider)
             else if (family === 'stt') registerSTTProvider(wrapped as STTProvider)
             else if (family === 'email') registerEmailProvider(wrapped as EmailProvider)
+            else if (family === 'contacts') registerContactsProvider(wrapped as ContactsProvider)
             plugin.registeredProviders.push({
               type: prefixedType,
               displayName: rawProvider.displayName,
@@ -1169,6 +1176,7 @@ class PluginManager {
       else if (family === 'tts') unregisterTTSProvider(prov.type)
       else if (family === 'stt') unregisterSTTProvider(prov.type)
       else if (family === 'email') unregisterEmailProvider(prov.type)
+      else if (family === 'contacts') unregisterContactsProvider(prov.type)
     }
     plugin.registeredProviders = []
 

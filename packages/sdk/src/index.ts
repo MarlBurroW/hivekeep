@@ -507,7 +507,7 @@ export interface ChannelAdapter {
 
 /** Capability flags a provider declares. Implemented as the union of the
  *  six native interfaces below. */
-export type ProviderCapability = 'llm' | 'embedding' | 'image' | 'search' | 'tts' | 'stt' | 'rerank' | 'email'
+export type ProviderCapability = 'llm' | 'embedding' | 'image' | 'search' | 'tts' | 'stt' | 'rerank' | 'email' | 'contacts'
 
 // ─── Config schema (provider-declared, UI-rendered) ─────────────────────────
 
@@ -1766,6 +1766,92 @@ export interface EmailProvider extends ProviderUIHints {
   ): Promise<{ contentBase64: string }>
 }
 
+// ─── Contacts (address book) ─────────────────────────────────────────────────
+
+export interface ContactsCapabilities {
+  /** Provider authenticates via the host's OAuth2 flow (declares an `oauth`
+   *  profile) vs typed credentials (CardDAV app password). */
+  readonly supportsOAuth?: boolean
+  /** Server-side search vs the host listing + filtering client-side. */
+  readonly supportsServerSearch?: boolean
+}
+
+/** A phone number on a contact card. */
+export interface ContactPhone {
+  number: string
+  /** Label as reported by the source: 'mobile' | 'home' | 'work' | free-form. */
+  type?: string
+}
+
+/** An email address on a contact card. */
+export interface ContactEmailAddress {
+  email: string
+  type?: string
+}
+
+/**
+ * A person from an external address book. Strictly read-only — the host never
+ * writes back, and these never enter KinBot's own contacts store. Surfaced
+ * on demand by the contacts tools (e.g. to look up a phone number).
+ */
+export interface Contact {
+  /** Provider-stable id (CardDAV: the vCard href/UID; Graph: contact id). */
+  id: string
+  displayName: string
+  givenName?: string
+  familyName?: string
+  organization?: string
+  phones: ContactPhone[]
+  emails: ContactEmailAddress[]
+  /** Source address book / folder when the provider exposes several. */
+  addressBook?: string
+}
+
+/** Cross-provider contact search filter. `raw` is a provider-native passthrough. */
+export interface ContactSearchQuery {
+  /** Free text matched against name / organization / email / phone. */
+  text?: string
+  raw?: string
+}
+
+/** Options for `listContacts`. Providers MUST tolerate an empty options object. */
+export interface ContactListOptions {
+  limit?: number
+  /** Opaque pagination cursor returned by a previous call. */
+  pageToken?: string
+  /** Address book / folder to list; provider default when omitted. */
+  addressBook?: string
+  signal?: AbortSignal
+}
+
+/** What `listContacts` returns — a page of contacts plus an optional cursor. */
+export interface ContactListResult {
+  contacts: Contact[]
+  nextPageToken?: string
+}
+
+/**
+ * Native contacts provider — read-only address book access. Same auth split as
+ * EmailProvider: OAuth providers (Google People, Microsoft Graph) declare an
+ * `oauth` profile; CardDAV providers (iCloud, generic) declare credentials in
+ * `configSchema`. The host detects the family by the presence of
+ * `listContacts` + `getContact`.
+ */
+export interface ContactsProvider extends ProviderUIHints {
+  readonly type: string
+  readonly displayName: string
+  readonly configSchema: ProviderConfigSchema
+  readonly capabilities: ContactsCapabilities
+  readonly oauth?: OAuthProfile
+
+  authenticate(config: ProviderConfig): Promise<AuthResult>
+
+  listContacts(options: ContactListOptions, config: ProviderConfig): Promise<ContactListResult>
+  getContact(id: string, config: ProviderConfig): Promise<Contact>
+  /** Server-side search when supported; otherwise the host lists + filters. */
+  searchContacts?(query: ContactSearchQuery, config: ProviderConfig): Promise<Contact[]>
+}
+
 /** Discriminated union of every native provider shape a plugin can declare. */
 export type PluginProvider =
   | LLMProvider
@@ -1775,6 +1861,7 @@ export type PluginProvider =
   | TTSProvider
   | STTProvider
   | EmailProvider
+  | ContactsProvider
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Hooks
