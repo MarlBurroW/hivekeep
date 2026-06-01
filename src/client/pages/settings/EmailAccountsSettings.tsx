@@ -275,10 +275,9 @@ function AddEmailAccountDialog({
             <Label className="text-xs">{t('settings.emailAccounts.provider')}</Label>
             <Select value={provider?.type ?? ''} onValueChange={setType}>
               <SelectTrigger className="w-full">
-                <span className="flex items-center gap-2">
-                  {provider && <ProviderIcon providerType={provider.type} variant="color" className="size-4" />}
-                  <SelectValue placeholder={t('settings.emailAccounts.provider')} />
-                </span>
+                {/* SelectValue renders the selected item's content (logo + name);
+                    no explicit icon here or it'd show twice. */}
+                <SelectValue placeholder={t('settings.emailAccounts.provider')} />
               </SelectTrigger>
               <SelectContent>
                 {providers.map((p) => (
