@@ -1019,11 +1019,11 @@ export const MessageBubble = memo(function MessageBubble({
   if (!isUser && contentParts) {
     return (
       <MessageContextMenu content={content} isUser={false} onRegenerate={onRegenerate} onQuoteReply={onQuoteReply} onEditResend={onEditResend}>
-      <div className={cn('flex gap-3 px-4', isNew && 'animate-fade-in-up', isGrouped ? 'py-0.5' : 'py-2')}>
+      <div className={cn('flex gap-2 px-2.5 sm:gap-3 sm:px-4', isNew && 'animate-fade-in-up', isGrouped ? 'py-0.5' : 'py-2')}>
         {isGrouped ? (
-          <div className="size-10 shrink-0" />
+          <div className="size-8 shrink-0 sm:size-10" />
         ) : (
-          <ChatAvatar avatarUrl={avatarUrl} name={senderName} />
+          <ChatAvatar avatarUrl={avatarUrl} name={senderName} className="size-8 sm:size-10" />
         )}
 
         <div className="group/msg relative min-w-0 max-w-[94%] sm:max-w-[88%] md:max-w-[80%] space-y-1.5">
@@ -1100,7 +1100,7 @@ export const MessageBubble = memo(function MessageBubble({
     <MessageContextMenu content={content} isUser={isUser} onRegenerate={isUser ? undefined : onRegenerate} onQuoteReply={onQuoteReply} onEditResend={isUser ? onEditResend : undefined}>
     <div
       className={cn(
-        'flex gap-3 px-4',
+        'flex gap-2 px-2.5 sm:gap-3 sm:px-4',
         isNew && 'animate-fade-in-up',
         isUser ? 'flex-row-reverse' : 'flex-row',
         isGrouped ? 'py-0.5' : 'py-2',
@@ -1108,9 +1108,9 @@ export const MessageBubble = memo(function MessageBubble({
     >
       {isGrouped ? (
         /* Invisible spacer preserving alignment with the avatar column */
-        <div className="size-10 shrink-0" />
+        <div className="size-8 shrink-0 sm:size-10" />
       ) : (
-        <ChatAvatar avatarUrl={avatarUrl} name={senderName} />
+        <ChatAvatar avatarUrl={avatarUrl} name={senderName} className="size-8 sm:size-10" />
       )}
 
       <div
