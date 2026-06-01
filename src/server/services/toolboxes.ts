@@ -217,6 +217,21 @@ export function getToolboxByName(name: string): Toolbox | null {
   return row ? rowToToolbox(row) : null
 }
 
+/**
+ * Resolve an array of toolbox **names** (as accepted by the spawn/cron tools)
+ * into toolbox **ids**. Unknown names are skipped. Returns `undefined` when
+ * nothing resolves, so the caller falls back to its own default.
+ */
+export function resolveToolboxNamesToIds(names: string[] | undefined): string[] | undefined {
+  if (!names || names.length === 0) return undefined
+  const ids: string[] = []
+  for (const name of names) {
+    const box = getToolboxByName(name.trim())
+    if (box) ids.push(box.id)
+  }
+  return ids.length > 0 ? ids : undefined
+}
+
 export function createToolbox(input: {
   name: string
   description?: string | null

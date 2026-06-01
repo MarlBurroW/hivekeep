@@ -447,6 +447,7 @@ Tâches planifiées récurrentes.
 | `target_kin_id` | text | FK → kins.id | Kin cible (NULL = soi-même) |
 | `model` | text | | Override du modèle LLM |
 | `provider_id` | text | | Override du provider pour le modèle |
+| `toolbox_ids` | text | | JSON `string[]` d'IDs de toolboxes — toolset natif des tâches spawnées par ce cron (figé sur la task au spawn). NULL → défaut `'all'` (surface native complète) |
 | `is_active` | integer | NOT NULL, DEFAULT 1 | Actif / Inactif |
 | `requires_approval` | integer | NOT NULL, DEFAULT 0 | Si créé par le Kin, nécessite validation utilisateur |
 | `run_once` | integer | NOT NULL, DEFAULT 0 | Si activé, le cron se désactive automatiquement après la première exécution |

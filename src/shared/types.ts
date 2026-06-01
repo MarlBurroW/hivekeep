@@ -308,6 +308,9 @@ export interface CronSummary {
   providerId: string | null
   thinkingEnabled: boolean
   thinkingEffort: KinThinkingEffort | null
+  /** Toolbox ids defining the native toolset of tasks spawned by this cron.
+   *  Empty → full native surface ("all"). */
+  toolboxIds: string[]
   runOnce: boolean
   triggerParentTurn: boolean
   isActive: boolean

@@ -37,6 +37,18 @@ function parseThinkingConfig(raw: string | null | undefined): { enabled: boolean
   }
 }
 
+/** Parse the stored `toolbox_ids` JSON into a string[] of toolbox ids ([] when
+ *  absent/malformed) for the API response. */
+function parseToolboxIds(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 function serializeCron(cron: any, kinInfo?: KinInfo, targetKinInfo?: KinInfo) {
   return {
     id: cron.id,
@@ -53,6 +65,7 @@ function serializeCron(cron: any, kinInfo?: KinInfo, targetKinInfo?: KinInfo) {
     providerId: cron.providerId ?? null,
     thinkingEnabled: parseThinkingConfig(cron.thinkingConfig).enabled,
     thinkingEffort: parseThinkingConfig(cron.thinkingConfig).effort,
+    toolboxIds: parseToolboxIds(cron.toolboxIds),
     runOnce: cron.runOnce,
     triggerParentTurn: cron.triggerParentTurn,
     isActive: cron.isActive,
@@ -98,6 +111,7 @@ cronRoutes.post('/', async (c) => {
     triggerParentTurn?: boolean
     thinkingEnabled?: boolean
     thinkingEffort?: 'low' | 'medium' | 'high' | 'max' | null
+    toolboxIds?: string[]
   }>()
 
   if (!body.kinId || !body.name || !body.schedule || !body.taskDescription) {
@@ -130,6 +144,7 @@ cronRoutes.post('/', async (c) => {
       runOnce: body.runOnce,
       triggerParentTurn: body.triggerParentTurn,
       thinkingConfig,
+      toolboxIds: body.toolboxIds,
       createdBy: 'user',
     })
 
@@ -166,10 +181,17 @@ cronRoutes.patch('/:id', async (c) => {
     triggerParentTurn?: boolean
     thinkingEnabled?: boolean
     thinkingEffort?: 'low' | 'medium' | 'high' | 'max' | null
+    toolboxIds?: string[] | null
   }>()
 
   try {
     const updates: Record<string, unknown> = { ...body }
+    // Toolbox ids are stored as a JSON string (or null to clear → default 'all').
+    if (body.toolboxIds !== undefined) {
+      updates.toolboxIds = Array.isArray(body.toolboxIds) && body.toolboxIds.length > 0
+        ? JSON.stringify(body.toolboxIds)
+        : null
+    }
     if (body.thinkingEffort !== undefined) {
       updates.thinkingConfig = body.thinkingEffort === null
         ? JSON.stringify({ enabled: false, effort: null })

@@ -778,6 +778,7 @@ Effets de bord :
     taskDescription: string
     targetKinId: string | null
     model: string | null
+    toolboxIds: string[]        // IDs de toolboxes; [] = surface native complète ('all')
     isActive: boolean
     requiresApproval: boolean
     lastTriggeredAt: number | null
@@ -797,6 +798,7 @@ Effets de bord :
   taskDescription: string
   targetKinId?: string
   model?: string
+  toolboxIds?: string[]         // toolset natif des tâches spawnées; omis = 'all'
 }
 
 // Response 201
@@ -814,6 +816,7 @@ Effets de bord :
   targetKinId?: string
   model?: string
   isActive?: boolean
+  toolboxIds?: string[] | null  // [] ou null efface la restriction (retour à 'all')
 }
 
 // Response 200

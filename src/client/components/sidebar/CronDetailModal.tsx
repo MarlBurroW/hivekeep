@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSSE } from '@/client/hooks/useSSE'
 import { useAuth } from '@/client/hooks/useAuth'
+import { useToolboxes } from '@/client/hooks/useToolboxes'
 import { useSidePanel } from '@/client/contexts/SidePanelContext'
 import {
   Dialog,
@@ -27,6 +28,8 @@ import {
   Play,
   Sparkles,
   Bell,
+  Lock,
+  Wrench,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MarkdownContent } from '@/client/components/chat/MarkdownContent'
@@ -76,8 +79,14 @@ export function CronDetailModal({
 }: CronDetailModalProps) {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
+  const { toolboxes } = useToolboxes()
   const serverTimezone = user?.serverTimezone
   const { openTask } = useSidePanel()
+
+  // Resolve the cron's selected toolbox ids to their objects (preserving order).
+  const selectedToolboxes = (cron.toolboxIds ?? [])
+    .map((id) => toolboxes.find((tb) => tb.id === id))
+    .filter((tb): tb is NonNullable<typeof tb> => tb != null)
   const [executions, setExecutions] = useState<TaskSummary[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState(false)
@@ -288,6 +297,27 @@ export function CronDetailModal({
                   })()
                 ) : (
                   <p className="text-sm text-muted-foreground italic">{t('cron.detail.modelInherited')}</p>
+                )}
+              </div>
+
+              {/* Toolboxes */}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">{t('cron.detail.toolboxes')}</p>
+                {selectedToolboxes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">{t('cron.detail.toolboxesAll')}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedToolboxes.map((tb) => (
+                      <span
+                        key={tb.id}
+                        title={tb.description ?? undefined}
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs text-primary"
+                      >
+                        {tb.builtin ? <Lock className="size-3" /> : <Wrench className="size-3" />}
+                        {tb.builtin ? t(`toolboxes.builtin.${tb.name}`, tb.name) : tb.name}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
 

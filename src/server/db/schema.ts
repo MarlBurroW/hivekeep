@@ -394,6 +394,10 @@ export const crons = sqliteTable('crons', {
   model: text('model'),
   providerId: text('provider_id'),
   thinkingConfig: text('thinking_config'), // JSON: KinThinkingConfig — overrides parent Kin if set
+  // JSON string[] of toolbox ids defining the native toolset of tasks spawned by
+  // this cron (frozen onto the task row at spawn). Null → spawn default, which
+  // is 'all' for crons (the full native surface).
+  toolboxIds: text('toolbox_ids'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   requiresApproval: integer('requires_approval', { mode: 'boolean' }).notNull().default(false),
   runOnce: integer('run_once', { mode: 'boolean' }).notNull().default(false),

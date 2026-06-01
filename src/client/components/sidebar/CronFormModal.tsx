@@ -14,6 +14,8 @@ import { Label } from '@/client/components/ui/label'
 import { FormErrorAlert } from '@/client/components/common/FormErrorAlert'
 import { MarkdownEditor } from '@/client/components/ui/markdown-editor'
 import { ModelPicker, modelPickerValue } from '@/client/components/common/ModelPicker'
+import { ToolboxMultiSelect } from '@/client/components/toolbox/ToolboxMultiSelect'
+import { useToolboxes } from '@/client/hooks/useToolboxes'
 import { KinSelector } from '@/client/components/common/KinSelector'
 import { KinSelectItem, type KinOption } from '@/client/components/common/KinSelectItem'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/client/components/ui/select'
@@ -58,6 +60,7 @@ interface CronFormModalProps {
     runOnce?: boolean
     triggerParentTurn?: boolean
     thinkingEffort?: KinThinkingEffort | null
+    toolboxIds?: string[]
   }) => Promise<CronSummary>
   onUpdate?: (id: string, updates: Record<string, unknown>) => Promise<CronSummary>
   onDelete?: (id: string) => Promise<void>
@@ -88,6 +91,7 @@ export function CronFormModal({
 }: CronFormModalProps) {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
+  const { toolboxes } = useToolboxes()
   const serverTimezone = user?.serverTimezone
   const isEdit = !!cron
 
@@ -107,6 +111,7 @@ export function CronFormModal({
   const [model, setModel] = useState('')
   const [modelProviderId, setModelProviderId] = useState('')
   const [thinkingEffort, setThinkingEffort] = useState<KinThinkingEffort | 'off'>('medium')
+  const [selectedToolboxIds, setSelectedToolboxIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -131,6 +136,7 @@ export function CronFormModal({
         setModel(cron.model ?? '')
         setModelProviderId(cron.providerId ?? '')
         setThinkingEffort(cron.thinkingEffort ?? (cron.thinkingEnabled ? 'medium' : 'off'))
+        setSelectedToolboxIds(cron.toolboxIds ?? [])
       } else if (defaults) {
         setName(defaults.name ?? '')
         setKinId(defaults.kinId ?? (kins.length === 1 ? kins[0]!.id : ''))
@@ -143,6 +149,7 @@ export function CronFormModal({
         setModel(defaults.model ?? '')
         setModelProviderId(defaults.providerId ?? '')
         setThinkingEffort(defaults.thinkingEffort ?? (defaults.thinkingEnabled ? 'medium' : 'off'))
+        setSelectedToolboxIds(defaults.toolboxIds ?? [])
       } else {
         setName('')
         setKinId(kins.length === 1 ? kins[0]!.id : '')
@@ -155,6 +162,7 @@ export function CronFormModal({
         setModel('')
         setModelProviderId('')
         setThinkingEffort('medium')
+        setSelectedToolboxIds([])
       }
       setError(null)
       resetDirty()
@@ -182,6 +190,7 @@ export function CronFormModal({
           runOnce,
           triggerParentTurn,
           thinkingEffort: effortPayload,
+          toolboxIds: selectedToolboxIds,
         })
       } else if (onCreate) {
         await onCreate({
@@ -195,6 +204,7 @@ export function CronFormModal({
           runOnce: runOnce || undefined,
           triggerParentTurn,
           thinkingEffort: effortPayload,
+          toolboxIds: selectedToolboxIds.length > 0 ? selectedToolboxIds : undefined,
         })
       }
       resetDirty()
@@ -452,6 +462,22 @@ export function CronFormModal({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Toolboxes */}
+            {toolboxes.length > 0 && (
+              <div className="space-y-2">
+                <Label className="inline-flex items-center gap-1.5">
+                  {t('cron.create.toolboxes')} <InfoTip content={t('cron.create.toolboxesTip')} />
+                </Label>
+                <ToolboxMultiSelect
+                  toolboxes={toolboxes}
+                  selected={selectedToolboxIds}
+                  onChange={(next) => { setSelectedToolboxIds(next); markDirty() }}
+                  disabled={isSubmitting}
+                />
+                <p className="text-[11px] text-muted-foreground">{t('cron.create.toolboxesHelp')}</p>
+              </div>
+            )}
 
             {/* Trigger parent turn */}
             <div className="space-y-2">

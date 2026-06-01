@@ -9,6 +9,7 @@ import {
 } from '@/server/services/crons'
 import { fetchPreviousCronRuns } from '@/server/services/tasks'
 import { resolveKinId } from '@/server/services/kin-resolver'
+import { resolveToolboxNamesToIds, getToolbox } from '@/server/services/toolboxes'
 import { createLogger } from '@/server/logger'
 import type { ToolRegistration } from '@/server/tools/types'
 import type { KinThinkingConfig, KinThinkingEffort } from '@/shared/types'
@@ -22,6 +23,21 @@ type ThinkingEffortInput = typeof THINKING_EFFORT_VALUES[number]
 function effortToConfig(effort: ThinkingEffortInput): KinThinkingConfig {
   if (effort === 'off') return { enabled: false, effort: null }
   return { enabled: true, effort: effort as KinThinkingEffort }
+}
+
+/** Resolve a stored `toolbox_ids` JSON string into human-readable toolbox names
+ *  for tool output. Empty when none set (→ full native surface). */
+function toolboxNamesFromJson(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const ids = JSON.parse(raw)
+    if (!Array.isArray(ids)) return []
+    return ids
+      .map((id) => (typeof id === 'string' ? getToolbox(id)?.name ?? null : null))
+      .filter((n): n is string => n !== null)
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -64,8 +80,12 @@ export const createCronTool: ToolRegistration = {
           .enum(THINKING_EFFORT_VALUES)
           .optional()
           .describe('Reasoning effort for tasks spawned by this cron. "off" disables thinking. Defaults to "medium" if omitted.'),
+        toolboxes: z
+          .array(z.string())
+          .optional()
+          .describe('Names of the toolboxes whose tools the tasks spawned by this cron may use. The task\'s native toolset is the mandatory core floor unioned with every chosen toolbox\'s tools. Built-ins: "code", "research", "ops", "scout" (read-only), "all" (full surface). Use list_toolboxes to discover available toolboxes. Omit for the full native surface ("all").'),
       }),
-      execute: async ({ name, schedule, task_description, target_kin_slug, model, provider_id, run_once, trigger_parent_turn, thinking_effort }) => {
+      execute: async ({ name, schedule, task_description, target_kin_slug, model, provider_id, run_once, trigger_parent_turn, thinking_effort, toolboxes }) => {
         let targetKinId: string | undefined
         if (target_kin_slug) {
           const resolved = resolveKinId(target_kin_slug)
@@ -74,7 +94,7 @@ export const createCronTool: ToolRegistration = {
           }
           targetKinId = resolved
         }
-        log.debug({ kinId: ctx.kinId, cronName: name, schedule }, 'Cron creation requested')
+        log.debug({ kinId: ctx.kinId, cronName: name, schedule, toolboxes }, 'Cron creation requested')
         try {
           const cron = await createCron({
             kinId: ctx.kinId,
@@ -88,6 +108,7 @@ export const createCronTool: ToolRegistration = {
             runOnce: run_once,
             triggerParentTurn: trigger_parent_turn,
             thinkingConfig: effortToConfig(thinking_effort ?? 'medium'),
+            toolboxIds: resolveToolboxNamesToIds(toolboxes),
           })
           return {
             cronId: cron.id,
@@ -113,7 +134,7 @@ export const updateCronTool: ToolRegistration = {
   availability: ['main'],
   create: (ctx) =>
     tool({
-      description: 'Update any field of an existing cron (schedule, description, active state, target Kin, model, provider, thinking, run_once). Omit a field to keep its current value.',
+      description: 'Update any field of an existing cron (schedule, description, active state, target Kin, model, provider, thinking, toolboxes, run_once). Omit a field to keep its current value.',
       inputSchema: z.object({
         cron_id: z.string(),
         name: z.string().optional(),
@@ -133,8 +154,10 @@ export const updateCronTool: ToolRegistration = {
           .describe('If true, the final report of each execution wakes the parent Kin for an LLM turn (self-calibration / conditional actions). Costly in tokens if frequent. Omit to keep current.'),
         thinking_effort: z.enum(THINKING_EFFORT_VALUES).optional()
           .describe('Change reasoning effort. "off" disables thinking. Omit to keep current.'),
+        toolboxes: z.array(z.string()).nullable().optional()
+          .describe('Replace the toolboxes the spawned tasks may use (by name). Built-ins: "code", "research", "ops", "scout", "all". Pass null or an empty array to clear and fall back to the full native surface ("all"). Omit to keep current.'),
       }),
-      execute: async ({ cron_id, name, schedule, task_description, is_active, target_kin_slug, model, provider_id, run_once, trigger_parent_turn, thinking_effort }) => {
+      execute: async ({ cron_id, name, schedule, task_description, is_active, target_kin_slug, model, provider_id, run_once, trigger_parent_turn, thinking_effort, toolboxes }) => {
         try {
           const updates: Parameters<typeof updateCron>[1] = {}
           if (name !== undefined) updates.name = name
@@ -160,6 +183,11 @@ export const updateCronTool: ToolRegistration = {
             updates.thinkingConfig = JSON.stringify(effortToConfig(thinking_effort))
           }
 
+          if (toolboxes !== undefined) {
+            const ids = toolboxes ? resolveToolboxNamesToIds(toolboxes) : undefined
+            updates.toolboxIds = ids ? JSON.stringify(ids) : null
+          }
+
           const updated = await updateCron(cron_id, updates)
           if (!updated) return { error: 'Cron not found' }
           return {
@@ -174,6 +202,7 @@ export const updateCronTool: ToolRegistration = {
             model: updated.model,
             providerId: updated.providerId,
             thinkingConfig: updated.thinkingConfig,
+            toolboxes: toolboxNamesFromJson(updated.toolboxIds),
           }
         } catch (err) {
           return { error: err instanceof Error ? err.message : 'Unknown error' }
@@ -234,6 +263,7 @@ export const listCronsTool: ToolRegistration = {
             model: c.model,
             providerId: c.providerId,
             thinkingConfig: c.thinkingConfig,
+            toolboxes: toolboxNamesFromJson(c.toolboxIds),
             lastTriggeredAt: c.lastTriggeredAt ? c.lastTriggeredAt.toISOString() : null,
           })),
         }

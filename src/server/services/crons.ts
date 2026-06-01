@@ -28,6 +28,25 @@ interface CreateCronParams {
   runOnce?: boolean
   triggerParentTurn?: boolean
   thinkingConfig?: { enabled: boolean; budgetTokens?: number | null }
+  /** Toolbox ids defining the native toolset of tasks spawned by this cron.
+   *  Omitted/empty → spawn default ('all' for crons). */
+  toolboxIds?: string[]
+}
+
+/** Safely parse the stored `toolbox_ids` JSON into a string[] for spawnTask.
+ *  Returns undefined when absent or malformed so spawnTask applies its default. */
+function parseToolboxIds(raw: string | null | undefined): string[] | undefined {
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      const ids = parsed.filter((x): x is string => typeof x === 'string')
+      return ids.length > 0 ? ids : undefined
+    }
+  } catch {
+    // fall through
+  }
+  return undefined
 }
 
 export async function createCron(params: CreateCronParams) {
@@ -72,6 +91,7 @@ export async function createCron(params: CreateCronParams) {
     model: params.model ?? null,
     providerId: params.providerId ?? null,
     thinkingConfig: params.thinkingConfig ? JSON.stringify(params.thinkingConfig) : null,
+    toolboxIds: params.toolboxIds && params.toolboxIds.length > 0 ? JSON.stringify(params.toolboxIds) : null,
     isActive: !isKinCreated,
     requiresApproval: isKinCreated,
     runOnce: params.runOnce ?? false,
@@ -123,6 +143,7 @@ export async function updateCron(
     model: string | null
     providerId: string | null
     thinkingConfig: string | null
+    toolboxIds: string | null
     isActive: boolean
     runOnce: boolean
     triggerParentTurn: boolean
@@ -336,6 +357,7 @@ export async function triggerCronManually(cronId: string): Promise<{ taskId: str
     providerId: cron.providerId ?? undefined,
     cronId: cron.id,
     thinkingConfig: cron.thinkingConfig ? JSON.parse(cron.thinkingConfig) : undefined,
+    toolboxIds: parseToolboxIds(cron.toolboxIds),
   })
 
   sseManager.sendToKin(cron.kinId, {
@@ -373,6 +395,7 @@ async function triggerCron(cronId: string) {
     providerId: cron.providerId ?? undefined,
     cronId: cron.id,
     thinkingConfig: cron.thinkingConfig ? JSON.parse(cron.thinkingConfig) : undefined,
+    toolboxIds: parseToolboxIds(cron.toolboxIds),
     concurrencyGroup: `cron:${cron.id}`,
     concurrencyMax: config.crons.maxConcurrentExecutions,
   })
