@@ -131,11 +131,9 @@ export function useCrons() {
     const regular = crons.filter((c) => !c.requiresApproval)
 
     if (cronOrder.length === 0) {
-      // Fallback: active first, then inactive, newest first within each group
-      const sorted = [...regular].sort((a, b) => {
-        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
-        return b.createdAt - a.createdAt
-      })
+      // Fallback: newest first. Deliberately NOT sorted by isActive — toggling a
+      // cron on/off must not make its card jump around, which is jarring.
+      const sorted = [...regular].sort((a, b) => b.createdAt - a.createdAt)
       return [...pending, ...sorted]
     }
 

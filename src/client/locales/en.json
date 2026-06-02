@@ -306,6 +306,10 @@
       "lastRun": "Last: {{time}}",
       "nextRun": "Next: in {{time}}",
       "never": "Never run",
+      "nextRunLabel": "Next run",
+      "lastRunLabel": "Last run",
+      "targetLabel": "Runs as",
+      "autoBadge": "Auto",
       "summary": {
         "active": "{{count}} active",
         "pending": "{{count}} pending"

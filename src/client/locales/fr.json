@@ -306,6 +306,10 @@
       "lastRun": "Dernier : {{time}}",
       "nextRun": "Prochain : dans {{time}}",
       "never": "Jamais exécutée",
+      "nextRunLabel": "Prochaine",
+      "lastRunLabel": "Dernière",
+      "targetLabel": "Exécute en tant que",
+      "autoBadge": "Auto",
       "summary": {
         "active": "{{count}} actifs",
         "pending": "{{count}} à approuver"
