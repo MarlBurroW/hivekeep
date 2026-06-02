@@ -644,7 +644,7 @@
     }
   },
   "chat": {
-    "placeholder": "Send a message...",
+    "placeholder": "How can I help you?",
     "send": "Send",
     "stop": "Stop generating",
     "selectKin": "Select a Kin to start chatting",

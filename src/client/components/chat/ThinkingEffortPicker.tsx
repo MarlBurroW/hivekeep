@@ -13,13 +13,6 @@ const LEVELS: Array<{ value: KinThinkingEffort | null; key: string }> = [
   { value: 'max', key: 'max' },
 ]
 
-const SHORT_LABEL: Record<NonNullable<KinThinkingEffort>, string> = {
-  low: 'L',
-  medium: 'M',
-  high: 'H',
-  max: 'X',
-}
-
 interface Props {
   enabled: boolean
   effort: KinThinkingEffort | null
@@ -56,9 +49,7 @@ export function ThinkingEffortPicker({ enabled, effort, onChange, compact = fals
               aria-label={t('chat.thinkingPicker.title')}
             >
               <Sparkles className="size-3" />
-              {compact
-                ? active && <span className="text-[10px] font-bold">{SHORT_LABEL[effort!]}</span>
-                : <span>{currentLabel}</span>}
+              {(!compact || active) && <span>{currentLabel}</span>}
             </button>
           </PopoverTrigger>
         </TooltipTrigger>

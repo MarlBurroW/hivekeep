@@ -644,7 +644,7 @@
     }
   },
   "chat": {
-    "placeholder": "Envoyer un message...",
+    "placeholder": "Comment puis-je vous aider ?",
     "send": "Envoyer",
     "stop": "Arrêter la génération",
     "selectKin": "Sélectionnez un Kin pour commencer",

@@ -4,7 +4,7 @@ import { Button } from '@/client/components/ui/button'
 import { Textarea } from '@/client/components/ui/textarea'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/client/components/ui/tooltip'
 import { cn } from '@/client/lib/utils'
-import { SendHorizontal, Square, Paperclip, X, FileIcon, Loader2 } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, X, FileIcon, Loader2 } from 'lucide-react'
 import { useInputHistory } from '@/client/hooks/useInputHistory'
 import { MAX_MESSAGE_LENGTH } from '@/shared/constants'
 import { MentionPopover, getMentionItemCount, getMentionItemAt, type MentionItem } from '@/client/components/chat/MentionPopover'
@@ -622,11 +622,11 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
         />
       )}
 
-      {/* Composer card */}
+      {/* Composer surface — borderless, blends into its container */}
       <div className={cn(
-        'mx-auto max-w-3xl rounded-2xl border bg-card shadow-sm transition-all duration-150',
-        'focus-within:border-ring/60 focus-within:shadow-md focus-within:ring-2 focus-within:ring-ring/15',
-        isDragging ? 'border-primary' : 'border-border',
+        'mx-auto max-w-3xl rounded-2xl bg-muted/50 transition-all duration-200',
+        'focus-within:bg-muted/70 focus-within:shadow-sm',
+        isDragging && 'ring-2 ring-primary/50',
       )}>
 
         {/* Pending file chips */}
@@ -686,7 +686,7 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
             disabled={disabled}
             rows={1}
             className={cn(
-              'min-h-12 max-h-48 resize-none border-0 bg-transparent shadow-none outline-none',
+              'min-h-12 max-h-48 resize-none border-0 bg-transparent dark:bg-transparent shadow-none outline-none',
               'focus-visible:ring-0 focus-visible:border-0 rounded-none',
               'px-4 py-3 text-sm',
               disabledReason && 'placeholder:text-warning/70',
@@ -731,7 +731,7 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
         </div>
 
         {/* Action bar */}
-        <div className="flex items-center gap-1 border-t border-border/60 px-2 py-2">
+        <div className="flex items-center gap-1 px-2 pb-2 pt-0.5">
           {/* Left: attach + model + thinking */}
           <div className="flex min-w-0 flex-1 items-center gap-0.5">
             {onAddFiles && (
@@ -793,32 +793,31 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
                   : '\u00A0'}
             </span>
 
-            {/* Stop button */}
-            {(isStreaming || isProcessing) && (
+            {/* Send / Stop — one button that morphs with the Kin's state.
+                Follow-ups can still be queued while streaming via the Enter key. */}
+            {(isStreaming || isProcessing) ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     onClick={onStop}
                     size="icon"
-                    variant="outline"
-                    className="size-8 shrink-0 rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive"
+                    className="size-8 shrink-0 rounded-full bg-foreground text-background transition-transform hover:bg-foreground/90 hover:scale-105 active:scale-95"
                   >
-                    <Square className="size-3.5" />
+                    <Square className="size-3 fill-current" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t('chat.stop')}</TooltipContent>
               </Tooltip>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={disabled || isUploading || (!value.trim() && !hasPendingFiles) || value.length > MAX_MESSAGE_LENGTH}
+                size="icon"
+                className="size-8 shrink-0 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+              >
+                <ArrowUp className="size-4" />
+              </Button>
             )}
-
-            {/* Send button */}
-            <Button
-              onClick={handleSubmit}
-              disabled={disabled || isUploading || (!value.trim() && !hasPendingFiles) || value.length > MAX_MESSAGE_LENGTH}
-              size="icon"
-              className="size-8 shrink-0 rounded-lg"
-            >
-              <SendHorizontal className="size-4" />
-            </Button>
           </div>
         </div>
       </div>
