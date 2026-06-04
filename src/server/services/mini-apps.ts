@@ -53,6 +53,12 @@ function serializeApp(row: MiniAppRow, kinName: string, kinAvatarUrl: string | n
     maintainerKinId: row.kinId,
     maintainerKinName: kinName,
     maintainerKinAvatarUrl: kinAvatarUrl,
+    // Backward-compat aliases (pre-decoupling field names) so a client still
+    // running a stale bundle doesn't crash on `app.kinName.slice(...)`. Safe to
+    // remove once all clients have reloaded the new bundle.
+    kinId: row.kinId,
+    kinName,
+    kinAvatarUrl,
     name: row.name,
     slug: row.slug,
     description: row.description,
@@ -64,7 +70,7 @@ function serializeApp(row: MiniAppRow, kinName: string, kinAvatarUrl: string | n
     version: row.version,
     createdAt: (row.createdAt as unknown as Date).getTime(),
     updatedAt: (row.updatedAt as unknown as Date).getTime(),
-  }
+  } as MiniAppSummary // cast: object carries extra backward-compat alias keys
 }
 
 // ─── Create ─────────────────────────────────────────────────────────────────

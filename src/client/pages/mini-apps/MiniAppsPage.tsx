@@ -47,7 +47,7 @@ export function MiniAppsPage() {
     return apps.filter(
       (a) =>
         a.name.toLowerCase().includes(q) ||
-        a.maintainerKinName.toLowerCase().includes(q) ||
+        (a.maintainerKinName ?? '').toLowerCase().includes(q) ||
         (a.description?.toLowerCase().includes(q)),
     )
   }, [apps, searchQuery])

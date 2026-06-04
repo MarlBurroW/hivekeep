@@ -63,10 +63,10 @@ export function MiniAppCard({
         )}
         <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground/70">
           <Avatar className="size-3">
-            {app.maintainerKinAvatarUrl && <AvatarImage src={app.maintainerKinAvatarUrl} alt={app.maintainerKinName} />}
-            <AvatarFallback className="text-[6px]">{app.maintainerKinName.slice(0, 2).toUpperCase()}</AvatarFallback>
+            {app.maintainerKinAvatarUrl && <AvatarImage src={app.maintainerKinAvatarUrl} alt={app.maintainerKinName ?? ''} />}
+            <AvatarFallback className="text-[6px]">{(app.maintainerKinName ?? '?').slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <span className="truncate">{app.maintainerKinName}</span>
+          <span className="truncate">{app.maintainerKinName ?? ''}</span>
           <span className="opacity-50">·</span>
           <span>v{app.version}</span>
         </div>
@@ -151,10 +151,10 @@ export function MiniAppTile({
       )}
       <div className="flex items-center gap-1 text-[9px] text-muted-foreground/70">
         <Avatar className="size-3">
-          {app.maintainerKinAvatarUrl && <AvatarImage src={app.maintainerKinAvatarUrl} alt={app.maintainerKinName} />}
-          <AvatarFallback className="text-[5px]">{app.maintainerKinName.slice(0, 2).toUpperCase()}</AvatarFallback>
+          {app.maintainerKinAvatarUrl && <AvatarImage src={app.maintainerKinAvatarUrl} alt={app.maintainerKinName ?? ''} />}
+          <AvatarFallback className="text-[5px]">{(app.maintainerKinName ?? '?').slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
-        <span className="max-w-[6rem] truncate">{app.maintainerKinName}</span>
+        <span className="max-w-[6rem] truncate">{app.maintainerKinName ?? ''}</span>
         <span className="opacity-50">·</span>
         <span>v{app.version}</span>
       </div>
