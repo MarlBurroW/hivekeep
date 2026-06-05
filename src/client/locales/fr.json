@@ -551,6 +551,18 @@
       "upload": "Importer",
       "auto": "Auto",
       "prompt": "Prompt",
+      "manual": "Manuel",
+      "manualDescription": "Personnalisez cet avatar précis. Le style et le type sont pré-remplis depuis vos réglages d'avatar globaux ; ajoutez d'éventuels détails ci-dessous. Rien ici ne modifie les réglages globaux.",
+      "baseImage": "Image de base",
+      "useBaseImage": "Utiliser l'image de base comme référence",
+      "baseImageCustomHint": "Votre image de base personnalisée (utilisée seulement si le modèle gère l'image-vers-image).",
+      "baseImageDefaultHint": "L'image de base par défaut (utilisée seulement si le modèle gère l'image-vers-image).",
+      "styleLabel": "Style artistique",
+      "stylePlaceholder": "ex. style Pixar / animation 3D, éclairage doux",
+      "subjectLabel": "Sujet / type",
+      "subjectPlaceholder": "ex. un petit robot mignon et sympathique",
+      "characterLabel": "Spécificités de cet avatar",
+      "characterPlaceholder": "Facultatif — ajoutez des détails propres à cet avatar (ex. lunettes rondes, palette turquoise, tenant un petit livre). Laissez vide pour tout déduire de l'identité du Kin.",
       "autoDescription": "Le Kin génère son propre portrait à partir de son identité. Son nom, son rôle et sa personnalité influencent le résultat - assurez-vous de les remplir d'abord.",
       "promptPlaceholder": "Décrivez l'avatar souhaité...",
       "generate": "Générer",
@@ -1318,6 +1330,48 @@
         "content": "Les paramètres généraux contrôlent le comportement global de la plateforme, applicable à tous vos Kins. Le prompt global permet de définir des instructions suivies par chaque Kin.",
         "bullet1": "Le prompt global est injecté dans le prompt système de chaque Kin. Utilisez-le pour des règles ou directives universelles",
         "bullet2": "Les limites d'exécution des tâches plafonnent les exécutions simultanées pour l'ensemble des Kins. Les tâches suspendues libèrent leur emplacement ; augmenter la limite remplit la file immédiatement, la diminuer est progressif"
+      }
+    },
+    "avatars": {
+      "title": "Avatars",
+      "description": "Contrôlez l'apparence des avatars générés. Ces réglages globaux sont partagés par chaque nouvel avatar généré pour que vos Kins restent cohérents. Ils ne modifient pas les avatars existants.",
+      "saved": "Réglages d'avatar mis à jour",
+      "noProvider": "Aucun fournisseur d'image n'est configuré, les avatars ne peuvent donc pas encore être générés. Ajoutez-en un pour activer la génération.",
+      "noProviderAction": "Ouvrir Fournisseurs",
+      "base": {
+        "title": "Image de base",
+        "tip": "Une image de référence neutre utilisée pour la génération image-vers-image, afin que tous les avatars partagent le même rendu. Générez-en une dans votre style + type, ou importez la vôtre. Utilisée seulement si le modèle gère l'image-vers-image.",
+        "upload": "Importer",
+        "generate": "Générer une base neutre",
+        "reset": "Réinitialiser",
+        "resetDone": "Image de base réinitialisée",
+        "needsProvider": "Nécessite un fournisseur d'image",
+        "customHint": "Image de base personnalisée utilisée.",
+        "defaultHint": "Image de base par défaut utilisée (un robot sympathique).",
+        "model": "Modèle de génération",
+        "enableLabel": "Utiliser l'image de base comme référence",
+        "enableHint": "Activé : les avatars dérivent de l'image de base (image-vers-image) pour une cohérence visuelle. Désactivé : chaque avatar est généré à partir du texte uniquement.",
+        "uploaded": "Image de base importée",
+        "generated": "Image de base générée",
+        "uploadFailed": "Échec de l'import"
+      },
+      "style": {
+        "title": "Style artistique (A)",
+        "tip": "La façon dont les avatars sont dessinés — le style de rendu. Choisissez un préréglage ou saisissez le vôtre. Partagé par chaque avatar généré.",
+        "placeholder": "ex. style Pixar / animation 3D, éclairage doux",
+        "hint": "Une courte directive de style partagée par tous les avatars générés."
+      },
+      "subject": {
+        "title": "Sujet / type (B)",
+        "tip": "Ce que représente chaque avatar — robot, humain, animal, dragon… Choisissez un préréglage ou saisissez le vôtre. Un sujet non-robot est généré en texte-vers-image (l'image de base fournie est un robot).",
+        "placeholder": "ex. un petit robot mignon et sympathique",
+        "hint": "Ce que représente chaque avatar généré."
+      },
+      "help": {
+        "content": "Les avatars sont construits selon trois axes. Deux sont globaux (réglés ici) ; le troisième est propre à chaque Kin.",
+        "bullet1": "Le style artistique (A) et le sujet/type (B) sont globaux — chaque nouvel avatar généré les utilise pour un rendu cohérent",
+        "bullet2": "L'image de base donne aux modèles compatibles une référence pour que les avatars partagent le même rendu. Générez-en une ou importez-la, puis gardez « Utiliser l'image de base » activé",
+        "bullet3": "Le caractère propre à chaque Kin (C) est écrit automatiquement à partir de son identité — ajustez un avatar précis depuis le sélecteur d'avatar du Kin (onglet Manuel) sans toucher à ces réglages globaux"
       }
     },
     "providers": {

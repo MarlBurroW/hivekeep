@@ -385,13 +385,13 @@ export function useKins() {
 
   const generateAvatarPreview = useCallback(async (
     id: string,
-    mode: 'auto' | 'prompt',
-    prompt?: string,
+    mode: 'auto' | 'manual',
+    opts?: { style?: string; subject?: string; character?: string; useBase?: boolean },
     imageModel?: { providerId: string; modelId: string },
   ): Promise<string> => {
     const data = await api.post<{ base64: string; mediaType: string }>(`/kins/${id}/avatar/generate`, {
       mode,
-      ...(prompt && { prompt }),
+      ...(opts ?? {}),
       ...(imageModel && { imageProviderId: imageModel.providerId, imageModel: imageModel.modelId }),
     })
     return `data:${data.mediaType};base64,${data.base64}`

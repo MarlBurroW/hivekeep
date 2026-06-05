@@ -551,6 +551,18 @@
       "upload": "Upload",
       "auto": "Auto",
       "prompt": "Prompt",
+      "manual": "Manual",
+      "manualDescription": "Fine-tune this one avatar. Style and type are pre-filled from your global avatar settings; add any extra details below. Nothing here changes the global settings.",
+      "baseImage": "Base image",
+      "useBaseImage": "Use base image as reference",
+      "baseImageCustomHint": "Your custom base image (used only if the model supports image-to-image).",
+      "baseImageDefaultHint": "The default base image (used only if the model supports image-to-image).",
+      "styleLabel": "Art style",
+      "stylePlaceholder": "e.g. Pixar / 3D-animation style, soft lighting",
+      "subjectLabel": "Subject / type",
+      "subjectPlaceholder": "e.g. a small, friendly, cute robot",
+      "characterLabel": "Specifics for this avatar",
+      "characterPlaceholder": "Optional — add details just for this avatar (e.g. round glasses, teal palette, holding a tiny book). Leave empty to derive everything from the Kin's identity.",
       "autoDescription": "The Kin generates its own portrait based on its identity. Its name, role, and personality all influence the result - make sure they're filled in first.",
       "promptPlaceholder": "Describe the avatar you want...",
       "generate": "Generate",
@@ -1318,6 +1330,48 @@
         "content": "General settings control platform-wide behavior that applies to all your Kins. The global prompt lets you define instructions every Kin follows.",
         "bullet1": "The global prompt is injected into every Kin's system prompt. Use it for universal rules or guidelines",
         "bullet2": "Task execution limits cap concurrent runs across all Kins. Suspended tasks release their slot; raising the limit fills the queue immediately, lowering it is gradual"
+      }
+    },
+    "avatars": {
+      "title": "Avatars",
+      "description": "Control the look of generated Kin avatars. These global settings are shared by every newly generated avatar so your Kins look consistent. They don't change existing avatars.",
+      "saved": "Avatar settings updated",
+      "noProvider": "No image provider is configured, so avatars can't be generated yet. Add one to enable avatar generation.",
+      "noProviderAction": "Open Providers",
+      "base": {
+        "title": "Base image",
+        "tip": "A neutral reference image used for image-to-image generation, so every avatar shares the same look. Generate one in your chosen style + type, or upload your own. Used only when the image model supports image-to-image.",
+        "upload": "Upload",
+        "generate": "Generate neutral base",
+        "reset": "Reset to default",
+        "resetDone": "Base image reset to default",
+        "needsProvider": "Requires an image provider",
+        "customHint": "Using your custom base image.",
+        "defaultHint": "Using the bundled default base image (a friendly robot).",
+        "model": "Generation model",
+        "enableLabel": "Use base image as reference",
+        "enableHint": "When on, avatars derive from the base image (image-to-image) for visual consistency. When off, every avatar is generated from text only.",
+        "uploaded": "Base image uploaded",
+        "generated": "Base image generated",
+        "uploadFailed": "Upload failed"
+      },
+      "style": {
+        "title": "Art style (A)",
+        "tip": "How avatars are drawn — the rendering style. Pick a preset or type your own. Shared by every generated avatar.",
+        "placeholder": "e.g. Pixar / 3D-animation style, soft lighting",
+        "hint": "A short art-style directive shared by all generated avatars."
+      },
+      "subject": {
+        "title": "Subject / type (B)",
+        "tip": "What every avatar depicts — robot, human, animal, dragon… Pick a preset or type your own. A non-robot subject is generated text-to-image (the bundled base image is a robot).",
+        "placeholder": "e.g. a small, friendly, cute robot",
+        "hint": "What every generated avatar depicts."
+      },
+      "help": {
+        "content": "Avatars are built from three axes. Two are global (set here); the third is per-Kin.",
+        "bullet1": "Art style (A) and Subject/type (B) are global — every newly generated avatar uses them for a consistent look",
+        "bullet2": "The base image gives image-capable models a reference so avatars share the same render. Generate or upload one, then keep 'Use base image' on",
+        "bullet3": "Each Kin's own character (C) is written automatically from its identity — tweak a single avatar from the Kin's avatar picker (Manual tab) without touching these globals"
       }
     },
     "providers": {

@@ -73,8 +73,8 @@ interface KinFormModalProps {
   onUploadAvatar: (kinId: string, file: File) => Promise<string>
   onGenerateAvatarPreview?: (
     kinId: string,
-    mode: 'auto' | 'prompt',
-    prompt?: string,
+    mode: 'auto' | 'manual',
+    opts?: { style?: string; subject?: string; character?: string; useBase?: boolean },
     imageModel?: { providerId: string; modelId: string },
   ) => Promise<string>
   hasImageCapability?: boolean

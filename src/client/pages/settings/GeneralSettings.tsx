@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
-import { Textarea } from '@/client/components/ui/textarea'
 import { Label } from '@/client/components/ui/label'
 import { Switch } from '@/client/components/ui/switch'
 import { MarkdownEditor } from '@/client/components/ui/markdown-editor'
@@ -25,10 +24,6 @@ export function GeneralSettings() {
   // Global prompt
   const [globalPrompt, setGlobalPrompt] = useState('')
   const [initialGlobalPrompt, setInitialGlobalPrompt] = useState('')
-
-  // Global avatar art-style directive (applies to newly generated Kin avatars)
-  const [avatarStyle, setAvatarStyle] = useState('')
-  const [initialAvatarStyle, setInitialAvatarStyle] = useState('')
 
   // Global task execution-slot limits (kept as strings so an in-progress edit
   // can be empty without coercing to 0; validated on save).
@@ -56,15 +51,12 @@ export function GeneralSettings() {
 
   const fetchSettings = async () => {
     try {
-      const [prompt, taskLimits, avatar] = await Promise.all([
+      const [prompt, taskLimits] = await Promise.all([
         api.get<{ globalPrompt: string }>('/settings/global-prompt'),
         api.get<{ maxConcurrent: number; maxQueue: number }>('/settings/task-limits'),
-        api.get<{ avatarStyle: string }>('/settings/avatar-style'),
       ])
       setGlobalPrompt(prompt.globalPrompt)
       setInitialGlobalPrompt(prompt.globalPrompt)
-      setAvatarStyle(avatar.avatarStyle)
-      setInitialAvatarStyle(avatar.avatarStyle)
       setMaxConcurrent(String(taskLimits.maxConcurrent))
       setInitialMaxConcurrent(String(taskLimits.maxConcurrent))
       setMaxQueue(String(taskLimits.maxQueue))
@@ -105,11 +97,6 @@ export function GeneralSettings() {
         await api.put('/settings/global-prompt', { globalPrompt })
         setInitialGlobalPrompt(globalPrompt)
       }
-      if (hasAvatarChanges) {
-        const data = await api.put<{ avatarStyle: string }>('/settings/avatar-style', { avatarStyle })
-        setAvatarStyle(data.avatarStyle)
-        setInitialAvatarStyle(data.avatarStyle)
-      }
       toast.success(t('settings.general.saved'))
     } catch (err: unknown) {
       toastError(err)
@@ -120,13 +107,11 @@ export function GeneralSettings() {
 
   const handleDiscard = () => {
     setGlobalPrompt(initialGlobalPrompt)
-    setAvatarStyle(initialAvatarStyle)
   }
 
   const MAX_PROMPT_LENGTH = 10000
   const hasPromptChanges = globalPrompt !== initialGlobalPrompt
-  const hasAvatarChanges = avatarStyle !== initialAvatarStyle
-  const hasChanges = hasPromptChanges || hasAvatarChanges
+  const hasChanges = hasPromptChanges
   const approxTokens = Math.ceil(globalPrompt.length / 4)
   const isOverLimit = globalPrompt.length > MAX_PROMPT_LENGTH
 
@@ -202,26 +187,6 @@ export function GeneralSettings() {
             {globalPrompt.length.toLocaleString()}/{MAX_PROMPT_LENGTH.toLocaleString()} · ~{approxTokens} tokens
           </p>
         </div>
-      </div>
-
-      {/* Global avatar art style */}
-      <div className="space-y-2">
-        <Label htmlFor="avatar-style" className="inline-flex items-center gap-1.5">
-          {t('settings.general.avatarStyle', 'Avatar art style')}
-          <InfoTip content={t('settings.general.avatarStyleTip', 'Applied to every newly generated Kin avatar so they share a consistent look. Leave empty for the default friendly Pixar-robot style. Does not change existing avatars.')} />
-        </Label>
-        <Textarea
-          id="avatar-style"
-          value={avatarStyle}
-          onChange={(e) => setAvatarStyle(e.target.value)}
-          placeholder={t('settings.general.avatarStylePlaceholder', 'e.g. heroic fantasy, cyberpunk cyborg, watercolor…')}
-          maxLength={2000}
-          rows={3}
-          className="resize-y"
-        />
-        <p className="text-xs text-muted-foreground">
-          {t('settings.general.avatarStyleHint', 'A short art-style directive shared by all generated avatars.')}
-        </p>
       </div>
 
       <div className="flex items-center gap-2">

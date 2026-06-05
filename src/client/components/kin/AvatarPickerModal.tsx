@@ -17,11 +17,12 @@ import { ToggleGroup, ToggleGroupItem } from '@/client/components/ui/toggle-grou
 import { ModelPicker, modelPickerValue } from '@/client/components/common/ModelPicker'
 import { Label } from '@/client/components/ui/label'
 import { Slider } from '@/client/components/ui/slider'
+import { Switch } from '@/client/components/ui/switch'
 import { Dialog as DialogPrimitive } from 'radix-ui'
-import { Camera, Crop, ImageUp, Info, Loader2, MessageSquare, Sparkles, Upload, ZoomIn } from 'lucide-react'
+import { Camera, Crop, ImageUp, Info, Loader2, SlidersHorizontal, Sparkles, Upload, ZoomIn } from 'lucide-react'
 import { cropImage, type CropArea } from '@/client/lib/crop-image'
 
-type AvatarMode = 'upload' | 'auto' | 'prompt'
+type AvatarMode = 'upload' | 'auto' | 'manual'
 
 interface ImageModel {
   id: string
@@ -47,8 +48,8 @@ interface AvatarPickerModalProps {
   imageModels?: ImageModel[]
   onGenerateAvatarPreview?: (
     kinId: string,
-    mode: 'auto' | 'prompt',
-    prompt?: string,
+    mode: 'auto' | 'manual',
+    opts?: { style?: string; subject?: string; character?: string; useBase?: boolean },
     imageModel?: { providerId: string; modelId: string },
   ) => Promise<string>
   onConfirm: (result: AvatarPickerResult) => void
@@ -76,7 +77,14 @@ export function AvatarPickerModal({
   const [mode, setMode] = useState<AvatarMode>('upload')
   const [preview, setPreview] = useState<string | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [prompt, setPrompt] = useState('')
+  // Manual mode (3 axes): A = art style, B = subject/type, C = per-shot specifics.
+  // A and B are pre-filled from the global avatar config; C is the user's empty
+  // free-form box for this one shot. useBase toggles the img2img reference.
+  const [styleA, setStyleA] = useState('')
+  const [subjectB, setSubjectB] = useState('')
+  const [characterC, setCharacterC] = useState('')
+  const [useBase, setUseBase] = useState(true)
+  const [hasCustomBase, setHasCustomBase] = useState(false)
   const [selectedModelValue, setSelectedModelValue] = useState<string>('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -100,7 +108,7 @@ export function AvatarPickerModal({
       setMode('upload')
       setPreview(null)
       setPendingFile(null)
-      setPrompt('')
+      setCharacterC('')
       const first = imageModels?.[0]
       setSelectedModelValue(first ? `${first.providerId}:${first.id}` : '')
       setIsGenerating(false)
@@ -122,6 +130,19 @@ export function AvatarPickerModal({
             (m) => m.id === data.defaultImageModel && m.providerId === data.defaultImageProviderId,
           )
           if (match) setSelectedModelValue(`${match.providerId}:${match.id}`)
+        })
+        .catch(() => {})
+
+      // Pre-fill the manual axes (A = style, B = subject) from the global avatar
+      // config, and seed the base-reference toggle from whether it's enabled.
+      api.get<{ style: string; subject: string; baseEnabled: boolean; hasCustomBase: boolean }>(
+        '/kins/avatar-config',
+      )
+        .then((cfg) => {
+          setStyleA(cfg.style)
+          setSubjectB(cfg.subject)
+          setUseBase(cfg.baseEnabled)
+          setHasCustomBase(cfg.hasCustomBase)
         })
         .catch(() => {})
     }
@@ -188,7 +209,17 @@ export function AvatarPickerModal({
     try {
       const dataUrl = mode === 'auto'
         ? await onGenerateAvatarPreview(kinId, 'auto', undefined, selectedImageModel)
-        : await onGenerateAvatarPreview(kinId, 'prompt', prompt.trim(), selectedImageModel)
+        : await onGenerateAvatarPreview(
+            kinId,
+            'manual',
+            {
+              style: styleA.trim(),
+              subject: subjectB.trim(),
+              character: characterC.trim(),
+              useBase,
+            },
+            selectedImageModel,
+          )
       setPreview(dataUrl)
       setPendingFile(null)
     } finally {
@@ -305,9 +336,9 @@ export function AvatarPickerModal({
                 <Sparkles className="size-4" />
                 {t('kin.avatar.auto')}
               </ToggleGroupItem>
-              <ToggleGroupItem value="prompt" disabled={!hasImageCapability}>
-                <MessageSquare className="size-4" />
-                {t('kin.avatar.prompt')}
+              <ToggleGroupItem value="manual" disabled={!hasImageCapability}>
+                <SlidersHorizontal className="size-4" />
+                {t('kin.avatar.manual')}
               </ToggleGroupItem>
             </ToggleGroup>
 
@@ -417,14 +448,84 @@ export function AvatarPickerModal({
                 </div>
               )}
 
-              {mode === 'prompt' && (
+              {mode === 'manual' && (
                 <div className="space-y-3">
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder={t('kin.avatar.promptPlaceholder')}
-                    rows={3}
-                  />
+                  <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3">
+                    <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      {t('kin.avatar.manualDescription')}
+                    </p>
+                  </div>
+
+                  {/* Base reference image (axis: img2img). Pre-filled from the
+                      global base; toggle whether to use it for this shot. */}
+                  {hasImageCapability && (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="size-10 rounded-md ring-1 ring-border">
+                          <AvatarImage
+                            src="/api/kins/avatar-base/image"
+                            alt={t('kin.avatar.baseImage')}
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="rounded-md text-xs">
+                            <ImageUp className="size-4 text-muted-foreground" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-0.5">
+                          <Label htmlFor="manual-use-base" className="cursor-pointer text-xs">
+                            {t('kin.avatar.useBaseImage')}
+                          </Label>
+                          <p className="text-[11px] text-muted-foreground">
+                            {hasCustomBase
+                              ? t('kin.avatar.baseImageCustomHint')
+                              : t('kin.avatar.baseImageDefaultHint')}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch id="manual-use-base" checked={useBase} onCheckedChange={setUseBase} />
+                    </div>
+                  )}
+
+                  {/* Axis A — art style (pre-filled) */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="manual-style" className="text-xs">{t('kin.avatar.styleLabel')}</Label>
+                    <Textarea
+                      id="manual-style"
+                      value={styleA}
+                      onChange={(e) => setStyleA(e.target.value)}
+                      placeholder={t('kin.avatar.stylePlaceholder')}
+                      rows={2}
+                      className="resize-y"
+                    />
+                  </div>
+
+                  {/* Axis B — subject / type (pre-filled) */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="manual-subject" className="text-xs">{t('kin.avatar.subjectLabel')}</Label>
+                    <Textarea
+                      id="manual-subject"
+                      value={subjectB}
+                      onChange={(e) => setSubjectB(e.target.value)}
+                      placeholder={t('kin.avatar.subjectPlaceholder')}
+                      rows={2}
+                      className="resize-y"
+                    />
+                  </div>
+
+                  {/* Axis C — per-shot specifics (empty, explanatory placeholder) */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="manual-character" className="text-xs">{t('kin.avatar.characterLabel')}</Label>
+                    <Textarea
+                      id="manual-character"
+                      value={characterC}
+                      onChange={(e) => setCharacterC(e.target.value)}
+                      placeholder={t('kin.avatar.characterPlaceholder')}
+                      rows={3}
+                      className="resize-y"
+                    />
+                  </div>
+
                   {canGenerate && hasImageModels && (
                     <div className="space-y-1.5">
                       <Label className="text-xs">{t('kin.avatar.imageModel')}</Label>
@@ -467,7 +568,7 @@ export function AvatarPickerModal({
                       variant="outline"
                       className="w-full"
                       onClick={handleGenerate}
-                      disabled={isGenerating || !prompt.trim()}
+                      disabled={isGenerating || !styleA.trim() || !subjectB.trim()}
                     >
                       {isGenerating ? (
                         <>
