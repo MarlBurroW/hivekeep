@@ -31,6 +31,7 @@ import { sseManager } from '@/server/sse/index'
 import {
   generateAvatarImage,
   buildAvatarPrompt,
+  isImg2imgEnabled,
   resolveImageTarget,
   getMaxImageInputs,
   getBaseAvatarBytes,
@@ -479,7 +480,10 @@ export async function generateAndSaveAvatar(kinId: string): Promise<string | nul
     throw err
   }
 
-  const supportsEdit = (await getMaxImageInputs(target.providerId, target.modelId)) > 0
+  // img2img edit transforms the neutral base image; gated by the global
+  // avatar_base_enabled setting (off → always text-to-image).
+  const maxImageInputs = await getMaxImageInputs(target.providerId, target.modelId)
+  const supportsEdit = maxImageInputs > 0 && (await isImg2imgEnabled())
 
   const prompt = await buildAvatarPrompt(
     {
@@ -489,6 +493,7 @@ export async function generateAndSaveAvatar(kinId: string): Promise<string | nul
       expertise: kin.expertise ?? '',
     },
     supportsEdit ? 'edit' : 'generate',
+    { targetModelId: target.modelId, maxImageInputs },
   )
 
   const result = await generateAvatarImage(prompt, {

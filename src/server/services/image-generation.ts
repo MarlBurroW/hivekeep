@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { join } from 'path'
+import { existsSync, mkdirSync, rmSync } from 'fs'
 import { db } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
 import { providers } from '@/server/db/schema'
@@ -7,6 +8,7 @@ import { loadProviderConfig } from '@/server/services/provider-config'
 import { getDefaultImageModel, getDefaultImageProviderId } from '@/server/services/app-settings'
 import { listModelsForProvider, lookupImageModel } from '@/server/providers/index'
 import { getImageProvider } from '@/server/llm/image/registry'
+import { DEFAULT_AVATAR_STYLE, DEFAULT_AVATAR_SUBJECT } from '@/shared/constants'
 import type { ProviderConfig } from '@/server/llm/core/types'
 
 const BASE_AVATAR_PATH = join(import.meta.dir, '..', 'assets', 'base-avatar.png')
@@ -139,7 +141,52 @@ export async function resolveImageTarget(
  * image-to-image avatar generation. Cached after the first read.
  */
 export async function getBaseAvatarBytes(): Promise<Uint8Array> {
+  const custom = await findCustomBasePath()
+  if (custom) return new Uint8Array(await Bun.file(custom).arrayBuffer())
   return loadBaseAvatar()
+}
+
+// ─── Custom img2img base image ───────────────────────────────────────────────
+// The img2img reference image (default = bundled robot). A custom one — uploaded
+// or auto-generated as a neutral avatar in the chosen (subject, style) — gives
+// the model a consistent reference so every Kin avatar shares the same look.
+
+const CUSTOM_BASE_DIR = `${config.upload.dir}/avatar-base`
+const CUSTOM_BASE_EXTS = ['png', 'webp', 'jpg', 'jpeg'] as const
+
+async function findCustomBasePath(): Promise<string | null> {
+  for (const ext of CUSTOM_BASE_EXTS) {
+    const p = `${CUSTOM_BASE_DIR}/base.${ext}`
+    if (await Bun.file(p).exists()) return p
+  }
+  return null
+}
+
+export async function hasCustomBaseAvatar(): Promise<boolean> {
+  return (await findCustomBasePath()) !== null
+}
+
+/** Persist a custom base image, replacing any existing one. */
+export async function setCustomBaseAvatar(bytes: Uint8Array | Buffer, ext = 'png'): Promise<void> {
+  if (!existsSync(CUSTOM_BASE_DIR)) mkdirSync(CUSTOM_BASE_DIR, { recursive: true })
+  for (const e of CUSTOM_BASE_EXTS) rmSync(`${CUSTOM_BASE_DIR}/base.${e}`, { force: true })
+  await Bun.write(`${CUSTOM_BASE_DIR}/base.${ext}`, bytes)
+}
+
+/** Remove the custom base image → fall back to the bundled default. */
+export function clearCustomBaseAvatar(): void {
+  for (const e of CUSTOM_BASE_EXTS) rmSync(`${CUSTOM_BASE_DIR}/base.${e}`, { force: true })
+}
+
+/**
+ * Whether image-to-image (edit) mode is enabled for avatar generation. Reads the
+ * `avatar_base_enabled` setting (default true). When false, avatars are always
+ * generated text-to-image (no base reference).
+ */
+export async function isImg2imgEnabled(): Promise<boolean> {
+  const { getSetting } = await import('@/server/services/app-settings')
+  const v = await getSetting('avatar_base_enabled')
+  return v !== 'false'
 }
 
 /**
@@ -315,18 +362,20 @@ export async function hasImageCapability(): Promise<boolean> {
 }
 
 /**
- * System prompt used when the target image model supports image-to-image editing.
- * Asks the LLM to produce *transformation instructions* applied to the base robot.
+ * System prompt for image-to-image (edit) mode, parameterized by the avatar
+ * SUBJECT and STYLE. The image model receives a neutral base reference image
+ * (which depicts ${subject} in ${style}) plus these transformation instructions.
  */
-const AVATAR_EDIT_SYSTEM = `You are an image prompt writer. The user will give you the identity of a character (name, role, personality, expertise).
+function buildEditSystem(subject: string, style: string): string {
+  return `You are an image prompt writer. The user will give you the identity of a character (name, role, personality, expertise).
 
-You are NOT writing a description from scratch. You are writing instructions to transform a base reference image: a small, friendly Pixar-style 3D robot in a neutral pose, neutral colors, against a plain background. The image model will receive this base image plus your instructions.
+You are NOT writing a description from scratch. You are writing instructions to transform a base reference image: a neutral ${subject}, in ${style}, neutral colors, against a plain background. The image model will receive this base image plus your instructions.
 
-Write a short prompt (2-3 sentences) telling the image model how to transform that base robot so it visually represents the character. You should ask it to:
-- Repaint the robot with a color palette that fits the character's domain or personality
-- Add small props, accessories, or markings that hint at the character's expertise (e.g. headphones, monocle, tool belt, miniature instruments)
+Write a short prompt (2-3 sentences) telling the image model how to transform that base ${subject} so it visually represents the character. You should ask it to:
+- Adjust the color palette to fit the character's domain or personality
+- Add small props, accessories, or markings that hint at the character's expertise (e.g. headphones, monocle, glasses, badges)
 - Replace the plain background with a simple scene related to the character's domain
-- Keep the friendly Pixar / 3D-rendered cartoon aesthetic, the proportions, and the cute robot identity intact
+- Keep the ${style} aesthetic, the proportions, and the ${subject} identity intact
 
 HOW TO USE THE CHARACTER DESCRIPTION (read carefully):
 The character description is INSPIRATION ONLY for COLOR, MOOD, and small head-area accessories. It is NOT a literal brief. You MUST silently FILTER OUT and IGNORE every element of the description that would require zooming out the camera, including:
@@ -336,29 +385,34 @@ The character description is INSPIRATION ONLY for COLOR, MOOD, and small head-ar
 - Long flowing hair or robes that extend below the chest
 - Large weapons or props that wouldn't fit beside a head
 - Any wide-environment description (battlefield, forest clearing seen wide, etc.)
-Only keep elements that can plausibly appear in an extreme head-and-shoulders crop: helmets, hats, glasses, headphones, monocles, masks, face paint, ear-level accessories, collars, neckwear (scarf, stethoscope, necklace, tie, lab coat collar), shoulder pads, small badges/insignia on the chest, eye color/shape, and the head's color/material/texture. If the description gives you a sword, give the robot a tiny pin-shaped sword emblem on its chest, not an actual sword. Translate big concepts into head-area equivalents.
+Only keep elements that can plausibly appear in an extreme head-and-shoulders crop: helmets, hats, glasses, headphones, monocles, masks, face paint, ear-level accessories, collars, neckwear (scarf, stethoscope, necklace, tie, lab coat collar), shoulder pads, small badges/insignia on the chest, eye color/shape, and the head's color/material/texture. If the description gives you a sword, render a tiny pin-shaped sword emblem on the chest, not an actual sword. Translate big concepts into head-area equivalents.
 
 CRITICAL FRAMING (this is the most important constraint, mention it EARLY and AGAIN at the end):
-The output must be an extreme close-up headshot / bust portrait — only the robot's head and the very top of its shoulders/chest are visible, the head fills the frame, the camera is zoomed in tight on the face. No legs, no arms, no waist, no full body, no wide shot. Think profile picture or social media avatar crop.
+The output must be an extreme close-up headshot / bust portrait — only the head and the very top of the shoulders/chest are visible, the head fills the frame, the camera is zoomed in tight on the face. No legs, no arms, no waist, no full body, no wide shot. Think profile picture or social media avatar crop.
 
 Rules:
 - Output ONLY the transformation prompt, nothing else
 - Never include the character's name
 - Never mention any body part below the upper chest, never mention any pose, never mention any prop that doesn't fit in a head-area crop
 - Never ask for text, letters, words, logos, frames, borders, or UI elements in the image
-- Start the prompt with a verb like "Repaint", "Transform", or "Customize this base robot", IMMEDIATELY followed by the framing constraint (e.g. "...as an extreme close-up headshot avatar showing only the head and top of the shoulders")
-- End the prompt with this exact sentence: "Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. Keep the friendly Pixar 3D robot style. No text, no letters, no words, no UI elements."`
+- Start the prompt with a verb like "Repaint", "Transform", or "Customize this base ${subject}", IMMEDIATELY followed by the framing constraint (e.g. "...as an extreme close-up headshot avatar showing only the head and top of the shoulders")
+- End the prompt with this exact sentence: "Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. ${style}. No text, no letters, no words, no UI elements."`
+}
 
 /**
- * System prompt used when the target image model is text-to-image only.
- * Best-effort fallback: describe a small robot in the same spirit, from scratch.
+ * System prompt for text-to-image (generate) mode, parameterized by the avatar
+ * SUBJECT (robot / human / dragon / cyborg / …) and the art STYLE (Pixar 3D /
+ * anime / watercolor / …). These are two independent axes. Used from scratch
+ * (no base image) — so it's also the path for any non-default subject, since
+ * the img2img base is a robot and can't be transformed into another subject.
  */
-const AVATAR_GENERATE_SYSTEM = `You are an image prompt writer. The user will give you the identity of a character (name, role, personality, expertise). You must write a short image generation prompt (2-3 sentences) describing an extreme close-up headshot avatar of a small, friendly Pixar-style 3D robot that visually represents this character.
+function buildGenerateSystem(subject: string, style: string): string {
+  return `You are an image prompt writer. The user will give you the identity of a character (name, role, personality, expertise). You must write a short image generation prompt (2-3 sentences) describing an extreme close-up headshot avatar of ${subject}, rendered in ${style}, that visually represents this character.
 
 Style guidelines:
-- A small, cute, friendly cartoon robot in Pixar / 3D-animation style — round shapes, large expressive eyes, soft materials
-- The robot's color palette, accessories, props, and background should reflect the character's role and expertise (e.g. lab coat for a doctor, tiny chef hat for a cook, headphones for a musician)
-- Soft studio lighting, slight depth of field, plain or simple thematic background
+- The avatar depicts ${subject}, rendered in ${style} — appealing, expressive, with a clear focal face
+- The color palette, accessories, props, and background should reflect the character's role and expertise (e.g. lab coat for a doctor, tiny chef hat for a cook, headphones for a musician)
+- Soft lighting, slight depth of field, plain or simple thematic background
 
 HOW TO USE THE CHARACTER DESCRIPTION (read carefully):
 The character description is INSPIRATION ONLY for COLOR, MOOD, and small head-area accessories. It is NOT a literal brief. You MUST silently FILTER OUT and IGNORE every element of the description that would require zooming out the camera, including:
@@ -368,44 +422,59 @@ The character description is INSPIRATION ONLY for COLOR, MOOD, and small head-ar
 - Long flowing hair or robes that extend below the chest
 - Large weapons or props that wouldn't fit beside a head
 - Any wide-environment description (battlefield, forest clearing seen wide, etc.)
-Only keep elements that can plausibly appear in an extreme head-and-shoulders crop: helmets, hats, glasses, headphones, monocles, masks, face paint, ear-level accessories, collars, neckwear (scarf, stethoscope, necklace, tie, lab coat collar), shoulder pads, small badges/insignia on the chest, eye color/shape, and the head's color/material/texture. If the description gives you a sword, give the robot a tiny pin-shaped sword emblem on its chest, not an actual sword. Translate big concepts into head-area equivalents.
+Only keep elements that can plausibly appear in an extreme head-and-shoulders crop: helmets, hats, glasses, headphones, monocles, masks, face paint, ear-level accessories, collars, neckwear (scarf, stethoscope, necklace, tie, lab coat collar), shoulder pads, small badges/insignia on the chest, eye color/shape, and the head's color/material/texture. If the description gives you a sword, render a tiny pin-shaped sword emblem on the chest, not an actual sword. Translate big concepts into head-area equivalents.
 
 CRITICAL FRAMING (this is the most important constraint, mention it EARLY and AGAIN at the end):
-The image must be an extreme close-up headshot / bust portrait — only the robot's head and the very top of its shoulders/chest are visible, the head fills the frame, the camera is zoomed in tight on the face. No legs, no arms, no waist, no full body, no wide shot. Think profile picture or social media avatar crop.
+The image must be an extreme close-up headshot / bust portrait — only the head and the very top of the shoulders/chest are visible, the head fills the frame, the camera is zoomed in tight on the face. No legs, no arms, no waist, no full body, no wide shot. Think profile picture or social media avatar crop.
 
 Rules:
 - Output ONLY the image prompt, nothing else
 - Never include the character's name
-- Never describe the robot's full body, legs, arms, or anything below the upper chest
+- Never describe the full body, legs, arms, or anything below the upper chest
 - Never mention any pose or any prop that doesn't fit in a head-area crop
 - Never ask for text, letters, words, logos, or UI elements in the image
-- Start the prompt with the framing constraint (e.g. "Extreme close-up headshot of a small Pixar-style robot...")
-- End the prompt with this exact sentence: "Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. Pixar 3D animation style, soft lighting. No text, no letters, no words, no UI elements."`
+- Start the prompt with the framing constraint and the subject (e.g. "Extreme close-up headshot of ${subject}...")
+- End the prompt with this exact sentence: "Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. ${style}. No text, no letters, no words, no UI elements."`
+}
 
 /**
- * No-LLM fallback: produce a serviceable robot prompt straight from kin metadata.
+ * No-LLM fallback: produce a serviceable prompt straight from kin metadata.
  * Used when no LLM provider is configured or the configured one isn't supported here.
  */
 function fallbackAvatarPrompt(
   kin: { role: string; expertise: string },
   mode: 'edit' | 'generate',
-  styleDirective?: string | null,
+  subject: string,
+  style: string,
 ): string {
   const domain = (kin.expertise || kin.role || 'a generalist assistant').slice(0, 120)
-  const style = styleDirective?.trim()
   if (mode === 'edit') {
-    const styleClause = style ? ` Render it in this overall art style: ${style}.` : ' Keep the friendly Pixar 3D robot style.'
-    return `Reframe this base robot as an extreme close-up headshot avatar (head and top of shoulders only, head fills the frame), repaint it with a color palette that fits ${domain}, add small props or accessories that hint at this domain, and replace the plain background with a simple thematic scene.${styleClause} Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. No text, no letters, no words, no UI elements.`
+    // Edit transforms the base robot — only used for the default robot subject.
+    return `Reframe this base robot as an extreme close-up headshot avatar (head and top of shoulders only, head fills the frame), repaint it with a color palette that fits ${domain}, add small props or accessories that hint at this domain, and replace the plain background with a simple thematic scene. Render it in this overall art style: ${style}. Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. No text, no letters, no words, no UI elements.`
   }
-  const styleClause = style ? `${style} art style` : 'Pixar 3D animation style, soft lighting'
-  return `Extreme close-up headshot avatar of a small, friendly character that visually represents ${domain}, head fills the frame, with a fitting color palette, small thematic props, and a simple matching background. Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. ${styleClause}. No text, no letters, no words, no UI elements.`
+  return `Extreme close-up headshot avatar of ${subject} that visually represents ${domain}, head fills the frame, with a fitting color palette, small thematic props, and a simple matching background. Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. ${style}. No text, no letters, no words, no UI elements.`
+}
+
+export interface BuildAvatarPromptOptions {
+  /** Override the global avatar subject (axis B) — used for one-shot manual gen. */
+  subject?: string | null
+  /** Override the global art style (axis A) — used for one-shot manual gen. */
+  style?: string | null
+  /** The image model that will render the result — given to the prompt-writer
+   *  so it can tailor the prompt to that model's strengths. */
+  targetModelId?: string
+  /** Whether the target model accepts image inputs (img2img). */
+  maxImageInputs?: number
 }
 
 /**
- * Use an LLM to generate an image prompt from Kin metadata.
- * The prompt style depends on whether the target image model supports image-to-image:
- * - 'edit'     → transformation instructions applied to the base robot reference image
- * - 'generate' → full description of a robot in the same spirit (text-to-image fallback)
+ * Ephemeral prompt-writer: an LLM rewrites the FULL image-generation prompt from
+ * the Kin's identity, GUIDED by the two global axes — SUBJECT (axis B, what it
+ * depicts) and STYLE (axis A, how it's drawn) — producing the per-Kin character
+ * (axis C). A full rewrite (not block concatenation) keeps the prompt coherent.
+ * The writer is also told which image model will render it.
+ * - 'edit'     → transformation instructions applied to the neutral base image
+ * - 'generate' → full description from scratch (text-to-image)
  */
 export async function buildAvatarPrompt(
   kin: {
@@ -415,23 +484,32 @@ export async function buildAvatarPrompt(
     expertise: string
   },
   mode: 'edit' | 'generate' = 'generate',
+  opts?: BuildAvatarPromptOptions,
 ): Promise<string> {
   const { pickAnyLLMModel } = await import('@/server/llm/core/resolve')
   const { runOneShot } = await import('@/server/llm/core/run-oneshot')
-  const { getAvatarStylePrompt } = await import('@/server/services/app-settings')
-  const styleDirective = await getAvatarStylePrompt()
+  const { getAvatarStylePrompt, getAvatarSubject } = await import('@/server/services/app-settings')
+  const [styleDirective, subjectDirective] = await Promise.all([
+    opts?.style !== undefined ? Promise.resolve(opts.style) : getAvatarStylePrompt(),
+    opts?.subject !== undefined ? Promise.resolve(opts.subject) : getAvatarSubject(),
+  ])
+  const subject = subjectDirective?.trim() || DEFAULT_AVATAR_SUBJECT
+  const style = styleDirective?.trim() || DEFAULT_AVATAR_STYLE
   const resolved = await pickAnyLLMModel()
-  if (!resolved) return fallbackAvatarPrompt(kin, mode, styleDirective)
+  if (!resolved) return fallbackAvatarPrompt(kin, mode, subject, style)
 
   const charSnippet = kin.character.slice(0, 300)
   const expertSnippet = kin.expertise.slice(0, 300)
 
-  // User-defined global art style overrides the default Pixar-robot baseline
-  // while the framing / no-text rules still apply.
-  const baseSystem = mode === 'edit' ? AVATAR_EDIT_SYSTEM : AVATAR_GENERATE_SYSTEM
-  const systemText = styleDirective?.trim()
-    ? `${baseSystem}\n\nGLOBAL ART STYLE OVERRIDE (apply this overall aesthetic to the whole avatar, replacing the default cute-Pixar-robot look, but KEEP every framing/headshot/no-text rule above): ${styleDirective.trim()}`
-    : baseSystem
+  // SUBJECT (axis B) + STYLE (axis A) are baked into the system template; the
+  // writer fills axis C (the per-Kin character) coherently.
+  const systemText = mode === 'edit'
+    ? buildEditSystem(subject, style)
+    : buildGenerateSystem(subject, style)
+
+  const modelHint = opts?.targetModelId
+    ? `\n\nThe generated prompt will be rendered by the image model "${opts.targetModelId}"${typeof opts.maxImageInputs === 'number' ? ` (${opts.maxImageInputs > 0 ? 'supports image-to-image' : 'text-to-image only'})` : ''}. Write the prompt to play to that model's strengths.`
+    : ''
 
   const avatarResult = await runOneShot(resolved, {
     system: [{ type: 'text', text: systemText }],
@@ -439,7 +517,7 @@ export async function buildAvatarPrompt(
       role: 'user',
       content: [{
         type: 'text',
-        text: `Name: ${kin.name}\nRole: ${kin.role}\nPersonality: ${charSnippet}\nExpertise: ${expertSnippet}`,
+        text: `Name: ${kin.name}\nRole: ${kin.role}\nPersonality: ${charSnippet}\nExpertise: ${expertSnippet}${modelHint}`,
       }],
     }],
     maxOutputTokens: 200,
@@ -460,6 +538,36 @@ export async function buildAvatarPrompt(
   })
 
   return avatarResult.text.trim()
+}
+
+/** A generic, character-less headshot prompt for the neutral base image. */
+function buildNeutralBasePrompt(subject: string, style: string): string {
+  return `Extreme close-up headshot avatar of ${subject}, rendered in ${style}. A neutral, generic, friendly base character: neutral colors, calm neutral expression, no specific accessories, props, or markings, plain simple background. Head fills the frame, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. ${style}. No text, no letters, no words, no UI elements.`
+}
+
+/**
+ * Generate a NEUTRAL base avatar in the given (or current) subject + style and
+ * store it as the img2img base reference, so every Kin avatar derives from it
+ * for visual consistency. Returns the generated image (base64 + mediaType).
+ */
+export async function generateNeutralAvatarBase(opts?: {
+  providerId?: string
+  modelId?: string
+  subject?: string
+  style?: string
+}): Promise<{ base64: string; mediaType: string }> {
+  const { getAvatarStylePrompt, getAvatarSubject } = await import('@/server/services/app-settings')
+  const [styleD, subjectD] = await Promise.all([getAvatarStylePrompt(), getAvatarSubject()])
+  const subject = opts?.subject?.trim() || subjectD?.trim() || DEFAULT_AVATAR_SUBJECT
+  const style = opts?.style?.trim() || styleD?.trim() || DEFAULT_AVATAR_STYLE
+  const prompt = buildNeutralBasePrompt(subject, style)
+  const result = await generateImage(prompt, {
+    ...(opts?.providerId ? { providerId: opts.providerId } : {}),
+    ...(opts?.modelId ? { modelId: opts.modelId } : {}),
+  })
+  const ext = result.mediaType.includes('webp') ? 'webp' : 'png'
+  await setCustomBaseAvatar(Buffer.from(result.base64, 'base64'), ext)
+  return result
 }
 
 // ─── Mini-App Icon Prompt ────────────────────────────────────────────────────

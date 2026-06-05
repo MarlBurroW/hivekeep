@@ -119,6 +119,31 @@ export async function setAvatarStylePrompt(value: string): Promise<void> {
   return setSetting('avatar_style_prompt', value)
 }
 
+/** Optional global avatar SUBJECT/type applied to every generated Kin avatar
+ *  (e.g. "a human character", "a dragon", "a cyborg"). Empty/null → the default
+ *  friendly robot. Independent of the art STYLE (see avatar_style_prompt).
+ *  A custom subject forces text-to-image generation (the img2img base is a
+ *  robot, so it can't be transformed into another subject). See sherpa.md §9. */
+export async function getAvatarSubject(): Promise<string | null> {
+  return getSetting('avatar_subject')
+}
+
+export async function setAvatarSubject(value: string): Promise<void> {
+  if (value.trim() === '') return deleteSetting('avatar_subject')
+  return setSetting('avatar_subject', value)
+}
+
+/** Whether avatars use the img2img base reference (default true). When false,
+ *  avatars are always generated text-to-image. See sherpa.md §9. */
+export async function isAvatarBaseEnabled(): Promise<boolean> {
+  const v = await getSetting('avatar_base_enabled')
+  return v !== 'false'
+}
+
+export async function setAvatarBaseEnabled(enabled: boolean): Promise<void> {
+  return setSetting('avatar_base_enabled', enabled ? 'true' : 'false')
+}
+
 export async function getExtractionModel(): Promise<string | null> {
   return getSetting('extraction_model')
 }

@@ -191,6 +191,11 @@ import {
   setGlobalPromptTool,
   getAvatarStyleTool,
   setAvatarStyleTool,
+  setAvatarSubjectTool,
+  listAvatarPresetsTool,
+  setAvatarBaseEnabledTool,
+  generateAvatarBaseTool,
+  resetAvatarBaseTool,
   testChannelTool,
 } from '@/server/tools/config-tools'
 import { requestProviderSetupTool, requestChannelSetupTool, promptSecretTool } from '@/server/tools/secure-input-tools'
@@ -529,6 +534,11 @@ export function registerAllTools(): void {
   toolRegistry.register('set_global_prompt', setGlobalPromptTool, 'system')
   toolRegistry.register('get_avatar_style', getAvatarStyleTool, 'system')
   toolRegistry.register('set_avatar_style', setAvatarStyleTool, 'system')
+  toolRegistry.register('set_avatar_subject', setAvatarSubjectTool, 'system')
+  toolRegistry.register('list_avatar_presets', listAvatarPresetsTool, 'system')
+  toolRegistry.register('set_avatar_base_enabled', setAvatarBaseEnabledTool, 'system')
+  toolRegistry.register('generate_avatar_base', generateAvatarBaseTool, 'system')
+  toolRegistry.register('reset_avatar_base', resetAvatarBaseTool, 'system')
   toolRegistry.register('test_channel', testChannelTool, 'system')
 
   // Secure-input tools (configurator Kin) — request a secret via UI popup; the

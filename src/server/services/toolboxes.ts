@@ -197,6 +197,11 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'set_global_prompt',
       'get_avatar_style',
       'set_avatar_style',
+      'set_avatar_subject',
+      'list_avatar_presets',
+      'set_avatar_base_enabled',
+      'generate_avatar_base',
+      'reset_avatar_base',
       // Kin creation.
       'create_kin',
       'update_kin',

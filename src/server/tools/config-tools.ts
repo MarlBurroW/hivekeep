@@ -27,6 +27,10 @@ import {
   setGlobalPrompt,
   getAvatarStylePrompt,
   setAvatarStylePrompt,
+  getAvatarSubject,
+  setAvatarSubject,
+  isAvatarBaseEnabled,
+  setAvatarBaseEnabled,
   setDefaultLlmProviderId,
   setEmbeddingProviderId,
   setDefaultImageProviderId,
@@ -61,7 +65,8 @@ import {
   getDefaultSttProviderId,
 } from '@/server/services/app-settings'
 import { PROVIDER_META } from '@/shared/provider-metadata'
-import { PROVIDER_API_KEY_URLS, PROVIDERS_WITHOUT_API_KEY } from '@/shared/constants'
+import { PROVIDER_API_KEY_URLS, PROVIDERS_WITHOUT_API_KEY, AVATAR_STYLE_PRESETS, AVATAR_SUBJECT_PRESETS } from '@/shared/constants'
+import { generateNeutralAvatarBase, hasCustomBaseAvatar, clearCustomBaseAvatar } from '@/server/services/image-generation'
 import { sseManager } from '@/server/sse/index'
 import { createLogger } from '@/server/logger'
 import type { ToolExecutionContext } from '@/server/tools/types'
@@ -455,11 +460,93 @@ export const getAvatarStyleTool: ToolRegistration = {
   create: (_ctx) =>
     tool({
       description:
-        'Read the current global avatar art-style directive applied to every newly generated Kin avatar (empty = the default cute Pixar-robot look).',
+        'Read the current global avatar appearance: the SUBJECT/type (axis B — robot/human/dragon/…), the art STYLE (axis A — Pixar 3D/anime/watercolor/…), and whether the img2img base reference is enabled (and customized). Empty values mean defaults (a friendly robot, Pixar 3D style).',
       inputSchema: z.object({}),
       execute: async () => {
-        const style = await getAvatarStylePrompt()
-        return { avatarStyle: style ?? '' }
+        const [style, subject, baseEnabled, customBase] = await Promise.all([
+          getAvatarStylePrompt(), getAvatarSubject(), isAvatarBaseEnabled(), hasCustomBaseAvatar(),
+        ])
+        return {
+          avatarSubject: subject ?? '',
+          avatarStyle: style ?? '',
+          img2imgBaseEnabled: baseEnabled,
+          hasCustomBaseImage: customBase,
+        }
+      },
+    }),
+}
+
+export const listAvatarPresetsTool: ToolRegistration = {
+  availability: ['main', 'sub-kin'],
+  readOnly: true,
+  concurrencySafe: true,
+  create: (_ctx) =>
+    tool({
+      description:
+        'List the suggested avatar STYLE presets (axis A) and SUBJECT/type presets (axis B) you can offer the user. The user can also pick "Other" and type their own. Apply a choice with set_avatar_style / set_avatar_subject (pass the preset\'s `prompt` text, or the user\'s free text).',
+      inputSchema: z.object({}),
+      execute: async () => ({
+        stylePresets: AVATAR_STYLE_PRESETS.map((p) => ({ label: p.label, prompt: p.prompt })),
+        subjectPresets: AVATAR_SUBJECT_PRESETS.map((p) => ({ label: p.label, prompt: p.prompt })),
+      }),
+    }),
+}
+
+export const setAvatarBaseEnabledTool: ToolRegistration = {
+  availability: ['main', 'sub-kin'],
+  create: (ctx) =>
+    tool({
+      description:
+        'Enable or disable the img2img BASE reference for avatar generation. Enabled (default): avatars derive from a neutral base image for visual consistency (when the image model supports image-to-image). Disabled: avatars are always generated text-to-image.',
+      inputSchema: z.object({ enabled: z.boolean() }),
+      execute: async ({ enabled }) => {
+        const denied = await requireAdmin(ctx)
+        if (denied) return denied
+        await setAvatarBaseEnabled(enabled)
+        return { ok: true, img2imgBaseEnabled: enabled }
+      },
+    }),
+}
+
+export const generateAvatarBaseTool: ToolRegistration = {
+  availability: ['main', 'sub-kin'],
+  create: (ctx) =>
+    tool({
+      description:
+        'Generate a NEUTRAL base avatar in the current (or given) style + subject and lock it in as the img2img base reference — so every Kin avatar derives from it and they all share a consistent look. Requires an image provider. Returns a URL to show the user. Tip: do this after the user has chosen a style + type.',
+      inputSchema: z.object({
+        style: z.string().optional().describe('Override the art style for this base (else uses the global setting).'),
+        subject: z.string().optional().describe('Override the subject/type for this base (else uses the global setting).'),
+      }),
+      execute: async ({ style, subject }) => {
+        const denied = await requireAdmin(ctx)
+        if (denied) return denied
+        try {
+          const result = await generateNeutralAvatarBase({
+            ...(style ? { style } : {}),
+            ...(subject ? { subject } : {}),
+          })
+          const ext = result.mediaType.includes('webp') ? 'webp' : 'png'
+          return { ok: true, baseImageUrl: `/api/uploads/avatar-base/base.${ext}?v=${Date.now()}` }
+        } catch (err) {
+          log.error({ err }, 'Failed to generate neutral avatar base')
+          return { error: 'Could not generate the base avatar — make sure an image provider is configured.' }
+        }
+      },
+    }),
+}
+
+export const resetAvatarBaseTool: ToolRegistration = {
+  availability: ['main', 'sub-kin'],
+  create: (ctx) =>
+    tool({
+      description: 'Reset the img2img base reference back to the bundled default (a neutral robot). Use if the user wants to undo a custom/generated base.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const denied = await requireAdmin(ctx)
+        if (denied) return denied
+        clearCustomBaseAvatar()
+        return { ok: true }
       },
     }),
 }
@@ -469,10 +556,10 @@ export const setAvatarStyleTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Set the GLOBAL avatar art style applied to every Kin avatar generated from now on (e.g. "heroic fantasy", "cyberpunk cyborg", "watercolor"). ' +
-        'Tip: agree on it empirically first — call generate_image to show the user an example avatar, iterate, then lock it in here. Pass an empty string to revert to the default Pixar-robot style. Does not change existing avatars.',
+        'Set the GLOBAL avatar ART STYLE — how avatars are drawn (e.g. "Pixar 3D", "anime", "watercolor", "heroic-fantasy oil painting", "pixel art"). This is the rendering style, NOT what the avatar depicts (for that use set_avatar_subject). ' +
+        'Tip: agree empirically — call generate_image to show an example, iterate, then lock it in. Empty string = default Pixar 3D style. Does not change existing avatars.',
       inputSchema: z.object({
-        style: z.string().describe('Short art-style directive (a few words to a sentence). Empty string resets to default.'),
+        style: z.string().describe('Short art-style directive. Empty string resets to default.'),
       }),
       execute: async ({ style }) => {
         const denied = await requireAdmin(ctx)
@@ -480,6 +567,26 @@ export const setAvatarStyleTool: ToolRegistration = {
         await setAvatarStylePrompt(style)
         log.info({ style }, 'Avatar style updated')
         return { ok: true, avatarStyle: style.trim() }
+      },
+    }),
+}
+
+export const setAvatarSubjectTool: ToolRegistration = {
+  availability: ['main', 'sub-kin'],
+  create: (ctx) =>
+    tool({
+      description:
+        'Set the GLOBAL avatar SUBJECT — what every Kin avatar depicts (e.g. "a human character", "a dragon", "a cyborg", "an alien", "a cute animal"). This is the subject, NOT the art style (for that use set_avatar_style). ' +
+        'Note: a non-default subject forces text-to-image generation (the built-in image-to-image base is a robot, so it can only be tweaked, not turned into another creature). Empty string = the default friendly robot. Does not change existing avatars.',
+      inputSchema: z.object({
+        subject: z.string().describe('What the avatar depicts. Empty string resets to the default robot.'),
+      }),
+      execute: async ({ subject }) => {
+        const denied = await requireAdmin(ctx)
+        if (denied) return denied
+        await setAvatarSubject(subject)
+        log.info({ subject }, 'Avatar subject updated')
+        return { ok: true, avatarSubject: subject.trim() }
       },
     }),
 }

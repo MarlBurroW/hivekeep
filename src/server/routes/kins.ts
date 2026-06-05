@@ -7,6 +7,7 @@ import { config } from '@/server/config'
 import {
   generateAvatarImage,
   buildAvatarPrompt,
+  isImg2imgEnabled,
   ImageGenerationError,
   findLLMProvider,
   resolveImageTarget,
@@ -281,7 +282,8 @@ kinRoutes.post('/avatar/preview', async (c) => {
 
   try {
     const target = await resolveImageTarget({ providerId: imageProviderId, modelId: imageModel })
-    const supportsEdit = (await getMaxImageInputs(target.providerId, target.modelId)) > 0
+    const maxImageInputs = await getMaxImageInputs(target.providerId, target.modelId)
+    const supportsEdit = maxImageInputs > 0 && (await isImg2imgEnabled())
 
     const prompt = await buildAvatarPrompt(
       {
@@ -291,6 +293,7 @@ kinRoutes.post('/avatar/preview', async (c) => {
         expertise: expertise ?? '',
       },
       supportsEdit ? 'edit' : 'generate',
+      { targetModelId: target.modelId, maxImageInputs },
     )
 
     const result = await generateAvatarImage(prompt, {
@@ -858,9 +861,11 @@ kinRoutes.post('/:id/avatar/generate', async (c) => {
       providerId: body.imageProviderId,
       modelId: body.imageModel,
     })
+    const autoMaxImageInputs = await getMaxImageInputs(target.providerId, target.modelId)
     const supportsEdit =
       mode === 'auto'
-      && (await getMaxImageInputs(target.providerId, target.modelId)) > 0
+      && autoMaxImageInputs > 0
+      && (await isImg2imgEnabled())
 
     const prompt =
       mode === 'auto'

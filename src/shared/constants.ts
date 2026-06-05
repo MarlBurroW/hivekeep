@@ -69,6 +69,41 @@ export const CONFIGURATOR_MODEL_PREFERENCES: Record<string, readonly string[]> =
   xai: ['grok-4', 'grok-3', 'grok-2', 'grok'],
 }
 
+/** Avatar appearance is two independent global axes the prompt-writer agent is
+ *  guided by: the art STYLE (how it's drawn) and the SUBJECT/type (what it
+ *  depicts). Presets are UI/onboarding shortcuts; both axes accept free text
+ *  ("Other"). The agent writes the per-Kin character (axis C) guided by A+B.
+ *  See sherpa.md §9. */
+export interface AvatarPreset {
+  id: string
+  /** Short label shown in the UI / proposed by the configurator. */
+  label: string
+  /** The directive text injected into the avatar prompt. */
+  prompt: string
+}
+
+export const AVATAR_STYLE_PRESETS: readonly AvatarPreset[] = [
+  { id: 'pixar', label: 'Pixar 3D', prompt: 'Pixar / 3D-animation style, soft lighting' },
+  { id: 'anime', label: 'Anime', prompt: 'anime art style, clean linework, cel shading' },
+  { id: 'watercolor', label: 'Watercolor', prompt: 'soft watercolor painting style' },
+  { id: 'heroic-fantasy', label: 'Heroic fantasy', prompt: 'heroic-fantasy oil painting, dramatic lighting, painterly' },
+  { id: 'pixel-art', label: 'Pixel art', prompt: 'detailed retro pixel-art style' },
+]
+
+export const AVATAR_SUBJECT_PRESETS: readonly AvatarPreset[] = [
+  { id: 'robot', label: 'Robot', prompt: 'a small, friendly, cute robot' },
+  { id: 'human', label: 'Human', prompt: 'a human character' },
+  { id: 'elf', label: 'Elf', prompt: 'an elf character with pointed ears' },
+  { id: 'animal', label: 'Animal', prompt: 'a cute anthropomorphic animal character' },
+  { id: 'alien', label: 'Alien', prompt: 'a friendly alien creature' },
+  { id: 'mythical', label: 'Mythical creature', prompt: 'a small mythical creature (dragon-like)' },
+]
+
+/** Defaults used when the user hasn't customized the avatar axes. The default
+ *  subject is a robot because the bundled img2img base image is a robot. */
+export const DEFAULT_AVATAR_STYLE = AVATAR_STYLE_PRESETS[0]!.prompt
+export const DEFAULT_AVATAR_SUBJECT = AVATAR_SUBJECT_PRESETS[0]!.prompt
+
 export const MEMORY_CATEGORIES = ['fact', 'preference', 'decision', 'knowledge'] as const
 
 export const MEMORY_SCOPES = ['private', 'shared'] as const
