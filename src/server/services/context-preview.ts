@@ -481,7 +481,7 @@ export async function buildContextPreview(kinId: string): Promise<ContextPreview
 
   // Build system prompt
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
-    kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise },
+    kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise, kind: kin.kind },
     contacts: contactsWithSlug,
     relevantMemories,
     relevantKnowledge,
@@ -1000,7 +1000,7 @@ export async function buildQuickSessionContextPreview(kinId: string, sessionId: 
   }
 
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
-    kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise },
+    kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise, kind: kin.kind },
     contacts: [],
     relevantMemories,
     relevantKnowledge,

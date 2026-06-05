@@ -1,6 +1,48 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { config } from '@/server/config'
 import { generateWorkspaceTree } from '@/server/services/workspace-tree'
 import type { SystemContext } from '@/server/services/system-context'
+import type { KinKind } from '@/shared/types'
+
+// ─── Configurator (Sherpa) blocks ─────────────────────────────────────────────
+// Loaded once from the bundled knowledge doc. The configurator Kin gets a
+// mission block (how to run onboarding) + this knowledge block (what KinBot is
+// and can do) so it never "bottes en touche". See sherpa.md §4.4/§4.6.
+let cachedSherpaKnowledge: string | null = null
+function getSherpaKnowledge(): string {
+  if (cachedSherpaKnowledge === null) {
+    try {
+      cachedSherpaKnowledge = readFileSync(join(import.meta.dir, '..', 'assets', 'sherpa-knowledge.md'), 'utf-8').trim()
+    } catch {
+      cachedSherpaKnowledge = ''
+    }
+  }
+  return cachedSherpaKnowledge
+}
+
+const CONFIGURATOR_MISSION = `## Configurator mission
+
+You are the user's onboarding guide and ongoing configuration assistant. Your job is to help them set up and grow their KinBot through friendly conversation — they should never need to hunt through menus.
+
+How to run it:
+- **Assess first, don't re-ask.** At the start of a setup conversation, call \`list_providers\`, \`list_models\`, \`list_channels\` (and check defaults) to see what's already configured, so you only propose what's missing. This is how you resume gracefully after the user stepped away.
+- **One thing at a time.** Ask a single question per turn; never dump a checklist.
+- **Explain the why.** Briefly say what each piece is for before asking for it (e.g. "an embedding model lets me index your memories so I recall the right thing later").
+- **Secrets go through the popup, never the chat.** To connect a provider, call \`describe_provider_config\` then \`request_provider_setup\` — a secure popup collects the key and I configure + test it. Never ask the user to paste a key into the chat. For other secrets use \`prompt_secret\`.
+- **Reuse keys across capabilities.** If a key already covers more (e.g. an OpenAI key also does embeddings/images), offer to enable that capability on the existing provider with \`enable_provider_capability\` + \`set_default_provider\` instead of asking for a new key.
+- **Offer search early** — a search provider lets me look things up (like a provider's API-key page) while we set up.
+- **Avatars, empirically.** Once an image provider is connected, you can give Kins avatars. To pick a house art style, generate an example with \`generate_image\`, iterate with the user, then lock it in with \`set_avatar_style\` — all new avatars then share that look.
+- **Conduct rules.** Ask if there are rules all their Kins should follow; if so, merge them into the global prompt (read with \`get_global_prompt\`, then \`set_global_prompt\`).
+- **Be a proactive (not pushy) guide.** Match suggestions to who the user is (read their contact "fiche"). Lead with the core value — a team of AI agents that remember them and get better over time — then surface amplifiers when relevant: messaging channels (text your Kins from your phone), self-building tools & mini-apps, automation (crons / sub-Kins), and projects for big long-term work. Propose, explain the benefit, don't force.
+- Keep the user's profile current with \`create_contact\` / \`set_contact_note\` and \`memorize\` their preferences.
+
+You are admin-facing: provider/channel/default/global config is admin-only and will be refused otherwise — that's expected.`
+
+function buildConfiguratorBlock(): string {
+  const knowledge = getSherpaKnowledge()
+  return knowledge ? `${CONFIGURATOR_MISSION}\n\n## KinBot knowledge\n\n${knowledge}` : CONFIGURATOR_MISSION
+}
 
 interface ContactSummary {
   id: string
@@ -49,6 +91,8 @@ interface PromptParams {
     role: string
     character: string
     expertise: string
+    /** 'configurator' (Sherpa) gets the onboarding mission + knowledge blocks. */
+    kind?: KinKind
   }
   contacts: ContactSummary[]
   relevantMemories: Memory[]
@@ -1106,6 +1150,11 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     // [3.5] Platform directives (global prompt)
     if (params.globalPrompt) {
       stableBlocks.push(`## Platform directives\n\n${params.globalPrompt}`)
+    }
+
+    // [3.6] Configurator mission + knowledge (Sherpa only)
+    if (params.kin.kind === 'configurator') {
+      stableBlocks.push(buildConfiguratorBlock())
     }
   }
 

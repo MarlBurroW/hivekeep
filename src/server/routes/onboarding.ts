@@ -197,4 +197,48 @@ onboardingRoutes.post('/profile', async (c) => {
   }, 201)
 })
 
+// POST /api/onboarding/configurator — seed the configurator Kin (Sherpa) bound
+// to the bootstrap LLM provider. Admin-only, idempotent. Called by the
+// onboarding flow right after the first LLM provider is connected.
+onboardingRoutes.post('/configurator', async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  if (!session) {
+    return c.json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }, 401)
+  }
+
+  const profile = await db.select().from(userProfiles).where(eq(userProfiles.userId, session.user.id)).get()
+  if (!profile || profile.role !== 'admin') {
+    return c.json({ error: { code: 'FORBIDDEN', message: 'Admin access required' } }, 403)
+  }
+
+  const body = await c.req.json().catch(() => ({}))
+  const providerId = (body as { providerId?: string }).providerId
+  if (!providerId || typeof providerId !== 'string') {
+    return c.json({ error: { code: 'VALIDATION_ERROR', message: 'providerId is required' } }, 400)
+  }
+
+  const provider = await db.select().from(providers).where(eq(providers.id, providerId)).get()
+  if (!provider) {
+    return c.json({ error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } }, 404)
+  }
+  let caps: string[] = []
+  try { caps = JSON.parse(provider.capabilities) as string[] } catch { /* ignore */ }
+  if (!caps.includes('llm')) {
+    return c.json({ error: { code: 'INVALID_PROVIDER', message: 'The bootstrap provider must have the llm capability' } }, 400)
+  }
+
+  try {
+    const { seedConfiguratorKin } = await import('@/server/services/configurator')
+    const kin = await seedConfiguratorKin(session.user.id, providerId)
+    return c.json({
+      kin: kin
+        ? { id: kin.id, slug: kin.slug, name: kin.name, kind: kin.kind }
+        : null,
+    }, 201)
+  } catch (err) {
+    log.error({ providerId, err }, 'Failed to seed configurator Kin')
+    return c.json({ error: { code: 'SEED_FAILED', message: 'Failed to create the configurator assistant' } }, 500)
+  }
+})
+
 export { onboardingRoutes }

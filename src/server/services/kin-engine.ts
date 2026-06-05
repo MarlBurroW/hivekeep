@@ -1323,7 +1323,7 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
     }
 
     const systemSegments = buildSystemPrompt({
-      kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise },
+      kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise, kind: kin.kind },
       contacts: contactsWithSlug,
       relevantMemories,
       relevantKnowledge,
@@ -2153,7 +2153,7 @@ export async function processQuickMessage(kinId: string): Promise<boolean> {
     }
 
     const systemSegments = buildSystemPrompt({
-      kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise },
+      kin: { name: kin.name, slug: kin.slug, role: kin.role, character: kin.character, expertise: kin.expertise, kind: kin.kind },
       contacts: [],
       relevantMemories,
       relevantKnowledge,

@@ -176,6 +176,56 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'delete_event',
     ],
   },
+  {
+    name: 'configurator',
+    description:
+      "Platform configuration set for the onboarding guide (Sherpa): connect/test AI providers (secure popup), set defaults, configure channels, customize the avatar style, edit the global prompt, manage contacts/memory, and create the user's first Kins.",
+    toolNames: [
+      // Provider discovery + secure setup + defaults.
+      'describe_provider_config',
+      'list_provider_types',
+      'list_providers',
+      'list_models',
+      'request_provider_setup',
+      'test_provider',
+      'enable_provider_capability',
+      'set_default_provider',
+      // Global prompt + avatar style.
+      'get_global_prompt',
+      'set_global_prompt',
+      'get_avatar_style',
+      'set_avatar_style',
+      // Kin creation.
+      'create_kin',
+      'update_kin',
+      'get_kin_details',
+      // Image generation (empirical avatar-style agreement).
+      'generate_image',
+      'list_image_models',
+      'describe_image_model',
+      // Contacts (the user "fiche").
+      'create_contact',
+      'update_contact',
+      'get_contact',
+      'set_contact_note',
+      'search_contacts',
+      // Memory.
+      'memorize',
+      'recall',
+      'list_memories',
+      // Secure secret entry.
+      'prompt_secret',
+      // Channels (Discord/Telegram).
+      'list_channels',
+      'request_channel_setup',
+      'test_channel',
+      // Search + web (to find provider key pages).
+      'list_search_providers',
+      'web_search',
+      'browse_url',
+      'extract_links',
+    ],
+  },
 ]
 
 const BUILTIN_NAMES = new Set<string>(BUILTIN_TOOLBOXES.map((b) => b.name))
