@@ -87,19 +87,29 @@ export async function seedConfiguratorKin(adminUserId: string, providerId: strin
     toolboxIds: toolbox ? [toolbox.id] : null,
   })
 
-  // Assign the bundled avatar (no image provider exists yet, so it is not generated).
+  // Assign the bundled avatar (no image provider exists yet, so it is not
+  // generated). The asset may ship as png/jpg/webp — match the real extension
+  // so it's served with the correct content type.
   try {
-    const src = join(import.meta.dir, '..', 'assets', 'sherpa-avatar.png')
-    const dir = `${config.upload.dir}/kins/${kin.id}`
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const dest = `${dir}/avatar.png`
-    await Bun.write(dest, Bun.file(src))
-    await db.update(kins).set({ avatarPath: dest, updatedAt: new Date() }).where(eq(kins.id, kin.id))
-    sseManager.broadcast({
-      type: 'kin:updated',
-      kinId: kin.id,
-      data: { kinId: kin.id, avatarUrl: `/api/uploads/kins/${kin.id}/avatar.png?v=${Date.now()}` },
-    })
+    const assetsDir = join(import.meta.dir, '..', 'assets')
+    let srcPath: string | null = null
+    let ext = 'png'
+    for (const e of ['png', 'jpg', 'jpeg', 'webp']) {
+      const p = join(assetsDir, `sherpa-avatar.${e}`)
+      if (existsSync(p)) { srcPath = p; ext = e === 'jpeg' ? 'jpg' : e; break }
+    }
+    if (srcPath) {
+      const dir = `${config.upload.dir}/kins/${kin.id}`
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      const dest = `${dir}/avatar.${ext}`
+      await Bun.write(dest, Bun.file(srcPath))
+      await db.update(kins).set({ avatarPath: dest, updatedAt: new Date() }).where(eq(kins.id, kin.id))
+      sseManager.broadcast({
+        type: 'kin:updated',
+        kinId: kin.id,
+        data: { kinId: kin.id, avatarUrl: `/api/uploads/kins/${kin.id}/avatar.${ext}?v=${Date.now()}` },
+      })
+    }
   } catch (err) {
     log.warn({ kinId: kin.id, err }, 'Failed to assign bundled Sherpa avatar')
   }
