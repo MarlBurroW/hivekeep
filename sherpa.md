@@ -229,7 +229,9 @@ Nouvelle table dédiée (isolée de `human_prompts`, jamais loggée) :
 | `request_provider_setup` | **À créer** | secure input (§7) |
 | `test_provider` | **À créer** | wrappe `testProviderConnection` |
 | `enable_provider_capability(providerId, capability)` | **À créer** | PATCH `capabilities[]` (réutilisation de clé) |
-| `set_default_provider(capability, providerId)` | **À créer** | écrit `app_settings.default_*` |
+| `set_default_provider(capability, providerId)` | ✅ Fait | provider par défaut (search/tts/stt) |
+| `set_default_model(service, model, providerId?)` | ✅ Fait | **modèle+provider** par défaut (llm/embedding/image/scout/compacting/extraction) — équivalent page « Models & services » |
+| `get_default_models` | ✅ Fait (read) | lit tous les défauts courants |
 | `get_global_prompt`, `set_global_prompt` | **À créer** (tool) | service/route/UI existent déjà (`app-settings.ts`, `settings.ts`, `GeneralSettings.tsx`) ; règles de conduite globales (bloc `[3.5]`). Lecture-modification-écriture pour ne pas écraser |
 | `request_channel_setup`, `test_channel` | **À créer** | secure input + adaptateurs |
 | `set_avatar_style(style)` | **À créer** | §9 |

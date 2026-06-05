@@ -609,6 +609,8 @@ Le panneau latéral actuel ([`MiniAppContext`](../src/client/contexts/MiniAppCon
 Remplace le wizard de configuration par une conversation avec un Kin configurateur (`Sherpa`) ouvert dans une modale au premier lancement. Spec complète : **`sherpa.md`** (source de vérité — la lire avant de commencer).
 
 > **Pré-requis bloquant** : §27.1 (centralisation des secrets dans le vault) avant §27.2 (secure input) et §27.3 (tools providers). Le `describe_provider_config` (§27.3) est requis par le secure input (§27.2).
+>
+> **État d'implémentation** (branche `feat/sherpa-onboarding`) : **backend complet + testé** (27.0 schéma, 27.1 vault refactor vérifié par workflow adversarial + tests, 27.2 secure-input provider/vault/channel, 27.3 tools config dont `set_default_model`/`get_default_models`, 27.4 avatar style, 27.5 Sherpa seed/prompt/knowledge/toolbox). **Frontend** : écran bootstrap (1 LLM natif) + atterrissage dans le chat de Sherpa. Tout en vert (typecheck + ~3400 tests + build + smoke runtime : 248 outils, toolbox `configurator` 36 outils résolus). **Déviation** : la « modale distraction-less enveloppant ChatPanel » a été simplifiée en *atterrissage direct dans le chat de Sherpa* (évite de re-plomber ChatPanel sans test navigateur). **Reste** : validation E2E manuelle navigateur (27.7).
 
 ### 27.0 — Schéma & fondation
 - [ ] **27.0.1** Migration : `kins.kind TEXT NOT NULL DEFAULT 'regular'` (`'regular'`|`'configurator'`) + `user_profiles.onboarding_modal_dismissed INTEGER NOT NULL DEFAULT 0` (`db:generate` + `db:migrate`)
