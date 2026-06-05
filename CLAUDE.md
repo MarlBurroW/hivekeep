@@ -16,6 +16,7 @@ Read these files **before starting any phase**. They are the source of truth.
 | `structure.md` | Project file tree, naming conventions, imports, i18n, error format |
 | `prompt-system.md` | How the Kin system prompt is assembled (blocks 1-12) |
 | `compacting.md` | Compacting algorithm + memory extraction pipeline |
+| `sherpa.md` | **Conversational onboarding** spec — the `Sherpa` configurator Kin, vault-centralized secrets, secure-input tools, avatar-style customization (Phase 27) |
 | `DEVELOPMENT_PLAN.md` | Phased development plan with checkboxes — **follow this plan** |
 
 ## Tech stack

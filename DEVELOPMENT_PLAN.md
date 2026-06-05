@@ -604,6 +604,81 @@ Le panneau latéral actuel ([`MiniAppContext`](../src/client/contexts/MiniAppCon
 
 ---
 
+## Phase 27 — Onboarding conversationnel (Kin configurateur « Sherpa »)
+
+Remplace le wizard de configuration par une conversation avec un Kin configurateur (`Sherpa`) ouvert dans une modale au premier lancement. Spec complète : **`sherpa.md`** (source de vérité — la lire avant de commencer).
+
+> **Pré-requis bloquant** : §27.1 (centralisation des secrets dans le vault) avant §27.2 (secure input) et §27.3 (tools providers). Le `describe_provider_config` (§27.3) est requis par le secure input (§27.2).
+
+### 27.0 — Schéma & fondation
+- [ ] **27.0.1** Migration : `kins.kind TEXT NOT NULL DEFAULT 'regular'` (`'regular'`|`'configurator'`) + `user_profiles.onboarding_modal_dismissed INTEGER NOT NULL DEFAULT 0` (`db:generate` + `db:migrate`)
+- [ ] **27.0.2** Type `KinKind` dans `src/shared/types.ts` ; exposer `kind` dans les payloads Kin (API + SSE)
+- [ ] **27.0.3** Asset `src/server/assets/sherpa-avatar.png` (placeholder en attendant l'image finale du porteur)
+- [ ] **27.0.4** Map `RECOMMENDED_CONFIGURATOR_MODELS` (par type natif) dans `src/shared/constants.ts` + `resolveConfiguratorModel(providerId)` (recommandé → fallback `listModels`)
+
+### 27.1 — Centralisation des secrets dans le vault (refactor)
+- [ ] **27.1.1** Helper `getSecretFieldKeys(type)` (extrait les `ConfigField.type === 'secret'` via `readConfigSchema`)
+- [ ] **27.1.2** Helpers partagés : `vaultifyProviderConfig(type, providerId, rawConfig)` (écrit `provider_<type>_<id>_<field>` + remplace par `"$vault:<key>"`) et `hydrateProviderConfig(parsed)` (substitue `getSecretValue`)
+- [ ] **27.1.3** Factoriser `loadProviderConfig(row)` = `decrypt` + `JSON.parse` + `hydrate` ; **router les ~27 sites de déchiffrement** dessus (`resolve.ts`, `embeddings.ts`, `search/tts/stt-resolver.ts`, `image-generation.ts`, `routes/providers.ts`, `tools/{provider,image,voice}-tools.ts`) — cf. `sherpa.md` §6.4
+- [ ] **27.1.4** Écriture : `POST/PATCH /api/providers` vaultifie les champs secrets ; suppression provider nettoie les refs `$vault:`
+- [ ] **27.1.5** Migration boot idempotente `src/server/services/migrate-provider-vaulting.ts` (appelée dans `index.ts` après Drizzle) — vaultifie les providers existants
+- [ ] **27.1.6** Tests : auth provider OK après vaultification ; rotation = `update_secret` sans réécriture provider ; migration idempotente
+
+### 27.2 — Saisie sécurisée (secure input)
+- [ ] **27.2.1** Table `secret_prompts` (cf. `sherpa.md` §7.3 — aucune valeur de secret stockée)
+- [ ] **27.2.2** Service `secret-prompts.ts` : create + `respondToSecretPrompt` (vault → créa+test provider/channel → claim atomique → reprise tour → message non sensible) calqué sur `human-prompts.ts`
+- [ ] **27.2.3** Events SSE `prompt:secret-request` / `prompt:secret-resolved` (`sse/types.ts`, `sse.md`, `api.md`)
+- [ ] **27.2.4** Route `POST /api/secret-prompts/:id/respond` (ne jamais logger `values`)
+- [ ] **27.2.5** Tools `request_provider_setup`, `request_channel_setup`, `prompt_secret`
+- [ ] **27.2.6** Frontend : modale de saisie (input password) sur `prompt:secret-request` + hook `useSSEResync`
+- [ ] **27.2.7** Tests : le secret n'atteint jamais le LLM (confirmation non sensible) ; secret bien chiffré dans le vault
+
+### 27.3 — Outils de configuration
+- [ ] **27.3.1** `describe_provider_config(type)`, `list_provider_types` (read) — wrappe `readConfigSchema` / `GET /providers/types`
+- [ ] **27.3.2** `test_provider`, `enable_provider_capability(providerId, capability)`, `set_default_provider(capability, providerId)`
+- [ ] **27.3.3** `get_global_prompt` / `set_global_prompt` (wrappe `getGlobalPrompt`/`setGlobalPrompt` ; lecture-modification-écriture pour ne pas écraser les directives existantes)
+- [ ] **27.3.4** `test_channel` (les channels vaultifient déjà)
+- [ ] **27.3.5** Garde-fou « config globale = admin only » sur ces tools (rôle de l'utilisateur du tour)
+- [ ] **27.3.6** Enregistrement dans `register.ts` + flags (`readOnly`/`concurrencySafe`)
+
+### 27.4 — Personnalisation du prompt d'avatar
+- [ ] **27.4.1** Clé `app_settings.avatar_style_prompt` (getter/setter dans `app-settings.ts`)
+- [ ] **27.4.2** Injecter la directive de style dans `buildAvatarPrompt()` (modes `edit` + `generate`) ; vide = comportement actuel
+- [ ] **27.4.3** Tool `set_avatar_style(style)` + champ d'édition Settings (UI)
+- [ ] **27.4.4** Accord empirique : `generate_image` dans la toolbox configurator (exemples d'avatar itératifs, cf. `sherpa.md` §9)
+
+### 27.5 — Sherpa (seed, prompt, toolbox)
+- [ ] **27.5.1** Toolbox builtin `configurator` dans `toolboxes.ts` (liste : `sherpa.md` §4.3)
+- [ ] **27.5.2** Câbler `kinKind` dans `PromptParams` + bloc STABLE `[Configurator mission]` conditionnel (`kind==='configurator' && !isSubKin`), data-driven (état plateforme lu chaque tour) — `prompt-builder.ts`
+- [ ] **27.5.3** Service `seedConfiguratorKin(adminUserId, providerId)` (idempotent) : créa Kin + copie avatar + toolbox + modèle résolu + message d'amorce (`enqueueMessage` `sourceType:'system'`)
+- [ ] **27.5.4** Vérifier le rendu client des messages `sourceType:'system'` (pas de bulle utilisateur, mais déclenche le tour)
+- [ ] **27.5.5** Endpoint `POST /api/onboarding/configurator { providerId }` (idempotent, admin-first-run)
+- [ ] **27.5.6** Rédiger `src/server/assets/sherpa-knowledge.md` (catalogue features + architecture + méta-projet + limites — distillé de `idea.md`/`CLAUDE.md`/`schema.md`, méta-projet fourni par le porteur) ; le charger au démarrage et l'injecter dans le bloc STABLE `[Configurator knowledge]` (Sherpa only). Note de maintenance en tête
+
+### 27.6 — Flow onboarding & modale (frontend)
+- [ ] **27.6.1** Réduire le wizard : écran Compte+langue → écran « connecter 1 provider LLM natif » (types natifs `llm` only, lien `apiKeyUrl`, bouton Tester) ; **supprimer** l'étape Préférences séparée
+- [ ] **27.6.2** Après créa du 1er provider : appel seed configurateur + set `default_llm_provider_id`
+- [ ] **27.6.3** `OnboardingChatModal` = `Dialog` autour de `ChatPanel` (thread principal de Sherpa, chrome masqué)
+- [ ] **27.6.4** Warning de fermeture/skip + flag `onboarding_modal_dismissed`
+- [ ] **27.6.5** Gérer `kin:error` dans la modale (action « reconfigurer le provider »)
+- [ ] **27.6.6** `onboardingComplete` ignore le configurateur (`kins.some(k => k.kind !== 'configurator')`) ; retirer la grosse carte SetupChecklist, **garder** les bannières capability inline
+
+### 27.7 — i18n & polish
+- [ ] **27.7.1** Namespace `sherpa.*` + clés des écrans d'onboarding et modale secret (`en.json` / `fr.json`)
+- [ ] **27.7.2** `bun run typecheck` + `bun run test` verts
+- [ ] **27.7.3** Validation manuelle bout-en-bout sur DB fraîche (`db:snapshot` puis restore)
+
+**Critère de validation Phase 27** :
+1. Compte + 1 clé LLM native → Sherpa apparaît, salue l'utilisateur dans une modale (thread persistant)
+2. Sherpa configure embedding/image/search/channels via chat ; les secrets passent par le popup et atterrissent **dans le vault** (jamais chez le LLM) ; les providers stockent des refs `$vault:`
+3. Réutilisation de clé : OpenAI LLM → activation embedding sans nouveau secret
+4. Accord empirique sur le style d'avatar (génération d'exemples) puis `set_avatar_style` ; les nouveaux Kins héritent du style
+5. Skip → warning → reprise via Sherpa dans la liste avec tout l'historique
+6. Rotation de clé via le vault sans toucher au provider
+7. Les invités n'ont pas d'onboarding ; ils voient Sherpa + la conversation de l'admin
+
+---
+
 ## Résumé des dépendances entre phases
 
 ```
