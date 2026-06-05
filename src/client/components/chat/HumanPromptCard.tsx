@@ -119,9 +119,10 @@ export const HumanPromptCard = memo(function HumanPromptCard({
         </div>
       )}
 
-      {/* Confirm type — two buttons side by side */}
+      {/* Confirm type — buttons side by side, wrapping to new lines when they
+          don't fit (e.g. 3 long options in a narrow onboarding modal). */}
       {!submitted && prompt.promptType === 'confirm' && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {prompt.options.map((option) => {
             const vc = variantClasses(option.variant)
             return (
@@ -130,7 +131,7 @@ export const HumanPromptCard = memo(function HumanPromptCard({
                 variant="outline"
                 size="sm"
                 disabled={disabled}
-                className={cn('flex-1 border', vc.button)}
+                className={cn('h-auto min-w-[7rem] flex-1 whitespace-normal border py-1.5 text-center', vc.button)}
                 onClick={() => handleConfirm(option.value)}
               >
                 {disabled && <Loader2 className="size-3.5 animate-spin" />}
