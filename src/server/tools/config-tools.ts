@@ -25,6 +25,8 @@ import { loadProviderConfig } from '@/server/services/provider-config'
 import {
   getGlobalPrompt,
   setGlobalPrompt,
+  getAvatarStylePrompt,
+  setAvatarStylePrompt,
   setDefaultLlmProviderId,
   setEmbeddingProviderId,
   setDefaultImageProviderId,
@@ -320,6 +322,44 @@ export const setGlobalPromptTool: ToolRegistration = {
         await setGlobalPrompt(prompt)
         log.info({ length: prompt.length }, 'Global prompt updated')
         return { ok: true, length: prompt.length }
+      },
+    }),
+}
+
+// ─── get_avatar_style / set_avatar_style ─────────────────────────────────────
+
+export const getAvatarStyleTool: ToolRegistration = {
+  availability: ['main', 'sub-kin'],
+  readOnly: true,
+  concurrencySafe: true,
+  create: (_ctx) =>
+    tool({
+      description:
+        'Read the current global avatar art-style directive applied to every newly generated Kin avatar (empty = the default cute Pixar-robot look).',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const style = await getAvatarStylePrompt()
+        return { avatarStyle: style ?? '' }
+      },
+    }),
+}
+
+export const setAvatarStyleTool: ToolRegistration = {
+  availability: ['main', 'sub-kin'],
+  create: (ctx) =>
+    tool({
+      description:
+        'Set the GLOBAL avatar art style applied to every Kin avatar generated from now on (e.g. "heroic fantasy", "cyberpunk cyborg", "watercolor"). ' +
+        'Tip: agree on it empirically first — call generate_image to show the user an example avatar, iterate, then lock it in here. Pass an empty string to revert to the default Pixar-robot style. Does not change existing avatars.',
+      inputSchema: z.object({
+        style: z.string().describe('Short art-style directive (a few words to a sentence). Empty string resets to default.'),
+      }),
+      execute: async ({ style }) => {
+        const denied = await requireAdmin(ctx)
+        if (denied) return denied
+        await setAvatarStylePrompt(style)
+        log.info({ style }, 'Avatar style updated')
+        return { ok: true, avatarStyle: style.trim() }
       },
     }),
 }

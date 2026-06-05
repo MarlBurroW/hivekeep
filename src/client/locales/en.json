@@ -2391,6 +2391,8 @@
       "set_default_provider": "Set Default Provider",
       "get_global_prompt": "Read Global Prompt",
       "set_global_prompt": "Set Global Prompt",
+      "get_avatar_style": "Read Avatar Style",
+      "set_avatar_style": "Set Avatar Style",
       "request_provider_setup": "Connect Provider (secure)",
       "prompt_secret": "Request Secret (secure)",
       "edit_mini_app_file": "Edit Mini-App File",

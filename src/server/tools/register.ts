@@ -187,6 +187,8 @@ import {
   setDefaultProviderTool,
   getGlobalPromptTool,
   setGlobalPromptTool,
+  getAvatarStyleTool,
+  setAvatarStyleTool,
 } from '@/server/tools/config-tools'
 import { requestProviderSetupTool, promptSecretTool } from '@/server/tools/secure-input-tools'
 import { runShellTool } from '@/server/tools/shell-tools'
@@ -520,6 +522,8 @@ export function registerAllTools(): void {
   toolRegistry.register('set_default_provider', setDefaultProviderTool, 'system')
   toolRegistry.register('get_global_prompt', getGlobalPromptTool, 'system')
   toolRegistry.register('set_global_prompt', setGlobalPromptTool, 'system')
+  toolRegistry.register('get_avatar_style', getAvatarStyleTool, 'system')
+  toolRegistry.register('set_avatar_style', setAvatarStyleTool, 'system')
 
   // Secure-input tools (configurator Kin) — request a secret via UI popup; the
   // value goes straight to the vault / encrypted provider config, never to the LLM.

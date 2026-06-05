@@ -389,12 +389,16 @@ Rules:
 function fallbackAvatarPrompt(
   kin: { role: string; expertise: string },
   mode: 'edit' | 'generate',
+  styleDirective?: string | null,
 ): string {
   const domain = (kin.expertise || kin.role || 'a generalist assistant').slice(0, 120)
+  const style = styleDirective?.trim()
   if (mode === 'edit') {
-    return `Reframe this base robot as an extreme close-up headshot avatar (head and top of shoulders only, head fills the frame), repaint it with a color palette that fits ${domain}, add small props or accessories that hint at this domain, and replace the plain background with a simple thematic scene. Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. Keep the friendly Pixar 3D robot style. No text, no letters, no words, no UI elements.`
+    const styleClause = style ? ` Render it in this overall art style: ${style}.` : ' Keep the friendly Pixar 3D robot style.'
+    return `Reframe this base robot as an extreme close-up headshot avatar (head and top of shoulders only, head fills the frame), repaint it with a color palette that fits ${domain}, add small props or accessories that hint at this domain, and replace the plain background with a simple thematic scene.${styleClause} Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. No text, no letters, no words, no UI elements.`
   }
-  return `Extreme close-up headshot avatar of a small, friendly Pixar-style 3D robot themed around ${domain}, head fills the frame, with a fitting color palette, small thematic props, and a simple matching background. Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. Pixar 3D animation style, soft lighting. No text, no letters, no words, no UI elements.`
+  const styleClause = style ? `${style} art style` : 'Pixar 3D animation style, soft lighting'
+  return `Extreme close-up headshot avatar of a small, friendly character that visually represents ${domain}, head fills the frame, with a fitting color palette, small thematic props, and a simple matching background. Extreme close-up headshot, head and top of shoulders only, no legs, no full body, no wide shot — tight avatar crop. ${styleClause}. No text, no letters, no words, no UI elements.`
 }
 
 /**
@@ -414,14 +418,23 @@ export async function buildAvatarPrompt(
 ): Promise<string> {
   const { pickAnyLLMModel } = await import('@/server/llm/core/resolve')
   const { runOneShot } = await import('@/server/llm/core/run-oneshot')
+  const { getAvatarStylePrompt } = await import('@/server/services/app-settings')
+  const styleDirective = await getAvatarStylePrompt()
   const resolved = await pickAnyLLMModel()
-  if (!resolved) return fallbackAvatarPrompt(kin, mode)
+  if (!resolved) return fallbackAvatarPrompt(kin, mode, styleDirective)
 
   const charSnippet = kin.character.slice(0, 300)
   const expertSnippet = kin.expertise.slice(0, 300)
 
+  // User-defined global art style overrides the default Pixar-robot baseline
+  // while the framing / no-text rules still apply.
+  const baseSystem = mode === 'edit' ? AVATAR_EDIT_SYSTEM : AVATAR_GENERATE_SYSTEM
+  const systemText = styleDirective?.trim()
+    ? `${baseSystem}\n\nGLOBAL ART STYLE OVERRIDE (apply this overall aesthetic to the whole avatar, replacing the default cute-Pixar-robot look, but KEEP every framing/headshot/no-text rule above): ${styleDirective.trim()}`
+    : baseSystem
+
   const avatarResult = await runOneShot(resolved, {
-    system: [{ type: 'text', text: mode === 'edit' ? AVATAR_EDIT_SYSTEM : AVATAR_GENERATE_SYSTEM }],
+    system: [{ type: 'text', text: systemText }],
     messages: [{
       role: 'user',
       content: [{

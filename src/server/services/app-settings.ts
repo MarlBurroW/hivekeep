@@ -106,6 +106,19 @@ export async function setGlobalPrompt(value: string): Promise<void> {
   return setSetting('global_prompt', value)
 }
 
+/** Optional global art-style directive applied to every generated Kin avatar
+ *  (e.g. "heroic fantasy", "cyberpunk cyborg"). Empty/null → the built-in
+ *  Pixar-robot baseline. Editable by the user (Settings) and the configurator
+ *  Kin (set_avatar_style). See sherpa.md §9. */
+export async function getAvatarStylePrompt(): Promise<string | null> {
+  return getSetting('avatar_style_prompt')
+}
+
+export async function setAvatarStylePrompt(value: string): Promise<void> {
+  if (value.trim() === '') return deleteSetting('avatar_style_prompt')
+  return setSetting('avatar_style_prompt', value)
+}
+
 export async function getExtractionModel(): Promise<string | null> {
   return getSetting('extraction_model')
 }

@@ -5,6 +5,8 @@ import { userProfiles, kins } from '@/server/db/schema'
 import {
   getGlobalPrompt,
   setGlobalPrompt,
+  getAvatarStylePrompt,
+  setAvatarStylePrompt,
   deleteSetting,
   getExtractionModel,
   setExtractionModel,
@@ -118,6 +120,28 @@ settingsRoutes.put('/global-prompt', async (c) => {
 
   log.info('Global prompt updated')
   return c.json({ globalPrompt: trimmed })
+})
+
+// GET /api/settings/avatar-style
+settingsRoutes.get('/avatar-style', async (c) => {
+  const value = await getAvatarStylePrompt()
+  return c.json({ avatarStyle: value ?? '' })
+})
+
+// PUT /api/settings/avatar-style
+settingsRoutes.put('/avatar-style', async (c) => {
+  const body = await c.req.json()
+  const { avatarStyle } = body as { avatarStyle: string }
+  if (typeof avatarStyle !== 'string') {
+    return c.json({ error: { code: 'INVALID_BODY', message: 'avatarStyle must be a string' } }, 400)
+  }
+  const trimmed = avatarStyle.trim()
+  if (trimmed.length > 2000) {
+    return c.json({ error: { code: 'INVALID_BODY', message: 'Avatar style must be under 2,000 characters' } }, 400)
+  }
+  await setAvatarStylePrompt(trimmed)
+  log.info('Avatar style updated')
+  return c.json({ avatarStyle: trimmed })
 })
 
 // GET /api/settings/models — legacy endpoint (extraction + embedding only)

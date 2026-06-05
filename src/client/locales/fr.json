@@ -2391,6 +2391,8 @@
       "set_default_provider": "Définir le fournisseur par défaut",
       "get_global_prompt": "Lire le prompt global",
       "set_global_prompt": "Définir le prompt global",
+      "get_avatar_style": "Lire le style d'avatar",
+      "set_avatar_style": "Définir le style d'avatar",
       "request_provider_setup": "Connecter un fournisseur (sécurisé)",
       "prompt_secret": "Demander un secret (sécurisé)",
       "edit_mini_app_file": "Modifier un fichier Mini-App",
