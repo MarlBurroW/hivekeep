@@ -2411,6 +2411,7 @@
       "browser_delete_state": "Browser: Delete Saved State",
       "http_request": "HTTP Request",
       "browse_history": "Browse History",
+      "read_message": "Read Message",
       "list_summaries": "List Summaries",
       "read_summary": "Read Summary",
       "review_memories": "Review Memories",

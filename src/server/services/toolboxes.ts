@@ -95,6 +95,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'screenshot_url',
       'search_history',
       'browse_history',
+      'read_message',
       'list_summaries',
       'read_summary',
       'recall',

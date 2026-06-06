@@ -1696,6 +1696,7 @@
       "forget": "Olvidar memoria",
       "list_memories": "Listar memorias",
       "search_history": "Buscar historial",
+      "read_message": "Leer mensaje",
       "get_secret": "Obtener secreto",
       "create_secret": "Crear secreto",
       "update_secret": "Actualizar secreto",

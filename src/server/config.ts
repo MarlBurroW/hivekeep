@@ -362,6 +362,16 @@ export const config = {
     }
   })(),
 
+  contacts: {
+    /** Bounds for the per-turn "Current speaker" profile block (contact notes
+     *  injected into EVERY Kin's prompt). Without these, a long-lived contact —
+     *  one global note per authoring Kin, plus each note growing as the model
+     *  rewrites it — would inflate every prompt unbounded. We keep the most
+     *  recently-updated notes per scope and truncate each one. */
+    speakerMaxNotesPerScope: Number(process.env.CONTACTS_SPEAKER_MAX_NOTES_PER_SCOPE ?? 12), // 0 = unlimited
+    speakerMaxNoteChars: Number(process.env.CONTACTS_SPEAKER_MAX_NOTE_CHARS ?? 500), // 0 = no truncation
+  },
+
   projectKnowledge: {
     /** Max number of entries that can be pinned per project. Pinned entries
      *  have their full markdown content injected into the system prompt

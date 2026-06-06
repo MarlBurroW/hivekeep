@@ -20,7 +20,7 @@ export const searchHistoryTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Keyword search in your message history. Optional date range + pagination. Returns totalCount.',
+        'Keyword search in your message history. Optional date range + pagination. Returns totalCount. Result content is truncated to 500 chars — use read_message(id) for the full text or the surrounding conversation.',
       inputSchema: z.object({
         query: z.string().describe('Search keywords'),
         startDate: z.string().optional().describe('ISO date string for range start (e.g. "2026-01-15")'),
@@ -169,6 +169,103 @@ export const browseHistoryTool: ToolRegistration = {
           }
         } catch {
           return { messages: [], totalCount: 0, error: 'Browse failed' }
+        }
+      },
+    }),
+}
+
+/**
+ * read_message — read the FULL text of a single message by ID, optionally with a
+ * window of surrounding messages (anchored view). Complements search_history,
+ * whose hits are truncated to 500 chars and carry no surrounding context.
+ */
+export const readMessageTool: ToolRegistration = {
+  availability: ['main'],
+  readOnly: true,
+  concurrencySafe: true,
+  create: (ctx) =>
+    tool({
+      description:
+        'Read the FULL text of a message by its ID (search_history truncates results to 500 chars). Optionally include the surrounding messages from the same conversation for context (anchored view).',
+      inputSchema: z.object({
+        messageId: z.string().describe('The message ID, e.g. from a search_history result'),
+        contextBefore: z.number().int().min(0).max(20).optional().describe('Include this many preceding messages from the same conversation. Default: 0'),
+        contextAfter: z.number().int().min(0).max(20).optional().describe('Include this many following messages from the same conversation. Default: 0'),
+      }),
+      execute: async ({ messageId, contextBefore, contextAfter }) => {
+        const before = contextBefore ?? 0
+        const after = contextAfter ?? 0
+        log.debug({ kinId: ctx.kinId, messageId, before, after }, 'Read message invoked')
+
+        try {
+          const target = sqlite
+            .query<
+              { rowid: number; id: string; role: string; content: string | null; source_type: string; task_id: string | null; session_id: string | null; created_at: number; is_redacted: number; kin_id: string },
+              [string]
+            >(
+              `SELECT rowid, id, role, content, source_type, task_id, session_id, created_at, is_redacted, kin_id
+               FROM messages WHERE id = ?`,
+            )
+            .get(messageId)
+
+          if (!target || target.kin_id !== ctx.kinId) return { error: 'Message not found' }
+          if (target.is_redacted) return { error: 'Message is redacted and cannot be read' }
+
+          const full = (r: { id: string; role: string; content: string | null; source_type: string; created_at: number }) => ({
+            id: r.id,
+            role: r.role,
+            content: r.content ?? '',
+            sourceType: r.source_type,
+            createdAt: r.created_at,
+          })
+          // Surrounding messages are truncated (read_message them individually
+          // for full text) so an anchored window stays a bounded payload.
+          const windowed = (r: { id: string; role: string; content: string | null; source_type: string; created_at: number }) => {
+            const c = r.content ?? ''
+            return { ...full(r), content: c.length > 800 ? c.slice(0, 800) + '...' : c }
+          }
+
+          const result: {
+            message: ReturnType<typeof full>
+            context?: { before: ReturnType<typeof windowed>[]; after: ReturnType<typeof windowed>[] }
+          } = { message: full(target) }
+
+          if (before > 0 || after > 0) {
+            // Anchor the window to the SAME conversation stream as the target
+            // (kin + matching task_id/session_id bucket), ordered by rowid
+            // (monotonic = chronological). Redacted + compaction rows excluded.
+            const taskClause = target.task_id === null ? 'task_id IS NULL' : 'task_id = ?'
+            const sessionClause = target.session_id === null ? 'session_id IS NULL' : 'session_id = ?'
+            const bucket: (string | number)[] = []
+            if (target.task_id !== null) bucket.push(target.task_id)
+            if (target.session_id !== null) bucket.push(target.session_id)
+
+            const cols = 'rowid, id, role, content, source_type, created_at'
+            const where = `kin_id = ? AND is_redacted = 0 AND source_type != 'compacting' AND ${taskClause} AND ${sessionClause}`
+
+            const beforeRows = before > 0
+              ? sqlite
+                  .query<{ id: string; role: string; content: string | null; source_type: string; created_at: number }, (string | number)[]>(
+                    `SELECT ${cols} FROM messages WHERE ${where} AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+                  )
+                  .all(ctx.kinId, ...bucket, target.rowid, before)
+                  .reverse()
+              : []
+
+            const afterRows = after > 0
+              ? sqlite
+                  .query<{ id: string; role: string; content: string | null; source_type: string; created_at: number }, (string | number)[]>(
+                    `SELECT ${cols} FROM messages WHERE ${where} AND rowid > ? ORDER BY rowid ASC LIMIT ?`,
+                  )
+                  .all(ctx.kinId, ...bucket, target.rowid, after)
+              : []
+
+            result.context = { before: beforeRows.map(windowed), after: afterRows.map(windowed) }
+          }
+
+          return result
+        } catch {
+          return { error: 'Failed to read message' }
         }
       },
     }),

@@ -1112,6 +1112,19 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
       userNotes?: string[]      // Notes from the platform user(s) — read-only
     } | undefined
 
+    // Bound the speaker block so a contact with many authoring Kins (one global
+    // note each) — or a single ever-growing note — can't inflate every prompt:
+    // keep the most-recently-updated notes per scope and truncate each one.
+    const { speakerMaxNotesPerScope, speakerMaxNoteChars } = config.contacts
+    const boundNotes = (notes: string[]): string[] => {
+      const capped = speakerMaxNotesPerScope > 0 ? notes.slice(0, speakerMaxNotesPerScope) : notes
+      return capped.map((n) =>
+        speakerMaxNoteChars > 0 && n.length > speakerMaxNoteChars
+          ? `${n.slice(0, speakerMaxNoteChars).trimEnd()}…`
+          : n,
+      )
+    }
+
     // Helper: enrich speaker data with contact notes (global + per-Kin + user-authored)
     const enrichSpeakerFromContact = (speakerData: NonNullable<typeof currentSpeaker>, contactId: string) => {
       speakerData.contactId = contactId
@@ -1119,10 +1132,11 @@ export async function processNextMessage(kinId: string): Promise<boolean> {
         .select({ content: contactNotesTable.content, scope: contactNotesTable.scope, kinId: contactNotesTable.kinId })
         .from(contactNotesTable)
         .where(eq(contactNotesTable.contactId, contactId))
+        .orderBy(desc(contactNotesTable.updatedAt))
         .all()
-      const globalNotes = allNotes.filter((n) => n.scope === 'global').map((n) => n.content)
-      const kinNotes = allNotes.filter((n) => n.scope === 'private' && n.kinId === kinId).map((n) => n.content)
-      const userNotes = allNotes.filter((n) => n.scope === 'user').map((n) => n.content)
+      const globalNotes = boundNotes(allNotes.filter((n) => n.scope === 'global').map((n) => n.content))
+      const kinNotes = boundNotes(allNotes.filter((n) => n.scope === 'private' && n.kinId === kinId).map((n) => n.content))
+      const userNotes = boundNotes(allNotes.filter((n) => n.scope === 'user').map((n) => n.content))
       if (globalNotes.length > 0) speakerData.contactNotes = globalNotes
       if (kinNotes.length > 0) speakerData.kinNotes = kinNotes
       if (userNotes.length > 0) speakerData.userNotes = userNotes
