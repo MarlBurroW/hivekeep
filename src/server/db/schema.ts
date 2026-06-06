@@ -59,6 +59,13 @@ export const userProfiles = sqliteTable('user_profiles', {
   // Set once the user dismisses the conversational onboarding modal (Sherpa).
   // Prevents the modal from auto-reopening; the Kin remains in the list. See sherpa.md.
   onboardingModalDismissed: integer('onboarding_modal_dismissed', { mode: 'boolean' }).notNull().default(false),
+  // Appearance preferences (DB-backed so they sync across devices). Null = unset
+  // (the client falls back to its localStorage cache / defaults). `theme` is the
+  // next-themes mode ('light' | 'dark' | 'system'); `palette` is a PaletteId;
+  // `contrastMode` is 'normal' | 'soft'.
+  theme: text('theme'),
+  palette: text('palette'),
+  contrastMode: text('contrast_mode'),
 })
 
 export const providers = sqliteTable('providers', {

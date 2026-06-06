@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/client/components/theme-provider'
 import { Toaster } from '@/client/components/ui/sonner'
 import { ErrorBoundary } from '@/client/components/common/ErrorBoundary'
 import { AuthProvider } from '@/client/hooks/useAuth'
+import { ThemeDbSync } from '@/client/components/ThemeDbSync'
 import * as HostReact from 'react'
 // Expose the host's single React instance so server-bundled custom-tool result
 // renderers (loaded at runtime via import()) share it. Sharing one React is what
@@ -20,6 +21,7 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
+          <ThemeDbSync />
           <App />
           <Toaster />
         </AuthProvider>

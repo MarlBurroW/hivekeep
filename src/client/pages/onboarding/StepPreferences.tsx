@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/client/components/ui/button'
 import { Label } from '@/client/components/ui/label'
 import { LanguageSelector } from '@/client/components/common/LanguageSelector'
-import { Sun, Moon, Monitor, Loader2 } from 'lucide-react'
+import { Sun, Moon, Monitor, Contrast, CircleDot, Loader2 } from 'lucide-react'
 import { usePalette, useTheme, PALETTES } from '@/client/components/theme-provider'
 import { api } from '@/client/lib/api'
 
@@ -14,7 +14,7 @@ interface StepPreferencesProps {
 
 export function StepPreferences({ onComplete, onBack }: StepPreferencesProps) {
   const { t, i18n } = useTranslation()
-  const { palette, setPalette } = usePalette()
+  const { palette, setPalette, contrastMode, setContrastMode } = usePalette()
   const { theme, setTheme } = useTheme()
   const [language, setLanguage] = useState(i18n.language || 'en')
   const [isSaving, setIsSaving] = useState(false)
@@ -22,9 +22,11 @@ export function StepPreferences({ onComplete, onBack }: StepPreferencesProps) {
   const handleComplete = async () => {
     setIsSaving(true)
     try {
-      await api.patch('/me', { language })
+      // Persist appearance prefs alongside language so they're DB-backed from the
+      // very first session (ThemeDbSync also keeps them in sync afterwards).
+      await api.patch('/me', { language, theme: theme ?? 'system', palette, contrastMode })
     } catch {
-      // Non-blocking: language will default to 'en' but onboarding can continue
+      // Non-blocking: defaults apply but onboarding can continue
     } finally {
       setIsSaving(false)
     }
@@ -107,6 +109,34 @@ export function StepPreferences({ onComplete, onBack }: StepPreferencesProps) {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Contrast */}
+      <div className="space-y-2">
+        <Label>{t('onboarding.preferences.contrast')}</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            { value: 'normal', label: t('onboarding.preferences.contrastNormal'), icon: Contrast },
+            { value: 'soft', label: t('onboarding.preferences.contrastSoft'), icon: CircleDot },
+          ] as const).map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setContrastMode(value)}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all hover:border-primary ${
+                contrastMode === value
+                  ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary'
+                  : 'border-border text-muted-foreground'
+              }`}
+            >
+              <Icon className="size-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {t('onboarding.preferences.contrastHint')}
+        </p>
       </div>
 
       {/* Navigation */}

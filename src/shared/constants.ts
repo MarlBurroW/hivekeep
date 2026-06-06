@@ -3,6 +3,17 @@
 
 export const SUPPORTED_LANGUAGES = ['en', 'fr'] as const
 
+// ─── Appearance preferences (DB-backed via user_profiles, see /api/me) ──────────
+// PALETTE_IDS already lives lower in this file. THEME_MODES / CONTRAST_MODES are
+// the other two appearance axes, used for server-side validation in /api/me.
+
+/** next-themes mode values. */
+export const THEME_MODES = ['light', 'dark', 'system'] as const
+export type ThemeMode = (typeof THEME_MODES)[number]
+
+/** Contrast modes (soft = reduced contrast). */
+export const CONTRAST_MODES = ['normal', 'soft'] as const
+
 /** Maximum length (in characters) for a user message. Enforced server-side. */
 export const MAX_MESSAGE_LENGTH = 32_000
 

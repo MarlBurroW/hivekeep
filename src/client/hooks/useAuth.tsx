@@ -16,6 +16,11 @@ interface UserProfile {
   /** Set once the user dismisses the conversational onboarding modal (DB-backed
    *  so a fresh DB re-shows it; persists across devices/browsers). */
   onboardingModalDismissed?: boolean
+  /** Appearance preferences (DB-backed, synced across devices). Null = unset
+   *  (the client uses its localStorage cache / defaults). See ThemeDbSync. */
+  theme?: 'light' | 'dark' | 'system' | null
+  palette?: string | null
+  contrastMode?: 'normal' | 'soft' | null
   createdAt: number | null
   /** IANA timezone the server uses to interpret cron schedules. */
   serverTimezone: string

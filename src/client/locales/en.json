@@ -150,7 +150,11 @@
       "themeMode": "Appearance",
       "themeModeLight": "Light",
       "themeModeDark": "Dark",
-      "themeModeSystem": "System"
+      "themeModeSystem": "System",
+      "contrast": "Contrast",
+      "contrastNormal": "Normal",
+      "contrastSoft": "Soft",
+      "contrastHint": "Soft slightly reduces contrast for a gentler look."
     },
     "providers": {
       "title": "AI Providers",

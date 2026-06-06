@@ -150,7 +150,11 @@
       "themeMode": "Apparence",
       "themeModeLight": "Clair",
       "themeModeDark": "Sombre",
-      "themeModeSystem": "Système"
+      "themeModeSystem": "Système",
+      "contrast": "Contraste",
+      "contrastNormal": "Normal",
+      "contrastSoft": "Doux",
+      "contrastHint": "Le mode doux réduit légèrement le contraste pour un rendu plus apaisé."
     },
     "providers": {
       "title": "Fournisseurs IA",

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/server/db/index'
 import { userProfiles, user } from '@/server/db/schema'
 import { getUnreadCountsForUser } from '@/server/services/kin-read-state'
+import { THEME_MODES, CONTRAST_MODES, PALETTE_IDS } from '@/shared/constants'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
 import { config } from '@/server/config'
@@ -28,6 +29,9 @@ meRoutes.get('/', async (c) => {
       kinOrder: userProfiles.kinOrder,
       cronOrder: userProfiles.cronOrder,
       onboardingModalDismissed: userProfiles.onboardingModalDismissed,
+      theme: userProfiles.theme,
+      palette: userProfiles.palette,
+      contrastMode: userProfiles.contrastMode,
       createdAt: user.createdAt,
     })
     .from(user)
@@ -85,6 +89,16 @@ meRoutes.patch('/', async (c) => {
   if (body.onboardingModalDismissed !== undefined) {
     if (typeof body.onboardingModalDismissed !== 'boolean') errors.push('onboardingModalDismissed must be a boolean')
   }
+  // Appearance preferences (null clears the saved value → client default).
+  if (body.theme !== undefined && body.theme !== null) {
+    if (!(THEME_MODES as readonly string[]).includes(body.theme)) errors.push(`theme must be one of: ${THEME_MODES.join(', ')}`)
+  }
+  if (body.palette !== undefined && body.palette !== null) {
+    if (!(PALETTE_IDS as readonly string[]).includes(body.palette)) errors.push('palette must be a valid palette id')
+  }
+  if (body.contrastMode !== undefined && body.contrastMode !== null) {
+    if (!(CONTRAST_MODES as readonly string[]).includes(body.contrastMode)) errors.push(`contrastMode must be one of: ${CONTRAST_MODES.join(', ')}`)
+  }
   if (body.kinOrder !== undefined) {
     if (!Array.isArray(body.kinOrder) || !body.kinOrder.every((id: unknown) => typeof id === 'string')) {
       errors.push('kinOrder must be an array of strings')
@@ -115,6 +129,9 @@ meRoutes.patch('/', async (c) => {
   if (body.kinOrder !== undefined) updates.kinOrder = body.kinOrder
   if (body.cronOrder !== undefined) updates.cronOrder = body.cronOrder
   if (body.onboardingModalDismissed !== undefined) updates.onboardingModalDismissed = body.onboardingModalDismissed
+  if (body.theme !== undefined) updates.theme = body.theme
+  if (body.palette !== undefined) updates.palette = body.palette
+  if (body.contrastMode !== undefined) updates.contrastMode = body.contrastMode
 
   if (Object.keys(updates).length > 0) {
     // Use upsert to handle the case where the profile row doesn't exist yet
@@ -179,6 +196,9 @@ meRoutes.patch('/', async (c) => {
       avatarUrl: user.image,
       kinOrder: userProfiles.kinOrder,
       cronOrder: userProfiles.cronOrder,
+      theme: userProfiles.theme,
+      palette: userProfiles.palette,
+      contrastMode: userProfiles.contrastMode,
       createdAt: user.createdAt,
     })
     .from(user)
