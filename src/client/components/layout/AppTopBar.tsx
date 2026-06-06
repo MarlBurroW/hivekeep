@@ -4,6 +4,7 @@ import { Home, FolderKanban, ListTodo, CalendarClock, Blocks } from 'lucide-reac
 import { cn } from '@/client/lib/utils'
 import { useAuth } from '@/client/hooks/useAuth'
 import { useTasksContext } from '@/client/contexts/TasksContext'
+import { KinbotLogo } from '@/client/components/common/KinbotLogo'
 import { ThemeToggle } from '@/client/components/common/ThemeToggle'
 import { PaletteToggle } from '@/client/components/common/PaletteToggle'
 import { UserMenu } from '@/client/components/common/UserMenu'
@@ -59,15 +60,14 @@ export function AppTopBar({ onOpenSettings, onOpenAccount }: AppTopBarProps) {
     <header className="surface-header sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b px-4">
       <button
         type="button"
-        className="flex shrink-0 items-center gap-2.5"
+        className="flex shrink-0 items-center"
         onClick={() => navigate('/')}
+        aria-label="KinBot"
       >
-        <img src="/kinbot.svg" alt="" width={28} height={28} className="rounded-lg" />
-        {/* Logo wordmark collides with the right cluster at very narrow widths
-            (<=375px). Hide the text on mobile; the icon alone keeps the brand. */}
-        <span className="hidden sm:inline gradient-primary-text text-xl font-bold tracking-tight">
-          KinBot
-        </span>
+        {/* Single themable lockup: the mark follows the active palette gradient.
+            The wordmark collides with the right cluster at very narrow widths
+            (<=375px), so it's hidden on mobile; the mark alone keeps the brand. */}
+        <KinbotLogo size={28} withWordmark wordmarkClassName="hidden sm:inline" title={null} />
       </button>
 
       {/* Mobile mode switch (Kins / Projects) — replaces the hidden ActivityBar

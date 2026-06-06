@@ -4,6 +4,7 @@ import { Input } from '@/client/components/ui/input'
 import { PasswordInput } from '@/client/components/ui/password-input'
 import { Button } from '@/client/components/ui/button'
 import { Label } from '@/client/components/ui/label'
+import { KinbotLogo } from '@/client/components/common/KinbotLogo'
 import { Alert, AlertDescription } from '@/client/components/ui/alert'
 import { AlertCircle, Loader2 } from 'lucide-react'
 
@@ -44,10 +45,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <div className="glass-strong rounded-2xl p-8 shadow-lg">
           {/* Header */}
           <div className="mb-8 text-center">
-            <img src="/kinbot.svg" alt="KinBot" width={64} height={64} className="mx-auto mb-3 rounded-2xl drop-shadow-lg" />
-            <h1 className="gradient-primary-text text-3xl font-bold tracking-tight">
-              KinBot
-            </h1>
+            <KinbotLogo size={64} title={null} className="mx-auto mb-3" />
+            <h1 className="text-3xl font-extrabold text-foreground">KinBot</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {t('login.subtitle')}
             </p>

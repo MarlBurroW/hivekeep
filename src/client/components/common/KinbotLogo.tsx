@@ -1,93 +1,114 @@
 import { useId } from 'react'
+import { cn } from '@/client/lib/utils'
+import {
+  KINBOT_LOGO_GRADIENT_LINE,
+  KINBOT_LOGO_PATHS,
+  KINBOT_LOGO_VIEWBOX,
+} from '@/client/components/common/kinbot-logo-paths'
 
-export interface KinbotLogoProps extends Omit<React.SVGProps<SVGSVGElement>, 'width' | 'height'> {
-  /** Pixel size (width = height). Default 32. */
-  size?: number | string
+export type KinbotLogoVariant = 'gradient' | 'white' | 'black' | 'mono'
+
+export interface KinbotLogoProps
+  extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'title'> {
+  /** Mark height in px (the mark is square). Default 32. */
+  size?: number
   /**
-   * 'gradient' (default) paints the head with the active palette's aurora gradient,
-   * so the logo automatically follows the current theme. 'mono' renders a flat
-   * silhouette in `currentColor` (eyes knocked out), for single-color contexts.
+   * How the mark is painted:
+   * - `gradient` (default): the active theme's aurora gradient. In the app the
+   *   stops come from `--color-gradient-start/mid/end` (redefined per palette),
+   *   so the mark follows the selected palette; elsewhere it falls back to the
+   *   brand aurora. Matches the marketing site.
+   * - `white` / `black`: flat single colour, no gradient (footers, print, OG).
+   * - `mono`: flat `currentColor`, so it inherits the surrounding text colour.
    */
-  variant?: 'gradient' | 'mono'
-  /** Accessible title. Pass null to mark the SVG decorative (aria-hidden). */
+  variant?: KinbotLogoVariant
+  /** Render the "KinBot" wordmark next to the mark (Plus Jakarta Sans 800). */
+  withWordmark?: boolean
+  /** Extra classes for the wordmark text (e.g. to override its colour). */
+  wordmarkClassName?: string
+  /** Accessible label. Pass `null` to mark the whole lockup decorative. */
   title?: string | null
 }
 
+const MARK_FILL: Record<Exclude<KinbotLogoVariant, 'gradient'>, string> = {
+  white: '#ffffff',
+  black: '#000000',
+  mono: 'currentColor',
+}
+
 /**
- * KinBot logomark — a friendly Kin head.
+ * KinBot logomark — a bee nested in a honeycomb cluster.
  *
- * Theme-aware: in `gradient` mode the head is filled with the palette gradient
- * tokens (`--color-gradient-start` / `--color-gradient-mid` / `--color-gradient-end`),
- * which are redefined per palette in globals.css — so the logo recolors with the
- * theme out of the box. Hardcoded aurora values are used as a fallback.
+ * One reusable, theme-aware lockup used everywhere the brand appears (app nav,
+ * footers, marketing, OG). The mark is a set of flat shapes filled with a single
+ * paint, so it recolours cleanly: a live theme gradient, or flat white/black for
+ * single-colour contexts. Optionally pairs with the "KinBot" wordmark.
  */
 export function KinbotLogo({
   size = 32,
   variant = 'gradient',
+  withWordmark = false,
+  wordmarkClassName,
   title = 'KinBot',
-  ...props
+  className,
+  ...rest
 }: KinbotLogoProps) {
   const uid = useId()
-  const gradId = `kinbot-grad-${uid}`
-  const maskId = `kinbot-mask-${uid}`
-  const a11y =
-    title == null
-      ? { 'aria-hidden': true as const }
-      : { role: 'img' as const, 'aria-label': title }
+  const gradId = `kinbot-logo-grad-${uid}`
+  const decorative = title == null
 
-  const headFill = variant === 'mono' ? 'currentColor' : `url(#${gradId})`
+  const markFill = variant === 'gradient' ? `url(#${gradId})` : MARK_FILL[variant]
+
+  // The wordmark scales with the mark; gap is proportional too.
+  const wordmarkStyle = { fontSize: size * 0.66, lineHeight: 1 }
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 48 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      {...a11y}
-      {...props}
+    <span
+      className={cn('inline-flex shrink-0 items-center', withWordmark && 'gap-2.5', className)}
+      {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': title })}
+      {...rest}
     >
-      {variant === 'gradient' && (
-        <defs>
-          <linearGradient id={gradId} x1="7" y1="6" x2="41" y2="44" gradientUnits="userSpaceOnUse">
-            <stop stopColor="var(--color-gradient-start, #7C4DFF)" />
-            <stop offset="0.52" stopColor="var(--color-gradient-mid, #E158C8)" />
-            <stop offset="1" stopColor="var(--color-gradient-end, #FF9E6D)" />
-          </linearGradient>
-        </defs>
-      )}
+      <svg
+        width={size}
+        height={size}
+        viewBox={KINBOT_LOGO_VIEWBOX}
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="block shrink-0"
+        aria-hidden
+      >
+        {variant === 'gradient' && (
+          <defs>
+            <linearGradient
+              id={gradId}
+              gradientUnits="userSpaceOnUse"
+              x1={KINBOT_LOGO_GRADIENT_LINE.x1}
+              y1={KINBOT_LOGO_GRADIENT_LINE.y1}
+              x2={KINBOT_LOGO_GRADIENT_LINE.x2}
+              y2={KINBOT_LOGO_GRADIENT_LINE.y2}
+            >
+              <stop stopColor="var(--color-gradient-start, #AE5AF9)" />
+              <stop offset="0.52" stopColor="var(--color-gradient-mid, #FB5FCA)" />
+              <stop offset="1" stopColor="var(--color-gradient-end, #FFB470)" />
+            </linearGradient>
+          </defs>
+        )}
+        <g fill={markFill}>
+          {KINBOT_LOGO_PATHS.map((d, i) => (
+            <path key={i} d={d} />
+          ))}
+        </g>
+      </svg>
 
-      {variant === 'mono' ? (
-        <>
-          {/* silhouette with knocked-out eyes — works on any background */}
-          <mask id={maskId}>
-            <rect x="0" y="0" width="48" height="48" fill="#fff" />
-            <circle cx="19.4" cy="26.4" r="3.2" fill="#000" />
-            <circle cx="28.6" cy="26.4" r="3.2" fill="#000" />
-          </mask>
-          <g fill="currentColor" mask={`url(#${maskId})`}>
-            <circle cx="24" cy="4.4" r="2.7" />
-            <rect x="22.6" y="6.4" width="2.8" height="5.4" rx="1.4" />
-            <rect x="5" y="10" width="38" height="33" rx="12" />
-          </g>
-        </>
-      ) : (
-        <>
-          {/* antenna */}
-          <circle cx="24" cy="4.4" r="2.7" fill={headFill} />
-          <rect x="22.6" y="6.4" width="2.8" height="5.4" rx="1.4" fill={headFill} />
-          {/* head */}
-          <rect x="5" y="10" width="38" height="33" rx="12" fill={headFill} />
-          {/* face screen */}
-          <rect x="11" y="16.5" width="26" height="20" rx="8" fill="#160E2B" />
-          {/* eyes */}
-          <circle cx="19.4" cy="26.4" r="3.2" fill="#FDFCFF" />
-          <circle cx="28.6" cy="26.4" r="3.2" fill="#FDFCFF" />
-          <circle cx="20.3" cy="27.1" r="1.25" fill="#160E2B" />
-          <circle cx="29.5" cy="27.1" r="1.25" fill="#160E2B" />
-        </>
+      {withWordmark && (
+        <span
+          className={cn('font-extrabold', wordmarkClassName)}
+          style={wordmarkStyle}
+        >
+          KinBot
+        </span>
       )}
-    </svg>
+    </span>
   )
 }
 
