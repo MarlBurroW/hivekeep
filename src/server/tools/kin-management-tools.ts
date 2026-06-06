@@ -37,7 +37,7 @@ export const createKinTool: ToolRegistration = {
           .array(z.string())
           .optional()
           .describe(
-            'Names of toolboxes granting this Kin its tools. A Kin with NO toolbox can only use the core floor (read/write files, shell, basic) — so give it the toolboxes it needs (don\'t be stingy). Built-ins: "all" (everything), "research" (web + memory), "ops" (memory + vault + http), "code" (projects/tickets), "scout", "email", "calendar". Omit to default to "all". Use list_toolboxes to discover more.',
+            'Names of toolboxes granting this Kin its tools. A Kin with NO toolbox can only use the core floor (read/write files, shell, basic) — so give it the toolboxes it needs (don\'t be stingy). Built-ins: "all" (everything), "research" (web + memory), "ops" (memory + vault + http), "code" (projects/tickets), "scout", "email", "calendar", "address-book". Omit to default to "all". Use list_toolboxes to discover more.',
           ),
         generate_avatar: z
           .boolean()
@@ -138,7 +138,7 @@ export const updateKinTool: ToolRegistration = {
           .array(z.string())
           .optional()
           .describe(
-            'Names of the toolboxes whose tools this Kin may use. The Kin\'s toolset is the mandatory core floor unioned with every chosen toolbox\'s tools. Built-ins: "all" (everything), "research", "ops", "code", "scout", "email", "calendar". Use list_toolboxes to discover more. Pass [] to remove ALL toolboxes — the Kin then only has the core floor (it will say it lacks tools for most things), so prefer a real selection.',
+            'Names of the toolboxes whose tools this Kin may use. The Kin\'s toolset is the mandatory core floor unioned with every chosen toolbox\'s tools. Built-ins: "all" (everything), "research", "ops", "code", "scout", "email", "calendar", "address-book". Use list_toolboxes to discover more. Pass [] to remove ALL toolboxes — the Kin then only has the core floor (it will say it lacks tools for most things), so prefer a real selection.',
           ),
         generate_avatar: z
           .boolean()

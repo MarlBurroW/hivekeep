@@ -202,10 +202,18 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'set_avatar_base_enabled',
       'generate_avatar_base',
       'reset_avatar_base',
-      // Kin creation.
+      // Kin creation + discovery.
       'create_kin',
       'update_kin',
       'get_kin_details',
+      'list_kins',
+      // Toolbox composition: discover tools, then build/edit minimal toolboxes
+      // so a new Kin gets exactly what it needs (not the broad "all").
+      'list_tools',
+      'list_toolboxes',
+      'create_toolbox',
+      'update_toolbox',
+      'delete_toolbox',
       // Image generation (empirical avatar-style agreement).
       'generate_image',
       'list_image_models',

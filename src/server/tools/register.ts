@@ -222,6 +222,13 @@ import {
   getKinDetailsTool,
 } from '@/server/tools/kin-management-tools'
 import {
+  listToolsTool,
+  listToolboxesTool,
+  createToolboxTool,
+  updateToolboxTool,
+  deleteToolboxTool,
+} from '@/server/tools/toolbox-tools'
+import {
   createWebhookTool,
   updateWebhookTool,
   deleteWebhookTool,
@@ -570,6 +577,11 @@ export function registerAllTools(): void {
   toolRegistry.register('update_kin', updateKinTool, 'kin-management')
   toolRegistry.register('delete_kin', deleteKinTool, 'kin-management')
   toolRegistry.register('get_kin_details', getKinDetailsTool, 'kin-management')
+  toolRegistry.register('list_toolboxes', listToolboxesTool, 'kin-management')
+  toolRegistry.register('list_tools', listToolsTool, 'kin-management')
+  toolRegistry.register('create_toolbox', createToolboxTool, 'kin-management')
+  toolRegistry.register('update_toolbox', updateToolboxTool, 'kin-management')
+  toolRegistry.register('delete_toolbox', deleteToolboxTool, 'kin-management')
 
   // Webhook tools (main only)
   toolRegistry.register('create_webhook', createWebhookTool, 'webhooks')
