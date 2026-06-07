@@ -75,3 +75,16 @@ Redo, from scratch, everything *around* Hivekeep for a **1.0 release**: the GitH
 ## Conventions
 
 English copy. No em-dashes. Reuse the app's design tokens/icons. Faithful UI sims or honest placeholders. Avatars/names from `agents.json`. Marketing compares against autonomous-agent platforms, never plain chat UIs.
+
+## OPEN DECISION — License
+
+The repo is legally **AGPL-3.0-only** (`LICENSE` file + `package.json` `"license"`). All shipped/public references now say AGPL-3.0 consistently (README, CONTRIBUTING, the GitHub Pages site `site/src/pages/*.astro`, the Dockerfile OCI label, and Queenie's knowledge base).
+
+Some **internal brand drafts still assume MIT** and were intentionally left untouched (they are notes, not shipped):
+- `README-1.0-draft.md` (badge + license section say MIT)
+- `hivekeep-video/PLAN.md` and `hivekeep-video/script.json` (scene-13 VO says "open source under the MIT license") — fix before recording, or the video ships a wrong license claim
+- `design-preview/concept-manual.html` (concept mockup, "License: MIT")
+
+The autonomous loop kept **AGPL-3.0 everywhere it ships**. Plugin-manifest `license` fields and the `create-hivekeep-plugin` scaffolder default (`"MIT"`) describe the *plugin author's* choice, not Hivekeep's, so they were left as-is.
+
+**Founder decision needed:** if MIT (or any other license) is actually desired instead of AGPL-3.0, a human must change `LICENSE` + `package.json` + every shipped reference (and the drafts above). The loop will not flip the license on its own.
