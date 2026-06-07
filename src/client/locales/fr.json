@@ -1307,6 +1307,11 @@
       "hubSaved": "Agent Hub mis à jour",
       "hubAgentNone": "Aucun",
       "fetchError": "Impossible de charger les paramètres",
+      "publicUrlWarning": {
+        "title": "L'URL publique est peut-être mal configurée",
+        "body": "Tu accèdes à Hivekeep via {{actual}}, mais l'URL publique configurée est {{configured}}. Les liens d'invitation, les webhooks et les callbacks OAuth sont construits à partir de l'URL publique : ils pointeront vers {{configured}} et risquent d'être injoignables.",
+        "fix": "Définis PUBLIC_URL sur {{actual}} puis redémarre — Docker : -e PUBLIC_URL={{actual}} (ou dans ton .env) ; install natif : HIVEKEEP_PUBLIC_URL={{actual}}."
+      },
       "interface": {
         "title": "Interface"
       },

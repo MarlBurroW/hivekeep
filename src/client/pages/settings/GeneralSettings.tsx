@@ -11,15 +11,22 @@ import { Skeleton } from '@/client/components/ui/skeleton'
 import { InfoTip } from '@/client/components/common/InfoTip'
 import { HelpPanel } from '@/client/components/common/HelpPanel'
 import { getToolCallsDefaultOpen, setToolCallsDefaultOpen } from '@/client/lib/tool-call-prefs'
+import { useAuth } from '@/client/hooks/useAuth'
+import { getPublicUrlMismatch } from '@/client/lib/public-url'
+import { AlertTriangle } from 'lucide-react'
 
 const MAX_CONCURRENT_UPPER_BOUND = 1000
 const MAX_QUEUE_UPPER_BOUND = 100_000
 
 export function GeneralSettings() {
   const { t } = useTranslation()
+  const { user } = useAuth()
 
   const [isLoading, setIsLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
+
+  // Configured public URL (best-effort, for the misconfiguration warning).
+  const [publicUrl, setPublicUrl] = useState<string | null>(null)
 
   // Global prompt
   const [globalPrompt, setGlobalPrompt] = useState('')
@@ -47,6 +54,14 @@ export function GeneralSettings() {
   useEffect(() => {
     setFetchError(null)
     fetchSettings().catch(() => {})
+  }, [])
+
+  // Best-effort — the public-URL warning must never block the settings load.
+  useEffect(() => {
+    api
+      .get<{ publicUrl: string }>('/info')
+      .then((info) => setPublicUrl(info.publicUrl ?? null))
+      .catch(() => {})
   }, [])
 
   const fetchSettings = async () => {
@@ -133,6 +148,10 @@ export function GeneralSettings() {
   const canSaveTaskLimits =
     hasTaskLimitChanges && isConcurrentValid && isQueueValid && !savingTaskLimits
 
+  // Public-URL misconfiguration warning — only admins can act on it (env + restart).
+  const isAdmin = user?.role === 'admin'
+  const publicUrlMismatch = getPublicUrlMismatch(publicUrl)
+
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -164,6 +183,23 @@ export function GeneralSettings() {
 
   return (
     <div className="space-y-8">
+      {isAdmin && publicUrlMismatch && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <AlertTriangle className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-1 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-300">
+              {t('settings.general.publicUrlWarning.title')}
+            </p>
+            <p className="text-muted-foreground">
+              {t('settings.general.publicUrlWarning.body', publicUrlMismatch)}
+            </p>
+            <p className="text-muted-foreground">
+              {t('settings.general.publicUrlWarning.fix', { actual: publicUrlMismatch.actual })}
+            </p>
+          </div>
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">
         {t('settings.general.description')}
       </p>

@@ -145,6 +145,9 @@ app.get('/api/info', async (c) => {
   return c.json({
     version: config.version,
     isDocker: config.isDocker,
+    // Surfaced so the client can warn when the browser's origin doesn't match
+    // the configured public URL (invites/webhooks/OAuth callbacks build on it).
+    publicUrl: config.publicUrl,
     startedAt,
     uptimeMs: Date.now() - startedAt,
     stats: {

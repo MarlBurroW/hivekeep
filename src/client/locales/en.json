@@ -1307,6 +1307,11 @@
       "hubSaved": "Hub Agent updated",
       "hubAgentNone": "None",
       "fetchError": "Failed to load settings",
+      "publicUrlWarning": {
+        "title": "Public URL may be misconfigured",
+        "body": "You're accessing Hivekeep at {{actual}}, but the configured public URL is {{configured}}. Invitation links, webhooks, and OAuth callbacks are built from the public URL, so they'll point to {{configured}} and may be unreachable.",
+        "fix": "Set PUBLIC_URL to {{actual}} and restart — Docker: -e PUBLIC_URL={{actual}} (or in your .env); native install: HIVEKEEP_PUBLIC_URL={{actual}}."
+      },
       "interface": {
         "title": "Interface"
       },
