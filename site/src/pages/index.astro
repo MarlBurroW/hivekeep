@@ -447,21 +447,12 @@ const cmpIcon = { yes: 'lucide:check', par: 'lucide:minus', no: 'lucide:x' };
     <div class="wrap" style="position:relative;z-index:1">
       <span class="kicker" style="justify-content:center">Get started</span>
       <h2 class="display">Run your team in two minutes.</h2>
-      <p>One command. It installs everything for you, then opens in your browser where Queenie walks you through the rest. Works on Linux and macOS.</p>
-      <span class="rec-tag"><Icon name="lucide:sparkles" /> Recommended way to install</span>
+      <p>Paste one command on your Linux or macOS machine. It installs everything, then opens in your browser where <b>Queenie</b> walks you through the rest.</p>
+      <span class="rec-tag"><Icon name="lucide:sparkles" /> The simplest way to install</span>
       <div class="cmd"><span><span class="c">$</span> curl -fsSL https://raw.githubusercontent.com/MarlBurroW/hivekeep/main/install.sh | bash</span><span class="cp"><Icon name="lucide:copy" /></span></div>
-      <div class="reassure">
-        <span class="rh"><Icon name="lucide:shield-check" /> What this command does</span>
-        <ul>
-          <li>Installs <b>Bun</b> if it is not already on the machine</li>
-          <li>Clones Hivekeep into its own folder and <b>builds</b> it</li>
-          <li>Generates and saves your <b>encryption key</b>, so your secrets survive restarts</li>
-          <li>Starts it as a background service and opens at <code>http://localhost:3000</code></li>
-        </ul>
-      </div>
-      <p style="margin-top:16px;font-size:.92rem;">Want a custom port, access from other devices, your own domain, or to compare Docker vs native first? <a class="link-mono" href={`${base}/install`}>See all install options <Icon name="lucide:arrow-right" /></a></p>
+      <p style="margin-top:18px;font-size:.92rem;">Need a custom port, your own domain, or Docker? <a class="link-mono" href={`${base}/install`}>See all install options <Icon name="lucide:arrow-right" /></a></p>
       <div class="btns">
-        <a class="btn btn-primary" href={`${base}/install`}><Icon name="lucide:terminal" /> See all install options</a>
+        <a class="btn btn-primary" href={`${base}/install`}><Icon name="lucide:terminal" /> Install Hivekeep</a>
         <a class="btn btn-ghost" href="https://github.com/MarlBurroW/hivekeep"><Icon name="lucide:github" /> Star on GitHub {showStars && <span class="ghstars"><Icon name="lucide:star" /> {starLabel}</span>}</a>
       </div>
     </div>

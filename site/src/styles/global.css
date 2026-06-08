@@ -356,6 +356,26 @@ hr.rule{border:0;border-top:1px solid var(--line);margin:0;}
 .rec-recover li::before{content:"";position:absolute;left:0;top:.5em;width:7px;height:7px;border-radius:2px;background:var(--peach);}
 .rec-does li b,.rec-recover li b{color:var(--ink);font-weight:600;}
 .rec-does code,.rec-recover code{font-family:"JetBrains Mono",monospace;font-size:.82em;background:oklch(0.10 0.018 312);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--peach);}
+/* the single "then..." line under the hero command */
+.rec-then{display:flex;align-items:center;gap:9px;margin:4px 0 0;font-size:.96rem;line-height:1.5;color:var(--ink-soft);}
+.rec-then b{color:var(--ink);font-weight:600;}
+.rec-then svg{flex:0 0 auto;width:1.1em;height:1.1em;color:var(--primary);}
+
+/* advanced / other options: a low-emphasis disclosure under the main path */
+.install-more{margin:46px 0 0;border:1px solid var(--line-strong);border-radius:var(--r-card);background:oklch(1 0 0/.02);overflow:hidden;}
+.install-more>summary{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;list-style:none;color:var(--ink);transition:background .15s ease;}
+.install-more>summary::-webkit-details-marker{display:none;}
+.install-more>summary:hover{background:oklch(1 0 0/.03);}
+.install-more .im-label{display:inline-flex;align-items:center;gap:9px;font-weight:700;font-size:.96rem;}
+.install-more .im-label svg{width:1.05em;height:1.05em;color:var(--primary);}
+.install-more .im-hint{color:var(--ink-soft);font-size:.86rem;flex:1;min-width:0;}
+.install-more .im-chev{flex:0 0 auto;width:1.1em;height:1.1em;color:var(--ink-soft);transition:transform .2s ease;}
+.install-more[open]>summary .im-chev{transform:rotate(180deg);}
+.install-more .im-body{padding:4px 20px 26px;border-top:1px solid var(--line);}
+.install-more .im-body .prereqs{margin-top:0;}
+@media(max-width:560px){
+  .install-more .im-hint{display:none;}
+}
 
 /* prerequisites */
 .prereqs{margin:48px 0 0;}

@@ -77,16 +77,16 @@ const prereqs = [
   <div class="wrap">
     <div class="install-head">
       <span class="kicker" style="justify-content:center">Install</span>
-      <h1 class="display">Install Hivekeep.</h1>
-      <p>One recommended way for everyone, plus options if you want a domain, a custom port, or Docker. Whichever you pick, once it's up <b>Queenie</b> sets up the rest by chatting with you. No config files to edit.</p>
+      <h1 class="display">Get Hivekeep running.</h1>
+      <p>One command does everything. Once it's up, <b>Queenie</b> sets up the rest by chatting with you, so there are no config files to edit.</p>
     </div>
 
-    <!-- ===== recommended quick start ===== -->
+    <!-- ===== recommended quick start: the single primary path ===== -->
     <div class="rec-card">
       <div class="rec-card-top">
-        <span class="rec-tag"><Icon name="lucide:sparkles" /> Recommended for everyone</span>
-        <h2 class="display">The one-line install.</h2>
-        <p>Paste this into a terminal on your Linux or macOS machine. It does everything for you, then opens in your browser.</p>
+        <span class="rec-tag"><Icon name="lucide:sparkles" /> Recommended · the simplest way</span>
+        <h2 class="display">Paste one line. That's it.</h2>
+        <p>Run this in a terminal on your Linux or macOS machine. It installs everything for you.</p>
       </div>
       <div class="rec-cmd">
         <code>{INSTALL_ONELINER}</code>
@@ -94,77 +94,71 @@ const prereqs = [
           <Icon name="lucide:copy" /> <span>Copy</span>
         </button>
       </div>
-      <div class="rec-grid">
-        <div class="rec-does">
-          <span class="rh"><Icon name="lucide:shield-check" /> What it does to your machine</span>
-          <ul>
-            <li>Installs <b>Bun</b> if it is missing</li>
-            <li>Clones Hivekeep into its own folder and <b>builds</b> it</li>
-            <li>Auto-generates and saves an <b>encryption key</b> at <code>$DATA_DIR/.encryption-key</code> so your secrets survive restarts</li>
-            <li>Sets it up as an optional background <b>service</b> and starts it</li>
-          </ul>
-        </div>
-        <div class="rec-recover">
-          <span class="rh"><Icon name="lucide:life-buoy" /> If something goes wrong</span>
-          <ul>
-            <li><b>"port already allocated" / address in use</b>: something else uses port 3000. Use the configurator below to pick another port, e.g. 3001.</li>
-            <li><b>Windows?</b> The native installer is Linux and macOS only. Use <b>WSL2</b> and run it inside your Linux shell, or use Docker Desktop.</li>
-            <li><b>Stuck downloading?</b> Make sure the machine can reach <code>github.com</code> and <code>bun.sh</code> over HTTPS (corporate proxies often block these).</li>
-          </ul>
-        </div>
-      </div>
+      <p class="rec-then"><Icon name="lucide:arrow-right" /> When it finishes, open the link it prints in your browser. <b>Queenie does the rest.</b></p>
     </div>
 
-    <!-- ===== prerequisites ===== -->
-    <div class="prereqs">
-      <span class="kicker">Before you start</span>
-      <h2 class="display" style="margin:12px 0 6px;">What the native install needs.</h2>
-      <p class="prereqs-sub">Most machines already have all of this. Quick checklist:</p>
-      <div class="prereq-grid">
-        {prereqs.map(([icon, title, desc]) => (
-          <div class="prereq">
-            <span class="pic"><Icon name={icon} /></span>
-            <div>
-              <div class="pt">{title}</div>
-              <div class="pd">{desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <p class="prereqs-win"><Icon name="lucide:monitor" /> <span><b>On Windows?</b> The native installer doesn't run on Windows directly. Use <b>WSL2</b> (run the one-liner inside your Linux distro) or <b>Docker Desktop</b>.</span></p>
-    </div>
-
-    <!-- ===== method comparison ===== -->
-    <div style="margin:48px 0 0;">
-      <span class="kicker">Compare</span>
-      <h2 class="display" style="margin:12px 0 6px;">Which path is right for you?</h2>
-      <p class="prereqs-sub">All three run the exact same app. They differ in how it lives on the machine.</p>
-    </div>
-    <div class="methods methods-3">
-      {methods.map((m) => (
-        <div class={`method${m.primary ? ' primary' : ''}`}>
-          <span class="tag">{m.tag}</span>
-          <h3 class="display">{m.name}</h3>
-          <p class="for">{m.pick}</p>
-          <ul>
-            {m.points.map(([k, label]) => (
-              <li class={k}>
-                <Icon name={k === 'y' ? 'lucide:check' : 'lucide:x'} />
-                <span class="lbl">{label}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-
-    <!-- ===== configurator ===== -->
-    <div id="configure" style="scroll-margin-top:80px;margin:48px 0 70px;">
-      <span class="kicker">Configure your install</span>
-      <h2 class="display" style="margin:12px 0 6px;">Need a port, a domain, or Docker?</h2>
-      <p class="prereqs-sub" style="margin-bottom:22px;">Answer a couple of questions and we'll generate the exact command for your setup.</p>
+    <!-- ===== customize (configurator) ===== -->
+    <div id="configure" style="scroll-margin-top:80px;margin:46px 0 0;">
+      <span class="kicker">Optional</span>
+      <h2 class="display" style="margin:12px 0 6px;">Want a custom port, a domain, or Docker?</h2>
+      <p class="prereqs-sub" style="margin-bottom:22px;">Skip this if the one-liner above is all you need. Otherwise answer a couple of questions and we'll generate the exact command for your setup.</p>
       <InstallConfigurator client:load />
     </div>
+
+    <!-- ===== advanced / reference: demoted into a disclosure ===== -->
+    <details class="install-more">
+      <summary>
+        <span class="im-label"><Icon name="lucide:settings-2" /> Advanced &amp; other options</span>
+        <span class="im-hint">Requirements, and Docker vs native vs source</span>
+        <Icon name="lucide:chevron-down" class="im-chev" />
+      </summary>
+      <div class="im-body">
+        <!-- prerequisites -->
+        <div class="prereqs" style="margin:8px 0 0;">
+          <span class="kicker">Before you start</span>
+          <h3 class="display" style="margin:12px 0 6px;">What the one-liner needs.</h3>
+          <p class="prereqs-sub">Most machines already have all of this.</p>
+          <div class="prereq-grid">
+            {prereqs.map(([icon, title, desc]) => (
+              <div class="prereq">
+                <span class="pic"><Icon name={icon} /></span>
+                <div>
+                  <div class="pt">{title}</div>
+                  <div class="pd">{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p class="prereqs-win"><Icon name="lucide:monitor" /> <span><b>On Windows?</b> The native installer doesn't run on Windows directly. Use <b>WSL2</b> (run the one-liner inside your Linux distro) or <b>Docker Desktop</b>.</span></p>
+        </div>
+
+        <!-- method comparison -->
+        <div style="margin:40px 0 0;">
+          <span class="kicker">Compare</span>
+          <h3 class="display" style="margin:12px 0 6px;">Native, Docker, or from source?</h3>
+          <p class="prereqs-sub">All three run the exact same app. They differ in how it lives on the machine.</p>
+        </div>
+        <div class="methods methods-3">
+          {methods.map((m) => (
+            <div class={`method${m.primary ? ' primary' : ''}`}>
+              <span class="tag">{m.tag}</span>
+              <h3 class="display">{m.name}</h3>
+              <p class="for">{m.pick}</p>
+              <ul>
+                {m.points.map(([k, label]) => (
+                  <li class={k}>
+                    <Icon name={k === 'y' ? 'lucide:check' : 'lucide:x'} />
+                    <span class="lbl">{label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </details>
+
+    <div style="height:70px"></div>
   </div>
 
   <!-- ===== footer ===== -->
