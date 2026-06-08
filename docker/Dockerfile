@@ -46,6 +46,26 @@ RUN sed -i '/"prepare":/d' package.json && \
 # flow fails with `Executable not found in $PATH: "npm"`).
 RUN apt-get update && apt-get install -y --no-install-recommends gosu npm && rm -rf /var/lib/apt/lists/*
 
+# Install Chromium for Playwright (the browse_url / screenshot_url tools and the
+# browser_* session tools in src/server/tools/ drive a headless Chromium via
+# playwright-extra → playwright; without the browser they fail at runtime with
+# "Executable doesn't exist ... run `playwright install`").
+#
+# Run the project-local playwright CLI (resolved from the node_modules installed
+# just above) rather than a pinned `playwright@x.y.z` — the browser build must
+# match the installed library version, and the lockfile range can resolve upward.
+#
+# Install to a global path that the dropped-privilege runtime user (hivekeep,
+# UID 1001) can read — the entrypoint execs the server via `gosu hivekeep`, so a
+# browser installed under root's $HOME (~/.cache/ms-playwright) would be invisible.
+# `--with-deps` pulls the OS shared libraries Chromium needs via apt; we install
+# only chromium (not firefox/webkit) to keep the image lean, then chmod the
+# browsers dir so the runtime user can read + execute it.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN bun x playwright install --with-deps chromium && \
+    chmod -R a+rX /ms-playwright && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy built frontend
 COPY --from=build /app/dist ./dist
 

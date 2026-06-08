@@ -1109,6 +1109,93 @@ build_hivekeep() {
     rm -rf "$HIVEKEEP_DIR/.output" "$HIVEKEEP_DIR/dist" "$HIVEKEEP_DIR/.nuxt" 2>/dev/null || true
     run_with_spinner "Building Hivekeep (clean retry)..." bun run build
   fi
+
+  # Install the headless browser the browse_url / screenshot_url / browser_*
+  # session tools need at runtime (driven via playwright-extra → playwright).
+  install_chromium
+}
+
+# ─── Headless browser (Playwright Chromium) ──────────────────────────────────
+# The browse_url / screenshot_url tools and the browser_* session tools launch a
+# headless Chromium via playwright-extra. Without the browser binary they fail at
+# runtime ("Executable doesn't exist … run `playwright install`").
+#
+# This step is best-effort: a failure here (e.g. no sudo for system libs) must
+# NOT abort the install — the rest of Hivekeep works fine, browsing tools just
+# stay unavailable until Chromium is present. Idempotent: re-running is a cheap
+# no-op once the matching browser build is already installed.
+install_chromium() {
+  cd "$HIVEKEEP_DIR" || return 0
+
+  # Install the browser INSIDE the install dir (not the caller's ~/.cache) so it
+  # lives somewhere the runtime service user can read. In the root/system-install
+  # flow the service runs as a separate '$HIVEKEEP_USER' account, and setup_system_user
+  # chowns the whole install dir to it — a browser under root's $HOME would be
+  # invisible to the service. We persist PLAYWRIGHT_BROWSERS_PATH into hivekeep.env
+  # so the running server looks in the same place.
+  local browsers_path="${HIVEKEEP_DIR}/.cache/ms-playwright"
+  mkdir -p "$browsers_path"
+  persist_browsers_path "$browsers_path"
+
+  # Run the project-local playwright CLI (matches the installed library version;
+  # a pinned version could pull a mismatched browser build).
+  if [ "$OS" = "Darwin" ]; then
+    # macOS: Homebrew/the system already provides the shared libs Chromium needs,
+    # and `--with-deps` isn't supported on macOS — plain install only.
+    if ! run_with_spinner "Installing headless browser (Chromium)..." \
+        env PLAYWRIGHT_BROWSERS_PATH="$browsers_path" bun x playwright install chromium; then
+      warn "Could not install Chromium for the browser tools (browse_url / screenshot_url / browser sessions)."
+      warn "Hivekeep is installed and will run; install it later with:"
+      warn "  cd ${HIVEKEEP_DIR} && PLAYWRIGHT_BROWSERS_PATH='${browsers_path}' bun x playwright install chromium"
+    fi
+  else
+    # Linux: prefer `--with-deps` so apt pulls Chromium's system libraries. That
+    # needs root/sudo; if neither is available, fall back to a plain browser
+    # install and tell the user how to add the OS libs themselves.
+    if [ "$IS_ROOT" = true ]; then
+      if ! run_with_spinner "Installing headless browser (Chromium + system libs)..." \
+          env PLAYWRIGHT_BROWSERS_PATH="$browsers_path" bun x playwright install --with-deps chromium; then
+        warn "Could not install Chromium for the browser tools (browse_url / screenshot_url / browser sessions)."
+        warn "Hivekeep is installed and will run; install it later with:"
+        warn "  cd ${HIVEKEEP_DIR} && PLAYWRIGHT_BROWSERS_PATH='${browsers_path}' bun x playwright install --with-deps chromium"
+      fi
+    elif command -v sudo &>/dev/null && sudo -n true 2>/dev/null; then
+      # `--with-deps` shells out to apt internally, so it must run under sudo;
+      # pass the browsers path through so the binary also lands in the shared dir.
+      if ! run_with_spinner "Installing headless browser (Chromium + system libs)..." \
+          sudo env PLAYWRIGHT_BROWSERS_PATH="$browsers_path" bun x playwright install --with-deps chromium; then
+        warn "Could not install Chromium for the browser tools (browse_url / screenshot_url / browser sessions)."
+        warn "Hivekeep is installed and will run; install it later with:"
+        warn "  cd ${HIVEKEEP_DIR} && sudo env PLAYWRIGHT_BROWSERS_PATH='${browsers_path}' bun x playwright install --with-deps chromium"
+      fi
+    else
+      # No sudo for the OS libs — install just the browser binary and tell the
+      # user how to add the system dependencies in a separate one-time step.
+      if ! run_with_spinner "Installing headless browser (Chromium)..." \
+          env PLAYWRIGHT_BROWSERS_PATH="$browsers_path" bun x playwright install chromium; then
+        warn "Could not install Chromium for the browser tools (browse_url / screenshot_url / browser sessions)."
+      else
+        warn "Chromium installed without system libraries (no sudo available)."
+        warn "If browsing tools fail to launch, install the OS deps once with:"
+        warn "  cd ${HIVEKEEP_DIR} && sudo bun x playwright install-deps chromium"
+      fi
+    fi
+  fi
+}
+
+# Persist PLAYWRIGHT_BROWSERS_PATH into hivekeep.env so the systemd/launchd
+# service (which may run as a different user than the installer) finds the
+# browser installed above. Idempotent: replaces any existing line.
+persist_browsers_path() {
+  local browsers_path="$1"
+  local env_file="$HIVEKEEP_DATA_DIR/hivekeep.env"
+  [ -f "$env_file" ] || return 0
+  # Drop a stale line then append the current value.
+  if command -v sed &>/dev/null; then
+    sed -i.bak '/^PLAYWRIGHT_BROWSERS_PATH=/d' "$env_file" 2>/dev/null || true
+    rm -f "${env_file}.bak" 2>/dev/null || true
+  fi
+  printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$browsers_path" >> "$env_file"
 }
 
 # ─── Database ────────────────────────────────────────────────────────────────
