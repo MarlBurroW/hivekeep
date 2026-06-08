@@ -48,15 +48,38 @@ export default defineConfig({
 					label: 'Getting Started',
 					items: [
 						{ label: 'Installation', slug: 'getting-started/installation' },
-						{ label: 'Your First Agent', slug: 'getting-started/first-agent' },
 						{ label: 'Configuration', slug: 'getting-started/configuration' },
+						{ label: 'Your First Agent', slug: 'getting-started/first-agent' },
+						{ label: 'Autonomy Quickstart', slug: 'guides/autonomy-quickstart' },
 					],
 				},
 				{
-					label: 'Guides',
+					label: 'Core Concepts',
 					items: [
-						{ label: 'Autonomy Quickstart', slug: 'guides/autonomy-quickstart' },
-						{ label: 'Model Selection', slug: 'guides/model-selection' },
+						{ label: 'Agents', slug: 'agents/overview' },
+						{ label: 'System Prompts', slug: 'agents/system-prompts' },
+						{ label: 'Native Tools', slug: 'agents/tools' },
+						{ label: 'Memory', slug: 'agents/memory' },
+						{ label: 'How Memory Works', slug: 'memory/how-it-works' },
+						{ label: 'Memory Configuration', slug: 'memory/configuration' },
+						{ label: 'Choosing a Model', slug: 'guides/model-selection' },
+					],
+				},
+				{
+					label: 'Agents Everywhere',
+					items: [
+						{ label: 'Channels Overview', slug: 'channels/overview' },
+						{ label: 'Telegram', slug: 'channels/telegram' },
+						{ label: 'Discord', slug: 'channels/discord' },
+						{ label: 'Slack', slug: 'channels/slack' },
+						{ label: 'WhatsApp', slug: 'channels/whatsapp' },
+						{ label: 'Signal', slug: 'channels/signal' },
+						{ label: 'Matrix', slug: 'channels/matrix' },
+					],
+				},
+				{
+					label: 'Automation',
+					items: [
 						{
 							label: 'Blueprints',
 							items: [
@@ -67,12 +90,16 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Agents',
+					label: 'Extending Hivekeep',
 					items: [
-						{ label: 'Overview', slug: 'agents/overview' },
-						{ label: 'System Prompts', slug: 'agents/system-prompts' },
-						{ label: 'Tools', slug: 'agents/tools' },
-						{ label: 'Memory', slug: 'agents/memory' },
+						{ label: 'Mini-Apps Overview', slug: 'mini-apps/overview' },
+						{ label: 'Mini-Apps: Getting Started', slug: 'mini-apps/getting-started' },
+						{ label: 'Mini-Apps: Components', slug: 'mini-apps/components' },
+						{ label: 'Mini-Apps: Hooks', slug: 'mini-apps/hooks' },
+						{ label: 'Mini-Apps: SDK Reference', slug: 'mini-apps/sdk-reference' },
+						{ label: 'Mini-Apps: Guidelines', slug: 'mini-apps/guidelines' },
+						{ label: 'Mini-Apps: Backend (_server.js)', slug: 'mini-apps/backend' },
+						{ label: 'Mini-Apps: Examples', slug: 'mini-apps/examples' },
 					],
 				},
 				{
@@ -80,41 +107,10 @@ export default defineConfig({
 					items: [
 						{ label: 'Overview', slug: 'plugins/overview' },
 						{ label: 'Developing Plugins', slug: 'plugins/developing' },
+						{ label: 'Tutorial: Mistral Provider', slug: 'plugins/tutorial-mistral' },
 						{ label: 'Plugin API', slug: 'plugins/api' },
 						{ label: 'Plugin Registry', slug: 'plugins/store' },
 						{ label: 'Migrating from 0.1', slug: 'plugins/migrating-from-01' },
-					],
-				},
-				{
-					label: 'Mini-Apps',
-					items: [
-						{ label: 'Overview', slug: 'mini-apps/overview' },
-						{ label: 'Getting Started', slug: 'mini-apps/getting-started' },
-						{ label: 'Components', slug: 'mini-apps/components' },
-						{ label: 'Hooks', slug: 'mini-apps/hooks' },
-						{ label: 'SDK Reference', slug: 'mini-apps/sdk-reference' },
-						{ label: 'Guidelines', slug: 'mini-apps/guidelines' },
-						{ label: 'Backend (_server.js)', slug: 'mini-apps/backend' },
-						{ label: 'Examples', slug: 'mini-apps/examples' },
-					],
-				},
-				{
-					label: 'Channels',
-					items: [
-						{ label: 'Overview', slug: 'channels/overview' },
-						{ label: 'Telegram', slug: 'channels/telegram' },
-						{ label: 'Discord', slug: 'channels/discord' },
-						{ label: 'Slack', slug: 'channels/slack' },
-						{ label: 'WhatsApp', slug: 'channels/whatsapp' },
-						{ label: 'Signal', slug: 'channels/signal' },
-						{ label: 'Matrix', slug: 'channels/matrix' },
-					],
-				},
-				{
-					label: 'Memory',
-					items: [
-						{ label: 'How It Works', slug: 'memory/how-it-works' },
-						{ label: 'Configuration', slug: 'memory/configuration' },
 					],
 				},
 				{
