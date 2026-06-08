@@ -12,7 +12,22 @@ Authenticate using either:
 - **API key header:** `X-API-Key: <your-api-key>`
 - **Session cookie** set during login
 
-Auth routes (`/api/auth/*`) are handled by [Better Auth](https://www.better-auth.com/) and don't require pre-authentication.
+Auth routes (`/api/auth/*`) are handled by [Better Auth](https://www.better-auth.com/) and don't require pre-authentication. Onboarding routes (`/api/onboarding/*`) are also unauthenticated (first-run setup).
+
+## Error Format
+
+All API routes return JSON. Errors use a consistent envelope with a machine-readable `code` and a human-readable `message`:
+
+```json
+{
+  "error": {
+    "code": "PROVIDER_NOT_FOUND",
+    "message": "Provider not found"
+  }
+}
+```
+
+The HTTP status reflects the error class (`400` validation, `401` unauthenticated, `403` forbidden, `404` not found, `409` conflict, `429` rate-limited, `500` server error). Common codes include `VALIDATION_ERROR`, `NOT_FOUND`, `UNAUTHORIZED`, `FORBIDDEN`, and resource-specific codes such as `PROVIDER_NOT_FOUND` or `SESSION_EXPIRED`.
 
 ## Agents
 
@@ -212,7 +227,7 @@ All session responses include an `expiresAt` field (Unix timestamp in ms, or `nu
 
 ## Tasks
 
-Sub-tasks spawned by Agents (inter-Agent delegation, subtasks). Tasks support **concurrency groups** — tasks in the same group are limited to a max number of parallel executions, with excess tasks queued and auto-promoted.
+Sub-tasks spawned by Agents (inter-Agent delegation, subtasks). Tasks support **concurrency groups**: tasks in the same group are limited to a max number of parallel executions, with excess tasks queued and auto-promoted.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -221,7 +236,7 @@ Sub-tasks spawned by Agents (inter-Agent delegation, subtasks). Tasks support **
 | `POST` | `/api/tasks/:id/cancel` | Cancel a running task |
 | `POST` | `/api/tasks/:id/pause` | Pause a running task (preserves state) |
 | `POST` | `/api/tasks/:id/resume` | Resume a paused task, optionally with a message (`{ message?: string }`) |
-| `POST` | `/api/tasks/:id/inject` | Inject a message into a running task (`{ content: string }`) — aborts current stream and re-triggers with addendum |
+| `POST` | `/api/tasks/:id/inject` | Inject a message into a running task (`{ content: string }`), aborts current stream and re-triggers with addendum |
 | `POST` | `/api/tasks/:id/force-promote` | Force-start a queued task (ignoring concurrency limit) |
 
 ## Plugins
@@ -415,16 +430,23 @@ Pending approval prompts (e.g. tool use confirmations).
 | `GET` | `/api/settings/global-prompt` | Get global system prompt |
 | `PUT` | `/api/settings/global-prompt` | Update global prompt |
 | `GET` | `/api/settings/models` | Get extraction + embedding model config (legacy) |
-| `GET` | `/api/settings/default-models` | Get all model/service defaults (LLM, image, compacting, extraction, embedding, search) |
+| `GET` | `/api/settings/default-models` | Get all model/service defaults (LLM, image, compacting, scout, extraction, embedding, search, TTS, STT) |
 | `PUT` | `/api/settings/default-llm` | Set default LLM model + provider |
 | `PUT` | `/api/settings/default-image` | Set default image generation model + provider |
 | `PUT` | `/api/settings/default-compacting` | Set default compacting model + provider |
+| `PUT` | `/api/settings/default-scout` | Set default scout model + provider |
+| `PUT` | `/api/settings/default-search` | Set default search provider |
+| `PUT` | `/api/settings/default-tts` | Set default text-to-speech provider/model |
+| `PUT` | `/api/settings/default-stt` | Set default speech-to-text provider/model |
 | `PUT` | `/api/settings/extraction-model` | Set memory extraction model |
 | `PUT` | `/api/settings/embedding-model` | Set embedding model |
-| `GET` | `/api/settings/search-provider` | Get search provider config |
-| `PUT` | `/api/settings/search-provider` | Update search provider |
-| `GET` | `/api/settings/hub` | Get Hub settings |
-| `PUT` | `/api/settings/hub` | Update Hub settings |
+| `GET` | `/api/settings/task-limits` | Get task concurrency/depth limits |
+| `PUT` | `/api/settings/task-limits` | Update task limits |
+| `GET` | `/api/settings/avatar-style` | Get the global avatar art style |
+| `PUT` | `/api/settings/avatar-style` | Update the avatar art style |
+| `GET` | `/api/settings/dismissed-setup-items` | List dismissed setup-checklist items |
+| `POST` | `/api/settings/dismissed-setup-items/:itemId` | Dismiss a setup-checklist item |
+| `DELETE` | `/api/settings/dismissed-setup-items/:itemId` | Restore a dismissed setup item |
 
 ## Current User
 
