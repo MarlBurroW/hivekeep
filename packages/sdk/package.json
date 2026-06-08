@@ -2,7 +2,7 @@
   "name": "@hivekeep/sdk",
   "version": "0.10.0",
   "description": "Plugin SDK for Hivekeep — declare tools, channels, providers, and hooks without depending on Hivekeep internals.",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "author": "Hivekeep Team",
   "homepage": "https://marlburrow.github.io/hivekeep",
   "repository": {

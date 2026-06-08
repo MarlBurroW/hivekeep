@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <sub>100% open-source (AGPL-3.0) · self-hosted · zero external infra</sub>
+  <sub>100% open-source (MIT) · self-hosted · zero external infra</sub>
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-22c55e?style=flat-square" alt="License AGPL-3.0" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-AE5AF9?style=flat-square" alt="License MIT" /></a>
   <a href="https://github.com/MarlBurroW/hivekeep/releases"><img src="https://img.shields.io/github/v/release/MarlBurroW/hivekeep?style=flat-square&color=a855f7" alt="Latest release" /></a>
   <a href="https://github.com/MarlBurroW/hivekeep/actions/workflows/ci.yml"><img src="https://github.com/MarlBurroW/hivekeep/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/MarlBurroW/hivekeep/pkgs/container/hivekeep"><img src="https://img.shields.io/badge/Docker-ghcr.io-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker image" /></a>
@@ -375,7 +375,7 @@ Contributions are welcome: code, plugins, mini-apps, translations, docs, feedbac
 
 ## License
 
-Hivekeep is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You are free to use, modify, and distribute it. If you deploy a modified version as a network service, you must make your source available under the same license. Your data, your keys, your server, no lock-in.
+Hivekeep is licensed under the [MIT License](LICENSE). You are free to use, modify, and distribute it, including in commercial and closed-source projects. Your data, your keys, your server, no lock-in.
 
 <p align="center">
   <sub>Built with care and <a href="https://bun.sh">Bun</a> · <a href="https://marlburrow.github.io/hivekeep/">Website</a> · <a href="https://marlburrow.github.io/hivekeep/docs/">Docs</a></sub>

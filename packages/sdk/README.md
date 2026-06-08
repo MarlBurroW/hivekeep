@@ -94,4 +94,4 @@ The canonical plugin author guide lives on the docs site:
 
 ## License
 
-AGPL-3.0-only.
+MIT.

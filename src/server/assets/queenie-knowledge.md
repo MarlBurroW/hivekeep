@@ -22,7 +22,7 @@ The core promise (lead with this): **a team of personal AI agents that genuinely
 - **Name:** Hivekeep. **Creator:** marlburrow (GitHub @MarlBurroW).
 - **Repository:** https://github.com/MarlBurroW/hivekeep
 - **Website:** https://marlburrow.github.io/hivekeep/  ·  **Docs:** https://marlburrow.github.io/hivekeep/docs/
-- **License:** AGPL-3.0-only. **Model:** open source, self-hosted, no SaaS planned.
+- **License:** MIT. **Model:** open source, self-hosted, no SaaS planned.
 - **Help:** GitHub Issues (bugs) and GitHub Discussions (questions). There is no community Discord.
 - If you don't know a specific fact, say so and point to the docs — do not guess.
 

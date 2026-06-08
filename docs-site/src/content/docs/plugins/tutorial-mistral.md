@@ -46,7 +46,7 @@ The manifest is what Hivekeep validates and loads. Required fields: `name` (lowe
   "version": "0.1.0",
   "description": "Mistral AI provider for Hivekeep: chat models (tool calling, vision, streaming) plus Voxtral speech-to-text, via api.mistral.ai.",
   "author": "Your Name",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "hivekeep": ">=0.41.0",
   "main": "index.ts",
   "icon": "🌬️",
@@ -74,7 +74,7 @@ Key fields explained:
   "version": "0.1.0",
   "description": "Mistral AI provider for Hivekeep: chat models (tool calling, vision, streaming) plus Voxtral speech-to-text, via api.mistral.ai.",
   "author": "Your Name",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/your-name/hivekeep-plugin-mistral.git"

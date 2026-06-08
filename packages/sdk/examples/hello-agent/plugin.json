@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Reference example demonstrating every plugin extension point Hivekeep supports: tools, channels, providers, hooks, cards, and the typed plugin context.",
   "author": "Hivekeep Team",
-  "license": "AGPL-3.0-only",
+  "license": "MIT",
   "main": "index.ts",
   "hivekeep": ">=0.41.0",
   "icon": "👋",

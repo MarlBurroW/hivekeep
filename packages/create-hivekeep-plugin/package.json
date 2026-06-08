@@ -2,7 +2,7 @@
   "name": "create-hivekeep-plugin",
   "version": "1.0.1",
   "description": "Scaffold a new Hivekeep plugin with best-practice boilerplate.",
-  "license": "AGPL-3.0",
+  "license": "MIT",
   "author": "Hivekeep Team",
   "type": "module",
   "bin": {

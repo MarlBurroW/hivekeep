@@ -25,7 +25,7 @@ LABEL org.opencontainers.image.title="Hivekeep" \
       org.opencontainers.image.description="Self-hosted AI agents with persistent memory, real identity, and collaboration" \
       org.opencontainers.image.url="https://github.com/MarlBurroW/hivekeep" \
       org.opencontainers.image.source="https://github.com/MarlBurroW/hivekeep" \
-      org.opencontainers.image.licenses="AGPL-3.0"
+      org.opencontainers.image.licenses="MIT"
 
 # Install production dependencies (better-sqlite3 needs build tools for node-gyp)
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
