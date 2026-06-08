@@ -42,7 +42,7 @@
     "db:snapshot": "bun scripts/db-snapshot.ts create",
     "db:snapshot:list": "bun scripts/db-snapshot.ts list",
     "db:snapshot:restore": "bun scripts/db-snapshot.ts restore",
-    "test": "bun test ./src ./packages/sdk/src ./packages/create-hivekeep-plugin ./plugins",
+    "test": "bun test $(find ./src ./packages/sdk/src ./packages/create-hivekeep-plugin ./plugins -name '*.test.ts' | sort)",
     "test:e2e": "npx playwright test",
     "typecheck": "tsc --noEmit",
     "prepare": "husky"
