@@ -11,6 +11,7 @@ export type {
   EmailSearchQuery,
   EmailListOptions,
   EmailListResult,
+  EmailFolder,
   OutgoingAttachment,
   SendEmailParams,
   SendEmailResult,

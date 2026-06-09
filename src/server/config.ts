@@ -525,6 +525,19 @@ export const config = {
     rateLimitPerMinute: Number(process.env.WEBHOOKS_RATE_LIMIT_PER_MINUTE ?? 60),
   },
 
+  // Email account triggers: condition-matched email → conversation/task dispatch.
+  emailTriggers: {
+    maxPerAccount: Number(process.env.EMAIL_TRIGGERS_MAX_PER_ACCOUNT ?? 20),
+    pollIntervalMs: Number(process.env.EMAIL_TRIGGER_POLL_INTERVAL ?? 120_000),
+    // Anti-flood: cap messages processed per (account, folder) per poll cycle.
+    maxPerCycle: Number(process.env.EMAIL_TRIGGER_MAX_PER_CYCLE ?? 50),
+    logRetentionDays: Number(process.env.EMAIL_TRIGGER_LOG_RETENTION_DAYS ?? 30),
+    maxLogsPerTrigger: Number(process.env.EMAIL_TRIGGER_MAX_LOGS_PER_TRIGGER ?? 500),
+    // Ring buffer of recently-seen message ids per (account, folder), to drop
+    // boundary duplicates (provider `after` filters are second-granular/inclusive).
+    seenIdsRing: Number(process.env.EMAIL_TRIGGER_SEEN_IDS_RING ?? 200),
+  },
+
   channels: {
     maxPerAgent: Number(process.env.CHANNELS_MAX_PER_KIN ?? 5),
     telegramWebhookPath: '/api/channels/telegram',

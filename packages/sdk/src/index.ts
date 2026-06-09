@@ -1721,6 +1721,14 @@ export interface EmailListResult {
   nextPageToken?: string
 }
 
+/** A mailbox folder (IMAP/Graph) or label (Gmail). `id` is what `listMessages`
+ *  expects as `folder`; `name` is the display label. */
+export interface EmailFolder {
+  id: string
+  name: string
+  type?: 'folder' | 'label'
+}
+
 /** A file to attach to an outgoing message. `contentBase64` is the raw bytes
  *  in standard base64 — the provider wraps it in a MIME part. */
 export interface OutgoingAttachment {
@@ -1801,6 +1809,9 @@ export interface EmailProvider extends ProviderUIHints {
 
   listMessages(options: EmailListOptions, config: ProviderConfig): Promise<EmailListResult>
   getMessage(id: string, config: ProviderConfig): Promise<EmailFull>
+  /** List mailbox folders / labels for the folder picker. Optional — providers
+   *  that can't enumerate folders omit it (the host falls back to INBOX). */
+  listFolders?(config: ProviderConfig): Promise<EmailFolder[]>
   searchMessages?(query: EmailSearchQuery, config: ProviderConfig): Promise<EmailSummary[]>
   sendMessage(params: SendEmailParams, config: ProviderConfig): Promise<SendEmailResult>
   /** Fetch an attachment's raw bytes (standard base64). Optional — providers

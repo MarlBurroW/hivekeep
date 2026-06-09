@@ -7,6 +7,7 @@ import { MarkdownContent } from '@/client/components/chat/MarkdownContent'
 import { InlineToolCall } from '@/client/components/chat/InlineToolCall'
 import { TaskResultCard } from '@/client/components/chat/TaskResultCard'
 import { WebhookMessageCard } from '@/client/components/chat/WebhookMessageCard'
+import { TriggerMessageCard } from '@/client/components/chat/TriggerMessageCard'
 import { ImageLightbox } from '@/client/components/chat/ImageLightbox'
 import { TokenUsageIndicator } from '@/client/components/chat/TokenUsageIndicator'
 import { ChatAvatar } from '@/client/components/chat/ChatAvatar'
@@ -938,6 +939,7 @@ export const MessageBubble = memo(function MessageBubble({
   const hasChannelBrand = Boolean(channelBrandColor)
   const isTaskResult = sourceType === 'task'
   const isWebhook = sourceType === 'webhook'
+  const isTrigger = sourceType === 'trigger'
   const isSystem = sourceType === 'system' || sourceType === 'cron'
   // Deduplicate tool calls by ID (safety net for race conditions between
   // streaming and fetched state that can produce the same call twice)
@@ -975,6 +977,11 @@ export const MessageBubble = memo(function MessageBubble({
   // Webhook message cards
   if (isWebhook) {
     return <WebhookMessageCard content={content} timestamp={timestamp} />
+  }
+
+  // Email trigger message cards
+  if (isTrigger) {
+    return <TriggerMessageCard content={content} timestamp={timestamp} />
   }
 
   // System messages centered. Channel-transfer audit events (out/in) get

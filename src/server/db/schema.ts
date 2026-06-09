@@ -509,6 +509,57 @@ export const webhookLogs = sqliteTable('webhook_logs', {
   index('idx_webhook_logs_webhook_created').on(table.webhookId, table.createdAt),
 ])
 
+// ─── Account triggers ──────────────────────────────────────────────────────────
+// Per connected-account automation: when a new email matches the condition tree,
+// inject into the target Agent's conversation or spawn a task. Polled (no push).
+
+export const accountTriggers = sqliteTable('account_triggers', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => providers.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  folder: text('folder').notNull().default('INBOX'),
+  conditions: text('conditions').notNull(), // JSON ConditionNode tree
+  prompt: text('prompt').notNull(),
+  targetAgentId: text('target_agent_id').notNull().references(() => agents.id),
+  dispatchMode: text('dispatch_mode').notNull().default('conversation'), // 'conversation' | 'task'
+  maxConcurrentTasks: integer('max_concurrent_tasks').notNull().default(1), // 0 = unlimited
+  needsBody: integer('needs_body', { mode: 'boolean' }).notNull().default(false), // tree references body/attachment_*
+  lastTriggeredAt: integer('last_triggered_at', { mode: 'timestamp_ms' }),
+  triggerCount: integer('trigger_count').notNull().default(0),
+  createdBy: text('created_by').notNull().default('user'), // 'user' | 'agent'
+  requiresApproval: integer('requires_approval', { mode: 'boolean' }).notNull().default(false),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('idx_account_triggers_account').on(table.accountId),
+  index('idx_account_triggers_target_agent').on(table.targetAgentId),
+])
+
+// Polling cursor + dedup, keyed per (account, folder) since triggers can target
+// different folders on the same account (each folder is a distinct message stream).
+export const accountSyncState = sqliteTable('account_sync_state', {
+  accountId: text('account_id').notNull().references(() => providers.id, { onDelete: 'cascade' }),
+  folder: text('folder').notNull(),
+  lastSeenDate: integer('last_seen_date').notNull(), // Unix ms watermark
+  seenIds: text('seen_ids').notNull().default('[]'), // JSON ring of provider msg ids at the watermark boundary
+  lastPolledAt: integer('last_polled_at'), // Unix ms
+  lastError: text('last_error'),
+}, (table) => [
+  primaryKey({ columns: [table.accountId, table.folder] }),
+])
+
+export const triggerLogs = sqliteTable('trigger_logs', {
+  id: text('id').primaryKey(),
+  triggerId: text('trigger_id').notNull().references(() => accountTriggers.id, { onDelete: 'cascade' }),
+  summary: text('summary'), // "from · subject"
+  matched: integer('matched', { mode: 'boolean' }).notNull(),
+  action: text('action'), // 'conversation' | 'task' | null when not matched
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('idx_trigger_logs_trigger_created').on(table.triggerId, table.createdAt),
+])
+
 export const vaultSecrets = sqliteTable('vault_secrets', {
   id: text('id').primaryKey(),
   key: text('key').notNull().unique(),

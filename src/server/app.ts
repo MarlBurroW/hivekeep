@@ -38,6 +38,7 @@ import { memoryRoutes } from '@/server/routes/memories'
 import { sharedRoutes } from '@/server/routes/shared'
 import { webhookRoutes } from '@/server/routes/webhooks'
 import { webhookIncomingRoutes } from '@/server/routes/webhooks-incoming'
+import { accountTriggerRoutes } from '@/server/routes/account-triggers'
 import { channelRoutes } from '@/server/routes/channels'
 import { channelTelegramRoutes } from '@/server/routes/channel-telegram'
 import { channelSlackRoutes } from '@/server/routes/channel-slack'
@@ -199,6 +200,7 @@ app.route('/api/secret-prompts', secretPromptRoutes)
 app.route('/api/memories', memoryRoutes)
 app.route('/api/webhooks/incoming', webhookIncomingRoutes)
 app.route('/api/webhooks', webhookRoutes)
+app.route('/api/account-triggers', accountTriggerRoutes)
 app.route('/api/channels/telegram', channelTelegramRoutes)
 app.route('/api/channels/slack/webhook', channelSlackRoutes)
 app.route('/api/channels/whatsapp/webhook', channelWhatsAppRoutes)

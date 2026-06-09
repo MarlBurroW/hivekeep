@@ -36,6 +36,7 @@ import { ConfirmDeleteButton } from '@/client/components/common/ConfirmDeleteBut
 import { ProviderIcon } from '@/client/components/common/ProviderIcon'
 import { useEmailAccounts, type EmailAccount, type EmailProviderInfo } from '@/client/hooks/useEmailAccounts'
 import { usePendingEmailSends } from '@/client/hooks/usePendingEmailSends'
+import { AccountTriggersSection } from '@/client/components/account-trigger/AccountTriggersSection'
 import type { PendingEmailSend } from '@/shared/types'
 
 export function EmailAccountsSettings() {
@@ -52,6 +53,8 @@ export function EmailAccountsSettings() {
       <p className="text-sm text-muted-foreground">{t('settings.emailAccounts.description')}</p>
 
       <PendingApprovals />
+
+      <TriggerApprovalToggle />
 
       <HelpPanel
         contentKey="settings.emailAccounts.help.content"
@@ -592,7 +595,47 @@ function EmailAccountCard({ account, onChange }: { account: EmailAccount; onChan
           />
         </div>
       </CardContent>
+      {servesEmail && <AccountTriggersSection accountId={account.id} />}
     </Card>
+  )
+}
+
+/** Global setting: require user approval for triggers created by an Agent. */
+function TriggerApprovalToggle() {
+  const { t } = useTranslation()
+  const [requireApproval, setRequireApproval] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await api.get<{ requireApproval: boolean }>('/account-triggers/settings/approval')
+        setRequireApproval(res.requireApproval)
+      } catch {
+        // Leave null → the row stays hidden.
+      }
+    })()
+  }, [])
+
+  if (requireApproval === null) return null
+
+  const toggle = async (next: boolean) => {
+    setRequireApproval(next)
+    try {
+      await api.put('/account-triggers/settings/approval', { enabled: next })
+    } catch (err) {
+      setRequireApproval(!next)
+      toast.error(getErrorMessage(err))
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-2.5">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{t('settings.triggers.approvalTitle')}</p>
+        <p className="text-xs text-muted-foreground">{t('settings.triggers.approvalDescription')}</p>
+      </div>
+      <Switch checked={requireApproval} onCheckedChange={(v) => void toggle(v)} />
+    </div>
   )
 }
 

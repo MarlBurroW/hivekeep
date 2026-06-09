@@ -262,6 +262,9 @@ export const fullMockSchema = {
   secretPrompts: {},
   toolDomains: {},
   toolboxes: {},
+  accountTriggers: {},
+  accountSyncState: {},
+  triggerLogs: {},
 }
 
 /**

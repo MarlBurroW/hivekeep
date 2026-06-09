@@ -18,6 +18,14 @@ import {
   downloadEmailAttachmentTool,
 } from '@/server/tools/email-tools'
 import {
+  describeTriggerConditionsTool,
+  listEmailFoldersTool,
+  createAccountTriggerTool,
+  listAccountTriggersTool,
+  updateAccountTriggerTool,
+  deleteAccountTriggerTool,
+} from '@/server/tools/account-trigger-tools'
+import {
   listAddressBooksTool,
   listAddressBookContactsTool,
   getAddressBookContactTool,
@@ -335,6 +343,13 @@ export function registerAllTools(): void {
   toolRegistry.register('search_emails', searchEmailsTool, 'email')
   toolRegistry.register('send_email', sendEmailTool, 'email')
   toolRegistry.register('download_email_attachment', downloadEmailAttachmentTool, 'email')
+  // Account triggers — automate Agent reactions to incoming email.
+  toolRegistry.register('describe_trigger_conditions', describeTriggerConditionsTool, 'email')
+  toolRegistry.register('list_email_folders', listEmailFoldersTool, 'email')
+  toolRegistry.register('create_account_trigger', createAccountTriggerTool, 'email')
+  toolRegistry.register('list_account_triggers', listAccountTriggersTool, 'email')
+  toolRegistry.register('update_account_trigger', updateAccountTriggerTool, 'email')
+  toolRegistry.register('delete_account_trigger', deleteAccountTriggerTool, 'email')
 
   // Address-book tools — read-only EXTERNAL contacts (iCloud, …), distinct from
   // Hivekeep's own contacts CRM. Resolved through a slug-based account.

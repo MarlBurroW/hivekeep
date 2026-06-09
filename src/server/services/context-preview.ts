@@ -3,6 +3,7 @@ import { agents, messages, userProfiles, compactingSummaries, tasks } from '@/se
 import { eq, and, isNull, desc, ne, asc } from 'drizzle-orm'
 import { getFilesForMessages } from '@/server/services/files'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
+import { listActiveTriggerSummariesForAgent } from '@/server/services/account-triggers'
 import { getRelevantMemories } from '@/server/services/memory'
 import { listContactsForPrompt } from '@/server/services/contacts'
 import { listAvailableAgents } from '@/server/services/inter-agent'
@@ -464,6 +465,8 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     activeProject = await buildActiveProjectInfo(agent.activeProjectId)
   }
 
+  const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agentId)
+
   // Build system prompt
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
@@ -474,6 +477,7 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     mcpTools: mcpToolsSummary,
     isSubAgent: false,
     activeChannels: activeChannels.length > 0 ? activeChannels : undefined,
+    accountTriggers: accountTriggerSummaries.length > 0 ? accountTriggerSummaries : undefined,
     globalPrompt,
     userLanguage,
     compactingSummaries: compactingSummariesData,

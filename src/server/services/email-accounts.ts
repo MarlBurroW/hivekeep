@@ -153,6 +153,32 @@ export async function resolveEmailProvider(opts: { slug?: string; agentId?: stri
   return { account: toAccount(row, cfg), provider, config, sendMode: cfg.send_mode ?? 'direct' }
 }
 
+/**
+ * Resolve an email account by its provider-row id, WITHOUT the agent allow-list.
+ * Used by account-scoped machinery (the trigger poller, the folder picker) where
+ * access is governed by the account itself, not a calling Agent.
+ */
+export async function resolveEmailProviderByAccountId(accountId: string): Promise<ResolvedEmail> {
+  const row = loadEmailRows().find((r) => r.id === accountId)
+  if (!row) throw new Error(`Email account not found: ${accountId}`)
+
+  const cfg = await decryptConfig(row)
+  const provider = getEmailProvider(row.type)
+  if (!provider) throw new Error(`Email provider not registered: ${row.type}`)
+
+  const config: ProviderConfig = { email_address: cfg.email_address }
+  if (provider.oauth) {
+    config.accessToken = await getFreshAccessToken({
+      id: row.id,
+      type: row.type,
+      refreshToken: cfg.refresh_token ?? '',
+    })
+  } else if (cfg.credentials) {
+    Object.assign(config, cfg.credentials)
+  }
+  return { account: toAccount(row, cfg), provider, config, sendMode: cfg.send_mode ?? 'direct' }
+}
+
 /** Create (or update, when the same type+address already exists) an email
  *  account from a completed OAuth flow. */
 function rowCapabilities(row: ProviderRow): string[] {

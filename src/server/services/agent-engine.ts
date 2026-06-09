@@ -21,6 +21,7 @@ import { buildActiveProjectInfo } from '@/server/services/projects'
 import { getContactDisplayName } from '@/shared/contact-display'
 import { decrypt } from '@/server/services/encryption'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
+import { listActiveTriggerSummariesForAgent } from '@/server/services/account-triggers'
 import { buildSegmentedMessages } from '@/server/services/llm-cache-hints'
 import { stringifyToolResultValue } from '@/server/llm/core/vercel-bridge'
 import { DEFAULT_MAX_LLM_TOOLS, getMaxToolsForRequest } from '@/server/services/tool-cap'
@@ -1347,6 +1348,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       return true
     }
 
+    const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agent.id)
     const systemSegments = buildSystemPrompt({
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: contactsWithSlug,
@@ -1356,6 +1358,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       mcpTools: mcpToolsSummary,
       isSubAgent: false,
       activeChannels: activeChannels.length > 0 ? activeChannels : undefined,
+      accountTriggers: accountTriggerSummaries.length > 0 ? accountTriggerSummaries : undefined,
       globalPrompt,
       userLanguage,
       compactingSummaries: compactingSummariesData,

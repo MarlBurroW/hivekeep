@@ -20,6 +20,7 @@ import {
   deleteEmailAccount,
   setSendMode,
   setAllowList,
+  resolveEmailProviderByAccountId,
   type SendMode,
 } from '@/server/services/email-accounts'
 import { sseManager } from '@/server/sse/index'
@@ -312,6 +313,23 @@ emailAccountRoutes.delete('/:id', async (c) => {
   await deleteEmailAccount(id)
   sseManager.broadcast({ type: 'email-account:deleted', data: { accountId: id } })
   return c.json({ ok: true })
+})
+
+// GET /api/email-accounts/:id/folders — list folders/labels for the trigger
+// folder picker. Falls back to INBOX when the provider can't enumerate folders.
+emailAccountRoutes.get('/:id/folders', async (c) => {
+  const id = c.req.param('id')
+  try {
+    const { provider, config } = await resolveEmailProviderByAccountId(id)
+    if (!provider.listFolders) {
+      return c.json({ folders: [{ id: 'INBOX', name: 'INBOX', type: 'folder' as const }] })
+    }
+    const folders = await provider.listFolders(config)
+    return c.json({ folders: folders.length > 0 ? folders : [{ id: 'INBOX', name: 'INBOX', type: 'folder' as const }] })
+  } catch (err) {
+    log.error({ err, id }, 'Failed to list folders')
+    return c.json({ error: { code: 'FOLDERS_FAILED', message: err instanceof Error ? err.message : 'Failed to list folders' } }, 400)
+  }
 })
 
 export { emailAccountRoutes }

@@ -143,7 +143,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
   },
   {
     name: 'email',
-    description: 'Email account access: list, read, search, and send mail through connected accounts.',
+    description: 'Email account access: list, read, search, and send mail through connected accounts. Set up triggers that react to incoming email.',
     toolNames: [
       'list_email_accounts',
       'list_emails',
@@ -151,6 +151,12 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'search_emails',
       'send_email',
       'download_email_attachment',
+      'describe_trigger_conditions',
+      'list_email_folders',
+      'create_account_trigger',
+      'list_account_triggers',
+      'update_account_trigger',
+      'delete_account_trigger',
     ],
   },
   {
@@ -180,7 +186,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
   {
     name: 'configurator',
     description:
-      "Platform configuration set for the onboarding guide (Queenie): connect/test AI providers (secure popup), set defaults, configure channels, customize the avatar style, edit the global prompt, manage contacts/memory, and create the user's first Agents.",
+      "Platform configuration set for the onboarding guide (Queenie): connect/test AI providers (secure popup), set defaults, configure channels, customize the avatar style, edit the global prompt, manage contacts/memory, set up email triggers, and create the user's first Agents.",
     toolNames: [
       // Provider discovery + secure setup + defaults.
       'describe_provider_config',
@@ -241,6 +247,14 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'list_email_accounts',
       'list_calendar_accounts',
       'list_address_books',
+      // Email triggers — connecting an account is UI-only, but automating
+      // reactions to incoming mail IS tool-driven, so Queenie can set these up.
+      'describe_trigger_conditions',
+      'list_email_folders',
+      'create_account_trigger',
+      'list_account_triggers',
+      'update_account_trigger',
+      'delete_account_trigger',
       // Search + web (to find provider key pages).
       'list_search_providers',
       'web_search',

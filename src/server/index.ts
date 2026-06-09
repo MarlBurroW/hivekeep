@@ -19,6 +19,7 @@ import { registerBuiltinContactsProviders } from '@/server/contacts/register'
 import { registerBuiltinCalendarProviders } from '@/server/calendar/register'
 import { initCronScheduler } from '@/server/services/crons'
 import { recoverPendingWakeups } from '@/server/services/wakeup-scheduler'
+import { startEmailTriggerPoller } from '@/server/services/email-trigger-poller'
 import { Cron } from 'croner'
 import { cleanExpiredFiles } from '@/server/services/file-storage'
 import { startQuickSessionCleanup } from '@/server/services/quick-session-cleanup'
@@ -143,6 +144,10 @@ initCronScheduler()
 log.info('Recovering pending wake-ups...')
 recoverPendingWakeups().catch((err) => log.error({ err }, 'Failed to recover pending wake-ups'))
 
+// Start the email account trigger poller (condition-matched email → Agent)
+log.info('Starting email trigger poller...')
+startEmailTriggerPoller()
+
 // Start quick session cleanup
 startQuickSessionCleanup()
 
@@ -182,6 +187,10 @@ startChannelFileCleanup()
 // Webhook log cleanup (prune old/excess logs)
 import { startWebhookLogCleanup } from '@/server/services/webhooks'
 startWebhookLogCleanup()
+
+// Trigger log cleanup (prune old trigger evaluation logs)
+import { startTriggerLogCleanup } from '@/server/services/account-triggers'
+startTriggerLogCleanup()
 
 // Version check cron (checks GitHub for new releases)
 import { startVersionCheckCron } from '@/server/services/version-check'

@@ -443,6 +443,71 @@ export interface WebhookFilterTestResult {
   error?: string
 }
 
+// ─── Account triggers ────────────────────────────────────────────────────────
+
+/** How a matched email reaches the target Agent. */
+export type TriggerDispatchMode = 'conversation' | 'task'
+
+/** A condition leaf field. Fields above the divider come free from the message
+ *  summary; `body` / `attachment_*` require fetching the full message. */
+export type ConditionField =
+  | 'sender_email' | 'sender_domain' | 'sender_name' | 'subject' | 'snippet'
+  | 'recipient' | 'has_attachment' | 'unread' | 'label'
+  | 'body' | 'attachment_name' | 'attachment_type'
+
+export type ConditionOp =
+  | 'equals' | 'contains' | 'starts_with' | 'ends_with' | 'matches' | 'in' | 'is_true' | 'is_false'
+
+export interface ConditionLeaf {
+  type: 'leaf'
+  field: ConditionField
+  op: ConditionOp
+  /** string for text ops, string[] for `in`, ignored for `is_true`/`is_false`. */
+  value: string | string[] | boolean
+  negate?: boolean
+}
+
+export interface ConditionGroup {
+  type: 'group'
+  op: 'and' | 'or'
+  children: ConditionNode[]
+}
+
+export type ConditionNode = ConditionGroup | ConditionLeaf
+
+/** Account trigger as returned by GET /api/account-triggers */
+export interface AccountTriggerSummary {
+  id: string
+  accountId: string
+  accountLabel: string
+  name: string
+  isActive: boolean
+  folder: string
+  conditions: ConditionNode
+  conditionsSummary: string
+  prompt: string
+  targetAgentId: string
+  targetAgentName: string
+  targetAgentAvatarUrl: string | null
+  dispatchMode: TriggerDispatchMode
+  maxConcurrentTasks: number
+  triggerCount: number
+  lastTriggeredAt: number | null
+  createdBy: 'user' | 'agent'
+  requiresApproval: boolean
+  createdAt: number
+}
+
+/** Trigger evaluation log entry as returned by GET /api/account-triggers/:id/logs */
+export interface TriggerLogEntry {
+  id: string
+  triggerId: string
+  summary: string | null
+  matched: boolean
+  action: TriggerDispatchMode | null
+  createdAt: number
+}
+
 // ─── Human Prompt types ──────────────────────────────────────────────────────
 
 export type HumanPromptType = 'confirm' | 'select' | 'multi_select' | 'text'

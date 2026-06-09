@@ -144,6 +144,18 @@ export async function setAvatarBaseEnabled(enabled: boolean): Promise<void> {
   return setSetting('avatar_base_enabled', enabled ? 'true' : 'false')
 }
 
+/** Whether triggers created by an Agent (via tools) require the user's approval
+ *  before they go active. Default false — Agent-created triggers are active
+ *  immediately. When true, they land inactive/pending until approved in the UI. */
+export async function getAgentTriggersRequireApproval(): Promise<boolean> {
+  const v = await getSetting('agent_triggers_require_approval')
+  return v === 'true'
+}
+
+export async function setAgentTriggersRequireApproval(enabled: boolean): Promise<void> {
+  return setSetting('agent_triggers_require_approval', enabled ? 'true' : 'false')
+}
+
 export async function getExtractionModel(): Promise<string | null> {
   return getSetting('extraction_model')
 }

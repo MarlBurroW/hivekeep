@@ -38,7 +38,7 @@ How to run it:
 - **Offer search early** — a search provider lets me look things up (like a provider's API-key page) while we set up.
 - **Avatars (two axes + a base, empirically).** Once an image provider is connected, Agents get generated avatars. There are two global axes: the art STYLE (\`set_avatar_style\` — Pixar 3D / anime / watercolor…) and the SUBJECT/type (\`set_avatar_subject\` — robot / human / dragon…). Call \`list_avatar_presets\` to offer the user a few of each (they can also type their own). For consistency, once style+type are chosen, call \`generate_avatar_base\` to make a NEUTRAL base image all Agent avatars derive from (img2img). Show it, iterate if needed. (\`set_avatar_base_enabled false\` switches to pure text-to-image; \`reset_avatar_base\` restores the default.) Don't over-generate — image credits cost money.
 - **Conduct rules.** Ask if there are rules all their Agents should follow; if so, merge them into the global prompt (read with \`get_global_prompt\`, then \`set_global_prompt\`).
-- **Be a proactive (not pushy) guide.** Match suggestions to who the user is (read their contact "fiche"). Lead with the core value — a team of AI agents that remember them and get better over time — then surface amplifiers when relevant: messaging channels (text your Agents from your phone), self-building tools & mini-apps, automation (crons / sub-Agents), and projects for big long-term work. Propose, explain the benefit, don't force.
+- **Be a proactive (not pushy) guide.** Match suggestions to who the user is (read their contact "fiche"). Lead with the core value — a team of AI agents that remember them and get better over time — then surface amplifiers when relevant: messaging channels (text your Agents from your phone), self-building tools & mini-apps, automation (crons / sub-Agents / email triggers that react to incoming mail), and projects for big long-term work. Propose, explain the benefit, don't force.
 - Keep the user's profile current. As you get to know them during onboarding, save what you learn with \`set_contact_note(contactId, "global", …)\` — **global** scope so every other Agent inherits the context and never has to re-learn who they are (reserve \`"private"\` for observations specific to your own interactions). Create the contact first with \`create_contact\` if none exists, and \`memorize\` their preferences.
 
 - Cover the WHOLE setup — never silently skip a category. Over the conversation (one thing at a time, at natural moments — never dump them all at once), make sure you OFFER each of these. The user may decline any, but you should have proposed it; use your read tools to see what is still missing before deciding what to suggest next:
@@ -113,6 +113,9 @@ interface PromptParams {
   previousCronRuns?: CronRunSummary[]
   cronLearnings?: Array<{ id: string; content: string; category: string | null; createdAt: Date }>
   activeChannels?: Array<{ platform: string; name: string }>
+  /** Active email triggers that target this Agent — so it understands incoming
+   *  [Trigger: …] messages. Main-Agent prompt only. */
+  accountTriggers?: Array<{ name: string; accountLabel: string; conditionsSummary: string; dispatchMode: 'conversation' | 'task'; folder: string }>
   globalPrompt?: string | null
   userLanguage: 'fr' | 'en'
   compactingSummaries?: Array<{
@@ -1454,6 +1457,19 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- **Slack**: Supports Markdown-like syntax (mrkdwn). Use *bold*, _italic_, \`code\`. No headings.\n` +
       `- **Web UI (Hivekeep)**: Full Markdown support including tables, headings, code blocks, and LaTeX.\n` +
       `When responding to an external platform message, match that platform's formatting capabilities.`,
+    )
+  }
+
+  // [6.6] Active email triggers targeting this Agent — stable (changes rarely).
+  //       Main-Agent only; the Agent must know that matching emails may arrive
+  //       on their own, prefixed [Trigger: …].
+  if (!params.isSubAgent && params.accountTriggers && params.accountTriggers.length > 0) {
+    const triggerLines = params.accountTriggers
+      .map((t) => `- **${t.name}** on ${t.accountLabel} (${t.folder}) — when ${t.conditionsSummary} → ${t.dispatchMode === 'task' ? 'a task is spawned' : 'injected into this conversation'}`)
+      .join('\n')
+    stableBlocks.push(
+      `## Active triggers on your connected accounts\n\n` +
+      `These email triggers can wake you up on their own. When an incoming email matches one, you receive a message prefixed \`[Trigger: <name>]\` with the email's From / Subject / preview followed by the trigger's instruction. Treat it as a real task to act on; use read_email for the full message when needed.\n\n${triggerLines}`,
     )
   }
 

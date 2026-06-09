@@ -22,6 +22,7 @@ import type {
   EmailAddress,
   EmailAttachment,
   EmailSearchQuery,
+  EmailFolder,
   SendEmailParams,
   SendEmailResult,
 } from '@/server/email/types'
@@ -345,6 +346,19 @@ export const imapProvider: EmailProvider = {
   async searchMessages(query: EmailSearchQuery, config: ProviderConfig): Promise<EmailSummary[]> {
     const res = await this.listMessages({ query, limit: 25 }, config)
     return res.messages
+  },
+
+  async listFolders(config: ProviderConfig): Promise<EmailFolder[]> {
+    const client = makeImapClient(config)
+    await client.connect()
+    try {
+      const boxes = await client.list()
+      return boxes
+        .filter((b) => b.path && !b.flags?.has('\\Noselect'))
+        .map((b) => ({ id: b.path, name: b.name || b.path, type: 'folder' as const }))
+    } finally {
+      await client.logout().catch(() => {})
+    }
   },
 
   async sendMessage(params: SendEmailParams, config: ProviderConfig): Promise<SendEmailResult> {
