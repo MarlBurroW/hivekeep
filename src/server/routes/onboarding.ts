@@ -83,15 +83,15 @@ onboardingRoutes.post('/profile', async (c) => {
   const body = await c.req.json()
   const { firstName, lastName, pseudonym, language, invitationToken } = body as {
     firstName: string
-    lastName: string
+    lastName?: string
     pseudonym: string
     language: string
     invitationToken?: string
   }
 
-  if (!firstName || !lastName || !pseudonym) {
+  if (!firstName || !pseudonym) {
     return c.json(
-      { error: { code: 'VALIDATION_ERROR', message: 'firstName, lastName, and pseudonym are required' } },
+      { error: { code: 'VALIDATION_ERROR', message: 'firstName and pseudonym are required' } },
       400,
     )
   }
@@ -102,14 +102,13 @@ onboardingRoutes.post('/profile', async (c) => {
   const PSEUDONYM_REGEX = /^[a-zA-Z0-9_-]+$/
 
   const trimmedFirstName = String(firstName).trim()
-  const trimmedLastName = String(lastName).trim()
+  const trimmedLastName = String(lastName ?? '').trim()
   const trimmedPseudonym = String(pseudonym).trim()
 
   const validationErrors: string[] = []
 
   if (!trimmedFirstName) validationErrors.push('firstName cannot be empty')
   if (trimmedFirstName.length > MAX_NAME_LENGTH) validationErrors.push(`firstName must be under ${MAX_NAME_LENGTH} characters`)
-  if (!trimmedLastName) validationErrors.push('lastName cannot be empty')
   if (trimmedLastName.length > MAX_NAME_LENGTH) validationErrors.push(`lastName must be under ${MAX_NAME_LENGTH} characters`)
   if (!trimmedPseudonym || trimmedPseudonym.length < 2) validationErrors.push('pseudonym must be at least 2 characters')
   if (trimmedPseudonym.length > MAX_PSEUDONYM_LENGTH) validationErrors.push(`pseudonym must be under ${MAX_PSEUDONYM_LENGTH} characters`)
@@ -161,7 +160,7 @@ onboardingRoutes.post('/profile', async (c) => {
   // Update name in Better Auth user table
   await db
     .update(user)
-    .set({ name: `${trimmedFirstName} ${trimmedLastName}`, updatedAt: new Date() })
+    .set({ name: `${trimmedFirstName} ${trimmedLastName}`.trim(), updatedAt: new Date() })
     .where(eq(user.id, userId))
 
   // Auto-create a contact for this user

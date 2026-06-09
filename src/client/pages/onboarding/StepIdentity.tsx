@@ -168,7 +168,7 @@ export function StepIdentity({ onComplete }: StepIdentityProps) {
       // 1. Register via Better Auth (or login if already registered)
       try {
         await register({
-          name: `${firstName} ${lastName}`,
+          name: `${firstName} ${lastName}`.trim(),
           email,
           password,
         })
@@ -285,12 +285,14 @@ export function StepIdentity({ onComplete }: StepIdentityProps) {
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="lastName">{t('onboarding.identity.lastName')}</Label>
+          <Label htmlFor="lastName">
+            {t('onboarding.identity.lastName')}
+            <span className="ml-1 font-normal text-muted-foreground">({t('common.optional')})</span>
+          </Label>
           <Input
             id="lastName"
             value={lastName}
             onChange={(e) => { setLastName(e.target.value); clearFieldError('lastName') }}
-            required
             aria-invalid={!!fieldErrors.lastName}
             aria-describedby={fieldErrors.lastName ? 'lastName-error' : undefined}
           />
