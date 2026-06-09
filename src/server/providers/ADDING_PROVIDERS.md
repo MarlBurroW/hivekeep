@@ -1,5 +1,10 @@
 # Adding a new provider
 
+> **For LLM providers, follow "Adding a native LLM provider" in `CLAUDE.md`** —
+> they live in `src/server/llm/llm/` + `provider-metadata.ts` + `register.ts`,
+> not the `ProviderDefinition` pattern below. This file covers the
+> capability-dispatch (`testConnection` / `listModels`) layer.
+
 **3 files to touch, in this order:**
 
 ## 1. `src/shared/provider-metadata.ts` — declare capabilities and display name

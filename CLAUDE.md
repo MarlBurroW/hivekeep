@@ -108,6 +108,20 @@ All API routes return JSON. Errors follow this format:
 - **Search**: `web_search` action tool + `list_search_providers` discovery tool. Provider resolved via `resolveSearchProvider(slug?)` (explicit slug → global default in `app_settings.default_search_provider_id` → first valid). Built-ins: Brave, SerpAPI, Tavily, Perplexity Sonar. `SearchProvider.capabilities` (static) drives capability-mismatch warnings emitted by the host before calling the upstream API. `SearchRequest.extra` is a free-form passthrough for provider-specific quirks. Follow-up reads go through the existing `browse_url` tool (no separate `web_fetch`).
 - **Tool concurrency**: within a single LLM step, tool calls are partitioned into batches by `tool-executor.ts`. Consecutive tools flagged `concurrencySafe: true` on their `ToolRegistration` fuse into one parallel batch (bounded by `HIVEKEEP_MAX_TOOL_USE_CONCURRENCY`, default 10); every other tool runs alone in its own serial batch. Three optional flags: `readOnly`, `concurrencySafe`, `destructive`. Default is `false` everywhere (conservative: assume write, assume not safe to parallelize). When adding a native tool, only set these flags when the answer is unambiguous — anything stateful, side-effecting, or with ordering dependencies should stay at the default.
 
+### Adding a native LLM provider
+
+Verified end-to-end (the DeepSeek provider followed exactly these steps). `PROVIDER_META` is the single source of truth — never hand-edit the derived `PROVIDER_TYPES` / `PROVIDER_CAPABILITIES` / `PROVIDER_DISPLAY_NAMES` / `PROVIDER_API_KEY_URLS` in `constants.ts`.
+
+1. **`src/shared/provider-metadata.ts`** — add one `PROVIDER_META` entry: `capabilities` (e.g. `['llm']`), `displayName`, optional `lobehubIcon`, `apiKeyUrl` (and `noApiKey` / `optionalApiKey` if relevant). Everything else derives from this.
+2. **`src/server/llm/llm/<type>.ts`** — implement the `LLMProvider` interface (`src/server/llm/llm/types.ts`): streaming chat + `listModels` + `testConnection` + model classification. For OpenAI-compatible APIs, clone `xai.ts` / `openrouter.ts`. Rules: **fetch the model list from the provider API — never hardcode model ids**; classify capability / context window / vision from API metadata first, name heuristics only as a fallback; **only advertise `thinking.efforts` if the model actually accepts `reasoning_effort`** — otherwise leave `thinking` undefined and gate the request param on `model.thinking?.efforts?.length` (sending an effort to a model that rejects it is a 400 — this bit gpt-5-chat-latest and grok `non-reasoning`).
+3. **`src/server/llm/llm/register.ts`** — import + `registerLLMProvider(<type>Provider)`.
+4. **`src/shared/constants.ts`** — add a `CONFIGURATOR_MODEL_PREFERENCES['<type>']` entry (ordered substrings, flagship first) so Queenie seeds on a strong, tool-reliable model when this provider is connected first. `resolveConfiguratorModel` drops lite tiers and prefers the canonical id.
+5. **`src/server/llm/llm/<type>.test.ts`** — mirror `xai.test.ts`: classification + `listModels` parsing.
+6. **Website** — add a chip in `site/src/components/Providers.astro` (import the matching `@lobehub/icons` mark).
+7. **Verify** — `bun run typecheck` + `bun run test`, then onboarding end-to-end: connect the provider, confirm models come from the API and are classified, and that Queenie completes onboarding making real tool calls.
+
+(`src/server/providers/ADDING_PROVIDERS.md` documents the older capability-dispatch `ProviderDefinition` layer — for LLM providers follow the steps above.)
+
 ## Git conventions
 
 - **Never** include `Co-Authored-By` lines in commit messages
