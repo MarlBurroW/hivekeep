@@ -47,6 +47,11 @@ interface ToolSelectorProps {
   onChange: (next: Set<string>) => void
   /** When true, every switch is rendered disabled (read-only built-in view). */
   readOnly?: boolean
+  /** Pure-listing mode: no switches at all and plain counts instead of
+   *  "x/y enabled" — for surfaces that only DISPLAY a toolset (e.g. the
+   *  composer's tools modal), where a wall of disabled switches reads as
+   *  broken interactivity rather than information. Implies readOnly. */
+  hideSwitches?: boolean
   /** Optional soft note shown under a tool row (warnings etc.). */
   toolNote?: ToolNoteResolver
   /** Show the friendly i18n name (tools.names.*) instead of the raw key as the
@@ -82,6 +87,7 @@ export function ToolSelector({
   selected,
   onChange,
   readOnly = false,
+  hideSwitches = false,
   toolNote,
   useFriendlyNames = true,
 }: ToolSelectorProps) {
@@ -160,6 +166,7 @@ export function ToolSelector({
                   totalCount={bucket.tools.length}
                   allEnabled={allEnabled}
                   readOnly={readOnly}
+                  hideSwitches={hideSwitches}
                   onToggleAll={() => toggleMany(bucket.tools)}
                 >
                   {bucket.tools.map((tool) => {
@@ -181,6 +188,7 @@ export function ToolSelector({
                         subLabel={subLabel}
                         enabled={selected.has(tool.name)}
                         readOnly={readOnly}
+                        hideSwitch={hideSwitches}
                         note={toolNote?.(tool)}
                         onToggle={() => toggleTool(tool.name)}
                       />
@@ -203,6 +211,7 @@ export function ToolSelector({
             totalCount={srcBucket.tools.length}
             allEnabled={srcEnabled === srcBucket.tools.length}
             readOnly={readOnly}
+            hideSwitches={hideSwitches}
             onToggleAll={() => toggleMany(srcBucket.tools)}
           >
             {domainGroups}
@@ -219,6 +228,7 @@ function SourceGroup({
   totalCount,
   allEnabled,
   readOnly,
+  hideSwitches,
   onToggleAll,
   children,
 }: {
@@ -227,6 +237,7 @@ function SourceGroup({
   totalCount: number
   allEnabled: boolean
   readOnly?: boolean
+  hideSwitches?: boolean
   onToggleAll: () => void
   children: React.ReactNode
 }) {
@@ -252,16 +263,18 @@ function SourceGroup({
                 {t(`toolboxes.sources.${source}`)}
               </Badge>
               <span className="text-xs text-muted-foreground">
-                {t('agent.tools.countEnabled', { count: enabledCount, total: totalCount })}
+                {hideSwitches ? totalCount : t('agent.tools.countEnabled', { count: enabledCount, total: totalCount })}
               </span>
             </button>
           </CollapsibleTrigger>
-          <Switch
-            size="sm"
-            checked={allEnabled}
-            disabled={readOnly}
-            onCheckedChange={onToggleAll}
-          />
+          {!hideSwitches && (
+            <Switch
+              size="sm"
+              checked={allEnabled}
+              disabled={readOnly}
+              onCheckedChange={onToggleAll}
+            />
+          )}
         </div>
         <CollapsibleContent>
           <div className="border-t p-3">{children}</div>
@@ -277,6 +290,7 @@ function DomainGroup({
   totalCount,
   allEnabled,
   readOnly,
+  hideSwitches,
   onToggleAll,
   children,
 }: {
@@ -285,6 +299,7 @@ function DomainGroup({
   totalCount: number
   allEnabled: boolean
   readOnly?: boolean
+  hideSwitches?: boolean
   onToggleAll: () => void
   children: React.ReactNode
 }) {
@@ -309,16 +324,18 @@ function DomainGroup({
               </span>
               <span className="text-sm font-medium">{meta.labelKey ? t(meta.labelKey) : (meta.label ?? domain)}</span>
               <span className="text-xs text-muted-foreground">
-                {t('agent.tools.countEnabled', { count: enabledCount, total: totalCount })}
+                {hideSwitches ? totalCount : t('agent.tools.countEnabled', { count: enabledCount, total: totalCount })}
               </span>
             </button>
           </CollapsibleTrigger>
-          <Switch
-            size="sm"
-            checked={allEnabled}
-            disabled={readOnly}
-            onCheckedChange={onToggleAll}
-          />
+          {!hideSwitches && (
+            <Switch
+              size="sm"
+              checked={allEnabled}
+              disabled={readOnly}
+              onCheckedChange={onToggleAll}
+            />
+          )}
         </div>
         <CollapsibleContent>
           <div className="border-t">{children}</div>
@@ -334,6 +351,7 @@ function ToolRow({
   subLabel,
   enabled,
   readOnly,
+  hideSwitch,
   note,
   onToggle,
 }: {
@@ -343,6 +361,7 @@ function ToolRow({
   subLabel?: string
   enabled: boolean
   readOnly?: boolean
+  hideSwitch?: boolean
   note?: string
   onToggle: () => void
 }) {
@@ -362,7 +381,7 @@ function ToolRow({
           <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">{note}</p>
         )}
       </div>
-      <Switch size="sm" checked={enabled} disabled={readOnly} onCheckedChange={onToggle} />
+      {!hideSwitch && <Switch size="sm" checked={enabled} disabled={readOnly} onCheckedChange={onToggle} />}
     </div>
   )
 }

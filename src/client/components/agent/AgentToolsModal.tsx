@@ -115,6 +115,7 @@ export function AgentToolsModal({ open, onOpenChange, agentId, agentName, tools,
               selected={resolvedNames}
               onChange={() => {}}
               readOnly
+              hideSwitches
             />
           )}
         </DialogBody>
