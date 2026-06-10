@@ -8,9 +8,7 @@ import { Label } from '@/client/components/ui/label'
 import { Badge } from '@/client/components/ui/badge'
 import { Switch } from '@/client/components/ui/switch'
 import { Skeleton } from '@/client/components/ui/skeleton'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/client/components/ui/dialog'
+import { FormDialog } from '@/client/components/common/FormDialog'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/client/components/ui/select'
@@ -18,6 +16,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/client/components/ui/
 import {
   Command, CommandInput, CommandList, CommandEmpty, CommandItem,
 } from '@/client/components/ui/command'
+import { ProviderIcon } from '@/client/components/common/ProviderIcon'
 import { api, getErrorMessage } from '@/client/lib/api'
 
 interface RegistryModel {
@@ -171,7 +170,12 @@ export function ModelRegistryTable() {
                     {m.overriddenFields.length > 0 && <Pin className="size-3 text-primary inline" />}
                   </span>
                 </td>
-                <td className="text-muted-foreground">{m.providerName}</td>
+                <td className="text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    {m.providerType && <ProviderIcon providerType={m.providerType} variant="color" className="size-4 shrink-0" />}
+                    <span className="truncate">{m.providerName}</span>
+                  </span>
+                </td>
                 <td className="text-right tabular-nums">{fmtCtx(m.contextWindow)}</td>
                 <td className="text-center">{cap(m.supportsImageInput)}</td>
                 <td className="text-center">{cap(m.supportsPdfInput)}</td>
@@ -269,19 +273,23 @@ function EditModelDialog({ model, onClose, onSaved }: {
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="font-mono text-base">{model.modelId}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            {t('settings.modelRegistry.matchInfo', 'models.dev match')}:{' '}
-            <span className="font-mono">{model.modelsDevKey ?? '—'}</span> ({model.matchConfidence ?? 'none'})
-          </p>
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={<span className="font-mono text-base">{model.modelId}</span>}
+      size="lg"
+      onSubmit={save}
+      isSubmitting={saving}
+      submitLabel={t('common.save', 'Save')}
+      cancelLabel={t('common.cancel', 'Cancel')}
+    >
+      <p className="text-xs text-muted-foreground">
+        {t('settings.modelRegistry.matchInfo', 'models.dev match')}:{' '}
+        <span className="font-mono">{model.modelsDevKey ?? '—'}</span> ({model.matchConfidence ?? 'none'})
+      </p>
 
-          {/* remap — searchable across the whole models.dev catalogue */}
-          <div className="space-y-1.5">
+      {/* remap — searchable across the whole models.dev catalogue */}
+      <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5"><Wand2 className="size-3.5" /> {t('settings.modelRegistry.remap', 'Remap to models.dev entry')}</Label>
             <Popover open={remapOpen} onOpenChange={setRemapOpen}>
               <PopoverTrigger asChild>
@@ -338,13 +346,7 @@ function EditModelDialog({ model, onClose, onSaved }: {
             )}
             <Toggle label={t('settings.modelRegistry.manual', 'Manual (freeze — never auto-synced)')} checked={manual} onChange={setManual} />
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
-          <Button onClick={save} disabled={saving}>{t('common.save', 'Save')}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   )
 }
 
