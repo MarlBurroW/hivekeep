@@ -236,6 +236,34 @@ export function reconcileProviderModels(
 }
 
 /**
+ * Reconcile a SINGLE valid LLM provider against the registry — lists its models
+ * live and reconciles. Used right after a provider is created or (re)validated so
+ * its models show up in the Models view immediately (mapped or flagged for
+ * review), without waiting for the periodic cron or a manual resync. No-op for
+ * invalid / non-LLM / unknown providers. Errors are logged, not thrown.
+ */
+export async function reconcileProvider(providerId: string): Promise<void> {
+  const p = db.select().from(providersTable).where(eq(providersTable.id, providerId)).get()
+  if (!p || !p.isValid) return
+  const llm = getLLMProvider(p.type)
+  if (!llm) return
+  let caps: string[] = []
+  try {
+    caps = JSON.parse(p.capabilities) as string[]
+  } catch {
+    return
+  }
+  if (!caps.includes('llm')) return
+  try {
+    const cfg = await loadProviderConfig(p)
+    const models = await llm.listModels(cfg)
+    reconcileProviderModels(p.id, p.type, models)
+  } catch (err) {
+    log.warn({ providerId: p.id, type: p.type, err }, 'Registry reconcile failed for provider')
+  }
+}
+
+/**
  * Reconcile every valid LLM provider against the registry. Lists each provider's
  * models live (raw, full metadata) and reconciles. Used by the periodic cron and
  * after a provider is (re)validated. Per-provider errors are logged, not thrown.
@@ -243,23 +271,7 @@ export function reconcileProviderModels(
 export async function reconcileAllProviders(): Promise<void> {
   const rows = db.select().from(providersTable).all()
   for (const p of rows) {
-    if (!p.isValid) continue
-    const llm = getLLMProvider(p.type)
-    if (!llm) continue
-    let caps: string[] = []
-    try {
-      caps = JSON.parse(p.capabilities) as string[]
-    } catch {
-      continue
-    }
-    if (!caps.includes('llm')) continue
-    try {
-      const cfg = await loadProviderConfig(p)
-      const models = await llm.listModels(cfg)
-      reconcileProviderModels(p.id, p.type, models)
-    } catch (err) {
-      log.warn({ providerId: p.id, type: p.type, err }, 'Registry reconcile failed for provider')
-    }
+    await reconcileProvider(p.id)
   }
 }
 

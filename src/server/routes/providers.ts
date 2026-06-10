@@ -18,7 +18,7 @@ import {
 } from '@/server/services/provider-config'
 import { getLLMProvider } from '@/server/llm/llm/registry'
 import { enrichModel } from '@/server/llm/metadata/enrich'
-import { listRegistryByProvider } from '@/server/services/model-registry'
+import { listRegistryByProvider, reconcileProvider } from '@/server/services/model-registry'
 import { config } from '@/server/config'
 import { getEmbeddingProvider } from '@/server/llm/embedding/registry'
 import { getImageProvider } from '@/server/llm/image/registry'
@@ -197,6 +197,11 @@ providerRoutes.post('/', async (c) => {
 
   log.info({ providerId: id, slug, name, type, capabilities, isValid: testResult.valid }, 'Provider created')
 
+  // Populate the model registry for the new provider before responding, so its
+  // models are already in the Models view when the user navigates there (no
+  // waiting for the 6h cron or a manual resync). reconcileProvider never throws.
+  if (testResult.valid) await reconcileProvider(id)
+
   sseManager.broadcast({
     type: 'provider:created',
     data: { providerId: id, slug, name, providerType: type, capabilities, isValid: testResult.valid },
@@ -270,6 +275,10 @@ providerRoutes.patch('/:id', async (c) => {
   await db.update(providers).set(updates).where(eq(providers.id, id))
 
   const updated = await db.select().from(providers).where(eq(providers.id, id)).get()
+
+  // A re-keyed / re-validated provider may now expose models — refresh its
+  // registry rows (clears stale, picks up new ids).
+  if (updated?.isValid) void reconcileProvider(id).catch(() => {})
 
   sseManager.broadcast({
     type: 'provider:updated',
@@ -421,6 +430,9 @@ providerRoutes.post('/:id/test', async (c) => {
     .update(providers)
     .set(updates)
     .where(eq(providers.id, id))
+
+  // Now-valid provider → (re)populate its registry rows immediately.
+  if (result.valid) void reconcileProvider(id).catch(() => {})
 
   const updatedCapabilities = result.valid
     ? getCapabilitiesForType(existing.type)
