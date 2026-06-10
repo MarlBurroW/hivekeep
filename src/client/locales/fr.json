@@ -1377,6 +1377,9 @@
         "bullet4": "Testez la connexion après ajout pour vérifier que la clé API est valide"
       }
     },
+    "modelRegistry": {
+      "title": "Registre de modèles"
+    },
     "models": {
       "title": "Modèles & Services",
       "description": "Configurez les modèles et services par défaut utilisés sur toute la plateforme.",

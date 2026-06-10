@@ -65,13 +65,23 @@ export interface ModelsDevMatch {
   model: ModelsDevModel
 }
 
-/** Lowercase, unify separators, drop trailing `-latest`/`-preview`/date suffixes. */
+/**
+ * Lowercase, unify separators, and strip trailing release markers so dated
+ * snapshots collapse onto their base model:
+ *   gpt-4-0613 → gpt-4, gemini-2.0-flash-001 → gemini-2.0-flash,
+ *   kimi-k2-0905-preview → kimi-k2.
+ * Repeated until stable so combined suffixes (date + "-preview") both go.
+ * Pure-digit suffixes of 3+ digits are treated as version/date stamps;
+ * context markers like `-16k`/`-128k` keep their letter and survive.
+ */
 function normalizeId(id: string): string {
-  return id
-    .toLowerCase()
-    .replace(/[\s_]+/g, '-')
-    .replace(/-(latest|preview)$/g, '')
-    .replace(/-\d{6,8}$/g, '') // trailing date stamp e.g. -0711 / -20250101
+  let s = id.toLowerCase().replace(/[\s_]+/g, '-')
+  let prev: string
+  do {
+    prev = s
+    s = s.replace(/-(latest|preview)$/g, '').replace(/-\d{3,}$/g, '')
+  } while (s !== prev)
+  return s
 }
 
 /**

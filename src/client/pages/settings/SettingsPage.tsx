@@ -23,6 +23,7 @@ import {
 import { GeneralSettings } from '@/client/pages/settings/GeneralSettings'
 import { ProvidersSettings } from '@/client/pages/settings/ProvidersSettings'
 import { ModelsSettings } from '@/client/pages/settings/ModelsSettings'
+import { ModelRegistrySettings } from '@/client/pages/settings/ModelRegistrySettings'
 import { AvatarsSettings } from '@/client/pages/settings/AvatarsSettings'
 import { VaultSettings } from '@/client/pages/settings/VaultSettings'
 import { McpServersSettings } from '@/client/pages/settings/McpServersSettings'
@@ -46,6 +47,7 @@ import {
   Brain,
   BrainCircuit,
   Layers,
+  Table2,
   Settings2,
   Puzzle,
   Lock,
@@ -89,6 +91,7 @@ const sectionGroups: SectionGroup[] = [
       { id: 'general', icon: Settings2, labelKey: 'settings.general.title' },
       { id: 'providers', icon: BrainCircuit, labelKey: 'settings.providers.title' },
       { id: 'models', icon: Layers, labelKey: 'settings.models.title' },
+      { id: 'modelRegistry', icon: Table2, labelKey: 'settings.modelRegistry.title' },
       { id: 'avatars', icon: ImageIcon, labelKey: 'settings.avatars.title' },
     ],
   },
@@ -148,6 +151,7 @@ const sectionComponents: Record<string, React.FC> = {
   general: GeneralSettings,
   providers: ProvidersSettings,
   models: ModelsSettings,
+  modelRegistry: ModelRegistrySettings,
   avatars: AvatarsSettings,
   mcp: McpServersSettings,
   vault: VaultSettings,

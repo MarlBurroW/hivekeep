@@ -1377,6 +1377,9 @@
         "bullet4": "Test the connection after adding to verify the API key is valid"
       }
     },
+    "modelRegistry": {
+      "title": "Model registry"
+    },
     "models": {
       "title": "Models & Services",
       "description": "Configure default models and services used across the platform.",

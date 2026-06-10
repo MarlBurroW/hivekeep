@@ -134,15 +134,16 @@ export async function refreshAllProviderModels(): Promise<void> {
       })
     await Promise.allSettled(tasks)
 
-    // Model registry (flag-gated): reconcile every provider's models into the
-    // registry (source of truth), then overlay the registry's context/maxOutput
-    // onto this cache so getModelContextWindow() reflects registry values. In
-    // phase 1 this matches the provider's own values (apiSeed wins), so it's a
-    // safe no-op overlay; once provider heuristics are removed (phase 3) the
-    // registry (models.dev) keeps the cache correct.
-    if (config.modelRegistry.enabled) {
-      try {
-        await reconcileAllProviders()
+    // Reconcile every provider's models into the registry (source of truth).
+    // This runs ALWAYS (even with the flag off) so the Models view is populated
+    // and admins can review/edit before enabling consumption — it only writes a
+    // data table, no behavior change. The CONTEXT-CACHE OVERLAY below is what
+    // changes behavior, so it stays flag-gated. (Phase 1: a no-op overlay since
+    // apiSeed wins; once heuristics are removed in phase 3 the registry keeps
+    // the cache correct.)
+    try {
+      await reconcileAllProviders()
+      if (config.modelRegistry.enabled) {
         for (const row of listRegistry()) {
           if (row.stale) continue
           setModelInfo(row.modelId, {
@@ -150,9 +151,9 @@ export async function refreshAllProviderModels(): Promise<void> {
             maxOutput: row.maxOutput ?? undefined,
           })
         }
-      } catch (err) {
-        log.warn({ err }, 'Model registry reconcile failed')
       }
+    } catch (err) {
+      log.warn({ err }, 'Model registry reconcile failed')
     }
 
     log.info({ providerCount: tasks.length, totalCached: cache.size }, 'Model-info cache refresh complete')
