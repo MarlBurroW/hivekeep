@@ -214,6 +214,14 @@ loadPersistedSnapshot()
 import { startModelInfoRefreshCron } from '@/server/services/model-info-cache'
 startModelInfoRefreshCron()
 
+// Wire usage-cost pricing (DI — keeps token-usage decoupled from the model
+// registry's import graph), then run a one-time, deferred, idempotent backfill
+// of historical LLM-usage costs (current-price estimate for pre-feature rows).
+import { backfillUsageCosts, setUsageCostHooks } from '@/server/services/token-usage'
+import { getModelPricing, listModelsWithPricing } from '@/server/services/model-registry'
+setUsageCostHooks({ getPricing: getModelPricing, listPricedModels: listModelsWithPricing })
+setTimeout(() => backfillUsageCosts(), 5000)
+
 // Serve uploaded files
 app.use('/api/uploads/*', serveStatic({ root: config.upload.dir, rewriteRequestPath: (path) => path.replace('/api/uploads', '') }))
 

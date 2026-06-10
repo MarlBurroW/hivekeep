@@ -899,6 +899,9 @@ export interface LlmUsageRow {
   reasoningTokens: number | null
   embeddingTokens: number | null
   stepCount: number
+  /** Estimated USD cost, frozen at the registry price when recorded (null when
+   *  the model had no pricing). */
+  costUsd: number | null
 }
 
 /** Per-message token usage stored in message metadata and sent via SSE. */
@@ -933,6 +936,8 @@ export interface UsageSummaryRow {
   totalTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
+  /** Estimated USD cost for the group (sum of per-row frozen costs). */
+  costUsd: number
   count: number
 }
 

@@ -1,0 +1,1 @@
+ALTER TABLE `llm_usage` ADD `cost_usd` real;

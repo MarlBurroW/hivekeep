@@ -124,8 +124,56 @@ export function getRegistryRow(providerId: string, modelId: string): Row | undef
     .get()
 }
 
+export interface ModelPricing {
+  input: number
+  output: number
+  cacheRead?: number
+  cacheWrite?: number
+}
+
+/**
+ * Effective USD-per-million-tokens pricing for a model, from its registry row.
+ * Prefers the exact `(providerId, modelId)` row; falls back to any row with the
+ * same `modelId` (handles a null/deleted providerId on historical usage). Null
+ * when no priced row exists.
+ */
+export function getModelPricing(providerId: string | null | undefined, modelId: string): ModelPricing | null {
+  const row = providerId
+    ? getRegistryRow(providerId, modelId)
+    : db.select().from(modelRegistry).where(eq(modelRegistry.modelId, modelId)).get()
+  const fallback = !row && providerId
+    ? db.select().from(modelRegistry).where(eq(modelRegistry.modelId, modelId)).get()
+    : undefined
+  const r = row ?? fallback
+  if (!r?.pricing) return null
+  try {
+    const p = JSON.parse(r.pricing) as ModelPricing
+    if (typeof p.input !== 'number' || typeof p.output !== 'number') return null
+    return p
+  } catch {
+    return null
+  }
+}
+
 export function listRegistry(): Row[] {
   return db.select().from(modelRegistry).all()
+}
+
+/** Distinct models that have pricing, with the parsed pricing — used to backfill
+ *  historical usage costs. Deduped by modelId (first priced row wins). */
+export function listModelsWithPricing(): Array<{ modelId: string; pricing: ModelPricing }> {
+  const out: Array<{ modelId: string; pricing: ModelPricing }> = []
+  const seen = new Set<string>()
+  for (const row of db.select().from(modelRegistry).all()) {
+    if (seen.has(row.modelId) || !row.pricing) continue
+    try {
+      const p = JSON.parse(row.pricing) as ModelPricing
+      if (typeof p.input !== 'number' || typeof p.output !== 'number') continue
+      seen.add(row.modelId)
+      out.push({ modelId: row.modelId, pricing: p })
+    } catch { /* ignore corrupt pricing */ }
+  }
+  return out
 }
 
 export function listRegistryByProvider(providerId: string): Row[] {

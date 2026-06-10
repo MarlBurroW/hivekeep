@@ -1079,6 +1079,11 @@ export const llmUsage = sqliteTable('llm_usage', {
 
   // Multi-step context (for streamText multi-step loops)
   stepCount: integer('step_count').notNull().default(1),
+
+  // Estimated cost in USD, computed from the model registry pricing at record
+  // time (frozen — survives later price changes). Null for rows recorded before
+  // the cost feature (backfilled at current price) or models with no pricing.
+  costUsd: real('cost_usd'),
 }, (table) => [
   index('idx_llm_usage_created').on(table.createdAt),
   index('idx_llm_usage_agent').on(table.agentId, table.createdAt),

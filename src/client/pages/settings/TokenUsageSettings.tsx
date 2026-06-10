@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/client/components/ui/card'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '@/client/components/ui/avatar'
 import { ProviderIcon } from '@/client/components/common/ProviderIcon'
-import { ArrowDownRight, ArrowUpRight, Activity, Hash, Zap, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Activity, Hash, Zap, X, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react'
 import { api } from '@/client/lib/api'
 import { computeCacheHitRate, computeNonCacheInput } from '@/shared/billing'
 import type { LlmUsageRow, UsageSummaryRow } from '@/shared/types'
@@ -58,6 +58,14 @@ function formatNumber(n: number): string {
   return n.toLocaleString()
 }
 
+function formatUsd(n: number): string {
+  if (!n) return '$0'
+  if (n < 0.01) return '<$0.01'
+  if (n < 100) return `$${n.toFixed(2)}`
+  if (n < 10_000) return `$${n.toFixed(0)}`
+  return `$${(n / 1_000).toFixed(1)}k`
+}
+
 function buildQuery(params: Record<string, string | number | undefined>): string {
   const qs = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== '')
@@ -69,7 +77,7 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 // ─── Summary Cards ──────────────────────────────────────────────────────────
 
 function SummaryCards({ data, loading, t }: {
-  data: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens: number; cacheWriteTokens: number; calls: number }
+  data: { inputTokens: number; outputTokens: number; totalTokens: number; cacheReadTokens: number; cacheWriteTokens: number; costUsd: number; calls: number }
   loading: boolean
   t: TFunction
 }) {
@@ -79,6 +87,14 @@ function SummaryCards({ data, loading, t }: {
   const nonCache = computeNonCacheInput(data)
   const hitRate = computeCacheHitRate(data)
   const cards = [
+    {
+      label: t('settings.tokenUsage.costEstimate', 'Cost (est.)'),
+      value: formatUsd(data.costUsd),
+      icon: DollarSign,
+      color: 'text-primary',
+      sub: t('settings.tokenUsage.costEstimateSub', 'from models.dev pricing'),
+      subClass: 'text-muted-foreground',
+    },
     {
       label: t('settings.tokenUsage.cacheHitInput', 'Cache hit'),
       value: formatTokens(cacheHit),
@@ -93,7 +109,7 @@ function SummaryCards({ data, loading, t }: {
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {cards.map((card) => (
         <Card key={card.label} className="py-3 px-4 gap-1">
           <CardContent className="p-0">
@@ -244,13 +260,14 @@ function BreakdownTable({ rows, loading, groupBy, agentMap, t }: {
     <div className="glass-strong rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
         <div className="min-w-[480px]">
-          {/* Header — group | cache hit | non-cache | output | hit% | calls */}
-          <div className="grid grid-cols-[1fr_80px_80px_80px_50px_50px] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground/60 border-b border-border/30">
+          {/* Header — group | cache hit | non-cache | output | hit% | cost | calls */}
+          <div className="grid grid-cols-[1fr_80px_80px_80px_50px_70px_50px] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground/60 border-b border-border/30">
             <span>{t('settings.tokenUsage.columnGroup')}</span>
             <span className="text-right" title={t('settings.tokenUsage.cacheHitInput', 'Cache hit')}>{t('settings.tokenUsage.columnCacheHit', 'Cache hit')}</span>
             <span className="text-right" title={t('settings.tokenUsage.nonCacheInput', 'Non-cache')}>{t('settings.tokenUsage.columnNonCache', 'Non-cache')}</span>
             <span className="text-right">{t('settings.tokenUsage.columnOutput')}</span>
             <span className="text-right" title={t('settings.tokenUsage.columnCacheHitFull')}>%</span>
+            <span className="text-right">{t('settings.tokenUsage.columnCost', 'Cost')}</span>
             <span className="text-right">{t('settings.tokenUsage.columnCalls')}</span>
           </div>
           {/* Rows */}
@@ -267,7 +284,7 @@ function BreakdownTable({ rows, loading, groupBy, agentMap, t }: {
           return (
             <div
               key={row.group}
-              className="grid grid-cols-[1fr_80px_80px_80px_50px_50px] gap-2 px-3 py-1.5 text-xs hover:bg-muted/30 border-b border-border/20 items-center"
+              className="grid grid-cols-[1fr_80px_80px_80px_50px_70px_50px] gap-2 px-3 py-1.5 text-xs hover:bg-muted/30 border-b border-border/20 items-center"
               title={tooltip}
             >
               <RowLabel group={row.group} groupBy={groupBy} agentMap={agentMap} />
@@ -282,6 +299,9 @@ function BreakdownTable({ rows, loading, groupBy, agentMap, t }: {
               </span>
               <span className={`text-right font-mono tabular-nums ${hasCache ? hitRateColor(hit) : 'text-muted-foreground/40'}`}>
                 {hasCache ? formatPercent(hit) : '—'}
+              </span>
+              <span className="text-right font-mono tabular-nums text-primary">
+                {row.costUsd > 0 ? formatUsd(row.costUsd) : '—'}
               </span>
               <span className="text-right font-mono tabular-nums text-muted-foreground">
                 {formatNumber(row.count)}
@@ -672,9 +692,10 @@ export function TokenUsageSettings({ initialAgentFilter }: { initialAgentFilter?
         totalTokens: acc.totalTokens + r.totalTokens,
         cacheReadTokens: acc.cacheReadTokens + (r.cacheReadTokens ?? 0),
         cacheWriteTokens: acc.cacheWriteTokens + (r.cacheWriteTokens ?? 0),
+        costUsd: acc.costUsd + (r.costUsd ?? 0),
         calls: acc.calls + r.count,
       }),
-      { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 },
+      { inputTokens: 0, outputTokens: 0, totalTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0, calls: 0 },
     )
   }, [summaryRows])
 
