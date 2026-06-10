@@ -218,14 +218,13 @@ export function ModelRegistryTable() {
 
   return (
     <div className="space-y-4">
+      {/* The page title lives in the canonical PageHeader (ModelRegistryPage);
+          here only the explainer + the sync actions. */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-lg font-semibold">{t('settings.modelRegistry.title', 'Models')}</h2>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            {t('settings.modelRegistry.subtitle',
-              'Every model exposed by your providers. Metadata (context, capabilities, pricing) is auto-filled from the community models.dev database — edit any value to pin it, or remap a wrong match.')}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground max-w-2xl">
+          {t('settings.modelRegistry.subtitle',
+            'Every model exposed by your providers. Metadata (context, capabilities, pricing) is auto-filled from the community models.dev database — edit any value to pin it, or remap a wrong match.')}
+        </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={refreshSnapshot} disabled={snapshotBusy} title={t('settings.modelRegistry.snapshotTip', 'Download the latest models.dev catalogue, then re-match')}>
             <DownloadCloud className={`size-4 ${snapshotBusy ? 'animate-pulse' : ''}`} />
