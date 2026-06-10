@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, FolderKanban, ListTodo, CalendarClock, Blocks } from 'lucide-react'
+import { Home, FolderKanban, ListTodo, CalendarClock, Blocks, Boxes } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { useAuth } from '@/client/hooks/useAuth'
 import { useTasksContext } from '@/client/contexts/TasksContext'
@@ -44,17 +44,20 @@ export function AppTopBar({ onOpenSettings, onOpenAccount }: AppTopBarProps) {
 
   // Mobile mode switch — the left ActivityBar rail is hidden below md, so the
   // section nav moves into this always-present top bar as a compact icon-only
-  // segmented control mirroring the ActivityBar destinations.
+  // segmented control mirroring the ActivityBar destinations (incl. the
+  // admin-only Models entry).
+  const isAdmin = user?.role === 'admin'
   const path = location.pathname
-  const sectionPrefixes = ['/projects', '/tasks', '/crons', '/mini-apps']
+  const sectionPrefixes = ['/projects', '/tasks', '/crons', '/mini-apps', '/models']
   const isSection = (prefix: string) => path.startsWith(prefix)
-  const modeItems = [
+  const modeItems: Array<{ key: string; to: string; icon: typeof Home; active: boolean; label: string; badge: boolean }> = [
     { key: 'agents', to: '/', icon: Home, active: !sectionPrefixes.some(isSection), label: t('activityBar.agents'), badge: false },
     { key: 'projects', to: '/projects', icon: FolderKanban, active: isSection('/projects'), label: t('activityBar.projects'), badge: false },
     { key: 'tasks', to: '/tasks', icon: ListTodo, active: isSection('/tasks'), label: t('activityBar.tasks'), badge: true },
     { key: 'crons', to: '/crons', icon: CalendarClock, active: isSection('/crons'), label: t('activityBar.crons'), badge: false },
     { key: 'apps', to: '/mini-apps', icon: Blocks, active: isSection('/mini-apps'), label: t('activityBar.apps'), badge: false },
-  ] as const
+    ...(isAdmin ? [{ key: 'models', to: '/models', icon: Boxes, active: isSection('/models'), label: t('activityBar.models'), badge: false }] : []),
+  ]
 
   return (
     <header className="surface-header sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b px-4">

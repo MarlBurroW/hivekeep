@@ -247,14 +247,14 @@ export function ModelRegistryTable() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={providerFilter} onValueChange={setProviderFilter}>
-          <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('settings.modelRegistry.allProviders', 'All providers')}</SelectItem>
             {providerOptions.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('settings.modelRegistry.statusAll', 'All statuses')}</SelectItem>
             <SelectItem value="enabled">{t('settings.modelRegistry.statusEnabled', 'Enabled')}</SelectItem>
@@ -296,7 +296,8 @@ export function ModelRegistryTable() {
         )
       })()}
 
-      <div className="overflow-x-auto rounded-lg border border-border">
+      {/* Desktop: the dense table. Mobile gets the card list below. */}
+      <div className="hidden sm:block overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-muted-foreground">
             <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
@@ -377,6 +378,64 @@ export function ModelRegistryTable() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile: stacked cards — the wide table doesn't fit a phone. */}
+      <div className="sm:hidden space-y-2">
+        {paged.map((m) => (
+          <div key={m.id} className={`surface-card rounded-lg border border-border p-3 space-y-2 ${m.enabled ? '' : 'opacity-45'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className={`text-sm font-medium truncate ${m.stale ? 'line-through opacity-60' : ''}`}>{m.displayName || m.modelId}</p>
+                {m.displayName && m.displayName !== m.modelId && (
+                  <p className="font-mono text-[11px] text-muted-foreground truncate">{m.modelId}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {m.needsReview && !m.stale && (
+                  <Button variant="ghost" size="icon-xs" onClick={() => confirmReview(m)} aria-label={t('settings.modelRegistry.confirmTooltip', 'Confirm this match is correct (clears review)')}>
+                    <Check className="size-4 text-amber-600" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon-xs" onClick={() => setEditing(m)} aria-label={t('common.edit', 'Edit')}>
+                  <Pencil className="size-3.5" />
+                </Button>
+                <Switch checked={m.enabled} onCheckedChange={(v) => toggleEnabled(m, v)} />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 min-w-0">
+                {m.providerType && <ProviderIcon providerType={m.providerType} variant="color" className="size-3.5 shrink-0" />}
+                <span className="truncate">{m.providerName}</span>
+              </span>
+              <span className="opacity-40">·</span>
+              <span className="tabular-nums">{fmtCtx(m.contextWindow)} ctx</span>
+              {m.pricing && (
+                <>
+                  <span className="opacity-40">·</span>
+                  <span className="tabular-nums">${m.pricing.input}·${m.pricing.output}/M</span>
+                </>
+              )}
+              {m.mappingMode === 'manual' && <Badge variant="secondary" className="text-[10px]">manual</Badge>}
+              {m.needsReview && !m.stale && <Badge className="bg-amber-500/20 text-amber-600 text-[10px]">review</Badge>}
+              {m.stale && <Badge variant="outline" className="text-[10px]">stale</Badge>}
+              {m.overriddenFields.length > 0 && <Pin className="size-3 text-primary" />}
+            </div>
+
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">{t('settings.modelRegistry.colImage', 'Image')} <CapCell value={m.supportsImageInput} /></span>
+              <span className="inline-flex items-center gap-1">{t('settings.modelRegistry.colPdf', 'PDF')} <CapCell value={m.supportsPdfInput} /></span>
+              <span className="inline-flex items-center gap-1">{t('settings.modelRegistry.colTools', 'Tools')} <CapCell value={m.supportsToolCall} /></span>
+              <span className="inline-flex items-center gap-1">{t('settings.modelRegistry.colReason', 'Reason')} <CapCell value={m.reasoning?.enabled ? true : m.reasoning ? false : null} /></span>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            {t('settings.modelRegistry.empty', 'No models. Connect a provider, then Resync.')}
+          </p>
+        )}
       </div>
 
       {filtered.length > 0 && (
