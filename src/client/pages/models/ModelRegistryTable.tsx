@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { RefreshCw, Pencil, AlertTriangle, Pin, Wand2, Search, ChevronsUpDown, Check, RotateCcw, X, Minus, ChevronLeft, ChevronRight, DownloadCloud } from 'lucide-react'
+import { Pencil, AlertTriangle, Pin, Wand2, Search, ChevronsUpDown, Check, RotateCcw, X, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Label } from '@/client/components/ui/label'
@@ -73,7 +73,7 @@ function CapCell({ value }: { value: boolean | null }) {
   )
 }
 
-export function ModelRegistryTable() {
+export function ModelRegistryTable({ reloadKey = 0 }: { reloadKey?: number } = {}) {
   const { t } = useTranslation()
   // Side-effect: registers each provider type's brand icon with <ProviderIcon>.
   // Without it the icons fall back to the generic chip (this page is reached
@@ -81,8 +81,6 @@ export function ModelRegistryTable() {
   useProviderTypes()
   const [models, setModels] = useState<RegistryModel[]>([])
   const [loading, setLoading] = useState(true)
-  const [resyncing, setResyncing] = useState(false)
-  const [snapshotBusy, setSnapshotBusy] = useState(false)
   const [providerFilter, setProviderFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [query, setQuery] = useState('')
@@ -102,36 +100,9 @@ export function ModelRegistryTable() {
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
-
-  const resync = async () => {
-    setResyncing(true)
-    try {
-      await api.post('/models/resync')
-      toast.success(t('settings.modelRegistry.resyncStarted', 'Resync started — refresh in a moment'))
-      // give the background reconcile a beat, then reload
-      setTimeout(() => void load(), 1500)
-    } catch (err) {
-      toast.error(getErrorMessage(err))
-    } finally {
-      setResyncing(false)
-    }
-  }
-
-  // Pull the latest models.dev catalogue (persisted to the data dir), then the
-  // server resyncs in the background so new matches/metadata take effect.
-  const refreshSnapshot = async () => {
-    setSnapshotBusy(true)
-    try {
-      const res = await api.post<{ modelCount: number; providerCount: number }>('/models/refresh-snapshot', {})
-      toast.success(t('settings.modelRegistry.snapshotRefreshed', { models: res.modelCount, providers: res.providerCount, defaultValue: 'models.dev updated — {{models}} models across {{providers}} providers. Re-matching…' }))
-      setTimeout(() => void load(), 2000)
-    } catch (err) {
-      toast.error(getErrorMessage(err))
-    } finally {
-      setSnapshotBusy(false)
-    }
-  }
+  // `reloadKey` lets the host page (whose header owns the resync/snapshot
+  // actions) trigger a refetch after one of them completes.
+  useEffect(() => { void load() }, [load, reloadKey])
 
   // One-click "this auto-match is correct" — an empty patch clears needsReview
   // server-side without pinning any field (and enables it if it was in review).
@@ -218,24 +189,12 @@ export function ModelRegistryTable() {
 
   return (
     <div className="space-y-4">
-      {/* The page title lives in the canonical PageHeader (ModelRegistryPage);
-          here only the explainer + the sync actions. */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          {t('settings.modelRegistry.subtitle',
-            'Every model exposed by your providers. Metadata (context, capabilities, pricing) is auto-filled from the community models.dev database — edit any value to pin it, or remap a wrong match.')}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={refreshSnapshot} disabled={snapshotBusy} title={t('settings.modelRegistry.snapshotTip', 'Download the latest models.dev catalogue, then re-match')}>
-            <DownloadCloud className={`size-4 ${snapshotBusy ? 'animate-pulse' : ''}`} />
-            {t('settings.modelRegistry.snapshotRefresh', 'Update models.dev')}
-          </Button>
-          <Button variant="outline" onClick={resync} disabled={resyncing}>
-            <RefreshCw className={`size-4 ${resyncing ? 'animate-spin' : ''}`} />
-            {t('settings.modelRegistry.resync', 'Resync')}
-          </Button>
-        </div>
-      </div>
+      {/* The page title + sync actions live in the canonical PageHeader
+          (ModelRegistryPage); here only the explainer. */}
+      <p className="text-sm text-muted-foreground max-w-2xl">
+        {t('settings.modelRegistry.subtitle',
+          'Every model exposed by your providers. Metadata (context, capabilities, pricing) is auto-filled from the community models.dev database — edit any value to pin it, or remap a wrong match.')}
+      </p>
 
       {reviewCount > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
