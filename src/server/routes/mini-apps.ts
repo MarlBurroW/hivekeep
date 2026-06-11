@@ -1042,74 +1042,38 @@ miniAppRoutes.get('/:id/static/*', async (c) => {
 
 export const miniAppSdkRoutes = new Hono()
 
-miniAppSdkRoutes.get('/hivekeep-sdk.js', async (c) => {
-  const jsPath = join(import.meta.dir, '../mini-app-sdk/hivekeep-sdk.js')
-  if (!existsSync(jsPath)) {
-    return new Response('/* Hivekeep SDK JS not found */', {
-      headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' },
+// SDK assets, each served under its canonical `hivekeep-*` name AND a legacy
+// `kinbot-*` alias. Mini-apps authored before the Hivekeep rebrand carry an
+// app.json import map pointing at `/api/mini-apps/sdk/kinbot-react.js` &
+// `kinbot-components.js`; without the alias those URLs miss this router, fall
+// through to the SPA catch-all (which returns index.html as `text/html`), and
+// the browser refuses the module — leaving every legacy mini-app blank.
+const SDK_ASSETS: { file: string; type: string; missing: string }[] = [
+  { file: 'hivekeep-sdk.js', type: 'application/javascript', missing: '/* Hivekeep SDK JS not found */' },
+  { file: 'hivekeep-react.js', type: 'application/javascript', missing: '/* Hivekeep React SDK not found */' },
+  { file: 'hivekeep-components.js', type: 'application/javascript', missing: '/* Hivekeep Components not found */' },
+  { file: 'hivekeep-sdk.css', type: 'text/css', missing: '/* Hivekeep SDK CSS not found */' },
+  { file: 'hivekeep-sdk.d.ts', type: 'application/typescript', missing: '// Type definitions not found' },
+  { file: 'hivekeep-react.d.ts', type: 'application/typescript', missing: '// Type definitions not found' },
+  { file: 'hivekeep-components.d.ts', type: 'application/typescript', missing: '// Type definitions not found' },
+]
+
+function serveSdkAsset(file: string, type: string, missing: string) {
+  return async () => {
+    const p = join(import.meta.dir, '../mini-app-sdk', file)
+    const body = existsSync(p) ? await Bun.file(p).text() : missing
+    return new Response(body, {
+      headers: { 'Content-Type': type, 'Cache-Control': 'public, max-age=3600' },
     })
   }
-  const js = await Bun.file(jsPath).text()
-  return new Response(js, {
-    headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' },
-  })
-})
-
-miniAppSdkRoutes.get('/hivekeep-react.js', async (c) => {
-  const jsPath = join(import.meta.dir, '../mini-app-sdk/hivekeep-react.js')
-  if (!existsSync(jsPath)) {
-    return new Response('/* Hivekeep React SDK not found */', {
-      headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' },
-    })
-  }
-  const js = await Bun.file(jsPath).text()
-  return new Response(js, {
-    headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' },
-  })
-})
-
-miniAppSdkRoutes.get('/hivekeep-components.js', async (c) => {
-  const jsPath = join(import.meta.dir, '../mini-app-sdk/hivekeep-components.js')
-  if (!existsSync(jsPath)) {
-    return new Response('/* Hivekeep Components not found */', {
-      headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' },
-    })
-  }
-  const js = await Bun.file(jsPath).text()
-  return new Response(js, {
-    headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' },
-  })
-})
-
-// Serve TypeScript type definitions for SDK autocomplete / documentation
-for (const dtsFile of ['hivekeep-sdk.d.ts', 'hivekeep-react.d.ts', 'hivekeep-components.d.ts']) {
-  miniAppSdkRoutes.get(`/${dtsFile}`, async (c) => {
-    const dtsPath = join(import.meta.dir, `../mini-app-sdk/${dtsFile}`)
-    if (!existsSync(dtsPath)) {
-      return new Response('// Type definitions not found', {
-        headers: { 'Content-Type': 'application/typescript', 'Cache-Control': 'public, max-age=3600' },
-      })
-    }
-    const content = await Bun.file(dtsPath).text()
-    return new Response(content, {
-      headers: { 'Content-Type': 'application/typescript', 'Cache-Control': 'public, max-age=3600' },
-    })
-  })
 }
 
-miniAppSdkRoutes.get('/hivekeep-sdk.css', async (c) => {
-  // Serve the SDK CSS file
-  const cssPath = join(import.meta.dir, '../mini-app-sdk/hivekeep-sdk.css')
-  if (!existsSync(cssPath)) {
-    return new Response('/* Hivekeep SDK CSS not found */', {
-      headers: { 'Content-Type': 'text/css', 'Cache-Control': 'public, max-age=3600' },
-    })
-  }
-  const css = await Bun.file(cssPath).text()
-  return new Response(css, {
-    headers: { 'Content-Type': 'text/css', 'Cache-Control': 'public, max-age=3600' },
-  })
-})
+for (const asset of SDK_ASSETS) {
+  const handler = serveSdkAsset(asset.file, asset.type, asset.missing)
+  miniAppSdkRoutes.get(`/${asset.file}`, handler)
+  // Legacy alias: hivekeep-react.js → also served at kinbot-react.js, etc.
+  miniAppSdkRoutes.get(`/${asset.file.replace(/^hivekeep-/, 'kinbot-')}`, handler)
+}
 
 // ─── Console entries ────────────────────────────────────────────────────────
 
