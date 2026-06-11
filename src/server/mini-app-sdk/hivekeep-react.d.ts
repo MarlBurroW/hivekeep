@@ -388,3 +388,6 @@ export function Link(props: {
   style?: React.CSSProperties;
   [key: string]: any;
 }): React.ReactElement;
+
+/** @deprecated Renamed to `useHivekeep`. Kept for pre-rebrand mini-apps. */
+export const useKinBot: typeof useHivekeep;

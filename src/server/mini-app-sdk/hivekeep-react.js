@@ -1460,3 +1460,10 @@ export function Link({ to, params, children, active, className = '', style, ...r
 
   return React.createElement('a', { href, className: cls || undefined, style, ...rest }, children)
 }
+
+// ─── Backward-compat aliases (pre-Hivekeep-rebrand mini-apps) ───────────────
+// Mini-apps authored before the KinBot → Hivekeep rebrand import `useKinBot`
+// from `@kinbot/react`. The hook was renamed to `useHivekeep`; this alias keeps
+// those apps running (the legacy `kinbot-*` SDK URLs are served by the route
+// aliases in routes/mini-apps.ts).
+export const useKinBot = useHivekeep
