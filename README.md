@@ -28,6 +28,15 @@
   <a href="#self-improving">Plugins</a>
 </p>
 
+<p align="center">
+  <a href="https://hivekeep.app/#demo">
+    <img src="docs/assets/demo-video.jpg" alt="Watch the Hivekeep walkthrough — from a blank install to your own AI team in six minutes" width="720" />
+  </a>
+</p>
+<p align="center">
+  <sub><strong>▶ Watch the 6-minute walkthrough</strong> — onboarding, Queenie setting everything up, agents building a mini-app and a custom tool live, and a full tour.</sub>
+</p>
+
 ---
 
 ## The 30-second pitch
