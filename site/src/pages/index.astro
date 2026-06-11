@@ -743,6 +743,9 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
       color: string
       age: number
       ttl: number
+      /** Idle pause before this pulse appears — keeps the grid mostly calm,
+       *  with often just one or two signals alive at a time. */
+      delay: number
     }
     let pulses: Pulse[] = []
     const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo)
@@ -755,16 +758,21 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
         a,
         b,
         t: 0,
-        speed: rand(240, 430),
+        speed: rand(240, 400),
         trail: [verts[a]],
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
         age: 0,
-        ttl: rand(4, 8),
+        ttl: rand(3.5, 6.5),
+        delay: rand(1.2, 5),
       }
     }
 
-    const MAXTRAIL = 150
+    const MAXTRAIL = 130
     function step(p: Pulse, dt: number) {
+      if (p.delay > 0) {
+        p.delay -= dt
+        return
+      }
       p.age += dt
       let A = verts[p.a]
       let B = verts[p.b]
@@ -791,6 +799,7 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       for (const p of pulses) {
+        if (p.delay > 0) continue
         const A = verts[p.a]
         const B = verts[p.b]
         const head = { x: A.x + (B.x - A.x) * p.t, y: A.y + (B.y - A.y) * p.t }
@@ -806,7 +815,7 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
           const d = Math.hypot(q.x - px, q.y - py)
           const a0 = 1 - dist / MAXTRAIL
           const a1 = Math.max(0, 1 - (dist + d) / MAXTRAIL)
-          ctx.globalAlpha = env * 0.62 * ((a0 + a1) / 2)
+          ctx.globalAlpha = env * 0.38 * ((a0 + a1) / 2)
           ctx.beginPath()
           ctx.moveTo(px, py)
           ctx.lineTo(q.x, q.y)
@@ -815,12 +824,12 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
           py = q.y
           dist += d
         }
-        ctx.globalAlpha = env * 0.95
+        ctx.globalAlpha = env * 0.65
         ctx.shadowColor = p.color
-        ctx.shadowBlur = 7
+        ctx.shadowBlur = 6
         ctx.fillStyle = p.color
         ctx.beginPath()
-        ctx.arc(head.x, head.y, 1.7, 0, Math.PI * 2)
+        ctx.arc(head.x, head.y, 1.5, 0, Math.PI * 2)
         ctx.fill()
         ctx.shadowBlur = 0
       }
@@ -837,12 +846,12 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
       cv.height = H * dpr
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       buildGraph()
-      const n = Math.max(3, Math.min(8, Math.round(W / 230)))
+      // few and calm: 2-3 pulses max, and their spawn delays mean often only
+      // one or two are visible at any moment
+      const n = Math.max(2, Math.min(3, Math.round(W / 550)))
       pulses = Array.from({ length: n }, spawn)
-      // stagger lifetimes so the fade-ins don't sync up
-      pulses.forEach((p) => {
-        p.age = Math.random() * p.ttl * 0.5
-      })
+      // let the first one appear quickly so the hero isn't dead on load
+      if (pulses[0]) pulses[0].delay = 0.6
     }
 
     let raf = 0
