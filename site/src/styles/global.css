@@ -721,3 +721,37 @@ html.js .reveal.in{opacity:1;transform:none;}
   .dm-drawer{transition:none;}
   .dm-scrim{transition:none;}
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Queenie onboarding figure (section 06) — an inline, auto-playing
+   chat that reuses the dm-* chat skin. qd-* adds the figure shell
+   and the SECURE INPUT card (key typed as dots → vault, never chat).
+   ───────────────────────────────────────────────────────────── */
+.qd{display:flex;flex-direction:column;}
+.qd-head{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);}
+.qd-body{height:430px;padding:14px 0 10px;}
+.qd .dm-input{padding-bottom:12px;}
+
+/* secure-input card: visually distinct from tool calls (green / vault) */
+.qd-secure{border:1px solid oklch(0.78 0.15 150/.4);background:oklch(0.78 0.15 150/.06);border-radius:12px;padding:10px 12px;animation:dm-rise .3s ease both;}
+.qd-sec-head{display:flex;align-items:center;gap:7px;font-family:"JetBrains Mono",monospace;font-size:.64rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--green);}
+.qd-sec-head svg{width:13px;height:13px;}
+.qd-sec-field{display:flex;align-items:center;margin:9px 0;background:oklch(0.10 0.018 312);border:1px solid var(--line-strong);border-radius:8px;padding:8px 11px;min-height:34px;}
+.qd-sec-dots{font-family:"JetBrains Mono",monospace;font-size:.8rem;letter-spacing:.18em;color:var(--ink);overflow:hidden;white-space:nowrap;width:0;animation:qd-type 1.6s steps(14,end) .25s forwards;}
+.qd-sec-dots::before{content:"••••••••••••••";}
+.qd-sec-caret{width:1.5px;height:14px;background:var(--green);margin-left:2px;animation:qd-caret 1s steps(1) infinite;}
+.qd-secure.done .qd-sec-caret{display:none;}
+.qd-sec-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.qd-sec-note{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;color:var(--ink-soft);}
+.qd-sec-note b{color:var(--ink);font-weight:600;}
+.qd-sec-note svg{width:13px;height:13px;color:var(--green);flex:0 0 auto;}
+.qd-sec-ok{display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",monospace;font-size:.66rem;color:var(--ink-soft);}
+.qd-sec-ok svg{width:13px;height:13px;color:var(--green);}
+.qd-sec-ok code{background:oklch(1 0 0/.06);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.92em;color:var(--ink);}
+@keyframes qd-type{to{width:9.2em;}}
+@keyframes qd-caret{0%,100%{opacity:1;}50%{opacity:0;}}
+@media (prefers-reduced-motion: reduce){
+  .qd-secure{animation:none;}
+  .qd-sec-dots{animation:none;width:9.2em;}
+  .qd-sec-caret{display:none;}
+}

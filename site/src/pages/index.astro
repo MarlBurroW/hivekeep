@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import Avatar from '../components/Avatar.astro';
 import Providers from '../components/Providers.astro';
 import AgentDemo from '../components/AgentDemo.tsx';
+import QueenieOnboarding from '../components/QueenieOnboarding.tsx';
 import { Icon } from 'astro-icon/components';
 import agents from '../agents.json';
 import stats from '../data/stats.json';
@@ -419,13 +420,7 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
           <p>Queenie, your setup agent, connects your providers, secures your secrets, and creates your first Agents by chatting with you. It stays around for good, ready to add an Agent or wire up a new provider any time.</p>
           <div class="taglist"><span class="t"><Icon name="lucide:shield-check" /> secure input → vault</span><span class="t"><Icon name="lucide:wand-sparkles" /> generates Agents for you</span></div>
         </div>
-        <div class="shot">
-          <span class="cap">Fig. 5 · Queenie onboarding</span>
-          <div class="shot-inner">
-            <!-- Drop the real capture at public/screens/queenie-onboarding.png -->
-            <div class="ph"><div><Icon name="lucide:messages-square" /><div class="lbl">Queenie connects a provider via secure input</div><span class="pt">screenshot to add</span></div></div>
-          </div>
-        </div>
+        <QueenieOnboarding client:visible />
       </div>
     </div>
   </section></div>
