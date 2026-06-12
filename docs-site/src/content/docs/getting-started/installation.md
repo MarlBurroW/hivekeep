@@ -68,3 +68,5 @@ NODE_ENV=production bun run start
 ## What's next?
 
 Head to [First Agent](/docs/getting-started/first-agent/) to create your first AI agent.
+
+Already installed? See [Updating Hivekeep](/docs/getting-started/updating/) for the in-app updater, update channels, and automatic rollback.

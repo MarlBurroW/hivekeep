@@ -58,6 +58,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Installation', slug: 'getting-started/installation' },
 						{ label: 'Configuration', slug: 'getting-started/configuration' },
+						{ label: 'Updating', slug: 'getting-started/updating' },
 						{ label: 'Queenie (Guided Setup)', slug: 'features/queenie' },
 						{ label: 'Your First Agent', slug: 'getting-started/first-agent' },
 						{ label: 'Autonomy Quickstart', slug: 'guides/autonomy-quickstart' },

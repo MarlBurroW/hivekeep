@@ -367,13 +367,19 @@ Triggers on connected email accounts: a matching incoming email prompts a target
 | `MINI_APPS_MAX_TOTAL_SIZE` | `50` (MB) | Max total size of a mini-app bundle. |
 | `MINI_APPS_BACKEND_ENABLED` | `true` | Enables/disables the mini-apps backend server. |
 
-## Version checking
+## Version checking & self-update
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `VERSION_CHECK_ENABLED` | `true` | Enables periodic new-version checks. |
 | `VERSION_CHECK_REPO` | `MarlBurroW/hivekeep` | Target repo for the checks. |
+| `VERSION_CHECK_BRANCH` | `main` | Branch tracked by the **edge** update channel. |
 | `VERSION_CHECK_INTERVAL_HOURS` | `1` | Check interval. |
+| `VERSION_CHECK_GITHUB_TOKEN` | — | Optional GitHub token to lift the unauthenticated API rate limit (60 req/h). |
+| `HIVEKEEP_GIT_SHA` | — | Git sha of the running code; baked into Docker images by CI (images have no `.git`). Enables the edge channel comparison in Docker. |
+| `HIVEKEEP_ALLOW_DEV_SELF_UPDATE` | `false` | Allows the UI self-update outside `NODE_ENV=production` (testing only). |
+
+> The update **channel** (`stable` = GitHub releases, `edge` = HEAD of main) is not an env var: it's a runtime admin setting (`app_settings.update_channel`, Settings → Updates), default `stable`. Self-update state lives in `data/update/` (journal, DB snapshots, dist backups, update.log).
 
 ## MCP
 

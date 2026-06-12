@@ -35,10 +35,16 @@ hivekeep/
 │
 ├── src/
 │   ├── server/                        # Backend (Bun + Hono)
-│   │   ├── index.ts                   # Point d'entrée : Hono app + serve static
+│   │   ├── index.ts                   # Point d'entrée : boot-guard self-update (rollback auto) → import main.ts
+│   │   ├── main.ts                    # Boot réel : migrations, registres, crons, Bun.serve
 │   │   ├── app.ts                     # Configuration Hono (middleware, routes)
 │   │   ├── config.ts                  # Configuration centralisée (env vars)
 │   │   ├── logger.ts                  # Logger (pino)
+│   │   │
+│   │   ├── update/                    # Self-update, zone SANS dépendances app (importable par le boot-guard)
+│   │   │   ├── journal.ts             # Journal persistant data/update/journal.json + update.log
+│   │   │   ├── rollback.ts            # Restauration version précédente (repo, dist, deps, snapshot DB)
+│   │   │   └── semver.ts              # compareSemver
 │   │   │
 │   │   ├── routes/                    # Routes API REST
 │   │   │   ├── auth.ts, me.ts, agents.ts, messages.ts, …

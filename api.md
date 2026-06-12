@@ -1362,6 +1362,82 @@ Soumet les valeurs : `{ values: Record<fieldKey, string> }`. Le serveur stocke d
 
 Écarte définitivement un prompt en attente sans fournir la valeur : statut `cancelled`, l'Agent (ou la sous-tâche suspendue) est relancé avec une note « refusé ». Idempotent si déjà résolu. → `{ success: true }` ou `400 SECRET_PROMPT_ERROR`.
 
+## Mises à jour de la plateforme (version-check)
+
+Deux canaux : `stable` (releases GitHub) et `edge` (HEAD de `main`). Le canal est un réglage global (`app_settings.update_channel`, défaut `stable`).
+
+### `GET /api/version-check`
+
+Infos de version en cache (rafraîchies en arrière-plan si périmées). Accessible à tout utilisateur authentifié.
+
+**Response 200**
+```json
+{
+  "currentVersion": "1.2.0",
+  "currentSha": "3492373",
+  "channel": "stable",
+  "installationType": "systemd-system",
+  "latestVersion": "1.3.0",
+  "isUpdateAvailable": true,
+  "canSelfUpdate": true,
+  "selfUpdateBlockedReason": null,
+  "releaseUrl": "https://github.com/MarlBurroW/hivekeep/releases/tag/v1.3.0",
+  "changelog": [
+    { "version": "1.3.0", "title": "Hivekeep v1.3.0", "notes": "### Features\n- ...", "url": "...", "publishedAt": 1765000000000 }
+  ],
+  "publishedAt": 1765000000000,
+  "lastCheckedAt": 1765000100000
+}
+```
+
+- `installationType`: `docker` | `systemd-system` | `systemd-user` | `launchd` | `manual`.
+- `canSelfUpdate` est `false` (avec `selfUpdateBlockedReason`: `docker` | `not-git` | `dev-mode`) quand l'update doit se faire hors UI (repull d'image docker, checkout dev…).
+- `changelog` est **cumulatif** : toutes les releases entre la version courante et la dernière (stable), ou la liste des commits `HEAD..origin/main` (edge, `notes` = null).
+
+### `POST /api/version-check/check`
+
+Force un check immédiat contre GitHub (admin). Même réponse que `GET /`. **400 `DISABLED`** si `VERSION_CHECK_ENABLED=false`.
+
+### `PUT /api/version-check/channel`
+
+Change le canal (admin). Body : `{ "channel": "stable" | "edge" }`. Invalide le cache et relance un check ; renvoie les infos fraîches. **400 `INVALID_CHANNEL`** sinon.
+
+### `POST /api/version-check/update`
+
+Lance la mise à jour auto (admin, installs git non-docker uniquement). Répond immédiatement :
+
+```json
+{ "started": true, "runId": "a1b2c3d4" }
+```
+
+La progression arrive via SSE (`update:progress`), l'issue finale via `GET /api/version-check/last-update` (le serveur redémarre en cours de route, le client doit poller). Erreurs : **400 `SELF_UPDATE_UNAVAILABLE`** (docker/dev/non-git), **400 `NO_UPDATE`**, **409 `UPDATE_IN_PROGRESS`**.
+
+Séquence serveur : preflight (worktree propre, disque) → snapshot DB (`VACUUM INTO`) → backup `dist/` + sha → download des assets client pré-buildés de la release (sha256 vérifié, fallback build local) → `git checkout` du tag (stable) / fast-forward `main` (edge) → `bun install` → restart. Si le nouveau code ne démarre pas, le boot-guard (`src/server/index.ts`) restaure automatiquement l'ancienne version (repo + dist + deps + snapshot DB) — statut `rolled-back`.
+
+### `GET /api/version-check/last-update`
+
+Dernière tentative de mise à jour (journal persistant `data/update/journal.json`, survit au restart).
+
+**Response 200**
+```json
+{
+  "run": {
+    "id": "a1b2c3d4",
+    "channel": "stable",
+    "fromVersion": "1.2.0",
+    "fromSha": "3492373",
+    "toVersion": "1.3.0",
+    "status": "success",
+    "currentStep": null,
+    "error": null,
+    "startedAt": 1765000000000,
+    "finishedAt": 1765000090000
+  }
+}
+```
+
+`status`: `running` | `restarting` | `success` | `failed` (rien n'a changé, l'ancienne version tourne toujours) | `rolled-back` (le nouveau code n'a pas booté, restauration automatique).
+
 ## SSE
 
 ### `GET /api/sse`
@@ -1426,6 +1502,17 @@ Connexion SSE **globale** (une seule par client). Le serveur multiplex les évé
 { event: 'project-tag:created', data: { tag: { id: string, label: string, color: string }, projectId: string } }
 { event: 'project-tag:updated', data: { tag: { id: string, label: string, color: string }, projectId: string } }
 { event: 'project-tag:deleted', data: { tagId: string, projectId: string } }
+
+// Mises à jour de la plateforme
+// Nouvelle version détectée par le cron de check (émis une seule fois par version)
+{ event: 'version:update-available', data: { channel: 'stable' | 'edge', latestVersion: string, releaseUrl: string | null, publishedAt: number | null } }
+// Progression d'une self-update en cours (steps: preflight, snapshot, backup,
+// download, apply, dependencies, assets, restart)
+{ event: 'update:progress', data: { runId: string, step: string, status: 'running' | 'done' | 'error', message: string | null } }
+// Issue d'une self-update. 'success' et 'rolled-back' sont émis APRÈS le restart
+// (le client doit donc aussi poller GET /api/version-check/last-update pendant
+// la coupure SSE) ; 'failed' est émis avant restart (l'ancienne version tourne).
+{ event: 'update:finished', data: { runId: string, status: 'success' | 'failed' | 'rolled-back', version?: string, error?: string } }
 ```
 
 > Le SSE est **global** (pas par Agent). Le client filtre côté frontend par `agentId` pour n'afficher que les événements pertinents. Cela permet de mettre a jour la sidebar (badges, statuts) pour tous les Agents simultanément.

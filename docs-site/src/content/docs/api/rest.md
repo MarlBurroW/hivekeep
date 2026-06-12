@@ -465,13 +465,15 @@ Public access to shared files (no auth required, token-based).
 | `GET` | `/s/:token` | View shared content |
 | `POST` | `/s/:token` | Access password-protected share |
 
-## Version Check
+## Platform Updates
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/version-check` | Get cached version info (current version, latest, update available, release notes). Returns `isUpdateAvailable: false` if disabled |
-| `POST` | `/api/version-check/check` | Force a fresh version check (admin only). Returns 400 if version check is disabled |
-| `POST` | `/api/version-check/update` | Self-update: runs `git pull` + `bun install` and restarts (admin only, non-Docker). Returns 400 in Docker mode |
+| `GET` | `/api/version-check` | Cached version info: current version/sha, channel (`stable`/`edge`), installation type, latest version, cumulative changelog, `canSelfUpdate` |
+| `POST` | `/api/version-check/check` | Force a fresh version check against GitHub (admin only). Returns 400 if version check is disabled |
+| `PUT` | `/api/version-check/channel` | Switch the update channel: `{ "channel": "stable" \| "edge" }` (admin only) |
+| `POST` | `/api/version-check/update` | Start the safe self-update (admin only, git installs). Returns `{ runId }`; progress over SSE `update:progress`, outcome in `/last-update`. 400 for Docker/dev installs, 409 if already running |
+| `GET` | `/api/version-check/last-update` | Latest update attempt (`running`/`restarting`/`success`/`failed`/`rolled-back`) — persisted, survives the restart |
 
 ## Usage (admin only)
 
