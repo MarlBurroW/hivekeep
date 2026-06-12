@@ -3185,7 +3185,24 @@
     "crons": "Attività pianificate",
     "apps": "Mini-app",
     "models": "Modelli",
-    "files": "File"
+    "files": "File",
+    "terminal": "Terminale"
+  },
+  "terminal": {
+    "title": "Terminale",
+    "newSession": "Nuova sessione",
+    "reconnect": "Riconnetti",
+    "maxSessions": "Limite di sessioni raggiunto. Chiudi un'altra sessione del terminale e riprova.",
+    "status": {
+      "connecting": "Connessione...",
+      "connected": "Connesso",
+      "disconnected": "Disconnesso",
+      "ended": "Sessione terminata"
+    },
+    "disabled": {
+      "title": "Il terminale è disattivato",
+      "description": "Questa funzione è disattivata su questa istanza. Imposta HIVEKEEP_TERMINAL_ENABLED=true e riavvia il server per attivarla."
+    }
   },
   "orphanTask": {
     "menuAction": "Avvia un'attività",

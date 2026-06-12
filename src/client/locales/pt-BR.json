@@ -3185,7 +3185,24 @@
     "crons": "Tarefas Agendadas",
     "apps": "Mini-Apps",
     "models": "Modelos",
-    "files": "Arquivos"
+    "files": "Arquivos",
+    "terminal": "Terminal"
+  },
+  "terminal": {
+    "title": "Terminal",
+    "newSession": "Nova sessão",
+    "reconnect": "Reconectar",
+    "maxSessions": "Limite de sessões atingido. Feche outra sessão de terminal e tente novamente.",
+    "status": {
+      "connecting": "Conectando...",
+      "connected": "Conectado",
+      "disconnected": "Desconectado",
+      "ended": "Sessão encerrada"
+    },
+    "disabled": {
+      "title": "O terminal está desativado",
+      "description": "Este recurso está desativado nesta instância. Defina HIVEKEEP_TERMINAL_ENABLED=true e reinicie o servidor para ativá-lo."
+    }
   },
   "orphanTask": {
     "menuAction": "Iniciar uma tarefa",

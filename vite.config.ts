@@ -40,6 +40,12 @@ export default defineConfig({
       allow: [path.resolve(__dirname)],
     },
     proxy: {
+      // Terminal WebSocket (must be declared before the generic /api rule)
+      '/api/terminal/ws': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true,
+      },
       '/api/sse': {
         target: 'http://localhost:3000',
         changeOrigin: true,

@@ -3185,7 +3185,24 @@
     "crons": "Tâches planifiées",
     "apps": "Mini-apps",
     "models": "Modèles",
-    "files": "Fichiers"
+    "files": "Fichiers",
+    "terminal": "Terminal"
+  },
+  "terminal": {
+    "title": "Terminal",
+    "newSession": "Nouvelle session",
+    "reconnect": "Reconnecter",
+    "maxSessions": "Limite de sessions atteinte. Fermez une autre session de terminal et réessayez.",
+    "status": {
+      "connecting": "Connexion...",
+      "connected": "Connecté",
+      "disconnected": "Déconnecté",
+      "ended": "Session terminée"
+    },
+    "disabled": {
+      "title": "Le terminal est désactivé",
+      "description": "Cette fonctionnalité est désactivée sur cette instance. Définissez HIVEKEEP_TERMINAL_ENABLED=true et redémarrez le serveur pour l'activer."
+    }
   },
   "orphanTask": {
     "menuAction": "Lancer une tâche",

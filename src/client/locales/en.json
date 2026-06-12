@@ -3185,7 +3185,24 @@
     "crons": "Scheduled Tasks",
     "apps": "Mini-Apps",
     "models": "Models",
-    "files": "Files"
+    "files": "Files",
+    "terminal": "Terminal"
+  },
+  "terminal": {
+    "title": "Terminal",
+    "newSession": "New session",
+    "reconnect": "Reconnect",
+    "maxSessions": "Session limit reached. Close another terminal session and try again.",
+    "status": {
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "ended": "Session ended"
+    },
+    "disabled": {
+      "title": "Terminal is disabled",
+      "description": "This feature is turned off on this instance. Set HIVEKEEP_TERMINAL_ENABLED=true and restart the server to enable it."
+    }
   },
   "orphanTask": {
     "menuAction": "Start a task",

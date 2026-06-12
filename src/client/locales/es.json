@@ -3185,7 +3185,24 @@
     "crons": "Tareas programadas",
     "apps": "Mini-apps",
     "models": "Modelos",
-    "files": "Archivos"
+    "files": "Archivos",
+    "terminal": "Terminal"
+  },
+  "terminal": {
+    "title": "Terminal",
+    "newSession": "Nueva sesión",
+    "reconnect": "Reconectar",
+    "maxSessions": "Límite de sesiones alcanzado. Cierra otra sesión de terminal e inténtalo de nuevo.",
+    "status": {
+      "connecting": "Conectando...",
+      "connected": "Conectado",
+      "disconnected": "Desconectado",
+      "ended": "Sesión finalizada"
+    },
+    "disabled": {
+      "title": "El terminal está desactivado",
+      "description": "Esta función está desactivada en esta instancia. Define HIVEKEEP_TERMINAL_ENABLED=true y reinicia el servidor para activarla."
+    }
   },
   "orphanTask": {
     "menuAction": "Iniciar una tarea",

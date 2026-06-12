@@ -3203,7 +3203,24 @@
     "crons": "Zaplanowane zadania",
     "apps": "Mini-aplikacje",
     "models": "Modele",
-    "files": "Pliki"
+    "files": "Pliki",
+    "terminal": "Terminal"
+  },
+  "terminal": {
+    "title": "Terminal",
+    "newSession": "Nowa sesja",
+    "reconnect": "Połącz ponownie",
+    "maxSessions": "Osiągnięto limit sesji. Zamknij inną sesję terminala i spróbuj ponownie.",
+    "status": {
+      "connecting": "Łączenie...",
+      "connected": "Połączono",
+      "disconnected": "Rozłączono",
+      "ended": "Sesja zakończona"
+    },
+    "disabled": {
+      "title": "Terminal jest wyłączony",
+      "description": "Ta funkcja jest wyłączona w tej instancji. Ustaw HIVEKEEP_TERMINAL_ENABLED=true i uruchom ponownie serwer, aby ją włączyć."
+    }
   },
   "orphanTask": {
     "menuAction": "Uruchom zadanie",

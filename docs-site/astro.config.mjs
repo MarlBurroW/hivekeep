@@ -84,6 +84,7 @@ export default defineConfig({
 						{ label: 'Connected Accounts', slug: 'features/connected-accounts' },
 						{ label: 'Projects and Tickets', slug: 'features/projects' },
 						{ label: 'Files (Workspace Browser)', slug: 'features/files' },
+						{ label: 'Terminal', slug: 'features/terminal' },
 						{ label: 'Automation, Crons and Webhooks', slug: 'features/automation' },
 						{ label: 'Vault and Secrets', slug: 'features/vault' },
 						{ label: 'Multi-User and the Household', slug: 'features/multi-user' },

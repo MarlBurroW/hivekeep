@@ -546,6 +546,21 @@ export const config = {
     searchMaxEntries: Number(process.env.WORKSPACE_FILES_SEARCH_MAX_ENTRIES ?? 20000),
   },
 
+  /** Terminal section — admin-only web terminal on the host (see api.md). */
+  terminal: {
+    /** Kill-switch: set HIVEKEEP_TERMINAL_ENABLED=false to disable the feature entirely. */
+    enabled: process.env.HIVEKEEP_TERMINAL_ENABLED !== 'false',
+    /** Shell binary spawned for each session. Defaults to $SHELL, then /bin/bash. */
+    shell: process.env.HIVEKEEP_TERMINAL_SHELL ?? process.env.SHELL ?? '/bin/bash',
+    /** Scrollback kept server-side per session, replayed on reattach (KB). */
+    scrollbackKb: Number(process.env.HIVEKEEP_TERMINAL_SCROLLBACK_KB ?? 256),
+    /** How long a detached session (no client connected) survives before the
+     *  shell is killed (seconds). Covers navigation away / brief disconnects. */
+    detachedTtlSec: Number(process.env.HIVEKEEP_TERMINAL_DETACHED_TTL_SEC ?? 600),
+    /** Hard cap of concurrently running PTY sessions across all users. */
+    maxSessions: Number(process.env.HIVEKEEP_TERMINAL_MAX_SESSIONS ?? 10),
+  },
+
   webhooks: {
     maxPerAgent: Number(process.env.WEBHOOKS_MAX_PER_KIN ?? 20),
     maxPayloadBytes: Number(process.env.WEBHOOKS_MAX_PAYLOAD_BYTES ?? 1_048_576), // 1MB

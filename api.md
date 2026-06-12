@@ -1691,6 +1691,41 @@ Dernière tentative de mise à jour (journal persistant `data/update/journal.jso
 
 `status`: `running` | `restarting` | `success` | `failed` (rien n'a changé, l'ancienne version tourne toujours) | `rolled-back` (le nouveau code n'a pas booté, restauration automatique).
 
+## Terminal (admin uniquement)
+
+Terminal web sur la machine hôte (ou le conteneur sous Docker). Section `/terminal`, réservée aux admins. Un shell (PTY, `bun-pty`) par session ; une session survit à une déconnexion WebSocket pendant `HIVEKEEP_TERMINAL_DETACHED_TTL_SEC` (le scrollback est rejoué au rattachement). Désactivable globalement via `HIVEKEEP_TERMINAL_ENABLED=false`.
+
+### `GET /api/terminal/status`
+
+Sonde la disponibilité de la fonctionnalité (la page l'appelle avant d'ouvrir le WebSocket, car un refus d'upgrade ne porte pas de corps d'erreur).
+
+**Response 200** : `{ "enabled": true, "shell": "/bin/bash" }`
+**403 `TERMINAL_DISABLED`** si désactivé par env var. **403 `FORBIDDEN`** si non-admin.
+
+### `GET /api/terminal/ws`
+
+Upgrade WebSocket (cookie de session Better Auth requis, mêmes gardes que `/status`).
+
+**Query params** : `cols`, `rows` (taille initiale), `sessionId` (optionnel — rattache une session détachée encore vivante du même utilisateur ; sinon un nouveau shell est créé).
+
+**Messages client → serveur** (JSON) :
+
+| Type | Payload | Effet |
+|---|---|---|
+| `input` | `{ "type": "input", "data": "ls\r" }` | Écrit sur le PTY |
+| `resize` | `{ "type": "resize", "cols": 120, "rows": 32 }` | Redimensionne le PTY |
+| `kill` | `{ "type": "kill" }` | Tue le shell et détruit la session |
+| `ping` | `{ "type": "ping" }` | Keepalive (ignoré côté serveur) |
+
+**Messages serveur → client** (JSON) :
+
+| Type | Payload | Sens |
+|---|---|---|
+| `ready` | `{ "type": "ready", "sessionId": "…", "resumed": false }` | Session attachée. Si `resumed: true`, le scrollback complet suit dans un message `output` |
+| `output` | `{ "type": "output", "data": "…" }` | Sortie brute du PTY (séquences ANSI incluses) |
+| `exit` | `{ "type": "exit" }` | Le shell s'est terminé (exit, kill ou TTL) ; la session n'existe plus |
+| `error` | `{ "type": "error", "code": "TERMINAL_MAX_SESSIONS" }` | Création refusée (cap `HIVEKEEP_TERMINAL_MAX_SESSIONS` atteint), le serveur ferme ensuite le socket |
+
 ## SSE
 
 ### `GET /api/sse`

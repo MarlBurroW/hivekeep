@@ -290,6 +290,16 @@ Internal tuning parameters — most deployments never touch them, the defaults a
 | `VAULT_MAX_ATTACHMENT_SIZE` | `50` (MB) | Max size per attachment. |
 | `VAULT_MAX_ATTACHMENTS_PER_ENTRY` | `10` | Max number of attachments per vault entry. |
 
+## Terminal
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `HIVEKEEP_TERMINAL_ENABLED` | `true` | Kill-switch for the admin web terminal. Set to `false` to disable the feature entirely. |
+| `HIVEKEEP_TERMINAL_SHELL` | `$SHELL`, then `/bin/bash` | Shell binary spawned for each terminal session. |
+| `HIVEKEEP_TERMINAL_SCROLLBACK_KB` | `256` | Scrollback kept server-side per session (KB), replayed when a client reattaches. |
+| `HIVEKEEP_TERMINAL_DETACHED_TTL_SEC` | `600` | How long a detached session (no client connected) survives before the shell is killed. |
+| `HIVEKEEP_TERMINAL_MAX_SESSIONS` | `10` | Hard cap of concurrently running PTY sessions across all users. |
+
 ## Webhooks
 
 | Env Var | Default | Description |

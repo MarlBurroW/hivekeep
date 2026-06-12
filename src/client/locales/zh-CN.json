@@ -3185,7 +3185,24 @@
     "crons": "定时任务",
     "apps": "迷你应用",
     "models": "模型",
-    "files": "文件"
+    "files": "文件",
+    "terminal": "终端"
+  },
+  "terminal": {
+    "title": "终端",
+    "newSession": "新建会话",
+    "reconnect": "重新连接",
+    "maxSessions": "已达到会话数量上限。请关闭其他终端会话后重试。",
+    "status": {
+      "connecting": "连接中...",
+      "connected": "已连接",
+      "disconnected": "已断开",
+      "ended": "会话已结束"
+    },
+    "disabled": {
+      "title": "终端已禁用",
+      "description": "此实例已关闭该功能。设置 HIVEKEEP_TERMINAL_ENABLED=true 并重启服务器即可启用。"
+    }
   },
   "orphanTask": {
     "menuAction": "发起任务",

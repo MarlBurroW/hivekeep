@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, FolderKanban, ListTodo, CalendarClock, Folder, Blocks, Boxes, ChevronDown } from 'lucide-react'
+import { Home, FolderKanban, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, ChevronDown } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -54,7 +54,7 @@ export function AppTopBar({ onOpenSettings, onOpenAccount }: AppTopBarProps) {
   // admin-only Models entry).
   const isAdmin = user?.role === 'admin'
   const path = location.pathname
-  const sectionPrefixes = ['/projects', '/tasks', '/crons', '/files', '/mini-apps', '/models']
+  const sectionPrefixes = ['/projects', '/tasks', '/crons', '/files', '/mini-apps', '/models', '/terminal']
   const isSection = (prefix: string) => path.startsWith(prefix)
   const modeItems: Array<{ key: string; to: string; icon: typeof Home; active: boolean; label: string; badge: boolean }> = [
     { key: 'agents', to: '/', icon: Home, active: !sectionPrefixes.some(isSection), label: t('activityBar.agents'), badge: false },
@@ -63,7 +63,12 @@ export function AppTopBar({ onOpenSettings, onOpenAccount }: AppTopBarProps) {
     { key: 'crons', to: '/crons', icon: CalendarClock, active: isSection('/crons'), label: t('activityBar.crons'), badge: false },
     { key: 'files', to: '/files', icon: Folder, active: isSection('/files'), label: t('activityBar.files'), badge: false },
     { key: 'apps', to: '/mini-apps', icon: Blocks, active: isSection('/mini-apps'), label: t('activityBar.apps'), badge: false },
-    ...(isAdmin ? [{ key: 'models', to: '/models', icon: Boxes, active: isSection('/models'), label: t('activityBar.models'), badge: false }] : []),
+    ...(isAdmin
+      ? [
+          { key: 'models', to: '/models', icon: Boxes, active: isSection('/models'), label: t('activityBar.models'), badge: false },
+          { key: 'terminal', to: '/terminal', icon: SquareTerminal, active: isSection('/terminal'), label: t('activityBar.terminal'), badge: false },
+        ]
+      : []),
   ]
 
   return (

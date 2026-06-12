@@ -231,10 +231,14 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', serveStatic({ path: './dist/client/index.html' }))
 }
 
+// WebSocket handler for the admin terminal (hono/bun upgrade glue)
+import { terminalWebSocket } from '@/server/routes/terminal'
+
 Bun.serve({
   port: config.port,
   hostname: process.env.HOST ?? '127.0.0.1',
   fetch: app.fetch,
+  websocket: terminalWebSocket,
   idleTimeout: 255, // seconds — keep SSE connections alive (Bun default is 10s)
   // Lift Bun's ~128 MB default body cap so large file-storage uploads succeed.
   // Configurable via MAX_REQUEST_BODY_MB; defaults to effectively unlimited.

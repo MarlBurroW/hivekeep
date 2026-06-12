@@ -3185,7 +3185,24 @@
     "crons": "Geplante Aufgaben",
     "apps": "Mini-Apps",
     "models": "Modelle",
-    "files": "Dateien"
+    "files": "Dateien",
+    "terminal": "Terminal"
+  },
+  "terminal": {
+    "title": "Terminal",
+    "newSession": "Neue Sitzung",
+    "reconnect": "Neu verbinden",
+    "maxSessions": "Sitzungslimit erreicht. Schließe eine andere Terminal-Sitzung und versuche es erneut.",
+    "status": {
+      "connecting": "Verbinden...",
+      "connected": "Verbunden",
+      "disconnected": "Getrennt",
+      "ended": "Sitzung beendet"
+    },
+    "disabled": {
+      "title": "Terminal ist deaktiviert",
+      "description": "Diese Funktion ist auf dieser Instanz deaktiviert. Setze HIVEKEEP_TERMINAL_ENABLED=true und starte den Server neu, um sie zu aktivieren."
+    }
   },
   "orphanTask": {
     "menuAction": "Aufgabe starten",

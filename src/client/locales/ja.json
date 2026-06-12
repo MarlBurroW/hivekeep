@@ -3185,7 +3185,24 @@
     "crons": "スケジュールタスク",
     "apps": "ミニアプリ",
     "models": "モデル",
-    "files": "ファイル"
+    "files": "ファイル",
+    "terminal": "ターミナル"
+  },
+  "terminal": {
+    "title": "ターミナル",
+    "newSession": "新しいセッション",
+    "reconnect": "再接続",
+    "maxSessions": "セッション数の上限に達しました。他のターミナルセッションを閉じてから再試行してください。",
+    "status": {
+      "connecting": "接続中...",
+      "connected": "接続済み",
+      "disconnected": "切断されました",
+      "ended": "セッションが終了しました"
+    },
+    "disabled": {
+      "title": "ターミナルは無効です",
+      "description": "この機能はこのインスタンスで無効化されています。HIVEKEEP_TERMINAL_ENABLED=true を設定してサーバーを再起動すると有効になります。"
+    }
   },
   "orphanTask": {
     "menuAction": "タスクを開始",

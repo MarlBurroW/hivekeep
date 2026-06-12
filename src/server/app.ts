@@ -56,6 +56,7 @@ import { pluginCardRoutes } from '@/server/routes/plugin-cards'
 import { knowledgeRoutes } from '@/server/routes/knowledge'
 import { workspaceFilesRoutes } from '@/server/routes/workspace-files'
 import { logRoutes } from '@/server/routes/logs'
+import { terminalRoutes } from '@/server/routes/terminal'
 import { usageRoutes } from '@/server/routes/usage'
 import { versionCheckRoutes } from '@/server/routes/version-check'
 
@@ -218,6 +219,7 @@ app.route('/api/mini-apps', miniAppRoutes)
 app.route('/api/plugins', pluginRoutes)
 app.route('/api/plugin-cards', pluginCardRoutes)
 app.route('/api/logs', logRoutes)
+app.route('/api/terminal', terminalRoutes)
 app.route('/api/usage', usageRoutes)
 app.route('/api/version-check', versionCheckRoutes)
 app.route('/s', sharedRoutes)
