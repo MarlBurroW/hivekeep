@@ -61,7 +61,7 @@
     "concurrently": "^9.2.1",
     "drizzle-kit": "^0.31.9",
     "husky": "^9.1.7",
-    "lint-staged": "^16.3.0",
+    "lint-staged": "^17.0.7",
     "vite": "^7.3.1"
   },
   "peerDependencies": {
