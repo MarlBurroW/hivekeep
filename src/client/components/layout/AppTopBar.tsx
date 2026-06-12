@@ -18,6 +18,7 @@ import { NotificationBell } from '@/client/components/notifications/Notification
 import { SSEStatusIndicator } from '@/client/components/common/SSEStatusIndicator'
 import { QueueIndicator } from '@/client/components/layout/QueueIndicator'
 import { SetupChecklistButton } from '@/client/components/layout/SetupChecklistButton'
+import { UpdateAvailableButton } from '@/client/components/layout/UpdateAvailableButton'
 
 interface AppTopBarProps {
   /** Open a settings section (or the default tab). */
@@ -173,6 +174,7 @@ export function AppTopBar({ onOpenSettings, onOpenAccount }: AppTopBarProps) {
         })}
       </nav>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-0.5 sm:gap-1">
+        {user && <UpdateAvailableButton />}
         {user && <QueueIndicator />}
         <SSEStatusIndicator />
         {user && <SetupChecklistButton onOpenSettings={onOpenSettings} />}

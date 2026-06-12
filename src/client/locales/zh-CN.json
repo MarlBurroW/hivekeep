@@ -3690,5 +3690,13 @@
       "noResults": "没有匹配的文件",
       "open": "快速打开（Ctrl+P）"
     }
+  },
+  "updateOverlay": {
+    "title": "正在更新 Hivekeep",
+    "successTitle": "更新完成",
+    "toVersion": "正在更新到 {{version}}"
+  },
+  "topbar": {
+    "updateAvailable": "更新"
   }
 }

@@ -3690,5 +3690,13 @@
       "noResults": "一致するファイルがありません",
       "open": "クイックオープン(Ctrl+P)"
     }
+  },
+  "updateOverlay": {
+    "title": "Hivekeep を更新中",
+    "successTitle": "更新が完了しました",
+    "toVersion": "{{version}} に更新中"
+  },
+  "topbar": {
+    "updateAvailable": "更新"
   }
 }

@@ -3728,5 +3728,13 @@
       "noResults": "Brak pasujących plików",
       "open": "Szybkie otwieranie (Ctrl+P)"
     }
+  },
+  "updateOverlay": {
+    "title": "Aktualizowanie Hivekeep",
+    "successTitle": "Aktualizacja zakonczona",
+    "toVersion": "Aktualizacja do {{version}}"
+  },
+  "topbar": {
+    "updateAvailable": "Aktualizuj"
   }
 }

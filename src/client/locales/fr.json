@@ -3690,5 +3690,13 @@
       "noResults": "Aucun fichier trouvé",
       "open": "Ouverture rapide (Ctrl+P)"
     }
+  },
+  "updateOverlay": {
+    "title": "Mise à jour de Hivekeep",
+    "successTitle": "Mise à jour terminée",
+    "toVersion": "Mise à jour vers {{version}}"
+  },
+  "topbar": {
+    "updateAvailable": "Mise à jour"
   }
 }

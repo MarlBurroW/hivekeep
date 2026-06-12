@@ -81,3 +81,4 @@ plugins/*
 # Stray exported context capture (debug artifact, not part of the app)
 kin-context.json
 image.jpg
+.playwright-mcp/

@@ -15,14 +15,10 @@ import { Skeleton } from '@/client/components/ui/skeleton'
 import { HelpPanel } from '@/client/components/common/HelpPanel'
 import { InfoTip } from '@/client/components/common/InfoTip'
 import { UpdateChangelog } from '@/client/components/common/UpdateChangelog'
-import { UpdateProgressView } from '@/client/components/common/UpdateProgressView'
-import {
-  DOCKER_UPDATE_COMMAND,
-  UpdateResultBanner,
-} from '@/client/components/common/UpdateResultBanner'
+import { DOCKER_UPDATE_COMMAND } from '@/client/components/common/UpdateResultBanner'
 import { api, getErrorMessage } from '@/client/lib/api'
 import { useAuth } from '@/client/hooks/useAuth'
-import { useVersionCheck } from '@/client/hooks/useVersionCheck'
+import { useUpdate } from '@/client/contexts/UpdateContext'
 import {
   ArrowUpCircle,
   CheckCircle2,
@@ -33,7 +29,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { useCopyToClipboard } from '@/client/hooks/useCopyToClipboard'
-import type { UpdateChannel, UpdateRunInfo, VersionInfo } from '@/shared/types'
+import type { UpdateChannel, VersionInfo } from '@/shared/types'
 
 const INSTALLATION_TYPE_LABELS: Record<VersionInfo['installationType'], string> = {
   docker: 'Docker',
@@ -48,11 +44,9 @@ export function UpdatesSettings() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const { copy, copied } = useCopyToClipboard()
-  const { versionInfo, isLoading, isChecking, refetch, forceCheck } = useVersionCheck()
+  const { versionInfo, isLoading, isChecking, refetch, forceCheck, startUpdate } = useUpdate()
 
   const [savingChannel, setSavingChannel] = useState(false)
-  const [runId, setRunId] = useState<string | null>(null)
-  const [result, setResult] = useState<UpdateRunInfo | null>(null)
 
   const handleChannelChange = async (channel: UpdateChannel) => {
     setSavingChannel(true)
@@ -76,23 +70,9 @@ export function UpdatesSettings() {
     }
   }
 
-  const handleUpdate = async () => {
-    try {
-      const { runId: id } = await api.post<{ runId: string }>('/version-check/update')
-      setResult(null)
-      setRunId(id)
-    } catch (err) {
-      toast.error(t('updateAvailable.updateFailed'), { description: getErrorMessage(err) })
-    }
-  }
-
-  const handleFinished = (run: UpdateRunInfo) => {
-    setRunId(null)
-    setResult(run)
-    if (run.status === 'success') {
-      toast.success(t('updateAvailable.updateSuccess', { version: run.toVersion }))
-      setTimeout(() => window.location.reload(), 2500)
-    }
+  // The global full-screen overlay (UpdateContext) owns all progress UI.
+  const handleUpdate = () => {
+    startUpdate({ channel: versionInfo!.channel, toVersion: versionInfo!.latestVersion ?? '' })
   }
 
   if (isLoading || !versionInfo) {
@@ -105,7 +85,6 @@ export function UpdatesSettings() {
   }
 
   const isDocker = versionInfo.installationType === 'docker'
-  const updating = runId !== null
 
   return (
     <div className="space-y-6">
@@ -178,7 +157,7 @@ export function UpdatesSettings() {
         <Select
           value={versionInfo.channel}
           onValueChange={(v) => handleChannelChange(v as UpdateChannel)}
-          disabled={!isAdmin || savingChannel || updating}
+          disabled={!isAdmin || savingChannel}
         >
           <SelectTrigger className="w-full sm:w-72">
             <SelectValue />
@@ -206,7 +185,7 @@ export function UpdatesSettings() {
       </div>
 
       {/* Update available */}
-      {versionInfo.isUpdateAvailable && !updating && !result && (
+      {versionInfo.isUpdateAvailable && (
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
           <h4 className="text-sm font-semibold">
             {versionInfo.channel === 'edge'
@@ -260,18 +239,6 @@ export function UpdatesSettings() {
           )}
         </div>
       )}
-
-      {/* Update in progress */}
-      {updating && runId && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h4 className="text-sm font-semibold">{t('updateProgress.title')}</h4>
-          <UpdateProgressView runId={runId} channel={versionInfo.channel} onFinished={handleFinished} />
-          <p className="text-xs text-muted-foreground">{t('updateProgress.dontClose')}</p>
-        </div>
-      )}
-
-      {/* Last run result */}
-      {result && result.status !== 'success' && <UpdateResultBanner result={result} />}
     </div>
   )
 }

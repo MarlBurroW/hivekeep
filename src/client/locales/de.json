@@ -3690,5 +3690,13 @@
       "noResults": "Keine passende Datei",
       "open": "Schnell öffnen (Ctrl+P)"
     }
+  },
+  "updateOverlay": {
+    "title": "Hivekeep wird aktualisiert",
+    "successTitle": "Aktualisierung abgeschlossen",
+    "toVersion": "Aktualisierung auf {{version}}"
+  },
+  "topbar": {
+    "updateAvailable": "Aktualisierung"
   }
 }

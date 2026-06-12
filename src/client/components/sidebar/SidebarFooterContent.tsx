@@ -4,8 +4,7 @@ import { Settings2, Keyboard, Command, RefreshCw, Loader2 } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { WhatsNewDialog } from '@/client/components/common/WhatsNewDialog'
-import { UpdateAvailableDialog } from '@/client/components/common/UpdateAvailableDialog'
-import { useVersionCheck } from '@/client/hooks/useVersionCheck'
+import { useUpdate } from '@/client/contexts/UpdateContext'
 import { api } from '@/client/lib/api'
 import { toast } from 'sonner'
 
@@ -17,8 +16,7 @@ export const SidebarFooterContent = memo(function SidebarFooterContent({ onOpenS
   const { t } = useTranslation()
   const [version, setVersion] = useState<string | null>(null)
   const [whatsNewOpen, setWhatsNewOpen] = useState(false)
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false)
-  const { versionInfo, isChecking, forceCheck } = useVersionCheck()
+  const { isUpdateAvailable: hasUpdate, isChecking, forceCheck, openUpdateDialog } = useUpdate()
 
   useEffect(() => {
     api
@@ -27,13 +25,11 @@ export const SidebarFooterContent = memo(function SidebarFooterContent({ onOpenS
       .catch(() => {})
   }, [])
 
-  const hasUpdate = versionInfo?.isUpdateAvailable === true
-
   const handleCheckForUpdates = async () => {
     try {
       const result = await forceCheck()
       if (result?.isUpdateAvailable) {
-        setUpdateDialogOpen(true)
+        openUpdateDialog()
       } else {
         toast.success(t('sidebar.footer.upToDate'))
       }
@@ -56,7 +52,7 @@ export const SidebarFooterContent = memo(function SidebarFooterContent({ onOpenS
               type="button"
               onClick={() => {
                 if (hasUpdate) {
-                  setUpdateDialogOpen(true)
+                  openUpdateDialog()
                 } else {
                   setWhatsNewOpen(true)
                 }
@@ -107,13 +103,6 @@ export const SidebarFooterContent = memo(function SidebarFooterContent({ onOpenS
         onOpenChange={setWhatsNewOpen}
         currentVersion={version}
       />
-      {hasUpdate && versionInfo && (
-        <UpdateAvailableDialog
-          open={updateDialogOpen}
-          onOpenChange={setUpdateDialogOpen}
-          versionInfo={versionInfo}
-        />
-      )}
 
       {/* Right: shortcut hints + settings */}
       <div className="flex items-center gap-0.5">

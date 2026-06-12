@@ -3737,5 +3737,13 @@
       "noResults": "Подходящих файлов нет",
       "open": "Быстрое открытие (Ctrl+P)"
     }
+  },
+  "updateOverlay": {
+    "title": "Обновление Hivekeep",
+    "successTitle": "Обновление завершено",
+    "toVersion": "Обновление до {{version}}"
+  },
+  "topbar": {
+    "updateAvailable": "Обновить"
   }
 }

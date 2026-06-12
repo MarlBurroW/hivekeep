@@ -8,6 +8,9 @@ import { api } from '@/client/lib/api'
 import { SidePanelProvider } from '@/client/contexts/SidePanelContext'
 import { TasksProvider } from '@/client/contexts/TasksContext'
 import { TicketMentionShell } from '@/client/contexts/TicketMentionShell'
+import { UpdateProvider } from '@/client/contexts/UpdateContext'
+import { UpdateOverlay } from '@/client/components/common/UpdateOverlay'
+import { GlobalUpdateDialog } from '@/client/components/common/GlobalUpdateDialog'
 import { ActivityBar } from '@/client/components/layout/ActivityBar'
 import { AppTopBar } from '@/client/components/layout/AppTopBar'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
@@ -200,6 +203,7 @@ function AuthenticatedShell() {
     <TooltipProvider delayDuration={0}>
     <SidePanelProvider>
     <TasksProvider>
+    <UpdateProvider>
     <TicketMentionShell>
       <div className="flex h-dvh w-screen flex-col overflow-hidden">
         <AppTopBar
@@ -255,8 +259,13 @@ function AuthenticatedShell() {
             onOpenChange={setAccountOpen}
           />
         </Suspense>
+
+        {/* Shared update dialog + full-screen self-update overlay (global) */}
+        <GlobalUpdateDialog />
+        <UpdateOverlay />
       </div>
     </TicketMentionShell>
+    </UpdateProvider>
     </TasksProvider>
     </SidePanelProvider>
     </TooltipProvider>

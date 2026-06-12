@@ -3690,5 +3690,13 @@
       "noResults": "No matching file",
       "open": "Quick open (Ctrl+P)"
     }
+  },
+  "updateOverlay": {
+    "title": "Updating Hivekeep",
+    "successTitle": "Update complete",
+    "toVersion": "Updating to {{version}}"
+  },
+  "topbar": {
+    "updateAvailable": "Update"
   }
 }
