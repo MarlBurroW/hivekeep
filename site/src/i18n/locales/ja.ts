@@ -2,6 +2,10 @@ import en from './en'
 
 const dict: typeof en = {
   meta: {
+    plugins: {
+      title: 'プラグイン',
+      description: 'npm に公開されたすべての Hivekeep プラグインを一覧できます。プロバイダー、チャンネル、ツール、フックをアプリ内マーケットプレイスからワンクリックでインストール。',
+    },
     home: {
       title: 'Hivekeep · あなたのAIチーム、自宅に。',
       description:
@@ -15,6 +19,7 @@ const dict: typeof en = {
   },
 
   nav: {
+    plugins: 'プラグイン',
     features: '機能',
     household: 'ハウスホールド',
     why: 'Hivekeepの強み',
@@ -622,6 +627,21 @@ const dict: typeof en = {
     },
   },
 
+  pluginsPage: {
+    kicker: 'マーケットプレイス',
+    heading: 'プラグインは npm から直接。',
+    sub: 'このリストは npm から自動で取得されます。<code>hivekeep-plugin</code> タグの付いたパッケージはすべてここに表示されます。アプリ内マーケットプレイスからワンクリックでインストールでき、ターミナルは不要です。',
+    count: '{count} 個のプラグイン、さらに増加中',
+    by: '作者: {author}',
+    downloads: '{count} ダウンロード/月',
+    updated: '更新: {date}',
+    viewNpm: 'npm',
+    viewGithub: 'GitHub',
+    publishHeading: 'あなたのプラグインを公開。',
+    publishText: 'プラグインは<b>プロバイダー、チャンネル、ツール、フック</b>を追加できます。自分で作るか、エージェントに書かせて、<code>hivekeep-plugin</code> キーワード付きで npm に公開すれば、ここにもアプリ内マーケットプレイスにも自動で表示されます。',
+    publishCta: 'プラグインガイドを読む',
+  },
+
   components: {
     marquee: {
       kicker: 'ミニアプリ · あなたのエージェントが作る',
@@ -630,6 +650,7 @@ const dict: typeof en = {
       note: 'イメージ用のプレビューです。エージェントはリクエストに応じて作成・装飾・改善します。<b>「グラフを追加して」</b>はメッセージひとつで済み、チケットは要りません。',
     },
     providers: {
+      browseAll: 'すべてのプラグインを見る',
       kicker: 'プロバイダーとプラグイン',
       heading: 'どのプロバイダーでも。自作の追加も。',
       intro: 'これらのプロバイダーはすべての機能に組み込み済みです。プロバイダーごとに設定はひとつ、機能は自動検出されます（OpenAI のキーひとつで LLM・画像・埋め込み・音声が一度に使えます）。他のものが必要なら、プラグインで追加できます。',
@@ -648,10 +669,6 @@ const dict: typeof en = {
       mistralDesc: '<b>Mistral AI</b> をプロバイダーとして追加。ツール呼び出し・ビジョン・ストリーミング対応のチャットモデルです。',
       replicateDesc: '<b>Replicate ホストのモデル</b>を利用可能に。画像 (Flux)、LLM (Llama 3、Mixtral)、埋め込みに対応。',
       viewGithub: 'GitHub で見る',
-      moreLead: 'マーケットプレイスには他にも:',
-      teamspeakTag: '（音声チャンネル）',
-      haTag: '（スマートホームツール）',
-      moreTail: 'さらに増えています。',
     },
     agentDemo: {
       rosterTitle: '// あなたのエージェント',

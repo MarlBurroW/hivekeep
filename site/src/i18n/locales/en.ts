@@ -9,6 +9,11 @@
 //    or " - " instead, in every language.
 export default {
   meta: {
+    plugins: {
+      title: 'Plugins',
+      description:
+        'Browse every Hivekeep plugin published on npm: providers, channels, tools and hooks, installed in one click from the in-app marketplace.',
+    },
     home: {
       title: 'Hivekeep · Your AI team. At home.',
       description:
@@ -23,6 +28,7 @@ export default {
 
   nav: {
     features: 'Features',
+    plugins: 'Plugins',
     household: 'The household',
     why: 'Why Hivekeep',
     docs: 'Docs',
@@ -635,6 +641,23 @@ export default {
     },
   },
 
+  // Dedicated /plugins page: the list itself comes from site/src/data/plugins.json
+  // (baked from the npm registry at deploy, fetch-plugins.mjs).
+  pluginsPage: {
+    kicker: 'Marketplace',
+    heading: 'Plugins, straight from npm.',
+    sub: 'This list is pulled automatically from npm: every package tagged <code>hivekeep-plugin</code> shows up here. Install any of them in one click from the in-app marketplace, no terminal needed.',
+    count: '{count} plugins and counting',
+    by: 'by {author}',
+    downloads: '{count} downloads/month',
+    updated: 'updated {date}',
+    viewNpm: 'npm',
+    viewGithub: 'GitHub',
+    publishHeading: 'Publish yours.',
+    publishText: 'A plugin can add <b>providers, channels, tools and hooks</b>. Build one (or have an Agent write it for you), publish it to npm with the <code>hivekeep-plugin</code> keyword, and it appears here and in the in-app marketplace automatically.',
+    publishCta: 'Read the plugin guide',
+  },
+
   // Section chrome for components that were initially scoped out: the mini-app
   // marquee, the providers/plugins section, the agent-directory domains and the
   // visible chrome of the scripted demos (transcripts stay English on purpose).
@@ -664,10 +687,7 @@ export default {
       mistralDesc: 'Adds <b>Mistral AI</b> as a provider: chat models with tool calling, vision and streaming.',
       replicateDesc: 'Brings <b>Replicate-hosted models</b>: image (Flux), LLM (Llama 3, Mixtral) and embeddings.',
       viewGithub: 'View on GitHub',
-      moreLead: 'Also on the marketplace:',
-      teamspeakTag: '(voice channel)',
-      haTag: '(smart-home tools)',
-      moreTail: 'And counting.',
+      browseAll: 'Browse all plugins',
     },
     agentDemo: {
       rosterTitle: '// your agents',

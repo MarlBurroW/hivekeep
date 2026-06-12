@@ -1,0 +1,105 @@
+{
+  "fetchedAt": "2026-06-12T14:32:03.709Z",
+  "plugins": [
+    {
+      "name": "hivekeep-plugin-mistral",
+      "displayName": "Mistral AI",
+      "version": "0.3.1",
+      "description": "Mistral AI provider for Hivekeep: chat models (with tool calling, vision, streaming) AND Voxtral speech-to-text, via api.mistral.ai.",
+      "author": "marlburrow",
+      "keywords": [],
+      "date": "2026-06-09T19:00:23.655Z",
+      "downloads": 273,
+      "links": {
+        "npm": "https://www.npmjs.com/package/hivekeep-plugin-mistral",
+        "repository": "https://github.com/MarlBurroW/hivekeep-plugin-mistral",
+        "homepage": "https://github.com/MarlBurroW/hivekeep-plugin-mistral#readme"
+      },
+      "logoUrl": "https://unpkg.com/hivekeep-plugin-mistral@0.3.1/logo.svg"
+    },
+    {
+      "name": "hivekeep-plugin-home-assistant",
+      "displayName": "Home Assistant",
+      "version": "1.3.1",
+      "description": "Control your smart home via Home Assistant. Toggle lights, check sensors, run automations, and monitor your home.",
+      "author": "marlburrow",
+      "keywords": [
+        "home-assistant",
+        "smart-home",
+        "iot",
+        "automation"
+      ],
+      "date": "2026-06-09T19:00:09.194Z",
+      "downloads": 197,
+      "links": {
+        "npm": "https://www.npmjs.com/package/hivekeep-plugin-home-assistant",
+        "repository": "https://github.com/MarlBurroW/hivekeep-plugin-home-assistant",
+        "homepage": "https://github.com/MarlBurroW/hivekeep-plugin-home-assistant#readme"
+      },
+      "logoUrl": "https://unpkg.com/hivekeep-plugin-home-assistant@1.3.1/logo.svg"
+    },
+    {
+      "name": "hivekeep-plugin-teamspeak",
+      "displayName": "TeamSpeak",
+      "version": "0.7.1",
+      "description": "Bridge Hivekeep with a TeamSpeak server via the local ts-bot WebSocket API. Channel adapter (chat + TTS) + tools (move, speak, send chat, status, per-speaker WAV recording).",
+      "author": "marlburrow",
+      "keywords": [
+        "teamspeak",
+        "voice",
+        "channel",
+        "tts"
+      ],
+      "date": "2026-06-09T19:00:52.639Z",
+      "downloads": 166,
+      "links": {
+        "npm": "https://www.npmjs.com/package/hivekeep-plugin-teamspeak",
+        "repository": "https://github.com/MarlBurroW/hivekeep-plugin-teamspeak",
+        "homepage": "https://github.com/MarlBurroW/hivekeep-plugin-teamspeak#readme"
+      },
+      "logoUrl": "https://unpkg.com/hivekeep-plugin-teamspeak@0.7.1/logo.svg"
+    },
+    {
+      "name": "hivekeep-plugin-replicate",
+      "displayName": "Replicate",
+      "version": "0.3.1",
+      "description": "Bring Replicate-hosted models to Hivekeep: LLM (Llama 3, Mistral, Mixtral), Image (Flux Schnell, Stable Diffusion 3.5), and Embedding: all behind one API token.",
+      "author": "marlburrow",
+      "keywords": [
+        "replicate",
+        "llm",
+        "image",
+        "embedding"
+      ],
+      "date": "2026-06-09T19:00:38.083Z",
+      "downloads": 150,
+      "links": {
+        "npm": "https://www.npmjs.com/package/hivekeep-plugin-replicate",
+        "repository": "https://github.com/MarlBurroW/hivekeep-plugin-replicate",
+        "homepage": "https://github.com/MarlBurroW/hivekeep-plugin-replicate#readme"
+      },
+      "logoUrl": "https://unpkg.com/hivekeep-plugin-replicate@0.3.1/logo.svg"
+    },
+    {
+      "name": "hivekeep-plugin-twilio-sms",
+      "displayName": "Twilio SMS",
+      "version": "0.5.1",
+      "description": "Send and receive SMS via the Twilio REST API and webhooks. Channel adapter (outbound via Messages API, inbound via signed webhooks).",
+      "author": "marlburrow",
+      "keywords": [
+        "twilio",
+        "sms",
+        "channel",
+        "webhook"
+      ],
+      "date": "2026-06-09T19:01:07.457Z",
+      "downloads": 146,
+      "links": {
+        "npm": "https://www.npmjs.com/package/hivekeep-plugin-twilio-sms",
+        "repository": "https://github.com/MarlBurroW/hivekeep-plugin-twilio-sms",
+        "homepage": "https://github.com/MarlBurroW/hivekeep-plugin-twilio-sms#readme"
+      },
+      "logoUrl": "https://unpkg.com/hivekeep-plugin-twilio-sms@0.5.1/logo.svg"
+    }
+  ]
+}

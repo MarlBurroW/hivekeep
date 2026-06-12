@@ -189,6 +189,11 @@ jobs:
           echo "Wrote site/src/data/stats.json:"
           cat site/src/data/stats.json
 
+      - name: Refresh npm plugins list
+        # Best-effort: the script keeps the committed plugins.json on any
+        # failure or empty result, so the site always builds with real content.
+        run: bun site/scripts/fetch-plugins.mjs
+
       - name: Build landing site
         run: cd site && bun install --frozen-lockfile && bun run build
 

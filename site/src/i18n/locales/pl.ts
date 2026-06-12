@@ -2,6 +2,10 @@ import en from './en'
 
 const dict: typeof en = {
   meta: {
+    plugins: {
+      title: 'Wtyczki',
+      description: 'Przeglądaj wszystkie wtyczki Hivekeep opublikowane na npm: dostawcy, kanały, narzędzia i hooki, instalowane jednym kliknięciem z wbudowanego marketplace\'u.',
+    },
     home: {
       title: 'Hivekeep · Twój zespół AI. U ciebie w domu.',
       description:
@@ -15,6 +19,7 @@ const dict: typeof en = {
   },
 
   nav: {
+    plugins: 'Wtyczki',
     features: 'Funkcje',
     household: 'Domowa ekipa',
     why: 'Dlaczego Hivekeep',
@@ -622,6 +627,21 @@ const dict: typeof en = {
     },
   },
 
+  pluginsPage: {
+    kicker: 'Marketplace',
+    heading: 'Wtyczki prosto z npm.',
+    sub: 'Ta lista pochodzi automatycznie z npm: każdy pakiet z tagiem <code>hivekeep-plugin</code> pojawia się tutaj. Instaluj je jednym kliknięciem z wbudowanego marketplace\'u, bez terminala.',
+    count: '{count} wtyczek, a lista rośnie',
+    by: 'od {author}',
+    downloads: '{count} pobrań/mies.',
+    updated: 'zaktualizowano {date}',
+    viewNpm: 'npm',
+    viewGithub: 'GitHub',
+    publishHeading: 'Opublikuj własną.',
+    publishText: 'Wtyczka może dodać <b>dostawców, kanały, narzędzia i hooki</b>. Zbuduj ją (albo niech napisze ją agent), opublikuj na npm ze słowem kluczowym <code>hivekeep-plugin</code>, a pojawi się tutaj i we wbudowanym marketplace automatycznie.',
+    publishCta: 'Przeczytaj przewodnik po wtyczkach',
+  },
+
   components: {
     marquee: {
       kicker: 'Mini-aplikacje · budowane przez twoich agentów',
@@ -630,6 +650,7 @@ const dict: typeof en = {
       note: 'Poglądowe podglądy. Agenci budują je, stylizują i ulepszają na życzenie: <b>„dodaj wykres”</b> to wiadomość, nie ticket.',
     },
     providers: {
+      browseAll: 'Zobacz wszystkie wtyczki',
       kicker: 'Dostawcy i wtyczki',
       heading: 'Podłącz dowolnego dostawcę albo dodaj własnego.',
       intro: 'Ci dostawcy są wbudowani we wszystkie możliwości. Jedna konfiguracja na dostawcę, a możliwości wykrywają się same (klucz OpenAI odblokowuje naraz LLM, obrazy, embeddingi i głos). Potrzebujesz innego? Dodaj go wtyczką.',
@@ -648,10 +669,6 @@ const dict: typeof en = {
       mistralDesc: 'Dodaje <b>Mistral AI</b> jako dostawcę: modele czatu z wywoływaniem narzędzi, widzeniem i streamingiem.',
       replicateDesc: 'Wnosi <b>modele hostowane na Replicate</b>: obrazy (Flux), LLM (Llama 3, Mixtral) i embeddingi.',
       viewGithub: 'Zobacz na GitHubie',
-      moreLead: 'Również na marketplace:',
-      teamspeakTag: '(kanał głosowy)',
-      haTag: '(narzędzia smart home)',
-      moreTail: 'I lista rośnie.',
     },
     agentDemo: {
       rosterTitle: '// twoi agenci',

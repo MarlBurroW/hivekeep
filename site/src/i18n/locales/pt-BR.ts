@@ -2,6 +2,10 @@ import en from './en'
 
 const dict: typeof en = {
   meta: {
+    plugins: {
+      title: 'Plugins',
+      description: 'Explore todos os plugins do Hivekeep publicados no npm: provedores, canais, ferramentas e hooks, instaláveis com um clique no marketplace integrado.',
+    },
     home: {
       title: 'Hivekeep · Seu time de IA. Na sua casa.',
       description:
@@ -15,6 +19,7 @@ const dict: typeof en = {
   },
 
   nav: {
+    plugins: 'Plugins',
     features: 'Recursos',
     household: 'A casa',
     why: 'Por que o Hivekeep',
@@ -622,6 +627,21 @@ const dict: typeof en = {
     },
   },
 
+  pluginsPage: {
+    kicker: 'Marketplace',
+    heading: 'Plugins, direto do npm.',
+    sub: 'Esta lista vem automaticamente do npm: todo pacote com a tag <code>hivekeep-plugin</code> aparece aqui. Instale com um clique no marketplace integrado, sem terminal.',
+    count: '{count} plugins, e a lista cresce',
+    by: 'por {author}',
+    downloads: '{count} downloads/mês',
+    updated: 'atualizado {date}',
+    viewNpm: 'npm',
+    viewGithub: 'GitHub',
+    publishHeading: 'Publique o seu.',
+    publishText: 'Um plugin pode adicionar <b>provedores, canais, ferramentas e hooks</b>. Crie um (ou peça para um agente escrever), publique no npm com a palavra-chave <code>hivekeep-plugin</code> e ele aparece aqui e no marketplace integrado automaticamente.',
+    publishCta: 'Ler o guia de plugins',
+  },
+
   components: {
     marquee: {
       kicker: 'Mini-apps · criados pelos seus agentes',
@@ -630,6 +650,7 @@ const dict: typeof en = {
       note: 'Prévias ilustrativas. Os agentes criam, estilizam e melhoram tudo sob demanda: <b>“adicione um gráfico”</b> é uma mensagem, não um ticket.',
     },
     providers: {
+      browseAll: 'Ver todos os plugins',
       kicker: 'Provedores e plugins',
       heading: 'Traga qualquer provedor, ou adicione o seu.',
       intro: 'Esses provedores vêm integrados em todas as capacidades. Uma configuração por provedor, e as capacidades são detectadas automaticamente (uma chave da OpenAI ativa de uma vez LLM, imagem, embeddings e voz). Precisa de outro? Adicione com um plugin.',
@@ -648,10 +669,6 @@ const dict: typeof en = {
       mistralDesc: 'Adiciona a <b>Mistral AI</b> como provedor: modelos de chat com chamadas de ferramentas, visão e streaming.',
       replicateDesc: 'Traz os <b>modelos hospedados na Replicate</b>: imagem (Flux), LLM (Llama 3, Mixtral) e embeddings.',
       viewGithub: 'Ver no GitHub',
-      moreLead: 'Também no marketplace:',
-      teamspeakTag: '(canal de voz)',
-      haTag: '(ferramentas de casa inteligente)',
-      moreTail: 'E a lista cresce.',
     },
     agentDemo: {
       rosterTitle: '// seus agentes',

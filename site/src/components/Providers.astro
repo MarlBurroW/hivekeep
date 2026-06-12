@@ -1,6 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components';
-import { getDict, type Locale } from '../i18n';
+import { getDict, localePath, type Locale } from '../i18n';
 // Colored brand marks from @lobehub/icons (same set the Hivekeep app uses, see ProviderIcon.tsx).
 // Rendered server-side → static HTML, no client JS.
 import Claude from '@lobehub/icons/es/Claude';
@@ -23,6 +23,8 @@ interface Props {
 }
 const { lang } = Astro.props;
 const t = getDict(lang).components.providers;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
 ---
 <div class="wrap" id="providers"><section class="section" style="grid-template-columns:1fr;">
   <div class="body">
@@ -116,6 +118,6 @@ const t = getDict(lang).components.providers;
         <span class="gh"><Icon name="simple-icons:github" /> {t.viewGithub}</span>
       </a>
     </div>
-    <p class="plug-more">{t.moreLead} <a href="https://github.com/MarlBurroW/hivekeep-plugin-teamspeak" target="_blank" rel="noopener">TeamSpeak</a> {t.teamspeakTag} · <a href="https://github.com/MarlBurroW/hivekeep-plugin-home-assistant" target="_blank" rel="noopener">Home Assistant</a> {t.haTag} {t.moreTail}</p>
+    <p class="plug-more"><a class="link-mono" href={pluginsHref}>{t.browseAll} <Icon name="lucide:arrow-right" /></a></p>
   </div>
 </section></div>

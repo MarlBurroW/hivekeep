@@ -1,0 +1,165 @@
+---
+// Localized /plugins page: every npm package tagged `hivekeep-plugin`,
+// rendered from site/src/data/plugins.json (refreshed at deploy by
+// site/scripts/fetch-plugins.mjs; the committed file is the fallback so the
+// site always builds with real content).
+import Base from '../../layouts/Base.astro';
+import { Icon } from 'astro-icon/components';
+import LangSwitcher from '../LangSwitcher.astro';
+import { getDict, localePath, type Locale } from '../../i18n';
+import pluginsData from '../../data/plugins.json';
+
+interface Props {
+  lang: Locale;
+}
+
+const { lang } = Astro.props;
+const t = getDict(lang);
+const tp = t.pluginsPage;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const homeHref = `${base}${localePath(lang, '/')}`;
+const installHref = `${base}${localePath(lang, '/install')}`;
+
+interface PluginEntry {
+  name: string;
+  displayName?: string;
+  version: string;
+  description: string;
+  author: string;
+  keywords: string[];
+  date: string | null;
+  downloads: number | null;
+  links: { npm: string; repository?: string; homepage?: string };
+  logoUrl?: string;
+}
+const plugins = (pluginsData as { plugins: PluginEntry[] }).plugins;
+
+const nf = new Intl.NumberFormat(lang);
+const fmtDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString(lang, { year: 'numeric', month: 'short' }) : null;
+/** "hivekeep-plugin-twilio-sms" -> "twilio sms" (fallback when no displayName). */
+const prettyName = (name: string) => name.replace(/^hivekeep-plugin-/, '').replace(/-/g, ' ');
+---
+<Base lang={lang} title={t.meta.plugins.title} description={t.meta.plugins.description}>
+  <!-- ===== top bar ===== -->
+  <header class="topbar"><div class="wrap in">
+    <a class="brand" href={homeHref}><img class="brand-logo" src={`${base}/logo.svg`} width="28" height="28" alt="" /> Hivekeep</a>
+    <nav>
+      <a href={`${homeHref}#memory`}>{t.nav.features}</a><a href={`${homeHref}#household`}>{t.nav.household}</a>
+      <a href={`${homeHref}#why`}>{t.nav.why}</a>
+      <a href="https://github.com/MarlBurroW/hivekeep">{t.nav.github}</a>
+    </nav>
+    <div class="nav-actions">
+      <LangSwitcher lang={lang} path="/plugins" />
+      <a class="btn btn-primary btn-sm" href={installHref}>{t.nav.getStarted}</a>
+    </div>
+  </div></header>
+
+  <div class="wrap">
+    <!-- ===== head ===== -->
+    <div class="install-head">
+      <span class="kicker" style="justify-content:center">{tp.kicker}</span>
+      <h1 class="display">{tp.heading}</h1>
+      <p set:html={tp.sub} />
+      <p class="pl-count mono">{tp.count.replace('{count}', String(plugins.length))}</p>
+    </div>
+
+    <!-- ===== plugin grid ===== -->
+    <div class="pl-grid">
+      {plugins.map((p) => (
+        <article class="pl-card">
+          <div class="pl-top">
+            {p.logoUrl ? (
+              <img class="pl-logo" src={p.logoUrl} alt="" width="42" height="42" loading="lazy" />
+            ) : (
+              <span class="pl-logo pl-logo-fallback"><Icon name="lucide:puzzle" /></span>
+            )}
+            <div class="pl-id">
+              <h3>{p.displayName ?? prettyName(p.name)}</h3>
+              <span class="pl-pkg mono">{p.name} · v{p.version}</span>
+            </div>
+          </div>
+          <p class="pl-desc">{p.description}</p>
+          {p.keywords.length > 0 && (
+            <div class="pl-tags">
+              {p.keywords.slice(0, 4).map((k) => <span class="pl-tag mono">{k}</span>)}
+            </div>
+          )}
+          <div class="pl-meta mono">
+            {typeof p.downloads === 'number' && (
+              <span><Icon name="lucide:download" /> {tp.downloads.replace('{count}', nf.format(p.downloads))}</span>
+            )}
+            {fmtDate(p.date) && <span><Icon name="lucide:history" /> {tp.updated.replace('{date}', fmtDate(p.date)!)}</span>}
+            {p.author && <span><Icon name="lucide:user-round" /> {tp.by.replace('{author}', p.author)}</span>}
+          </div>
+          <div class="pl-links">
+            <a class="pl-link" href={p.links.npm} target="_blank" rel="noopener">
+              <Icon name="simple-icons:npm" /> {tp.viewNpm}
+            </a>
+            {p.links.repository && (
+              <a class="pl-link" href={p.links.repository} target="_blank" rel="noopener">
+                <Icon name="simple-icons:github" /> {tp.viewGithub}
+              </a>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
+
+    <!-- ===== publish your own ===== -->
+    <div class="pl-publish">
+      <h2 class="display">{tp.publishHeading}</h2>
+      <p set:html={tp.publishText} />
+      <a class="btn btn-ghost" href={`${base}/docs/plugins/developing/`}>
+        <Icon name="lucide:book-open" /> {tp.publishCta}
+      </a>
+    </div>
+
+    <div style="height:70px"></div>
+  </div>
+
+  <!-- ===== footer ===== -->
+  <footer class="footer"><div class="wrap in">
+    <a class="brand" href={homeHref}><img class="brand-logo" src={`${base}/logo.svg`} width="26" height="26" alt="" /> Hivekeep</a>
+    <span class="m">{t.footer.line}</span>
+  </div></footer>
+</Base>
+
+<style>
+  .pl-count{margin-top:14px;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);}
+
+  .pl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-top:34px;}
+  .pl-card{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid var(--line-strong);border-radius:16px;background:oklch(1 0 0/.025);transition:border-color .15s ease,transform .15s ease;}
+  .pl-card:hover{border-color:var(--primary);transform:translateY(-2px);}
+
+  .pl-top{display:flex;align-items:center;gap:12px;}
+  .pl-logo{width:42px;height:42px;border-radius:10px;object-fit:cover;flex:0 0 auto;background:oklch(1 0 0/.05);}
+  .pl-logo-fallback{display:grid;place-items:center;color:var(--ink-soft);}
+  .pl-logo-fallback svg{width:20px;height:20px;}
+  .pl-id{min-width:0;}
+  .pl-id h3{margin:0;font-size:1.02rem;font-weight:700;letter-spacing:-.01em;text-transform:capitalize;}
+  .pl-pkg{display:block;font-size:.64rem;color:var(--ink-soft);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .pl-desc{margin:0;font-size:.9rem;color:var(--ink-soft);line-height:1.5;flex:1;}
+
+  .pl-tags{display:flex;flex-wrap:wrap;gap:6px;}
+  .pl-tag{font-size:.62rem;letter-spacing:.04em;padding:.18rem .5rem;border:1px solid var(--line);border-radius:var(--r-pill);color:var(--ink-soft);}
+
+  .pl-meta{display:flex;flex-wrap:wrap;gap:12px;font-size:.64rem;letter-spacing:.03em;color:var(--ink-soft);}
+  .pl-meta span{display:inline-flex;align-items:center;gap:5px;}
+  .pl-meta svg{width:12px;height:12px;color:var(--primary);}
+
+  .pl-links{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:12px;}
+  .pl-link{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;color:var(--ink-soft);text-decoration:none;padding:.3rem .65rem;border:1px solid var(--line-strong);border-radius:var(--r-pill);transition:color .15s ease,border-color .15s ease;}
+  .pl-link:hover{color:var(--ink);border-color:var(--primary);}
+  .pl-link svg{width:13px;height:13px;}
+
+  .pl-publish{margin-top:56px;padding:30px 26px;text-align:center;border:1px solid var(--line-strong);border-radius:18px;background:oklch(1 0 0/.02);}
+  .pl-publish .display{font-size:clamp(1.3rem,2.6vw,1.7rem);margin:0 0 10px;}
+  .pl-publish p{max-width:62ch;margin:0 auto 18px;color:var(--ink-soft);}
+
+  @media(max-width:560px){
+    .pl-grid{grid-template-columns:1fr;}
+  }
+</style>

@@ -24,6 +24,7 @@ const agentDomains: Record<string, string> = t.components.domains;
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const installHref = `${base}${localePath(lang, '/install')}`;
+const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
 // Live GitHub stats baked in at deploy by the pages workflow (site/src/data/stats.json).
 const repoVersion = stats.version;
 const repoStars = stats.stars;
@@ -115,7 +116,7 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
     <div class="brand"><img class="brand-logo" src={`${base}/logo.svg`} width="28" height="28" alt="" /> Hivekeep</div>
     <nav id="site-nav">
       <a href="#memory">{t.nav.features}</a><a href="#household">{t.nav.household}</a>
-      <a href="#why">{t.nav.why}</a><a href={`${base}/docs/`}>{t.nav.docs}</a>
+      <a href="#why">{t.nav.why}</a><a href={pluginsHref}>{t.nav.plugins}</a><a href={`${base}/docs/`}>{t.nav.docs}</a>
       <a href="https://github.com/MarlBurroW/hivekeep">{t.nav.github}</a>
     </nav>
     <div class="nav-actions">

@@ -2,6 +2,10 @@ import en from './en'
 
 const dict: typeof en = {
   meta: {
+    plugins: {
+      title: '插件',
+      description: '浏览发布在 npm 上的全部 Hivekeep 插件：服务商、频道、工具和钩子，在应用内市场一键安装。',
+    },
     home: {
       title: 'Hivekeep · 你的 AI 团队，就在家中。',
       description:
@@ -15,6 +19,7 @@ const dict: typeof en = {
   },
 
   nav: {
+    plugins: '插件',
     features: '功能特性',
     household: '智能体之家',
     why: '为什么选 Hivekeep',
@@ -628,6 +633,21 @@ const dict: typeof en = {
     },
   },
 
+  pluginsPage: {
+    kicker: '插件市场',
+    heading: '插件，直接来自 npm。',
+    sub: '这份列表自动来自 npm：所有带 <code>hivekeep-plugin</code> 标签的包都会出现在这里。在应用内市场一键安装，无需终端。',
+    count: '{count} 个插件，还在增加',
+    by: '作者：{author}',
+    downloads: '{count} 次下载/月',
+    updated: '更新于 {date}',
+    viewNpm: 'npm',
+    viewGithub: 'GitHub',
+    publishHeading: '发布你自己的插件。',
+    publishText: '插件可以添加<b>服务商、频道、工具和钩子</b>。自己构建一个（或让智能体来写），以 <code>hivekeep-plugin</code> 关键词发布到 npm，它就会自动出现在这里和应用内市场。',
+    publishCta: '阅读插件开发指南',
+  },
+
   components: {
     marquee: {
       kicker: '迷你应用 · 由你的智能体打造',
@@ -636,6 +656,7 @@ const dict: typeof en = {
       note: '示意性预览。智能体会按需构建、美化和改进它们：<b>「加个图表」</b>只是一条消息，不是一张工单。',
     },
     providers: {
+      browseAll: '查看全部插件',
       kicker: '服务商与插件',
       heading: '接入任意服务商，也能自己添加。',
       intro: '这些服务商已内置于所有能力。每个服务商只需一份配置，能力自动检测（一个 OpenAI 密钥同时点亮 LLM、图像、嵌入和语音）。需要别的？用插件添加。',
@@ -654,10 +675,6 @@ const dict: typeof en = {
       mistralDesc: '将 <b>Mistral AI</b> 添加为服务商：支持工具调用、视觉和流式输出的对话模型。',
       replicateDesc: '带来 <b>Replicate 托管的模型</b>：图像 (Flux)、LLM (Llama 3、Mixtral) 和嵌入。',
       viewGithub: '在 GitHub 上查看',
-      moreLead: '市场上还有：',
-      teamspeakTag: '（语音频道）',
-      haTag: '（智能家居工具）',
-      moreTail: '而且还在增加。',
     },
     agentDemo: {
       rosterTitle: '// 你的智能体',

@@ -16,6 +16,7 @@ const t = getDict(lang);
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const homeHref = `${base}${localePath(lang, '/')}`;
+const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
 
 const INSTALL_ONELINER = 'curl -fsSL https://raw.githubusercontent.com/MarlBurroW/hivekeep/main/install.sh | bash';
 
@@ -33,7 +34,7 @@ const prereqs = t.install.prereqs.items;
     <nav>
       <a href={`${homeHref}#memory`}>{t.nav.features}</a><a href={`${homeHref}#household`}>{t.nav.household}</a>
       <a href={`${homeHref}#why`}>{t.nav.why}</a>
-      <a href="https://github.com/MarlBurroW/hivekeep">{t.nav.github}</a>
+      <a href={pluginsHref}>{t.nav.plugins}</a><a href="https://github.com/MarlBurroW/hivekeep">{t.nav.github}</a>
     </nav>
     <div class="nav-actions">
       <LangSwitcher lang={lang} path="/install" />
