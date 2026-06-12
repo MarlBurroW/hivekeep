@@ -3178,6 +3178,11 @@
       "selectPlaceholder": "Wybierz Agenta",
       "reassign": "Przypisz ponownie",
       "reassigned": "Opiekunem został {{agent}}"
+    },
+    "permissions": {
+      "title": "Uprawnienia żądane przez backend",
+      "approve": "Zatwierdź",
+      "granted": "Uprawnienia przyznane"
     }
   },
   "accessibility": {

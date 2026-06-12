@@ -1,0 +1,1 @@
+ALTER TABLE `mini_apps` ADD `granted_permissions` text;

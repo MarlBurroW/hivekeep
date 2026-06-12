@@ -431,6 +431,59 @@ export async function readAppManifest(appId: string): Promise<MiniAppManifest> {
   }
 }
 
+// ─── Capability permissions ──────────────────────────────────────────────────
+
+/**
+ * Grant capability permissions to a mini-app (additive — grants are never
+ * silently revoked here). Only permissions actually requested in app.json can
+ * be granted. The backend is restarted so the new grants take effect.
+ */
+export async function grantMiniAppPermissions(
+  appId: string,
+  grant: string[],
+): Promise<{ requested: string[]; granted: string[]; invalid: string[] } | null> {
+  const { parseRequestedPermissions, parseGrantedPermissions, isKnownPermission } = await import('@/server/services/mini-app-capabilities')
+
+  const app = await db.select().from(miniApps).where(eq(miniApps.id, appId)).get()
+  if (!app) return null
+
+  const manifest = await readAppManifest(appId)
+  const requested = parseRequestedPermissions(manifest)
+  const current = parseGrantedPermissions(app.grantedPermissions)
+
+  const invalid: string[] = []
+  const accepted: string[] = []
+  for (const p of grant) {
+    if (typeof p !== 'string' || !isKnownPermission(p) || !requested.includes(p)) invalid.push(String(p))
+    else accepted.push(p)
+  }
+
+  const granted = [...new Set([...current, ...accepted])]
+  await db.update(miniApps)
+    .set({ grantedPermissions: JSON.stringify(granted), updatedAt: new Date() })
+    .where(eq(miniApps.id, appId))
+
+  if (accepted.length > 0) notifyBackendRestart(appId)
+
+  log.info({ appId, accepted, invalid }, 'Mini-app permissions granted')
+  return { requested, granted, invalid }
+}
+
+/** Current permission state of an app: requested (manifest) vs granted (DB). */
+export async function getMiniAppPermissions(
+  appId: string,
+): Promise<{ requested: string[]; granted: string[]; missing: string[] } | null> {
+  const { parseRequestedPermissions, parseGrantedPermissions } = await import('@/server/services/mini-app-capabilities')
+
+  const app = await db.select().from(miniApps).where(eq(miniApps.id, appId)).get()
+  if (!app) return null
+
+  const manifest = await readAppManifest(appId)
+  const requested = parseRequestedPermissions(manifest)
+  const granted = parseGrantedPermissions(app.grantedPermissions).filter((p) => requested.includes(p))
+  return { requested, granted, missing: requested.filter((p) => !granted.includes(p)) }
+}
+
 /** Ids of all active apps that have a backend (for boot-time background loading). */
 export async function listBackendAppIds(): Promise<string[]> {
   const rows = await db.select({ id: miniApps.id })
@@ -710,12 +763,14 @@ export async function rollbackToSnapshot(appId: string, targetVersion: number): 
   }
 }
 
-/** Walk directory excluding .snapshots */
+/** Walk directory excluding .snapshots and the runtime data dir (_data) */
 async function walkDirForSnapshot(base: string, current: string, results: { path: string; size: number }[]): Promise<void> {
   if (!existsSync(current)) return
   const entries = await readdir(current, { withFileTypes: true })
   for (const entry of entries) {
     if (entry.name === '.snapshots') continue
+    // ctx.files runtime data is not source code: never snapshotted/rolled back
+    if (current === base && entry.name === '_data') continue
     const fullPath = join(current, entry.name)
     if (entry.isDirectory()) {
       await walkDirForSnapshot(base, fullPath, results)

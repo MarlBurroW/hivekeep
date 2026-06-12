@@ -3160,6 +3160,11 @@
       "selectPlaceholder": "选择智能体",
       "reassign": "重新指派",
       "reassigned": "维护者已设为 {{agent}}"
+    },
+    "permissions": {
+      "title": "后端请求的权限",
+      "approve": "批准",
+      "granted": "权限已授予"
     }
   },
   "accessibility": {

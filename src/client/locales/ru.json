@@ -3187,6 +3187,11 @@
       "selectPlaceholder": "Выберите Агента",
       "reassign": "Переназначить",
       "reassigned": "Сопровождающим назначен {{agent}}"
+    },
+    "permissions": {
+      "title": "Разрешения, запрошенные бэкендом",
+      "approve": "Одобрить",
+      "granted": "Разрешения предоставлены"
     }
   },
   "accessibility": {

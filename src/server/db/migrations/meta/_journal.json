@@ -715,6 +715,13 @@
       "when": 1781285919624,
       "tag": "0101_groovy_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "6",
+      "when": 1781292752830,
+      "tag": "0102_classy_vance_astro",
+      "breakpoints": true
     }
   ]
 }

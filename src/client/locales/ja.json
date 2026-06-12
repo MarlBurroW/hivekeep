@@ -3160,6 +3160,11 @@
       "selectPlaceholder": "エージェントを選択",
       "reassign": "再割り当て",
       "reassigned": "メンテナーを{{agent}}に設定しました"
+    },
+    "permissions": {
+      "title": "バックエンドが要求した権限",
+      "approve": "承認",
+      "granted": "権限が付与されました"
     }
   },
   "accessibility": {

@@ -3160,6 +3160,11 @@
       "selectPlaceholder": "Seleziona un Agente",
       "reassign": "Riassegna",
       "reassigned": "Manutentore impostato su {{agent}}"
+    },
+    "permissions": {
+      "title": "Permessi richiesti dal backend",
+      "approve": "Approva",
+      "granted": "Permessi concessi"
     }
   },
   "accessibility": {

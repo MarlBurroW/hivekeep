@@ -17,7 +17,7 @@ import { Textarea } from '@/client/components/ui/textarea'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/client/components/ui/sheet'
 import { VisuallyHidden } from 'radix-ui'
 import { useIsMobile } from '@/client/hooks/use-mobile'
-import { X, RotateCw, Maximize2, Minimize2, Sparkles, Wand2, Loader2, AlertTriangle, ClipboardList } from 'lucide-react'
+import { X, RotateCw, Maximize2, Minimize2, Sparkles, Wand2, Loader2, AlertTriangle, ClipboardList, ShieldAlert } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { lazyWithRetry as lazy } from '@/client/lib/lazy-with-retry'
 import { api, getErrorMessage } from '@/client/lib/api'
@@ -116,6 +116,42 @@ export function MiniAppViewer() {
     })
     return () => { cancelled = true }
   }, [activeAppId])
+
+  // Capability permissions: backends may request access (app.json "permissions")
+  // that the user has to approve before the matching ctx capabilities work.
+  const [permissions, setPermissions] = useState<{ requested: string[]; granted: string[]; missing: string[] } | null>(null)
+  const [granting, setGranting] = useState(false)
+
+  useEffect(() => {
+    setPermissions(null)
+    if (!activeAppId || !app?.hasBackend) return
+    let cancelled = false
+    api.get<{ requested: string[]; granted: string[]; missing: string[] }>(`/mini-apps/${activeAppId}/permissions`)
+      .then((data) => { if (!cancelled) setPermissions(data) })
+      .catch(() => { if (!cancelled) setPermissions(null) })
+    return () => { cancelled = true }
+  }, [activeAppId, app?.hasBackend, app?.version])
+
+  const handleGrantPermissions = useCallback(async () => {
+    if (!activeAppId || !permissions || permissions.missing.length === 0 || granting) return
+    setGranting(true)
+    try {
+      const result = await api.post<{ requested: string[]; granted: string[] }>(
+        `/mini-apps/${activeAppId}/permissions`,
+        { grant: permissions.missing },
+      )
+      setPermissions({
+        requested: result.requested,
+        granted: result.granted,
+        missing: result.requested.filter((p) => !result.granted.includes(p)),
+      })
+      toast.success(t('miniApps.permissions.granted'))
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setGranting(false)
+    }
+  }, [activeAppId, permissions, granting, t])
 
   // Reload iframe when version changes
   useEffect(() => {
@@ -635,6 +671,25 @@ export function MiniAppViewer() {
     </AlertDialog>
   )
 
+  // Approval banner shown above the iframe while the backend has ungranted permissions
+  const permissionsBanner = app?.hasBackend && permissions && permissions.missing.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2">
+      <ShieldAlert className="size-4 shrink-0 text-warning" />
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-medium">{t('miniApps.permissions.title')}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1">
+          {permissions.missing.map((p) => (
+            <code key={p} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">{p}</code>
+          ))}
+        </div>
+      </div>
+      <Button size="sm" className="h-7 text-xs" onClick={handleGrantPermissions} disabled={granting}>
+        {granting ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
+        {t('miniApps.permissions.approve')}
+      </Button>
+    </div>
+  ) : null
+
   // Full-page mode: render as overlay
   if (isFullPage && panelOpen && activeAppId) {
     return (
@@ -691,6 +746,8 @@ export function MiniAppViewer() {
             <X className="size-3.5" />
           </Button>
         </div>
+
+        {permissionsBanner}
 
         {/* Iframe */}
         <iframe
@@ -846,6 +903,8 @@ export function MiniAppViewer() {
                 </Button>
               </div>
             )}
+
+            {permissionsBanner}
 
             {/* Iframe */}
             {activeAppId && (

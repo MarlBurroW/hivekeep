@@ -3160,6 +3160,11 @@
       "selectPlaceholder": "Agent auswählen",
       "reassign": "Neu zuweisen",
       "reassigned": "Betreuer auf {{agent}} gesetzt"
+    },
+    "permissions": {
+      "title": "Vom Backend angeforderte Berechtigungen",
+      "approve": "Genehmigen",
+      "granted": "Berechtigungen erteilt"
     }
   },
   "accessibility": {

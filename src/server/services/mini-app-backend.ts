@@ -40,6 +40,19 @@ import {
   storageClear,
 } from '@/server/services/mini-apps'
 import { pushConsoleEntry } from '@/server/services/mini-app-console'
+import {
+  buildFilesApi,
+  buildSecretsApi,
+  buildLlmApi,
+  buildAgentApi,
+  guardedFetch,
+  parseGrantedPermissions,
+  parseRequestedPermissions,
+  type MiniAppFilesApi,
+  type MiniAppSecretsApi,
+  type MiniAppLlmApi,
+  type MiniAppAgentApi,
+} from '@/server/services/mini-app-capabilities'
 
 const log = createLogger('mini-app-backend')
 
@@ -150,6 +163,22 @@ export interface MiniAppBackendContext {
    * configured external channels). Rate-limited per app.
    */
   notify: (title: string, body?: string) => Promise<void>
+  /** Permission introspection: what the app requested vs what the user granted */
+  permissions: {
+    readonly requested: string[]
+    readonly granted: string[]
+    has: (permission: string) => boolean
+  }
+  /** Vault secrets — gated per secret by the "secrets:<NAME>" permission */
+  secrets: MiniAppSecretsApi
+  /** One-shot LLM completion via platform providers — gated by "llm" */
+  llm: MiniAppLlmApi
+  /** Bridge to the maintainer Agent — gated by "agent:inform" / "agent:task" */
+  agent: MiniAppAgentApi
+  /** SSRF-guarded fetch (http/https only, private hosts blocked, 30s timeout) */
+  fetch: (url: string, options?: RequestInit) => Promise<Response>
+  /** Scoped file storage under the app's `_data/` dir (excluded from snapshots) */
+  files: MiniAppFilesApi
   /** Logger — entries also land in the app console (get_mini_app_console) */
   log: {
     info: (...args: unknown[]) => void
@@ -263,15 +292,20 @@ function buildContext(params: {
   appId: string
   agentId: string
   appName: string
+  appDir: string
   version: number
   background: boolean
+  requested: string[]
+  granted: string[]
   controller: AbortController
   timers: Set<TimerId>
   jobs: Map<string, Cron>
 }): MiniAppBackendContext {
-  const { appId, agentId, appName, version, background, controller, timers, jobs } = params
+  const { appId, agentId, appName, appDir, version, background, requested, granted, controller, timers, jobs } = params
   const appLog = createLogger(`mini-app:${appId.slice(0, 8)}`)
   const emitter = getAppEmitter(appId)
+  const capabilityParams = { appId, agentId, appName, appDir, granted }
+  const grantedSet = new Set(granted)
 
   return {
     appId,
@@ -386,6 +420,16 @@ function buildContext(params: {
         relatedType: 'miniapp',
       })
     },
+    permissions: {
+      requested,
+      granted,
+      has: (permission: string) => grantedSet.has(permission),
+    },
+    secrets: buildSecretsApi(capabilityParams),
+    llm: buildLlmApi(capabilityParams),
+    agent: buildAgentApi(capabilityParams),
+    fetch: (url: string, options?: RequestInit) => guardedFetch(url, options),
+    files: buildFilesApi(appDir),
     log: {
       info: (...args: unknown[]) => {
         appLog.info({ appId }, String(args[0]), ...args.slice(1))
@@ -440,6 +484,14 @@ async function loadBackend(appId: string): Promise<BackendInstance | null> {
     try {
       const manifest = await readAppManifest(appId)
       const background = manifest.background === true
+      const requested = parseRequestedPermissions(manifest)
+      const granted = parseGrantedPermissions(app.grantedPermissions).filter((p) => requested.includes(p))
+      const missing = requested.filter((p) => !granted.includes(p))
+      if (missing.length > 0) {
+        pushBackendConsole(appId, 'warn', [
+          `Requested permissions not granted yet: ${missing.join(', ')} — the matching ctx capabilities will throw until the user approves them.`,
+        ])
+      }
 
       // Use a cache-busting query to force re-import on version change
       const moduleUrl = `${serverPath}?v=${app.version}&t=${Date.now()}`
@@ -456,7 +508,19 @@ async function loadBackend(appId: string): Promise<BackendInstance | null> {
       const controller = new AbortController()
       const timers = new Set<TimerId>()
       const jobs = new Map<string, Cron>()
-      const ctx = buildContext({ appId, agentId: app.agentId, appName: app.name, version: app.version, background, controller, timers, jobs })
+      const ctx = buildContext({
+        appId,
+        agentId: app.agentId,
+        appName: app.name,
+        appDir: dir,
+        version: app.version,
+        background,
+        requested,
+        granted,
+        controller,
+        timers,
+        jobs,
+      })
 
       let handler: Hono | null = null
       if (typeof factory === 'function') {
