@@ -3622,6 +3622,12 @@
         "overwrite": "Écraser"
       }
     },
-    "browseWorkspace": "Parcourir les fichiers"
+    "browseWorkspace": "Parcourir les fichiers",
+    "share": {
+      "title": "Partager le fichier",
+      "snapshotNotice": "Crée une copie figée dans le file storage — les modifications ultérieures du fichier du workspace ne seront pas reflétées.",
+      "submit": "Partager & copier le lien",
+      "urlCopied": "Lien de partage copié dans le presse-papier"
+    }
   }
 }

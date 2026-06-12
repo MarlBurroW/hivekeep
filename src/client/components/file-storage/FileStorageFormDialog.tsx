@@ -11,12 +11,26 @@ import { AgentSelector } from '@/client/components/common/AgentSelector'
 import { api, getErrorMessage } from '@/client/lib/api'
 import type { StoredFileData } from '@/client/components/file-storage/FileStorageCard'
 
+/** Creation-summary shape returned by the share endpoints (url included). */
+export interface SavedStoredFile {
+  id: string
+  name: string
+  url: string
+}
+
 interface FileStorageFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSaved: () => void
+  /** Carries the created file in workspaceSource mode (URL-copy step). */
+  onSaved: (file?: SavedStoredFile) => void
   file?: StoredFileData | null
   agents: { id: string; name: string }[]
+  /**
+   * Share-from-workspace mode (Files section, files.md § 4.4): hides the file
+   * input + agent selector, prefills the name with the basename and submits a
+   * SNAPSHOT to POST /api/file-storage/from-workspace.
+   */
+  workspaceSource?: { agentId: string; path: string } | null
 }
 
 export function FileStorageFormDialog({
@@ -25,9 +39,11 @@ export function FileStorageFormDialog({
   onSaved,
   file,
   agents,
+  workspaceSource,
 }: FileStorageFormDialogProps) {
   const { t } = useTranslation()
   const isEditing = !!file
+  const isWorkspaceShare = !!workspaceSource && !isEditing
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [isSaving, setIsSaving] = useState(false)
@@ -52,6 +68,16 @@ export function FileStorageFormDialog({
       setReadAndBurn(file.readAndBurn)
       setSelectedFile(null)
       setError('')
+    } else if (open && workspaceSource) {
+      setName(workspaceSource.path.split('/').pop() ?? '')
+      setDescription('')
+      setAgentId(workspaceSource.agentId)
+      setIsPublic(true)
+      setPassword('')
+      setExpiresIn('')
+      setReadAndBurn(false)
+      setSelectedFile(null)
+      setError('')
     } else if (open) {
       setName('')
       setDescription('')
@@ -63,7 +89,7 @@ export function FileStorageFormDialog({
       setSelectedFile(null)
       setError('')
     }
-  }, [open, file, agents])
+  }, [open, file, agents, workspaceSource])
 
   const handleClose = () => {
     onOpenChange(false)
@@ -85,6 +111,21 @@ export function FileStorageFormDialog({
         if (Object.keys(body).length > 0) {
           await api.patch(`/file-storage/${file.id}`, body)
         }
+      } else if (isWorkspaceShare && workspaceSource) {
+        const created = await api.post<{ file: SavedStoredFile }>('/file-storage/from-workspace', {
+          agentId: workspaceSource.agentId,
+          path: workspaceSource.path,
+          name: name || undefined,
+          description: description || undefined,
+          isPublic,
+          password: password || undefined,
+          expiresIn: expiresIn ? Number(expiresIn) : undefined,
+          readAndBurn,
+        })
+        onSaved(created.file)
+        handleClose()
+        setIsSaving(false)
+        return
       } else {
         if (!selectedFile) {
           setError(t('settings.files.fileRequired'))
@@ -122,22 +163,28 @@ export function FileStorageFormDialog({
     }
   }
 
-  const canSave = isEditing ? true : !!selectedFile && !!agentId
+  const canSave = isEditing || isWorkspaceShare ? true : !!selectedFile && !!agentId
 
   return (
     <FormDialog
       open={open}
       onOpenChange={(v) => { if (!v) handleClose() }}
-      title={isEditing ? t('settings.files.edit') : t('settings.files.add')}
-      description={isEditing ? t('settings.files.editHint') : t('settings.files.addHint')}
+      title={isEditing ? t('settings.files.edit') : isWorkspaceShare ? t('files.share.title') : t('settings.files.add')}
+      description={
+        isEditing
+          ? t('settings.files.editHint')
+          : isWorkspaceShare
+            ? t('files.share.snapshotNotice')
+            : t('settings.files.addHint')
+      }
       size="md"
       error={error || null}
       onSubmit={handleSave}
       isSubmitting={isSaving}
       submitDisabled={!canSave}
-      submitLabel={isEditing ? t('common.save') : t('settings.files.add')}
+      submitLabel={isEditing ? t('common.save') : isWorkspaceShare ? t('files.share.submit') : t('settings.files.add')}
     >
-      {!isEditing && (
+      {!isEditing && !isWorkspaceShare && (
         <>
           <FormField label={t('settings.files.file')} htmlFor="file-storage-file">
             <Input

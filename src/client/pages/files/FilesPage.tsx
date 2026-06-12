@@ -29,6 +29,7 @@ import {
 } from '@/client/hooks/useWorkspaceFiles'
 import { useWorkspaceTabs } from '@/client/hooks/useWorkspaceTabs'
 import { WorkspaceTree, type WorkspaceTreeActions } from '@/client/components/files/WorkspaceTree'
+import { FileStorageFormDialog } from '@/client/components/file-storage/FileStorageFormDialog'
 import { WorkspaceEditor, workspaceRawUrl } from '@/client/components/files/WorkspaceEditor'
 import { FileTabs } from '@/client/components/files/FileTabs'
 import type { WorkspaceEntry } from '@/shared/types'
@@ -67,6 +68,7 @@ export function FilesPage() {
   const [treeSheetOpen, setTreeSheetOpen] = useState(false)
   const [closingTab, setClosingTab] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<WorkspaceEntry | null>(null)
+  const [shareTarget, setShareTarget] = useState<WorkspaceEntry | null>(null)
 
   const openPath = useCallback(
     (path: string) => {
@@ -178,6 +180,7 @@ export function FilesPage() {
         toastError(err)
       }
     },
+    share: (entry) => setShareTarget(entry),
     uploadTo: async (dirPath, files) => {
       try {
         const result = await workspace.uploadFiles(dirPath, files)
@@ -338,6 +341,21 @@ export function FilesPage() {
         }}
         onCancel={() => setClosingTab(null)}
       />
+
+      {activeAgentId && (
+        <FileStorageFormDialog
+          open={shareTarget !== null}
+          onOpenChange={(open) => !open && setShareTarget(null)}
+          workspaceSource={shareTarget ? { agentId: activeAgentId, path: shareTarget.path } : null}
+          agents={[]}
+          onSaved={(file) => {
+            if (file?.url) {
+              void navigator.clipboard.writeText(file.url)
+              toast.success(t('files.share.urlCopied'))
+            }
+          }}
+        />
+      )}
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

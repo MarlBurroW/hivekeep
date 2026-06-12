@@ -3622,6 +3622,12 @@
         "overwrite": "Overwrite"
       }
     },
-    "browseWorkspace": "Browse files"
+    "browseWorkspace": "Browse files",
+    "share": {
+      "title": "Share file",
+      "snapshotNotice": "Creates a frozen copy in the file storage — later changes to the workspace file will not be reflected.",
+      "submit": "Share & copy link",
+      "urlCopied": "Share link copied to clipboard"
+    }
   }
 }
