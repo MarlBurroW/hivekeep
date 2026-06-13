@@ -82,7 +82,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hivekeep/sdk": "workspace:*",
-    "@hono/node-server": "^1.19.9",
+    "@hono/node-server": "^2.0.4",
     "@hookform/resolvers": "^5.2.2",
     "@lobehub/icons": "^5.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
