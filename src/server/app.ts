@@ -6,6 +6,7 @@ import { createLogger } from '@/server/logger'
 import { db } from '@/server/db/index'
 import { agents, providers, channels, crons, memories, mcpServers, contacts, user } from '@/server/db/schema'
 import { authMiddleware } from '@/server/auth/middleware'
+import { miniAppOriginGuard } from '@/server/auth/mini-app-origin-guard'
 import { authRoutes } from '@/server/routes/auth'
 import { meRoutes } from '@/server/routes/me'
 import { onboardingRoutes } from '@/server/routes/onboarding'
@@ -97,6 +98,9 @@ app.onError((err, c) => {
   log.error({ err }, 'Unhandled error')
   return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500)
 })
+
+// Sandbox mini-app iframes to their own namespace (defense-in-depth) before auth.
+app.use('/api/*', miniAppOriginGuard)
 
 app.use('/api/*', authMiddleware)
 

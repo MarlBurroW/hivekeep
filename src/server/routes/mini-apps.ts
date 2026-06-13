@@ -777,10 +777,12 @@ miniAppRoutes.post('/:id/permissions', async (c) => {
 // to the real /api/<resource> route carrying the user's session, after checking
 // the app's granted `platform:<resource>:<read|write>` permission.
 //
-// NOTE (security follow-up): the iframe is same-origin, so today an app could
-// also hit /api/<resource> directly with the session cookie, bypassing this gate.
-// This gateway is the blessed, documented, permissioned path; making it the ONLY
-// path (tokenized iframe instead of cookie) is a tracked hardening step.
+// SECURITY: the iframe is same-origin, so its JS carries the session cookie. The
+// mini-app origin guard (auth/mini-app-origin-guard.ts) now sandboxes well-behaved
+// iframes to their own namespace via Referer, so this gateway is the path apps
+// take to reach platform resources. That guard is defense-in-depth (a hostile app
+// can suppress its Referer); the complete barrier — a scoped token instead of the
+// cookie + dropping allow-same-origin — is still a tracked hardening step.
 miniAppRoutes.all('/:id/platform/*', async (c) => {
   const appId = c.req.param('id')
   const app = await getMiniAppRow(appId)
@@ -799,12 +801,20 @@ miniAppRoutes.all('/:id/platform/*', async (c) => {
   }
 
   // Re-dispatch to the real REST route, carrying the original session + body.
+  // Strip the iframe Referer/Sec-Fetch so the trusted, permission-checked
+  // re-dispatch isn't rejected by the mini-app origin guard (which would see a
+  // mini-app Referer on a non-mini-app path).
   const url = new URL(c.req.url)
   url.pathname = `/api/${subPath.replace(/^\/+/, '')}`
   const isBodyless = c.req.method === 'GET' || c.req.method === 'HEAD'
+  const innerHeaders = new Headers(c.req.raw.headers)
+  innerHeaders.delete('referer')
+  innerHeaders.delete('sec-fetch-site')
+  innerHeaders.delete('sec-fetch-dest')
+  innerHeaders.delete('sec-fetch-mode')
   const innerReq = new Request(url.toString(), {
     method: c.req.method,
-    headers: c.req.raw.headers,
+    headers: innerHeaders,
     body: isBodyless ? undefined : c.req.raw.body,
     // @ts-ignore - duplex needed for streaming bodies in Bun
     duplex: 'half',

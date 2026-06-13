@@ -242,7 +242,7 @@ Same shorthands as `Hivekeep.api` (`get/post/put/patch/delete/json`), but proxie
 Discover each resource's routes and payload shapes in [the API reference](https://github.com/MarlBurroW/hivekeep/blob/main/api.md). A few resources are never reachable through the gateway: `auth`, `vault` (secret values), `database`, `users`, and `mini-apps` (so an app can't grant itself permissions).
 
 :::caution
-The platform API runs with **your** privileges. Only install mini-apps you trust with the resources they request, and review the permission banner before approving.
+The platform API runs with **your** privileges. Only install mini-apps you trust with the resources they request, and review the permission banner before approving. (Mini-app iframes are sandboxed to their own namespace server-side, but a self-hosted instance still runs the app code you install.)
 :::
 
 ## Server-Sent Events
