@@ -618,6 +618,81 @@ describe('ctx.notify rate limiting', () => {
   })
 })
 
+// ─── ctx.on event subscription (SSE tap routing + cleanup) ───────────────────
+
+describe('Event subscription tap routing', () => {
+  // Replicates the SSEManager tap registry + the ctx.on filter wrapper.
+  type Tap = (event: { type: string; agentId?: string; data: Record<string, unknown> }) => void
+
+  function makeManager() {
+    const taps = new Set<Tap>()
+    return {
+      addTap(t: Tap) { taps.add(t); return () => { taps.delete(t) } },
+      emit(event: { type: string; agentId?: string; data: Record<string, unknown> }) {
+        for (const t of taps) { try { t(event) } catch { /* never break fan-out */ } }
+      },
+      get size() { return taps.size },
+    }
+  }
+
+  function subscribe(mgr: ReturnType<typeof makeManager>, unsubs: Set<() => void>, type: string, handler: Tap) {
+    const tapUnsub = mgr.addTap((event) => { if (event.type === type) handler(event) })
+    unsubs.add(tapUnsub)
+    return () => { tapUnsub(); unsubs.delete(tapUnsub) }
+  }
+
+  it('delivers only the subscribed event type', () => {
+    const mgr = makeManager()
+    const unsubs = new Set<() => void>()
+    const got: string[] = []
+    subscribe(mgr, unsubs, 'task:done', (e) => got.push(e.type))
+
+    mgr.emit({ type: 'task:done', data: { id: 't1' } })
+    mgr.emit({ type: 'contact:created', data: { id: 'c1' } })
+    mgr.emit({ type: 'task:done', data: { id: 't2' } })
+
+    expect(got).toEqual(['task:done', 'task:done'])
+  })
+
+  it('passes the structured { type, agentId, data } event through', () => {
+    const mgr = makeManager()
+    const unsubs = new Set<() => void>()
+    let received: unknown = null
+    subscribe(mgr, unsubs, 'cron:triggered', (e) => { received = e })
+
+    mgr.emit({ type: 'cron:triggered', agentId: 'a-1', data: { cronId: 'x', taskId: 'y' } })
+    expect(received).toEqual({ type: 'cron:triggered', agentId: 'a-1', data: { cronId: 'x', taskId: 'y' } })
+  })
+
+  it('stop clears all subscriptions (no delivery after teardown)', () => {
+    const mgr = makeManager()
+    const unsubs = new Set<() => void>()
+    const got: string[] = []
+    subscribe(mgr, unsubs, 'task:done', (e) => got.push(e.type))
+    subscribe(mgr, unsubs, 'contact:created', (e) => got.push(e.type))
+    expect(mgr.size).toBe(2)
+
+    // teardown like stopInstance does
+    for (const u of unsubs) u()
+    unsubs.clear()
+    expect(mgr.size).toBe(0)
+
+    mgr.emit({ type: 'task:done', data: {} })
+    expect(got).toEqual([])
+  })
+
+  it('the manager isolates taps from each other', () => {
+    const mgr = makeManager()
+    const unsubs = new Set<() => void>()
+    const got: string[] = []
+    mgr.addTap(() => { throw new Error('boom') })
+    subscribe(mgr, unsubs, 'task:done', (e) => got.push(e.type))
+
+    expect(() => mgr.emit({ type: 'task:done', data: {} })).not.toThrow()
+    expect(got).toEqual(['task:done'])
+  })
+})
+
 // ─── Manifest background flag parsing ───────────────────────────────────────
 
 describe('app.json background flag', () => {

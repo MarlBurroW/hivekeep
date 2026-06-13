@@ -1814,7 +1814,7 @@ Canal montant UI → backend (`Hivekeep.events.send()`). Délivré à l'export `
 
 ### `GET /api/mini-apps/:id/permissions`
 
-État des permissions de capacités : demandées dans `app.json` (`"permissions": ["llm", "agent:inform", "agent:task", "channels:send", "secrets:<NAME>", "platform:<resource>:<read|write>"]`) vs accordées par l'utilisateur.
+État des permissions de capacités : demandées dans `app.json` (`"permissions": ["llm", "agent:inform", "agent:task", "channels:send", "secrets:<NAME>", "platform:<resource>:<read|write>", "events:<prefix>"]`) vs accordées par l'utilisateur.
 
 ```typescript
 // Réponse 200
@@ -1946,6 +1946,8 @@ Connexion SSE **globale** (une seule par client). Le serveur multiplex les évé
 // la coupure SSE) ; 'failed' est émis avant restart (l'ancienne version tourne).
 { event: 'update:finished', data: { runId: string, status: 'success' | 'failed' | 'rolled-back', version?: string, error?: string } }
 ```
+
+> Les backends de mini-apps peuvent s'abonner IN-PROCESS à ce catalogue via `ctx.on(eventType, handler)` (gardé par la permission `events:<prefix>`, ex. `events:task`). Les types haute-fréquence/internes (`chat:token`, `queue:update`, `*-token-usage`…) ne sont pas abonnables. Voir `docs-site` > mini-apps > backend.
 
 > Le SSE est **global** (pas par Agent). Le client filtre côté frontend par `agentId` pour n'afficher que les événements pertinents. Cela permet de mettre a jour la sidebar (badges, statuts) pour tous les Agents simultanément.
 

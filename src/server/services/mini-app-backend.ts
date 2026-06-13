@@ -49,12 +49,14 @@ import {
   guardedFetch,
   parseGrantedPermissions,
   parseRequestedPermissions,
+  checkEventAccess,
   type MiniAppFilesApi,
   type MiniAppSecretsApi,
   type MiniAppLlmApi,
   type MiniAppAgentApi,
   type MiniAppChannelsApi,
 } from '@/server/services/mini-app-capabilities'
+import { sseManager } from '@/server/sse/index'
 
 const log = createLogger('mini-app-backend')
 
@@ -65,6 +67,7 @@ const MAX_JOBS_PER_APP = 10
 /** Runtime guard: a scheduled job never runs more often than this */
 const MIN_JOB_SPACING_MS = 15_000
 const NOTIFY_MAX_PER_HOUR = 10
+const MAX_EVENT_SUBSCRIPTIONS_PER_APP = 30
 
 /** Per-app notification timestamps for rate limiting (survives backend reloads) */
 const notifyTimestamps = new Map<string, number[]>()
@@ -161,6 +164,14 @@ export interface MiniAppBackendContext {
    */
   schedule: (name: string, cronExpr: string, handler: () => void | Promise<void>) => { stop: () => void }
   /**
+   * Subscribe to a platform event (the same catalogue Hivekeep sends over SSE:
+   * "task:done", "channel:message-received", "contact:created", "cron:triggered"…).
+   * The handler receives { type, agentId?, data }. Returns an unsubscribe fn;
+   * all subscriptions are torn down automatically when the instance stops.
+   * Gated by the "events:<prefix>" permission (e.g. events:task for task:*).
+   */
+  on: (eventType: string, handler: (event: { type: string; agentId?: string; data: Record<string, unknown> }) => void | Promise<void>) => () => void
+  /**
    * Send a platform notification to users (notification center + SSE +
    * configured external channels). Rate-limited per app.
    */
@@ -214,6 +225,8 @@ interface BackendInstance {
   controller: AbortController
   timers: Set<TimerId>
   jobs: Map<string, Cron>
+  /** Unsubscribe fns for ctx.on platform-event subscriptions (SSE taps). */
+  eventUnsubs: Set<() => void>
   module: BackendModule
   ctx: MiniAppBackendContext
 }
@@ -226,6 +239,11 @@ const loading = new Map<string, Promise<BackendInstance | null>>()
 
 /** Stop a backend instance: stop jobs, clear timers, abort signal, run onStop (bounded). */
 async function stopInstance(appId: string, inst: BackendInstance): Promise<void> {
+  for (const unsub of inst.eventUnsubs) {
+    try { unsub() } catch { /* already removed */ }
+  }
+  inst.eventUnsubs.clear()
+
   for (const job of inst.jobs.values()) {
     try { job.stop() } catch { /* already stopped */ }
   }
@@ -304,8 +322,9 @@ function buildContext(params: {
   controller: AbortController
   timers: Set<TimerId>
   jobs: Map<string, Cron>
+  eventUnsubs: Set<() => void>
 }): MiniAppBackendContext {
-  const { appId, agentId, appName, appDir, version, background, requested, granted, controller, timers, jobs } = params
+  const { appId, agentId, appName, appDir, version, background, requested, granted, controller, timers, jobs, eventUnsubs } = params
   const appLog = createLogger(`mini-app:${appId.slice(0, 8)}`)
   const emitter = getAppEmitter(appId)
   const capabilityParams = { appId, agentId, appName, appDir, granted }
@@ -403,6 +422,37 @@ function buildContext(params: {
           try { job.stop() } catch { /* already stopped */ }
           jobs.delete(name)
         },
+      }
+    },
+    on: (eventType: string, handler: (event: { type: string; agentId?: string; data: Record<string, unknown> }) => void) => {
+      if (typeof eventType !== 'string' || !eventType.trim()) throw new Error('on: eventType is required')
+      if (typeof handler !== 'function') throw new Error('on: handler must be a function')
+      if (controller.signal.aborted) throw new Error('Backend instance is stopped')
+
+      const denial = checkEventAccess(granted, eventType)
+      if (denial) throw new Error(`on: ${denial.message}`)
+      if (eventUnsubs.size >= MAX_EVENT_SUBSCRIPTIONS_PER_APP) {
+        throw new Error(`Too many event subscriptions (max ${MAX_EVENT_SUBSCRIPTIONS_PER_APP})`)
+      }
+
+      const reportError = (err: unknown) =>
+        pushBackendConsole(appId, 'error', [`Event handler for "${eventType}" failed: ${err instanceof Error ? err.message : String(err)}`])
+      const tapUnsub = sseManager.addTap((event) => {
+        if (event.type !== eventType) return
+        // Handlers run synchronously in the SSE fan-out path: catch sync throws
+        // AND async rejections, and never let a handler block/break fan-out.
+        try {
+          const result: unknown = handler({ type: event.type, agentId: event.agentId, data: event.data })
+          if (result instanceof Promise) result.catch(reportError)
+        } catch (err) {
+          reportError(err)
+        }
+      })
+      eventUnsubs.add(tapUnsub)
+
+      return () => {
+        tapUnsub()
+        eventUnsubs.delete(tapUnsub)
       }
     },
     notify: async (title: string, body?: string) => {
@@ -513,6 +563,7 @@ async function loadBackend(appId: string): Promise<BackendInstance | null> {
       const controller = new AbortController()
       const timers = new Set<TimerId>()
       const jobs = new Map<string, Cron>()
+      const eventUnsubs = new Set<() => void>()
       const ctx = buildContext({
         appId,
         agentId: app.agentId,
@@ -525,6 +576,7 @@ async function loadBackend(appId: string): Promise<BackendInstance | null> {
         controller,
         timers,
         jobs,
+        eventUnsubs,
       })
 
       let handler: Hono | null = null
@@ -546,6 +598,7 @@ async function loadBackend(appId: string): Promise<BackendInstance | null> {
         controller,
         timers,
         jobs,
+        eventUnsubs,
         module: mod,
         ctx,
       }
@@ -647,6 +700,7 @@ export function getBackendStatus(appId: string): {
   loadedAt: number | null
   activeTimers: number
   sseSubscribers: number
+  eventSubscriptions: number
   jobs: { name: string; pattern: string; nextRunAt: number | null }[]
 } {
   const inst = instances.get(appId)
@@ -657,6 +711,7 @@ export function getBackendStatus(appId: string): {
     loadedAt: inst?.loadedAt ?? null,
     activeTimers: inst?.timers.size ?? 0,
     sseSubscribers: appEmitters.get(appId)?.subscriberCount ?? 0,
+    eventSubscriptions: inst?.eventUnsubs.size ?? 0,
     jobs: inst
       ? [...inst.jobs.entries()].map(([name, job]) => ({
           name,

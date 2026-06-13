@@ -9,8 +9,30 @@ type SSEWriter = {
   userId: string
 }
 
+/** A tap receives every event the manager fans out (in-process observers). */
+export type SSETap = (event: SSEEvent, scope: { kind: 'broadcast' | 'user' | 'agent'; userId?: string }) => void
+
 class SSEManager {
   private connections = new Map<string, SSEWriter>()
+  /** In-process observers of the event stream (e.g. mini-app event subscriptions). */
+  private taps = new Set<SSETap>()
+
+  /**
+   * Observe every event the manager fans out to clients, in-process. Returns an
+   * unsubscribe function. Used by mini-app backends to react to platform events
+   * (the tap mirrors the exact catalogue already sent over SSE). Taps must never
+   * throw or block — they are called synchronously after client fan-out.
+   */
+  addTap(tap: SSETap): () => void {
+    this.taps.add(tap)
+    return () => { this.taps.delete(tap) }
+  }
+
+  private notifyTaps(event: SSEEvent, scope: { kind: 'broadcast' | 'user' | 'agent'; userId?: string }): void {
+    for (const tap of this.taps) {
+      try { tap(event, scope) } catch { /* a tap must never break fan-out */ }
+    }
+  }
 
   /**
    * Register a new SSE connection for a user.
@@ -40,6 +62,7 @@ class SSEManager {
         // Connection might be closed
       }
     }
+    this.notifyTaps(event, { kind: 'broadcast' })
   }
 
   /**
@@ -56,6 +79,7 @@ class SSEManager {
         }
       }
     }
+    this.notifyTaps(event, { kind: 'user', userId })
   }
 
   /**
@@ -71,6 +95,7 @@ class SSEManager {
         // Connection might be closed
       }
     }
+    this.notifyTaps({ ...event, agentId }, { kind: 'agent' })
   }
 
   get connectionCount(): number {

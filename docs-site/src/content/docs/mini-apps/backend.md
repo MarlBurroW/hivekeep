@@ -83,6 +83,29 @@ export async function onStart(ctx) {
 - Jobs stop automatically when the instance stops or reloads.
 - Handler errors land in the app console (`get_mini_app_console`).
 
+## Reacting to Platform Events
+
+`ctx.on(eventType, handler)` subscribes to Hivekeep's platform events — the same catalogue the app sends over SSE (see [the SSE reference](https://github.com/MarlBurroW/hivekeep/blob/main/api.md)). This is what makes a background app **reactive** instead of having to poll: run something the moment a task finishes, a message arrives on a channel, a contact is created, a cron fires.
+
+```javascript
+export async function onStart(ctx) {
+  ctx.on("task:done", (event) => {
+    // event = { type, agentId?, data }
+    ctx.notify("Task finished", String(event.data.taskId));
+  });
+
+  ctx.on("channel:message-received", (event) => {
+    ctx.storage.set("lastInbound", event.data);
+    ctx.events.emit("inbound", event.data); // forward to the open UI
+  });
+}
+```
+
+- Gated by the `events:<prefix>` permission — `events:task` covers `task:*`, `events:channel` covers `channel:*`, etc. Declare them in `app.json`.
+- The handler receives `{ type, agentId?, data }`. Returns an unsubscribe function; all subscriptions are torn down automatically on reload/stop. Max 30 per app.
+- High-frequency / internal events are **not** subscribable (`chat:token`, `queue:update`, `*-token-usage`, …) — a per-token handler would be a footgun.
+- **Avoid feedback loops**: a handler reacting to an event that itself triggers that event (e.g. handling `contact:updated` by updating a contact) will recurse. The action capabilities are rate-limited, but design handlers to be idempotent / guarded.
+
 ## Timers and Cancellation
 
 Never use the global `setInterval`/`setTimeout` in a backend — they would survive reloads and leak. Use the managed equivalents:
@@ -125,6 +148,7 @@ When the app panel is open and permissions are missing, Hivekeep shows an approv
 | `ctx.agent.inform(text)` | `agent:inform` | 10/hour | Drop an informational message into the maintainer Agent's queue. |
 | `ctx.agent.task(description, opts?)` | `agent:task` | 5/hour | Spawn an async sub-task on the maintainer Agent. Returns `{ taskId }`. |
 | `ctx.channels.list()` / `.send(channelId, chatId, text)` / `.sendToContact(contact, platform, text)` | `channels:send` | 20/hour | Send through the platform's existing messaging channels (Telegram, Discord, Twilio SMS, plugin platforms…). `sendToContact` resolves the contact's platform identifier and an active channel automatically. Prefer this over re-implementing a provider API with raw secrets: one permission, audited sends, no credentials in the app. |
+| `ctx.on(eventType, handler)` | `events:<prefix>` (e.g. `events:task`) | 30 subscriptions | Subscribe to platform events ([Reacting to Platform Events](#reacting-to-platform-events)). |
 
 `ctx.permissions` exposes `{ requested, granted, has(permission) }` for introspection.
 
@@ -158,10 +182,11 @@ await ctx.files.delete("cache/feed.json");
 | `ctx.signal` | `AbortSignal` | Aborted when the instance stops (see [Timers](#timers-and-cancellation)) |
 | `ctx.timers` | `object` | Managed timers, auto-cleared on stop (see [Timers](#timers-and-cancellation)) |
 | `ctx.schedule` | `function` | Named cron jobs (see [Scheduled Jobs](#scheduled-jobs)) |
+| `ctx.on` | `function` | Subscribe to platform events (see [Reacting to Platform Events](#reacting-to-platform-events)) |
 | `ctx.notify` | `function` | Platform notifications (see [Notifications](#notifications)) |
 | `ctx.fetch` | `function` | SSRF-guarded outbound HTTP (see [Outbound HTTP and Files](#outbound-http-and-files)) |
 | `ctx.files` | `object` | Scoped `_data/` file storage (see [Outbound HTTP and Files](#outbound-http-and-files)) |
-| `ctx.secrets` / `ctx.llm` / `ctx.agent` | `object` | Permission-gated capabilities (see [Capability Permissions](#capability-permissions)) |
+| `ctx.secrets` / `ctx.llm` / `ctx.agent` / `ctx.channels` | `object` | Permission-gated capabilities (see [Capability Permissions](#capability-permissions)) |
 | `ctx.permissions` | `object` | `{ requested, granted, has() }` introspection |
 | `ctx.log` | `object` | Scoped logger (see [Logging](#logging)) |
 

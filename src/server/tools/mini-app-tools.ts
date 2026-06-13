@@ -936,6 +936,7 @@ export const getMiniAppBackendStatusTool: ToolRegistration = {
           })),
           activeTimers: status.activeTimers,
           sseSubscribers: status.sseSubscribers,
+          eventSubscriptions: status.eventSubscriptions,
           permissions,
           note: !existing.hasBackend
             ? 'This app has no backend (_server.js).'

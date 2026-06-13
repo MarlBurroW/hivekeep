@@ -248,6 +248,7 @@ automatically after every edit. Use \`onStart\` to launch live work (jobs, watch
 - \`ctx.storage\` — KV storage (.get/.set/.delete/.list/.clear), shared with the frontend
 - \`ctx.events.emit(event, data, {userId}?)\` — SSE push to the app UI (optionally a single user)
 - \`ctx.schedule(name, cronPattern, handler)\` — local cron job (croner pattern, max 10/app, runs spaced >= 15s, auto-stopped on reload). Returns \`{stop()}\`
+- \`ctx.on(eventType, handler)\` — REACT to platform events (the same catalogue Hivekeep sends over SSE): "task:done", "channel:message-received", "contact:created", "cron:triggered", "notification:new"… The handler gets \`{ type, agentId?, data }\`. Returns an unsubscribe fn; all subscriptions are torn down on reload. Gated by the \`events:<prefix>\` permission (e.g. \`events:task\` for task:*, \`events:channel\` for channel:*). This is what makes a background app reactive instead of just polling. (High-frequency/internal events like chat:token are not subscribable. Beware feedback loops: an event handler that triggers the same event.)
 - \`ctx.timers.setTimeout/setInterval/clearTimeout/clearInterval\` — managed timers, auto-cleared when the instance stops (interval min 1s). NEVER use global setInterval — it would leak across reloads
 - \`ctx.signal\` — AbortSignal aborted when the instance stops (pass it to fetch/loops)
 - \`ctx.notify(title, body?)\` — platform notification (notification center + user's external channels), max 10/hour
@@ -262,6 +263,7 @@ The user approves from the banner in the app panel. Until granted, these throw:
 - \`ctx.llm.complete(prompt, {model?, maxTokens?})\` — one-shot LLM completion (needs \`llm\`, 30/hour)
 - \`ctx.agent.inform(text)\` — drop a message into the maintainer Agent's queue (needs \`agent:inform\`, 10/hour)
 - \`ctx.agent.task(description, {title?})\` — spawn an async sub-task on the maintainer Agent (needs \`agent:task\`, 5/hour)
+- \`ctx.on(eventType, handler)\` — subscribe to platform events (needs \`events:<prefix>\`, e.g. events:task): see the context list above. Lets an app react ("when a task finishes, SMS me"; "when a contact is created, sync it").
 - \`ctx.channels\` — send through the platform's EXISTING messaging channels (needs \`channels:send\`, 20/hour):
   - \`ctx.channels.list()\` — channels with id/name/platform/status
   - \`ctx.channels.send(channelId, chatId, text)\` — send to a known platform chat id

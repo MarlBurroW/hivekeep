@@ -29,6 +29,83 @@ const SECRET_PERMISSION_RE = /^secrets:[A-Za-z0-9_.-]{1,128}$/
 /** `platform:<resource>:<read|write>` — gates the platform REST API gateway. */
 const PLATFORM_PERMISSION_RE = /^platform:[a-z][a-z0-9-]*:(read|write)$/
 
+/** `events:<prefix>` — gates subscribing to platform events (ctx.on). */
+const EVENTS_PERMISSION_RE = /^events:[a-z][a-z0-9-]*$/
+
+/**
+ * Event-type prefixes a mini-app may subscribe to via ctx.on(). The prefix is
+ * the part before the first colon of an SSE event type. High-frequency / noisy
+ * streams (chat:token, queue:update, *-token-usage, compacting:*, *-progress)
+ * are deliberately excluded — a background handler firing per LLM token would be
+ * a footgun. Subscribing to `task:done` requires the `events:task` permission.
+ */
+export const MINI_APP_SUBSCRIBABLE_EVENT_PREFIXES = new Set([
+  'chat',       // chat:message, chat:done, chat:messages-deleted (NOT chat:token)
+  'task',       // task:status, task:done, task:deleted
+  'cron',       // cron:triggered, cron:created/updated/deleted
+  'channel',    // channel:message-received/sent, channel:user-*, channel:*
+  'notification',
+  'contact',    // contact:created/updated/deleted
+  'project',    // project:*, project-tag handled under its own prefix below
+  'ticket',     // ticket:*
+  'memory',     // memory:created/updated/deleted
+  'trigger',    // trigger:fired/created/updated/deleted
+  'webhook',    // webhook:triggered/created/updated/deleted
+  'workspace',  // workspace:changed
+  'miniapp',    // miniapp:created/updated/deleted/file-updated
+  'agent',      // agent:created/updated/deleted/error (NOT agent token streams)
+])
+
+/** Event types never deliverable to a mini-app even if the prefix is allowed (noisy/internal). */
+const EVENT_TYPE_DENYLIST = new Set([
+  'chat:token',
+  'chat:reasoning-token',
+  'chat:reasoning-done',
+  'chat:tool-call-start',
+  'chat:tool-call',
+  'chat:tool-result',
+  'chat:token-usage',
+  'task:token-usage',
+  'task:todos',
+  'queue:update',
+  'agent:read',
+  'agent:active-project',
+])
+
+/** The prefix of an SSE event type (part before the first colon). */
+export function eventPrefix(eventType: string): string {
+  return eventType.split(':')[0] ?? ''
+}
+
+/** True when a mini-app is allowed to subscribe to this event type at all. */
+export function isSubscribableEvent(eventType: string): boolean {
+  if (EVENT_TYPE_DENYLIST.has(eventType)) return false
+  return MINI_APP_SUBSCRIBABLE_EVENT_PREFIXES.has(eventPrefix(eventType))
+}
+
+/**
+ * Decide whether granted permissions allow subscribing to an event type.
+ * Returns the denial reason, or null when allowed.
+ */
+export function checkEventAccess(
+  granted: string[],
+  eventType: string,
+): { code: string; message: string } | null {
+  if (!isSubscribableEvent(eventType)) {
+    return {
+      code: 'EVENT_NOT_SUBSCRIBABLE',
+      message: `Event "${eventType}" is not subscribable from a mini-app (unknown or high-frequency/internal).`,
+    }
+  }
+  if (!granted.includes(`events:${eventPrefix(eventType)}`)) {
+    return {
+      code: 'PERMISSION_REQUIRED',
+      message: `This app needs the "events:${eventPrefix(eventType)}" permission to subscribe to "${eventType}". Declare it in app.json and have the user approve it.`,
+    }
+  }
+  return null
+}
+
 /**
  * Resources that must NEVER be reachable through the generic platform gateway,
  * regardless of granted permissions. Covers auth/account internals, secret
@@ -52,7 +129,8 @@ export function isKnownPermission(permission: string): boolean {
   return (
     (MINI_APP_STATIC_PERMISSIONS as readonly string[]).includes(permission) ||
     SECRET_PERMISSION_RE.test(permission) ||
-    PLATFORM_PERMISSION_RE.test(permission)
+    PLATFORM_PERMISSION_RE.test(permission) ||
+    EVENTS_PERMISSION_RE.test(permission)
   )
 }
 

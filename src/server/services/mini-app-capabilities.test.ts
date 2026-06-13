@@ -14,17 +14,42 @@ import { resolve, join } from 'path'
 const STATIC_PERMISSIONS = ['llm', 'agent:inform', 'agent:task', 'channels:send'] as const
 const SECRET_PERMISSION_RE = /^secrets:[A-Za-z0-9_.-]{1,128}$/
 const PLATFORM_PERMISSION_RE = /^platform:[a-z][a-z0-9-]*:(read|write)$/
+const EVENTS_PERMISSION_RE = /^events:[a-z][a-z0-9-]*$/
 
 const PLATFORM_GATEWAY_DENIED_RESOURCES = new Set([
   'auth', 'onboarding', 'vault', 'database', 'mini-apps', 'users', 'sse', 'health', 'uploads',
+])
+
+const SUBSCRIBABLE_EVENT_PREFIXES = new Set([
+  'chat', 'task', 'cron', 'channel', 'notification', 'contact', 'project',
+  'ticket', 'memory', 'trigger', 'webhook', 'workspace', 'miniapp', 'agent',
+])
+const EVENT_TYPE_DENYLIST = new Set([
+  'chat:token', 'chat:reasoning-token', 'chat:reasoning-done', 'chat:tool-call-start',
+  'chat:tool-call', 'chat:tool-result', 'chat:token-usage', 'task:token-usage',
+  'task:todos', 'queue:update', 'agent:read', 'agent:active-project',
 ])
 
 function isKnownPermission(permission: string): boolean {
   return (
     (STATIC_PERMISSIONS as readonly string[]).includes(permission) ||
     SECRET_PERMISSION_RE.test(permission) ||
-    PLATFORM_PERMISSION_RE.test(permission)
+    PLATFORM_PERMISSION_RE.test(permission) ||
+    EVENTS_PERMISSION_RE.test(permission)
   )
+}
+
+function eventPrefix(eventType: string): string {
+  return eventType.split(':')[0] ?? ''
+}
+function isSubscribableEvent(eventType: string): boolean {
+  if (EVENT_TYPE_DENYLIST.has(eventType)) return false
+  return SUBSCRIBABLE_EVENT_PREFIXES.has(eventPrefix(eventType))
+}
+function checkEventAccess(granted: string[], eventType: string): { code: string } | null {
+  if (!isSubscribableEvent(eventType)) return { code: 'EVENT_NOT_SUBSCRIBABLE' }
+  if (!granted.includes(`events:${eventPrefix(eventType)}`)) return { code: 'PERMISSION_REQUIRED' }
+  return null
 }
 
 function resolvePlatformResource(subPath: string, method: string): { resource: string; mode: 'read' | 'write' } | null {
@@ -133,6 +158,54 @@ describe('Platform gateway: access decision', () => {
     expect(checkPlatformAccess(['platform:vault:read'], 'vault', 'read')?.code).toBe('RESOURCE_FORBIDDEN')
     expect(checkPlatformAccess(['platform:database:write'], 'database', 'write')?.code).toBe('RESOURCE_FORBIDDEN')
     expect(checkPlatformAccess(['platform:users:read'], 'users', 'read')?.code).toBe('RESOURCE_FORBIDDEN')
+  })
+})
+
+describe('Event subscription: permission form + allowlist', () => {
+  it('accepts events:<prefix> permissions', () => {
+    expect(isKnownPermission('events:task')).toBe(true)
+    expect(isKnownPermission('events:contact')).toBe(true)
+    expect(isKnownPermission('events:channel')).toBe(true)
+  })
+
+  it('rejects malformed event permissions', () => {
+    expect(isKnownPermission('events:')).toBe(false)
+    expect(isKnownPermission('events:Task')).toBe(false)
+    expect(isKnownPermission('events:task:done')).toBe(false)
+  })
+
+  it('maps an event type to its prefix', () => {
+    expect(eventPrefix('task:done')).toBe('task')
+    expect(eventPrefix('channel:message-received')).toBe('channel')
+  })
+
+  it('allows lifecycle events, blocks high-frequency/internal ones', () => {
+    expect(isSubscribableEvent('task:done')).toBe(true)
+    expect(isSubscribableEvent('contact:created')).toBe(true)
+    expect(isSubscribableEvent('channel:message-received')).toBe(true)
+    // Firehose / internal — never subscribable even though prefix is allowed
+    expect(isSubscribableEvent('chat:token')).toBe(false)
+    expect(isSubscribableEvent('queue:update')).toBe(false)
+    expect(isSubscribableEvent('task:token-usage')).toBe(false)
+    // Unknown prefix
+    expect(isSubscribableEvent('provider:created')).toBe(false)
+  })
+})
+
+describe('Event subscription: access decision', () => {
+  it('allows when the prefix permission is granted', () => {
+    expect(checkEventAccess(['events:task'], 'task:done')).toBeNull()
+    expect(checkEventAccess(['events:contact'], 'contact:created')).toBeNull()
+  })
+
+  it('denies a non-subscribable event before checking permission', () => {
+    expect(checkEventAccess(['events:chat'], 'chat:token')?.code).toBe('EVENT_NOT_SUBSCRIBABLE')
+    expect(checkEventAccess(['events:queue'], 'queue:update')?.code).toBe('EVENT_NOT_SUBSCRIBABLE')
+  })
+
+  it('denies a subscribable event without the matching permission', () => {
+    expect(checkEventAccess([], 'task:done')?.code).toBe('PERMISSION_REQUIRED')
+    expect(checkEventAccess(['events:contact'], 'task:done')?.code).toBe('PERMISSION_REQUIRED')
   })
 
   it('accepts well-formed secret permissions', () => {

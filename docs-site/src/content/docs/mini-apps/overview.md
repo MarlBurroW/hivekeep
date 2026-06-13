@@ -19,6 +19,7 @@ A mini-app is a self-contained web application (HTML + JSX + CSS) stored in Hive
 - **Platform notifications** from the backend (notification center + external channels)
 - **Capability permissions**: user-approved access to vault secrets, LLM completions, the maintainer Agent (messages and sub-tasks), and messaging channels
 - **Platform API**: build UI extensions that manage Hivekeep's own resources (contacts, crons, projects…) through the same REST API the settings pages use, gated per resource
+- **Event-reactive**: a background backend can subscribe to platform events (`ctx.on("task:done" | "channel:message-received" | "contact:created"…)`) and act the moment something happens, gated per event family
 - **Theme-aware** with automatic light/dark mode support
 - **Snapshots** for versioning and rollback
 
