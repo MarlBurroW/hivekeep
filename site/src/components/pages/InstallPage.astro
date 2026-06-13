@@ -156,7 +156,7 @@ const prereqs = t.install.prereqs.items;
         return
       }
       // Conversion signal: copying the recommended install one-liner.
-      try { (window as any).plausible?.('Install Copy', { props: { source: 'install' } }) } catch { /* analytics absent */ }
+      try { (window as any).umami?.track('Install Copy', { source: 'install' }) } catch { /* analytics absent */ }
       btn.classList.add('done')
       if (label) label.textContent = copiedLabel
       setTimeout(() => {

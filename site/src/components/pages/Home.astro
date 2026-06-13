@@ -615,7 +615,7 @@ const fxCount = fxCategories.reduce((n, c) => n + c.cards.length, 0);
       }
       // Conversion signal: copying the install one-liner. Lets campaign
       // referrers be measured against real install intent, not just visits.
-      try { (window as any).plausible?.('Install Copy', { props: { source: 'home' } }) } catch { /* analytics absent */ }
+      try { (window as any).umami?.track('Install Copy', { source: 'home' }) } catch { /* analytics absent */ }
       btn.classList.add('copied')
       setTimeout(() => btn.classList.remove('copied'), 1500)
     })

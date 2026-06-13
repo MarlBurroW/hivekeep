@@ -8,6 +8,7 @@ import {
   parseLocaleFromPath,
   type Locale,
 } from '../i18n';
+import { UMAMI_SCRIPT_URL, UMAMI_WEBSITE_ID } from '../config/analytics';
 
 interface Props {
   /** Page-specific title. Rendered as-is when `titleSuffix` is false, otherwise
@@ -148,20 +149,13 @@ const xDefaultHref = new URL(localePath(DEFAULT_LOCALE, basePath), Astro.site).h
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
-  {/* Privacy-friendly, cookieless analytics (Plausible). Production build only,
-       so `astro dev` never tracks. The per-site `pa-…` script identifies the
-       site; measurement options (UTM/referrers, outbound links, custom events)
-       are toggled in the Plausible dashboard. The inline init also queues manual
-       goal events (e.g. `Install Copy`) fired before the async script loads. No
-       cookies, no personal data, no consent banner required. */}
-  {import.meta.env.PROD && (
-    <Fragment>
-      <script is:inline async src="https://plausible.io/js/pa-HUgRYNVl7nfFKFnWzCErF.js"></script>
-      <script is:inline>
-        window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
-        plausible.init()
-      </script>
-    </Fragment>
+  {/* Privacy-friendly, cookieless analytics (self-hosted Umami). Production
+       build only (so `astro dev` never tracks) and only when configured in
+       src/config/analytics.ts. Umami auto-collects referrers + UTM campaign
+       params; the `Install Copy` custom event (window.umami.track) measures
+       install intent. No cookies, no personal data, no consent banner needed. */}
+  {import.meta.env.PROD && UMAMI_SCRIPT_URL && UMAMI_WEBSITE_ID && (
+    <script is:inline defer src={UMAMI_SCRIPT_URL} data-website-id={UMAMI_WEBSITE_ID}></script>
   )}
 </head>
 <body>
