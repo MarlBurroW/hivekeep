@@ -1,0 +1,1749 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-bguv2lll"> <head><script>
+	try {
+		if (typeof localStorage !== 'undefined' && !localStorage.getItem('starlight-theme')) {
+			localStorage.setItem('starlight-theme', 'dark');
+		}
+	} catch (e) {}
+</script><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>REST API | Hivekeep Docs</title><link rel="canonical" href="https://hivekeep.app/docs/api/rest/"/><link rel="sitemap" href="/docs/sitemap-index.xml"/><link rel="shortcut icon" href="/docs/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v5.18.0"/><meta name="generator" content="Starlight v0.37.6"/><meta property="og:title" content="REST API"/><meta property="og:type" content="article"/><meta property="og:url" content="https://hivekeep.app/docs/api/rest/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Hivekeep REST API endpoint reference."/><meta property="og:site_name" content="Hivekeep Docs"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Hivekeep REST API endpoint reference."/><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/docs/_astro/print.DNXP8c50.css" media="print"><link rel="stylesheet" href="/docs/_astro/index.do1vWj7m.css"><script type="module" src="/docs/_astro/page.B1D-nYk3.js"></script></head> <body class="astro-bguv2lll"> <a href="#_top" class="astro-7q3lir66">Skip to content</a>  <div class="page sl-flex astro-vrdttmbt"> <header class="header astro-vrdttmbt"><div class="kb-announcement-bar astro-3ef6ksr2" id="kb-announcement" aria-label="Announcement"> <a href="/hivekeep/" class="astro-3ef6ksr2"> <span class="kb-announcement-dot astro-3ef6ksr2" aria-hidden="true"></span>
+Hivekeep is in early development
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="astro-3ef6ksr2"><path d="m9 18 6-6-6-6" class="astro-3ef6ksr2"></path></svg> </a> <button class="kb-announcement-dismiss astro-3ef6ksr2" id="kb-dismiss" aria-label="Dismiss announcement" title="Dismiss"> <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="astro-3ef6ksr2"><path d="M18 6 6 18" class="astro-3ef6ksr2"></path><path d="m6 6 12 12" class="astro-3ef6ksr2"></path></svg> </button> </div> <div class="header sl-flex astro-3ef6ksr2"> <div class="title-wrapper sl-flex astro-3ef6ksr2"> <a href="/docs/" class="site-title sl-flex astro-idrpryed">  <img class="astro-idrpryed" alt="Hivekeep" src="/docs/_astro/logo.s6KAeEdb.svg" width="256" height="256">  <span class="astro-idrpryed" translate="no"> Hivekeep Docs </span> </a>  </div> <div class="sl-flex print:hidden astro-3ef6ksr2"> <site-search class="astro-3ef6ksr2 astro-v37mnknz" data-translations="{&#34;placeholder&#34;:&#34;Search&#34;}"> <button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-v37mnknz"> <svg aria-hidden="true" class="astro-v37mnknz astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg> <span class="sl-hidden md:sl-block astro-v37mnknz" aria-hidden="true">Search</span> <kbd class="sl-hidden md:sl-flex astro-v37mnknz" style="display: none;"> <kbd class="astro-v37mnknz">Ctrl</kbd><kbd class="astro-v37mnknz">K</kbd> </kbd> </button> <dialog style="padding:0" aria-label="Search" class="astro-v37mnknz"> <div class="dialog-frame sl-flex astro-v37mnknz">  <button data-close-modal class="sl-flex md:sl-hidden astro-v37mnknz"> Cancel </button> <div class="search-container astro-v37mnknz"> <div id="starlight__search" class="astro-v37mnknz"></div> </div> </div> </dialog> </site-search>  <script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script> <script type="module" src="/docs/_astro/Search.astro_astro_type_script_index_0_lang.CMOHWuLo.js"></script>   </div> <div class="sl-hidden md:sl-flex print:hidden right-group astro-3ef6ksr2"> <a class="kb-back-to-site astro-3ef6ksr2" href="/hivekeep/"> <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="astro-3ef6ksr2"><path d="m12 19-7-7 7-7" class="astro-3ef6ksr2"></path><path d="M19 12H5" class="astro-3ef6ksr2"></path></svg> <span class="astro-3ef6ksr2">Back to site</span> </a> <div class="sl-flex social-icons astro-3ef6ksr2"> <a href="https://github.com/MarlBurroW/hivekeep" rel="me" class="sl-flex astro-wy4te6ga"><span class="sr-only astro-wy4te6ga">GitHub</span><svg aria-hidden="true" class="astro-wy4te6ga astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a> </div> <starlight-theme-select>  <label style="--sl-select-width: 6.25em" class="astro-4yphtoen"> <span class="sr-only astro-4yphtoen">Select theme</span> <svg aria-hidden="true" class="icon label-icon astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg> <select autocomplete="off" class="astro-4yphtoen"> <option value="dark" class="astro-4yphtoen">Dark</option><option value="light" class="astro-4yphtoen">Light</option><option value="auto" selected class="astro-4yphtoen">Auto</option> </select> <svg aria-hidden="true" class="icon caret astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg> </label>  </starlight-theme-select>  <script>
+	StarlightThemeProvider.updatePickers();
+</script> <script type="module">const r="starlight-theme",o=e=>e==="auto"||e==="dark"||e==="light"?e:"auto",c=()=>o(typeof localStorage<"u"&&localStorage.getItem(r));function n(e){typeof localStorage<"u"&&localStorage.setItem(r,e==="light"||e==="dark"?e:"")}const l=()=>matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";function t(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e==="auto"?l():e,n(e)}matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>{c()==="auto"&&t("auto")});class s extends HTMLElement{constructor(){super(),t(c()),this.querySelector("select")?.addEventListener("change",a=>{a.currentTarget instanceof HTMLSelectElement&&t(o(a.currentTarget.value))})}}customElements.define("starlight-theme-select",s);</script> <script type="module">class s extends HTMLElement{constructor(){super();const e=this.querySelector("select");e&&(e.addEventListener("change",t=>{t.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=t.currentTarget.value)}),window.addEventListener("pageshow",t=>{if(!t.persisted)return;const n=e.querySelector("option[selected]")?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}}customElements.define("starlight-lang-select",s);</script> </div> </div> <div class="kb-scroll-progress astro-3ef6ksr2" aria-hidden="true"></div>  <script type="module">const n=document.querySelector("header.header");if(n){const e=()=>{const t=n.offsetHeight,s=document.documentElement;s.style.setProperty("--kb-header-height",`${t}px`),s.style.scrollPaddingTop=`calc(${t}px + 1rem)`};e(),"ResizeObserver"in window&&new ResizeObserver(e).observe(n),window.addEventListener("resize",e,{passive:!0})}const o=document.querySelector(".kb-scroll-progress");if(o){const e=()=>{const t=document.documentElement.scrollHeight-window.innerHeight,s=t>0?Math.min(window.scrollY/t,1):0;o.style.width=`${s*100}%`,o.style.opacity=window.scrollY>40?"1":"0"};window.addEventListener("scroll",e,{passive:!0}),e()}const i=document.getElementById("kb-announcement"),c=document.getElementById("kb-dismiss"),d="kb-announcement-dismissed";i&&(localStorage.getItem(d)==="1"&&i.classList.add("dismissed"),c?.addEventListener("click",e=>{e.preventDefault(),i.classList.add("dismissed"),localStorage.setItem(d,"1")}));</script></header> <nav class="sidebar print:hidden astro-vrdttmbt" aria-label="Main"> <starlight-menu-button class="print:hidden astro-jif73yzw"> <button aria-expanded="false" aria-label="Menu" aria-controls="starlight__sidebar" class="sl-flex md:sl-hidden astro-jif73yzw"> <svg aria-hidden="true" class="open-menu astro-jif73yzw astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg> <svg aria-hidden="true" class="close-menu astro-jif73yzw astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg> </button> </starlight-menu-button> <script type="module">class s extends HTMLElement{constructor(){super(),this.btn=this.querySelector("button"),this.btn.addEventListener("click",()=>this.toggleExpanded());const t=this.closest("nav");t&&t.addEventListener("keyup",e=>this.closeOnEscape(e))}setExpanded(t){this.setAttribute("aria-expanded",String(t)),document.body.toggleAttribute("data-mobile-menu-expanded",t)}toggleExpanded(){this.setExpanded(this.getAttribute("aria-expanded")!=="true")}closeOnEscape(t){t.code==="Escape"&&(this.setExpanded(!1),this.btn.focus())}}customElements.define("starlight-menu-button",s);</script>   <div id="starlight__sidebar" class="sidebar-pane astro-vrdttmbt"> <div class="sidebar-content sl-flex astro-vrdttmbt"> <sl-sidebar-state-persist data-hash="0yrw4tc" class="astro-kku4brbg"> <script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script>  <ul class="top-level astro-3ii7xxms"> <li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Getting Started</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="0"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/getting-started/installation/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Installation</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/getting-started/configuration/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Configuration</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/getting-started/updating/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Updating</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/queenie/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Queenie (Guided Setup)</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/getting-started/first-agent/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Your First Agent</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/guides/autonomy-quickstart/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Autonomy Quickstart</span>  </a> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Core Concepts</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="1"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/agents/overview/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Agents</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/agents/system-prompts/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">System Prompts</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/agents/tools/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Native Tools</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/agents/memory/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Memory</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/memory/how-it-works/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">How Memory Works</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/memory/configuration/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Memory Configuration</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/guides/model-selection/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Choosing a Model</span>  </a> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Capabilities</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="2"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/features/toolboxes/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Toolboxes</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/scout/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Scout</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/connected-accounts/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Connected Accounts</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/projects/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Projects and Tickets</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/files/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Files (Workspace Browser)</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/terminal/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Terminal</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/automation/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Automation, Crons and Webhooks</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/vault/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Vault and Secrets</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/multi-user/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Multi-User and the Household</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/mcp/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">MCP (Model Context Protocol)</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/features/token-usage/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Token Usage &amp; Cost</span>  </a> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Agents Everywhere</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="3"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/channels/overview/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Channels Overview</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/channels/telegram/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Telegram</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/channels/discord/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Discord</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/channels/slack/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Slack</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/channels/whatsapp/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">WhatsApp</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/channels/signal/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Signal</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/channels/matrix/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Matrix</span>  </a> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Automation</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="4"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Blueprints</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="5"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/guides/blueprints/github-issue-processor/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">GitHub Issue Processor</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/guides/blueprints/daily-digest/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Daily Digest</span>  </a> </li> </ul>  </details> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Extending Hivekeep</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="6"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/mini-apps/overview/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps Overview</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/mini-apps/getting-started/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps: Getting Started</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/mini-apps/components/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps: Components</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/mini-apps/hooks/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps: Hooks</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/mini-apps/sdk-reference/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps: SDK Reference</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/mini-apps/guidelines/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps: Guidelines</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/mini-apps/backend/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps: Backend (_server.js)</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/mini-apps/examples/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mini-Apps: Examples</span>  </a> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Plugins</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="7"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/plugins/overview/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Overview</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/plugins/developing/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Developing Plugins</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/plugins/tutorial-mistral/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Tutorial: Mistral Provider</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/plugins/api/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Plugin API</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/plugins/store/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Plugin Registry</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/plugins/migrating-from-01/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Migrating from 0.1</span>  </a> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Providers</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="8"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/providers/supported/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Supported Providers</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/providers/model-registry/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Model Registry</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/providers/custom/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Adding Custom</span>  </a> </li> </ul>  </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">API Reference</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="9"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/docs/api/rest/" aria-current="page" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">REST Endpoints</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/docs/api/sse/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">SSE Events</span>  </a> </li> </ul>  </details> </li> </ul>   <script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script> </sl-sidebar-state-persist>  <div class="md:sl-hidden"> <div class="kb-mobile-footer astro-lbnvevm2"> <div class="mobile-preferences sl-flex astro-wu23bvmt"> <div class="social-icons astro-wu23bvmt"> <a href="https://github.com/MarlBurroW/hivekeep" rel="me" class="sl-flex astro-wy4te6ga"><span class="sr-only astro-wy4te6ga">GitHub</span><svg aria-hidden="true" class="astro-wy4te6ga astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a> </div> <starlight-theme-select>  <label style="--sl-select-width: 6.25em" class="astro-4yphtoen"> <span class="sr-only astro-4yphtoen">Select theme</span> <svg aria-hidden="true" class="icon label-icon astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg> <select autocomplete="off" class="astro-4yphtoen"> <option value="dark" class="astro-4yphtoen">Dark</option><option value="light" class="astro-4yphtoen">Light</option><option value="auto" selected class="astro-4yphtoen">Auto</option> </select> <svg aria-hidden="true" class="icon caret astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg> </label>  </starlight-theme-select>  <script>
+	StarlightThemeProvider.updatePickers();
+</script>   </div>  </div>  </div>  </div> </div> </nav> <div class="main-frame astro-vrdttmbt">     <script type="module">const a=document.getElementById("starlight__sidebar"),n=a?.querySelector("sl-sidebar-state-persist"),o="sl-sidebar-state",i=()=>{let t=[];const e=n?.dataset.hash||"";try{const s=sessionStorage.getItem(o),r=JSON.parse(s||"{}");Array.isArray(r.open)&&r.hash===e&&(t=r.open)}catch{}return{hash:e,open:t,scroll:a?.scrollTop||0}},c=t=>{try{sessionStorage.setItem(o,JSON.stringify(t))}catch{}},d=()=>c(i()),l=(t,e)=>{const s=i();s.open[e]=t,c(s)};n?.addEventListener("click",t=>{if(!(t.target instanceof Element))return;const e=t.target.closest("summary")?.closest("details");if(!e)return;const s=e.querySelector("sl-sidebar-restore"),r=parseInt(s?.dataset.index||"");isNaN(r)||l(!e.open,r)});addEventListener("visibilitychange",()=>{document.visibilityState==="hidden"&&d()});addEventListener("pageHide",d);</script> <div class="lg:sl-flex astro-67yu43on"> <aside class="right-sidebar-container print:hidden astro-67yu43on"> <div class="right-sidebar astro-67yu43on"> <script type="module" src="/docs/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.hwBsy0Mo.js"></script><script type="module" src="/docs/_astro/TableOfContents.astro_astro_type_script_index_0_lang.FuRcXuRY.js"></script><div class="lg:sl-hidden astro-pb3aqygn"><div class="kb-mobile-toc astro-kasrnjty"> <mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-doynk5tl"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-doynk5tl"><details id="starlight__mobile-toc" class="astro-doynk5tl"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-doynk5tl"><span class="toggle sl-flex astro-doynk5tl">On this page<svg aria-hidden="true" class="caret astro-doynk5tl astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-doynk5tl"></span></summary><div class="dropdown astro-doynk5tl"><ul class="isMobile astro-g2bywc46" style="--depth: 0;"> <li class="astro-g2bywc46" style="--depth: 0;"> <a href="#_top" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Overview</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#authentication" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Authentication</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#error-format" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Error Format</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#agents" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Agents</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#messages" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Messages</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#reactions" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Reactions</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#compacting" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Compacting</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#memories" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Memories</span> </a> <ul class="isMobile astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#agent-scoped" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Agent-scoped</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#global-maintenance" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Global maintenance</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#knowledge" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Knowledge</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#channels" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Channels</span> </a> <ul class="isMobile astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#channel-webhooks" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Channel webhooks</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#mini-apps" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Mini-Apps</span> </a> <ul class="isMobile astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-files" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App files</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-storage-key-value" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App storage (key-value)</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-snapshots" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App snapshots</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-backend" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App backend</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-serving" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App serving</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-sdk" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App SDK</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#quick-sessions" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Quick Sessions</span> </a> <ul class="isMobile astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#agent-scoped-1" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Agent-scoped</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#session-detail" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Session detail</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#tasks" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Tasks</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#plugins" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Plugins</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#providers" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Providers</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#contacts" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Contacts</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#mcp-servers" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">MCP Servers</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#cron-jobs" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Cron Jobs</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#webhooks" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Webhooks</span> </a> <ul class="isMobile astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#incoming-webhook-endpoint" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Incoming webhook endpoint</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#vault" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Vault</span> </a> <ul class="isMobile astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#vaults" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Vaults</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#entries" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Entries</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#attachments" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Attachments</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#types" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Types</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#file-storage" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">File Storage</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#files" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Files</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#workspace-files" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Workspace Files</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#notifications" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Notifications</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#prompts" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Prompts</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#users" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Users</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#invitations" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Invitations</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#settings" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Settings</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#current-user" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Current User</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#shared-links" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Shared Links</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#platform-updates" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Platform Updates</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#usage-admin-only" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Usage (admin only)</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#sse" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">SSE</span> </a>  </li> </ul> </div></details></nav></mobile-starlight-toc> </div> </div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-pb3aqygn"><div class="sl-container astro-pb3aqygn"><div class="kb-toc-wrap astro-xvrfupwn"> <starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-g2bywc46" style="--depth: 0;"> <li class="astro-g2bywc46" style="--depth: 0;"> <a href="#_top" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Overview</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#authentication" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Authentication</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#error-format" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Error Format</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#agents" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Agents</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#messages" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Messages</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#reactions" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Reactions</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#compacting" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Compacting</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#memories" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Memories</span> </a> <ul class="astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#agent-scoped" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Agent-scoped</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#global-maintenance" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Global maintenance</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#knowledge" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Knowledge</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#channels" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Channels</span> </a> <ul class="astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#channel-webhooks" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Channel webhooks</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#mini-apps" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Mini-Apps</span> </a> <ul class="astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-files" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App files</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-storage-key-value" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App storage (key-value)</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-snapshots" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App snapshots</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-backend" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App backend</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-serving" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App serving</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#mini-app-sdk" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Mini-App SDK</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#quick-sessions" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Quick Sessions</span> </a> <ul class="astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#agent-scoped-1" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Agent-scoped</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#session-detail" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Session detail</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#tasks" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Tasks</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#plugins" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Plugins</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#providers" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Providers</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#contacts" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Contacts</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#mcp-servers" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">MCP Servers</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#cron-jobs" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Cron Jobs</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#webhooks" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Webhooks</span> </a> <ul class="astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#incoming-webhook-endpoint" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Incoming webhook endpoint</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#vault" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Vault</span> </a> <ul class="astro-g2bywc46" style="--depth: 1;"> <li class="astro-g2bywc46" style="--depth: 1;"> <a href="#vaults" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Vaults</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#entries" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Entries</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#attachments" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Attachments</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 1;"> <a href="#types" class="astro-g2bywc46" style="--depth: 1;"> <span class="astro-g2bywc46" style="--depth: 1;">Types</span> </a>  </li> </ul>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#file-storage" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">File Storage</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#files" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Files</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#workspace-files" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Workspace Files</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#notifications" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Notifications</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#prompts" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Prompts</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#users" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Users</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#invitations" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Invitations</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#settings" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Settings</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#current-user" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Current User</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#shared-links" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Shared Links</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#platform-updates" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Platform Updates</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#usage-admin-only" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">Usage (admin only)</span> </a>  </li><li class="astro-g2bywc46" style="--depth: 0;"> <a href="#sse" class="astro-g2bywc46" style="--depth: 0;"> <span class="astro-g2bywc46" style="--depth: 0;">SSE</span> </a>  </li> </ul> </nav></starlight-toc> </div> </div></div> </div> </aside> <div class="main-pane astro-67yu43on">   <main data-pagefind-body class="astro-bguv2lll" lang="en" dir="ltr">    <div class="content-panel astro-7nkwcw3z"> <div class="sl-container astro-7nkwcw3z"> <h1 id="_top" class="kb-page-title astro-guvttfii">REST API</h1>  </div> </div>  <div class="content-panel astro-7nkwcw3z"> <div class="sl-container astro-7nkwcw3z"> <div class="sl-markdown-content"> <p>Hivekeep exposes a REST API used by the web UI and available for external integrations. All endpoints are under <code dir="auto">/api/</code> and require authentication unless noted otherwise.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="authentication">Authentication</h2><a class="sl-anchor-link" href="#authentication"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Authentication”</span></a></div>
+<p>Authenticate using either:</p>
+<ul>
+<li><strong>API key header:</strong> <code dir="auto">X-API-Key: &#x3C;your-api-key></code></li>
+<li><strong>Session cookie</strong> set during login</li>
+</ul>
+<p>Auth routes (<code dir="auto">/api/auth/*</code>) are handled by <a href="https://www.better-auth.com/">Better Auth</a> and don’t require pre-authentication. Onboarding routes (<code dir="auto">/api/onboarding/*</code>) are also unauthenticated (first-run setup).</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="error-format">Error Format</h2><a class="sl-anchor-link" href="#error-format"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Error Format”</span></a></div>
+<p>All API routes return JSON. Errors use a consistent envelope with a machine-readable <code dir="auto">code</code> and a human-readable <code dir="auto">message</code>:</p>
+<div class="expressive-code"><link rel="stylesheet" href="/docs/_astro/ec.alrlf.css"><script type="module" src="/docs/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="json"><code><div class="ec-line"><div class="code"><span style="--0:#918DAB;--1:#625F77">{</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#918DAB;--1:#625F77">"</span><span style="--0:#9CCFD8;--1:#3D6971">error</span><span style="--0:#918DAB;--1:#625F77">"</span><span style="--0:#918DAB;--1:#625F77">:</span><span style="--0:#E0DEF4;--1:#575279"> </span><span style="--0:#918DAB;--1:#625F77">{</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#918DAB;--1:#625F77">"</span><span style="--0:#9CCFD8;--1:#3D6971">code</span><span style="--0:#918DAB;--1:#625F77">"</span><span style="--0:#918DAB;--1:#625F77">:</span><span style="--0:#E0DEF4;--1:#575279"> </span><span style="--0:#F6C177;--1:#855A1E">"PROVIDER_NOT_FOUND"</span><span style="--0:#918DAB;--1:#625F77">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#918DAB;--1:#625F77">"</span><span style="--0:#9CCFD8;--1:#3D6971">message</span><span style="--0:#918DAB;--1:#625F77">"</span><span style="--0:#918DAB;--1:#625F77">:</span><span style="--0:#E0DEF4;--1:#575279"> </span><span style="--0:#F6C177;--1:#855A1E">"Provider not found"</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#918DAB;--1:#625F77">}</span></div></div><div class="ec-line"><div class="code"><span style="--0:#918DAB;--1:#625F77">}</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="{  &#x22;error&#x22;: {    &#x22;code&#x22;: &#x22;PROVIDER_NOT_FOUND&#x22;,    &#x22;message&#x22;: &#x22;Provider not found&#x22;  }}"><div></div></button></div></figure></div>
+<p>The HTTP status reflects the error class (<code dir="auto">400</code> validation, <code dir="auto">401</code> unauthenticated, <code dir="auto">403</code> forbidden, <code dir="auto">404</code> not found, <code dir="auto">409</code> conflict, <code dir="auto">429</code> rate-limited, <code dir="auto">500</code> server error). Common codes include <code dir="auto">VALIDATION_ERROR</code>, <code dir="auto">NOT_FOUND</code>, <code dir="auto">UNAUTHORIZED</code>, <code dir="auto">FORBIDDEN</code>, and resource-specific codes such as <code dir="auto">PROVIDER_NOT_FOUND</code> or <code dir="auto">SESSION_EXPIRED</code>.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="agents">Agents</h2><a class="sl-anchor-link" href="#agents"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Agents”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents</code></td><td>List all Agents</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents</code></td><td>Create a new Agent</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id</code></td><td>Get Agent details</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/agents/:id</code></td><td>Update an Agent</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/agents/:id</code></td><td>Delete an Agent</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id/tools</code></td><td>List available tools (grouped by domain)</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id/context-usage</code></td><td>Get context window usage</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id/context-preview</code></td><td>Get full LLM context preview (system prompt, messages, tools, token estimates). Accepts <code dir="auto">?taskId</code> or <code dir="auto">?sessionId</code> query params</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:id/avatar</code></td><td>Upload avatar (multipart)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:id/avatar/generate</code></td><td>Generate avatar with AI</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/avatar/preview</code></td><td>Preview generated avatar</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/generate-config</code></td><td>AI-generate Agent config from description</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id/export</code></td><td>Export Agent as archive</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/import</code></td><td>Import Agent from archive</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="messages">Messages</h2><a class="sl-anchor-link" href="#messages"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Messages”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/messages</code></td><td>Get conversation history</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/messages</code></td><td>Send a message to an Agent</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/messages/inject</code></td><td>Inject a message with high priority (aborts current stream if active, used by <code dir="auto">/btw</code> command)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="reactions">Reactions</h2><a class="sl-anchor-link" href="#reactions"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Reactions”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/messages/:messageId/reactions</code></td><td>List reactions on a message</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/messages/:messageId/reactions</code></td><td>Add or toggle a reaction</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="compacting">Compacting</h2><a class="sl-anchor-link" href="#compacting"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Compacting”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id/compacting/summaries</code></td><td>List compacting summaries (with date ranges, token estimates, depth)</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id/compacting/snapshots</code></td><td>List compacting summaries (backwards-compatible alias, returns legacy format)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:id/compacting/run</code></td><td>Trigger manual compacting</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:id/compacting/purge</code></td><td>Purge compacting data (deactivate all active summaries)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:id/compacting/rollback</code></td><td>Rollback to a summary (archives newer summaries)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="memories">Memories</h2><a class="sl-anchor-link" href="#memories"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Memories”</span></a></div>
+<p>Memories can be accessed via Agent-scoped routes or global maintenance routes.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="agent-scoped">Agent-scoped</h3><a class="sl-anchor-link" href="#agent-scoped"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Agent-scoped”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:id/memories</code></td><td>List memories for an Agent</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:id/memories</code></td><td>Create a memory</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/agents/:id/memories/:memoryId</code></td><td>Update a memory</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/agents/:id/memories/:memoryId</code></td><td>Delete a memory</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="global-maintenance">Global maintenance</h3><a class="sl-anchor-link" href="#global-maintenance"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Global maintenance”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/memories</code></td><td>List all memories (cross-Agent)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/memories/backfill-importance</code></td><td>Backfill importance scores</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/memories/consolidate</code></td><td>Run memory consolidation</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/memories/reembed</code></td><td>Re-embed all memories</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="knowledge">Knowledge</h2><a class="sl-anchor-link" href="#knowledge"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Knowledge”</span></a></div>
+<p>Agent-scoped knowledge base (RAG document sources).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/knowledge</code></td><td>List knowledge sources</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/knowledge</code></td><td>Add a knowledge source</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/knowledge/search</code></td><td>Search knowledge</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/knowledge/:sourceId</code></td><td>Get source details</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/agents/:agentId/knowledge/:sourceId</code></td><td>Delete a source</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/knowledge/:sourceId/reprocess</code></td><td>Reprocess a source</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="channels">Channels</h2><a class="sl-anchor-link" href="#channels"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Channels”</span></a></div>
+<p>Channels are managed globally (not scoped to an Agent).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/channels</code></td><td>List all channels</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels</code></td><td>Create a channel</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/channels/pending-count</code></td><td>Get pending message counts</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/channels/:id</code></td><td>Get channel details</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/channels/:id</code></td><td>Update a channel</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/channels/:id</code></td><td>Delete a channel</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels/:id/activate</code></td><td>Activate a channel</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels/:id/deactivate</code></td><td>Deactivate a channel</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels/:id/test</code></td><td>Test channel configuration</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/channels/:id/user-mappings</code></td><td>List user mappings</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels/:id/user-mappings/:mapId/approve</code></td><td>Approve a user mapping</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="channel-webhooks">Channel webhooks</h3><a class="sl-anchor-link" href="#channel-webhooks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Channel webhooks”</span></a></div>
+<p>Platform-specific webhook endpoints (no auth required, verified by platform signature):</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels/telegram/:channelId</code></td><td>Telegram webhook</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels/slack/webhook/:channelId</code></td><td>Slack Events API</td></tr><tr><td><code dir="auto">GET/POST</code></td><td><code dir="auto">/api/channels/whatsapp/webhook/:channelId</code></td><td>WhatsApp verification &#x26; webhook</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/channels/signal/webhook/:channelId</code></td><td>Signal webhook</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="mini-apps">Mini-Apps</h2><a class="sl-anchor-link" href="#mini-apps"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Mini-Apps”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps</code></td><td>List all mini-apps</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mini-apps</code></td><td>Create a mini-app</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id</code></td><td>Get mini-app details</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/mini-apps/:id</code></td><td>Update a mini-app</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/mini-apps/:id</code></td><td>Delete a mini-app</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/by-slug/:agentId/:slug</code></td><td>Get mini-app by Agent + slug</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/gallery/browse</code></td><td>Browse mini-app gallery</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mini-apps/:id/generate-icon</code></td><td>Generate an icon with AI</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="mini-app-files">Mini-App files</h3><a class="sl-anchor-link" href="#mini-app-files"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Mini-App files”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/files</code></td><td>List app files</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/files/*</code></td><td>Read a file</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/mini-apps/:id/files/*</code></td><td>Write a file</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/mini-apps/:id/files/*</code></td><td>Delete a file</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="mini-app-storage-key-value">Mini-App storage (key-value)</h3><a class="sl-anchor-link" href="#mini-app-storage-key-value"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Mini-App storage (key-value)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/storage</code></td><td>List all keys</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/storage/:key</code></td><td>Get a value</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/mini-apps/:id/storage/:key</code></td><td>Set a value</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/mini-apps/:id/storage/:key</code></td><td>Delete a key</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/mini-apps/:id/storage</code></td><td>Clear all storage</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="mini-app-snapshots">Mini-App snapshots</h3><a class="sl-anchor-link" href="#mini-app-snapshots"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Mini-App snapshots”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/snapshots</code></td><td>List snapshots</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mini-apps/:id/snapshots</code></td><td>Create a snapshot</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mini-apps/:id/snapshots/:version/rollback</code></td><td>Rollback to snapshot</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="mini-app-backend">Mini-App backend</h3><a class="sl-anchor-link" href="#mini-app-backend"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Mini-App backend”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mini-apps/:id/http</code></td><td>Proxy HTTP request to app backend</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/events</code></td><td>SSE stream from app backend</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/memories/search</code></td><td>Search mini-app memories</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mini-apps/:id/memories</code></td><td>Create a mini-app memory</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="mini-app-serving">Mini-App serving</h3><a class="sl-anchor-link" href="#mini-app-serving"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Mini-App serving”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/serve</code></td><td>Serve mini-app HTML</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/:id/static/*</code></td><td>Serve static assets</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="mini-app-sdk">Mini-App SDK</h3><a class="sl-anchor-link" href="#mini-app-sdk"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Mini-App SDK”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/sdk/hivekeep-sdk.js</code></td><td>SDK JavaScript</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/sdk/hivekeep-react.js</code></td><td>React bindings</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/sdk/hivekeep-components.js</code></td><td>Component library</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/sdk/hivekeep-sdk.css</code></td><td>SDK stylesheet</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mini-apps/sdk/*.d.ts</code></td><td>TypeScript declarations</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="quick-sessions">Quick Sessions</h2><a class="sl-anchor-link" href="#quick-sessions"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Quick Sessions”</span></a></div>
+<p>Ephemeral conversation sessions for quick interactions.</p>
+<p>All session responses include an <code dir="auto">expiresAt</code> field (Unix timestamp in ms, or <code dir="auto">null</code>). Sending a message to an expired session returns <code dir="auto">409 SESSION_EXPIRED</code>.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="agent-scoped-1">Agent-scoped</h3><a class="sl-anchor-link" href="#agent-scoped-1"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Agent-scoped”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/quick-sessions</code></td><td>List sessions for an Agent</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/quick-sessions</code></td><td>Create a session</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="session-detail">Session detail</h3><a class="sl-anchor-link" href="#session-detail"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Session detail”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/quick-sessions/:id</code></td><td>Get session with messages</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/quick-sessions/:id/messages</code></td><td>Send a message</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/quick-sessions/:id/messages/stop</code></td><td>Stop AI generation</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/quick-sessions/:id/close</code></td><td>Close a session</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="tasks">Tasks</h2><a class="sl-anchor-link" href="#tasks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Tasks”</span></a></div>
+<p>Sub-tasks spawned by Agents (inter-Agent delegation, subtasks). Tasks support <strong>concurrency groups</strong>: tasks in the same group are limited to a max number of parallel executions, with excess tasks queued and auto-promoted.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/tasks</code></td><td>List all tasks</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/tasks/:id</code></td><td>Get task details with messages</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/tasks/:id/cancel</code></td><td>Cancel a running task</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/tasks/:id/pause</code></td><td>Pause a running task (preserves state)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/tasks/:id/resume</code></td><td>Resume a paused task, optionally with a message (<code dir="auto">{ message?: string }</code>)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/tasks/:id/inject</code></td><td>Inject a message into a running task (<code dir="auto">{ content: string }</code>), aborts current stream and re-triggers with addendum</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/tasks/:id/force-promote</code></td><td>Force-start a queued task (ignoring concurrency limit)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="plugins">Plugins</h2><a class="sl-anchor-link" href="#plugins"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Plugins”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/plugins</code></td><td>List installed plugins</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/plugins</code></td><td>Install a plugin</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/plugins/:id</code></td><td>Update plugin config</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/plugins/:id</code></td><td>Uninstall a plugin</td></tr></tbody></table>
+<p>See <a href="/docs/plugins/api/">Plugin API</a> for the full plugin store and registry routes.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="providers">Providers</h2><a class="sl-anchor-link" href="#providers"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Providers”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/providers</code></td><td>List providers with status</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/providers</code></td><td>Configure a provider</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/providers/:id</code></td><td>Update provider config</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/providers/:id</code></td><td>Remove provider config</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/providers/:id/test</code></td><td>Test provider connection</td></tr></tbody></table>
+<p>See <a href="/docs/providers/supported/">Providers</a> for the full provider reference.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="contacts">Contacts</h2><a class="sl-anchor-link" href="#contacts"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Contacts”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/contacts</code></td><td>List contacts</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/contacts</code></td><td>Create a contact</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/contacts/:id</code></td><td>Get contact details</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/contacts/:id</code></td><td>Update a contact</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/contacts/:id</code></td><td>Delete a contact</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/contacts/:id/identifiers</code></td><td>Replace all identifiers atomically</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/contacts/:id/identifiers</code></td><td>Add an identifier</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/contacts/:id/identifiers/:identifierId</code></td><td>Update an identifier</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/contacts/:id/identifiers/:identifierId</code></td><td>Remove an identifier</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/contacts/:id/platform-ids</code></td><td>List platform IDs</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/contacts/:id/platform-ids</code></td><td>Add a platform ID</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/contacts/:id/platform-ids/:pidId</code></td><td>Remove a platform ID</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/contacts/:id/notes</code></td><td>Add a note</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/contacts/:id/notes/:noteId</code></td><td>Update a note</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/contacts/:id/notes/:noteId</code></td><td>Delete a note</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="mcp-servers">MCP Servers</h2><a class="sl-anchor-link" href="#mcp-servers"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “MCP Servers”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/mcp-servers</code></td><td>List MCP server configs</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mcp-servers</code></td><td>Add an MCP server</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/mcp-servers/:id</code></td><td>Update MCP server</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/mcp-servers/:id/approve</code></td><td>Approve an MCP server</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/mcp-servers/:id</code></td><td>Remove MCP server</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="cron-jobs">Cron Jobs</h2><a class="sl-anchor-link" href="#cron-jobs"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Cron Jobs”</span></a></div>
+<p>Cron jobs are managed globally (not scoped to an Agent).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/crons</code></td><td>List cron jobs</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/crons</code></td><td>Create a cron job</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/crons/:id</code></td><td>Update a cron job</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/crons/:id/trigger</code></td><td>Trigger a job immediately</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/crons/:id/approve</code></td><td>Approve a pending job</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/crons/:id</code></td><td>Delete a cron job</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="webhooks">Webhooks</h2><a class="sl-anchor-link" href="#webhooks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Webhooks”</span></a></div>
+<p>Webhooks are managed globally.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/webhooks</code></td><td>List webhooks</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/webhooks</code></td><td>Create a webhook</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/webhooks/:id</code></td><td>Update a webhook</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/webhooks/:id</code></td><td>Delete a webhook</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/webhooks/:id/logs</code></td><td>Get webhook execution logs</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/webhooks/:id/regenerate-token</code></td><td>Regenerate webhook token</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/webhooks/:id/test-filter</code></td><td>Test a payload filter against a sample payload</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/webhooks/:id/suggest-fields</code></td><td>Extract field path suggestions from the last received payload</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="incoming-webhook-endpoint">Incoming webhook endpoint</h3><a class="sl-anchor-link" href="#incoming-webhook-endpoint"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Incoming webhook endpoint”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/webhooks/incoming/:webhookId</code></td><td>Receive an incoming webhook (rate-limited)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="vault">Vault</h2><a class="sl-anchor-link" href="#vault"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Vault”</span></a></div>
+<p>Secure storage for secrets and sensitive data.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="vaults">Vaults</h3><a class="sl-anchor-link" href="#vaults"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Vaults”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/vault</code></td><td>List vaults</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/vault</code></td><td>Create a vault</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/vault/:id</code></td><td>Update a vault</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/vault/:id</code></td><td>Delete a vault</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="entries">Entries</h3><a class="sl-anchor-link" href="#entries"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Entries”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/vault/entries</code></td><td>List entries</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/vault/entries</code></td><td>Create an entry</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/vault/entries/:id</code></td><td>Get entry details</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/vault/entries/:id</code></td><td>Update an entry</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/vault/entries/:id</code></td><td>Delete an entry</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="attachments">Attachments</h3><a class="sl-anchor-link" href="#attachments"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Attachments”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/vault/entries/:id/attachments</code></td><td>List attachments</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/vault/entries/:id/attachments</code></td><td>Upload attachment</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/vault/attachments/:id</code></td><td>Download attachment</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/vault/attachments/:id</code></td><td>Delete attachment</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="types">Types</h3><a class="sl-anchor-link" href="#types"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Types”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/vault/types</code></td><td>List vault types</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/vault/types</code></td><td>Create a type</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/vault/types/:id</code></td><td>Update a type</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/vault/types/:id</code></td><td>Delete a type</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="file-storage">File Storage</h2><a class="sl-anchor-link" href="#file-storage"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “File Storage”</span></a></div>
+<p>Shared file hosting with optional expiration and passwords.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/file-storage</code></td><td>List stored files</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/file-storage</code></td><td>Upload a file (multipart)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/file-storage/from-workspace</code></td><td>Snapshot a workspace file into the storage (share)</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/file-storage/:id</code></td><td>Download a file</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/file-storage/:id</code></td><td>Update file metadata</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/file-storage/:id</code></td><td>Delete a file</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="files">Files</h2><a class="sl-anchor-link" href="#files"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Files”</span></a></div>
+<p>Internal file uploads (used by messages).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/files/upload</code></td><td>Upload a file (multipart)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="workspace-files">Workspace Files</h2><a class="sl-anchor-link" href="#workspace-files"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Workspace Files”</span></a></div>
+<p>Direct access to an Agent’s workspace from the <a href="/docs/features/files/">Files section</a>. All paths are relative to the workspace root and strictly contained (no traversal, no symlink escape).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/workspace/ls</code></td><td>List a directory</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/workspace/file</code></td><td>Read a file (metadata + text content)</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/agents/:agentId/workspace/file</code></td><td>Write a text file (optimistic concurrency via <code dir="auto">baseModifiedAt</code>)</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/workspace/raw</code></td><td>Stream raw bytes (download / inline view)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/workspace/mkdir</code></td><td>Create a folder</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/workspace/move</code></td><td>Move / rename (cross-workspace via <code dir="auto">fromAgentId</code>)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/workspace/copy</code></td><td>Copy (auto ” (copy N)” suffix on collision)</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/agents/:agentId/workspace/file</code></td><td>Delete a file or folder (recursive)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/workspace/upload</code></td><td>Upload files into a folder (multipart)</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/agents/:agentId/workspace/search</code></td><td>Search files by name/path</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/agents/:agentId/workspace/resolve-paths</code></td><td>Batched existence check (chat path chips)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="notifications">Notifications</h2><a class="sl-anchor-link" href="#notifications"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Notifications”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/notifications</code></td><td>List notifications</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/notifications/unread-count</code></td><td>Get unread count</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/notifications/:id/read</code></td><td>Mark as read</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/notifications/mark-all-read</code></td><td>Mark all as read</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/notifications/:id</code></td><td>Delete a notification</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="prompts">Prompts</h2><a class="sl-anchor-link" href="#prompts"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Prompts”</span></a></div>
+<p>Pending approval prompts (e.g. tool use confirmations).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/prompts/pending</code></td><td>List pending prompts</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/prompts/:id/respond</code></td><td>Respond to a prompt</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="users">Users</h2><a class="sl-anchor-link" href="#users"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Users”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/users</code></td><td>List users</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/users/mentionables</code></td><td>List mentionable users</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/users/:id</code></td><td>Delete a user</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="invitations">Invitations</h2><a class="sl-anchor-link" href="#invitations"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Invitations”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/invitations</code></td><td>List invitations</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/invitations</code></td><td>Create an invitation</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/invitations/:id</code></td><td>Delete an invitation</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/invitations/:token/validate</code></td><td>Validate an invitation token</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="settings">Settings</h2><a class="sl-anchor-link" href="#settings"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Settings”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/settings/global-prompt</code></td><td>Get global system prompt</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/global-prompt</code></td><td>Update global prompt</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/settings/models</code></td><td>Get extraction + embedding model config (legacy)</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/settings/default-models</code></td><td>Get all model/service defaults (LLM, image, compacting, scout, extraction, embedding, search, TTS, STT)</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-llm</code></td><td>Set default LLM model + provider</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-image</code></td><td>Set default image generation model + provider</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-compacting</code></td><td>Set default compacting model + provider</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-scout</code></td><td>Set default scout model + provider</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-scout-thinking</code></td><td>Set the global scout reasoning default (<code dir="auto">{ thinking: AgentThinkingConfig | null }</code>)</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-search</code></td><td>Set default search provider</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-tts</code></td><td>Set default text-to-speech provider/model</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/default-stt</code></td><td>Set default speech-to-text provider/model</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/extraction-model</code></td><td>Set memory extraction model</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/embedding-model</code></td><td>Set embedding model</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/settings/task-limits</code></td><td>Get task concurrency/depth limits</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/task-limits</code></td><td>Update task limits</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/settings/avatar-style</code></td><td>Get the global avatar art style</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/settings/avatar-style</code></td><td>Update the avatar art style</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/settings/dismissed-setup-items</code></td><td>List dismissed setup-checklist items</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/settings/dismissed-setup-items/:itemId</code></td><td>Dismiss a setup-checklist item</td></tr><tr><td><code dir="auto">DELETE</code></td><td><code dir="auto">/api/settings/dismissed-setup-items/:itemId</code></td><td>Restore a dismissed setup item</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="current-user">Current User</h2><a class="sl-anchor-link" href="#current-user"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Current User”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/me</code></td><td>Get current user info</td></tr><tr><td><code dir="auto">PATCH</code></td><td><code dir="auto">/api/me</code></td><td>Update profile</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/me/avatar</code></td><td>Upload avatar (multipart)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="shared-links">Shared Links</h2><a class="sl-anchor-link" href="#shared-links"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Shared Links”</span></a></div>
+<p>Public access to shared files (no auth required, token-based).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/s/:token</code></td><td>View shared content</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/s/:token</code></td><td>Access password-protected share</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="platform-updates">Platform Updates</h2><a class="sl-anchor-link" href="#platform-updates"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Platform Updates”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/version-check</code></td><td>Cached version info: current version/sha, channel (<code dir="auto">stable</code>/<code dir="auto">edge</code>), installation type, latest version, cumulative changelog, <code dir="auto">canSelfUpdate</code></td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/version-check/check</code></td><td>Force a fresh version check against GitHub (admin only). Returns 400 if version check is disabled</td></tr><tr><td><code dir="auto">PUT</code></td><td><code dir="auto">/api/version-check/channel</code></td><td>Switch the update channel: <code dir="auto">{ "channel": "stable" | "edge" }</code> (admin only)</td></tr><tr><td><code dir="auto">POST</code></td><td><code dir="auto">/api/version-check/update</code></td><td>Start the safe self-update (admin only, git installs). Returns <code dir="auto">{ runId }</code>; progress over SSE <code dir="auto">update:progress</code>, outcome in <code dir="auto">/last-update</code>. 400 for Docker/dev installs, 409 if already running</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/version-check/last-update</code></td><td>Latest update attempt (<code dir="auto">running</code>/<code dir="auto">restarting</code>/<code dir="auto">success</code>/<code dir="auto">failed</code>/<code dir="auto">rolled-back</code>) — persisted, survives the restart</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="usage-admin-only">Usage (admin only)</h2><a class="sl-anchor-link" href="#usage-admin-only"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Usage (admin only)”</span></a></div>
+<p>Token usage tracking for all LLM calls. All routes require admin role.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/usage</code></td><td>Paginated list of LLM usage records with filters (agentId, providerId, providerType, modelId, taskId, cronId, callSite, from/to timestamps)</td></tr><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/usage/summary</code></td><td>Aggregated usage grouped by dimension (groupBy: <code dir="auto">provider_type</code>, <code dir="auto">model_id</code>, <code dir="auto">agent_id</code>, <code dir="auto">call_site</code>, <code dir="auto">day</code>)</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h2"><h2 id="sse">SSE</h2><a class="sl-anchor-link" href="#sse"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “SSE”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead><tbody><tr><td><code dir="auto">GET</code></td><td><code dir="auto">/api/sse</code></td><td>SSE event stream (see <a href="/docs/api/sse/">SSE Events</a>)</td></tr></tbody></table> </div> <footer class="sl-flex astro-3yyafb3n"> <div class="meta sl-flex astro-3yyafb3n"> <a href="https://github.com/MarlBurroW/hivekeep/edit/main/docs-site/src/content/docs/api/rest.md" class="sl-flex print:hidden astro-eez2twj6"><svg aria-hidden="true" class="astro-eez2twj6 astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a> <p>Last updated: <time datetime="2026-06-14T14:23:02.000Z">Jun 14, 2026</time></p> </div> <div class="kb-pagination astro-d776pwuy"> <div class="pagination-links print:hidden astro-u2l5gyhi" dir="ltr"> <a href="/docs/providers/custom/" rel="prev" class="astro-u2l5gyhi"> <svg aria-hidden="true" class="astro-u2l5gyhi astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg> <span class="astro-u2l5gyhi"> Previous <br class="astro-u2l5gyhi"> <span class="link-title astro-u2l5gyhi">Adding Custom</span> </span> </a> <a href="/docs/api/sse/" rel="next" class="astro-u2l5gyhi"> <svg aria-hidden="true" class="astro-u2l5gyhi astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg> <span class="astro-u2l5gyhi"> Next <br class="astro-u2l5gyhi"> <span class="link-title astro-u2l5gyhi">SSE Events</span> </span> </a> </div>  </div>   </footer>  <footer class="kb-site-footer astro-sz7xmlte"> <div class="kb-footer-divider astro-sz7xmlte" aria-hidden="true"></div> <div class="kb-footer-content astro-sz7xmlte"> <div class="kb-footer-links astro-sz7xmlte"> <div class="kb-footer-col astro-sz7xmlte"> <p class="kb-footer-heading astro-sz7xmlte">Resources</p> <ul class="astro-sz7xmlte"> <li class="astro-sz7xmlte"><a href="/hivekeep/" class="astro-sz7xmlte">Landing Page</a></li> <li class="astro-sz7xmlte"><a href="https://github.com/MarlBurroW/hivekeep" target="_blank" rel="noopener noreferrer" class="astro-sz7xmlte">GitHub <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="astro-sz7xmlte"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" class="astro-sz7xmlte"></path><polyline points="15 3 21 3 21 9" class="astro-sz7xmlte"></polyline><line x1="10" y1="14" x2="21" y2="3" class="astro-sz7xmlte"></line></svg></a></li> <li class="astro-sz7xmlte"><a href="https://github.com/MarlBurroW/hivekeep/releases" target="_blank" rel="noopener noreferrer" class="astro-sz7xmlte">Releases <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="astro-sz7xmlte"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" class="astro-sz7xmlte"></path><polyline points="15 3 21 3 21 9" class="astro-sz7xmlte"></polyline><line x1="10" y1="14" x2="21" y2="3" class="astro-sz7xmlte"></line></svg></a></li> </ul> </div> <div class="kb-footer-col astro-sz7xmlte"> <p class="kb-footer-heading astro-sz7xmlte">Community</p> <ul class="astro-sz7xmlte"> <li class="astro-sz7xmlte"><a href="https://github.com/MarlBurroW/hivekeep/discussions" target="_blank" rel="noopener noreferrer" class="astro-sz7xmlte">Discussions <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="astro-sz7xmlte"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" class="astro-sz7xmlte"></path><polyline points="15 3 21 3 21 9" class="astro-sz7xmlte"></polyline><line x1="10" y1="14" x2="21" y2="3" class="astro-sz7xmlte"></line></svg></a></li> <li class="astro-sz7xmlte"><a href="https://github.com/MarlBurroW/hivekeep/issues/new" target="_blank" rel="noopener noreferrer" class="astro-sz7xmlte">Report Issue <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="astro-sz7xmlte"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" class="astro-sz7xmlte"></path><polyline points="15 3 21 3 21 9" class="astro-sz7xmlte"></polyline><line x1="10" y1="14" x2="21" y2="3" class="astro-sz7xmlte"></line></svg></a></li> <li class="astro-sz7xmlte"><a href="https://github.com/MarlBurroW/hivekeep/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer" class="astro-sz7xmlte">Contributing <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="astro-sz7xmlte"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" class="astro-sz7xmlte"></path><polyline points="15 3 21 3 21 9" class="astro-sz7xmlte"></polyline><line x1="10" y1="14" x2="21" y2="3" class="astro-sz7xmlte"></line></svg></a></li> </ul> </div> </div> <div class="kb-footer-bottom astro-sz7xmlte"> <span class="kb-copyright astro-sz7xmlte">© 2026 Hivekeep. Built with <a href="https://starlight.astro.build" target="_blank" rel="noopener noreferrer" class="astro-sz7xmlte">Starlight</a>.</span> </div> </div> </footer>  </div> </div>   </main>   </div> </div>    </div> </div>  <!-- Back-to-top button with circular scroll progress --> <button class="kb-back-to-top astro-4toy2ex6" id="kb-btt" aria-label="Back to top" title="Back to top"> <svg class="kb-btt-ring astro-4toy2ex6" width="44" height="44" viewBox="0 0 44 44"> <circle cx="22" cy="22" r="19.5" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" class="astro-4toy2ex6"></circle> <circle class="kb-btt-progress astro-4toy2ex6" cx="22" cy="22" r="19.5" fill="none" stroke="url(#btt-grad)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="122.52" stroke-dashoffset="122.52"></circle> <defs class="astro-4toy2ex6"> <linearGradient id="btt-grad" x1="0" y1="0" x2="1" y2="1" class="astro-4toy2ex6"> <stop offset="0%" stop-color="oklch(0.72 0.19 305)" class="astro-4toy2ex6"></stop> <stop offset="100%" stop-color="oklch(0.72 0.22 342)" class="astro-4toy2ex6"></stop> </linearGradient> </defs> </svg> <svg class="kb-btt-arrow astro-4toy2ex6" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"> <path d="m18 15-6-6-6 6" class="astro-4toy2ex6"></path> </svg> </button>   <script type="module">const t=document.getElementById("kb-btt"),s=t?.querySelector(".kb-btt-progress"),c=2*Math.PI*19.5;if(t&&s){const e=()=>{const o=document.documentElement.scrollHeight-window.innerHeight,n=o>0?Math.min(window.scrollY/o,1):0;s.style.strokeDashoffset=String(c*(1-n)),t.classList.toggle("visible",window.scrollY>400)};window.addEventListener("scroll",e,{passive:!0}),e(),t.addEventListener("click",()=>{window.scrollTo({top:0,behavior:"smooth"})})}</script> </body></html>

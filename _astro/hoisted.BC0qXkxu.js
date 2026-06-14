@@ -1,0 +1,1 @@
+document.querySelectorAll("[data-set-lang]").forEach(e=>{e.addEventListener("click",()=>{try{localStorage.setItem("hk-lang",e.dataset.setLang||"")}catch{}})});document.addEventListener("click",e=>{document.querySelectorAll(".lang-switcher[open]").forEach(t=>{t.contains(e.target)||(t.open=!1)})});
