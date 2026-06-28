@@ -15,7 +15,7 @@ Hivekeep ships with built-in providers across six capability families: language 
 | OpenAI (Codex CLI) | ✅ | | | | | | ❌ (OAuth) |
 | [Google Gemini](https://aistudio.google.com/apikey) | ✅ | | ✅ | | | | ✅ |
 | [OpenRouter](https://openrouter.ai/keys) | ✅ | ✅ | ✅ | | | | ✅ |
-| [Kilo Gateway](https://kilocode.ai/) | ✅ | | | | | | ✅ |
+| [Kilo Gateway](https://kilo.ai/gateway) | ✅ | | | | | | ✅ |
 | [Ollama Cloud](https://ollama.com/) | ✅ | | | ✅ | | | ✅ |
 | [xAI](https://console.x.ai) | ✅ | | | | | | ✅ |
 | [DeepSeek](https://platform.deepseek.com/api_keys) | ✅ | | | | | | ✅ |
