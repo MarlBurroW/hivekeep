@@ -130,9 +130,7 @@ export function mapModel(model: OllamaTagModel): LLMModel | null {
 }
 
 function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
-  return globalThis.btoa(binary)
+  return Buffer.from(bytes).toString('base64')
 }
 
 function systemPrompt(system: ChatRequest['system']): string | undefined {
@@ -248,14 +246,14 @@ async function* streamChat(url: string, body: Record<string, unknown>, config: P
         }
       }
     }
+
+    if (buffer.trim()) {
+      const chunk = JSON.parse(buffer) as OllamaChatChunk
+      if (chunk.message?.content) yield { type: 'text-delta', text: chunk.message.content }
+      if (chunk.done) usage = { inputTokens: chunk.prompt_eval_count, outputTokens: chunk.eval_count }
+    }
   } catch (err) {
     throw mapApiError(err)
-  }
-
-  if (buffer.trim()) {
-    const chunk = JSON.parse(buffer) as OllamaChatChunk
-    if (chunk.message?.content) yield { type: 'text-delta', text: chunk.message.content }
-    if (chunk.done) usage = { inputTokens: chunk.prompt_eval_count, outputTokens: chunk.eval_count }
   }
   yield { type: 'finish', reason: finishReason(doneReason), usage }
 }

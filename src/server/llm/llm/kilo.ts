@@ -276,9 +276,7 @@ export function mapModel(model: KiloModel): LLMModel | null {
 }
 
 function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
-  return globalThis.btoa(binary)
+  return Buffer.from(bytes).toString('base64')
 }
 
 function systemPromptToMessage(system: ChatRequest['system']): ChatCompletionSystemMessageParam | undefined {

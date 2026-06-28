@@ -199,17 +199,13 @@ export function mapModel(model: OpenRouterImageModel, endpoints?: OpenRouterImag
 }
 
 function dataUrlFor(input: { data: Uint8Array; mediaType: string }): string {
-  let binary = ''
-  for (let i = 0; i < input.data.length; i++) binary += String.fromCharCode(input.data[i]!)
-  return `data:${input.mediaType};base64,${globalThis.btoa(binary)}`
+  const base64 = Buffer.from(input.data).toString('base64')
+  return `data:${input.mediaType};base64,${base64}`
 }
 
 function base64ToUint8Array(b64: string): Uint8Array {
   const stripped = b64.includes(',') ? b64.slice(b64.indexOf(',') + 1) : b64
-  const binary = globalThis.atob(stripped)
-  const out = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
-  return out
+  return new Uint8Array(Buffer.from(stripped, 'base64'))
 }
 
 function firstImage(payload: OpenRouterImageResponse): OpenRouterImageResponseItem | undefined {
