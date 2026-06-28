@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, mock, afterEach, beforeAll, afterAll } from 'bun:test'
-import { mkdirSync, rmSync } from 'fs'
+import { mkdirSync, realpathSync, rmSync } from 'fs'
 import { fullMockConfig } from '../../test-helpers'
 import type { ToolRegistration } from '@/server/tools/types'
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
-const WORKSPACE_BASE = '/tmp/test-workspace-shell'
-
+const TMP_DIR = realpathSync('/tmp')
+const WORKSPACE_BASE = `${TMP_DIR}/test-workspace-shell`
 mock.module('@/server/config', () => ({
   config: {
     ...fullMockConfig,
@@ -97,7 +97,7 @@ describe('runShellTool', () => {
     it('uses custom cwd when provided', async () => {
       const result = await execute({ command: 'pwd', cwd: '/tmp' })
       expect(result.success).toBe(true)
-      expect(result.output).toBe('/tmp')
+      expect(result.output).toBe(TMP_DIR)
     })
 
     it('sets HIVEKEEP_KIN_ID environment variable', async () => {

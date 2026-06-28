@@ -82,6 +82,12 @@ Limits of the [Files workspace browser](/docs/features/files/).
 | `VERSION_CHECK_REPO` | `MarlBurroW/hivekeep` | GitHub repo to check for new releases |
 | `VERSION_CHECK_INTERVAL_HOURS` | `12` | Hours between version checks |
 
+## Built-in AI providers
+
+Provider credentials are configured from Queenie or the Providers settings UI, not environment variables. Hivekeep stores secrets in the encrypted vault and auto-detects enabled capabilities from each configured provider.
+
+Current built-in provider types include OpenAI, Anthropic, Google Gemini, OpenRouter, Kilo Gateway, Ollama Cloud, xAI, DeepSeek, MiniMax, Kimi (Moonshot), OpenAI-compatible endpoints, Brave Search, SerpAPI, Tavily, Perplexity Sonar, SearXNG, and ElevenLabs. OpenRouter exposes LLM, embedding, and image capabilities; Kilo Gateway exposes LLM; Ollama Cloud exposes LLM plus web search using `https://ollama.com/api` and API keys from `https://ollama.com/settings/keys`.
+
 ## Advanced options
 
 See [`.env.example`](https://github.com/MarlBurroW/hivekeep/blob/main/.env.example) for the complete list of all options including:
