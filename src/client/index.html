@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hivekeep</title>
+    <title>Gezy</title>
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
-    <link rel="icon" href="/hivekeep.svg" type="image/svg+xml" />
+    <link rel="icon" href="/gezy.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#7c3aed" />
@@ -19,7 +19,7 @@
     <script>
       // Anti-flicker: apply palette + dark mode before first paint
       (function() {
-        var p = localStorage.getItem('hivekeep-palette');
+        var p = localStorage.getItem('gezy-palette');
         if (p && p !== 'aurora') document.documentElement.setAttribute('data-palette', p);
         var t = localStorage.getItem('theme');
         if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {

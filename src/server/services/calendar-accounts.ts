@@ -10,7 +10,7 @@ import { decrypt } from '@/server/services/encryption'
 import { getCalendarProvider } from '@/server/calendar/registry'
 import { getFreshAccessToken } from '@/server/services/email-token-manager'
 import type { CalendarProvider } from '@/server/calendar/types'
-import type { ProviderConfig } from '@hivekeep/sdk'
+import type { ProviderConfig } from '@gezy/sdk'
 
 interface AccountConfig {
   account_label?: string

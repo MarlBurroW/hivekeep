@@ -94,7 +94,7 @@ async function gatherOptions(yes: boolean, overrides: Partial<ScaffoldOptions>):
 
 export function generateManifest(opts: ScaffoldOptions): string {
   const manifest: Record<string, any> = {
-    $schema: 'https://unpkg.com/@hivekeep/sdk/schemas/plugin-manifest.schema.json',
+    $schema: 'https://unpkg.com/@gezy/sdk/schemas/plugin-manifest.schema.json',
     name: opts.name,
     version: '0.1.0',
     description: opts.description,
@@ -127,9 +127,9 @@ export function generateIndex(opts: ScaffoldOptions): string {
 
   const lines: string[] = []
   if (importParts.length > 0) {
-    lines.push(`import { ${importParts.join(', ')} } from '@hivekeep/sdk'`)
+    lines.push(`import { ${importParts.join(', ')} } from '@gezy/sdk'`)
   }
-  lines.push(`import type { ${typeImports.join(', ')} } from '@hivekeep/sdk'`)
+  lines.push(`import type { ${typeImports.join(', ')} } from '@gezy/sdk'`)
   lines.push('')
 
   // ─── Channel adapter skeleton ────────────────────────────────────────────
@@ -235,7 +235,7 @@ export function generateIndex(opts: ScaffoldOptions): string {
   if (opts.types.includes('hooks')) {
     lines.push(`    hooks: {`)
     lines.push(`      // Each hook handler receives the typed payload for its hook name.`)
-    lines.push(`      // See HookPayloadMap in @hivekeep/sdk.`)
+    lines.push(`      // See HookPayloadMap in @gezy/sdk.`)
     lines.push(`      afterChat: (h) => {`)
     lines.push(`        ctx.log.info({ agentId: h.agentId, responseLen: h.response.length }, 'afterChat')`)
     lines.push(`      },`)
@@ -312,7 +312,7 @@ export function generateGitignore(): string {
  * on that exact keyword. Without it, the plugin stays invisible.
  *
  * Key choices:
- * - **peerDependencies on @hivekeep/sdk**: the SDK MUST come
+ * - **peerDependencies on @gezy/sdk**: the SDK MUST come
  *   from the host. If a plugin declares it as a regular `dependencies`,
  *   npm/bun installs a SECOND copy and `instanceof` checks across
  *   plugin/host break (the two SDK modules export DIFFERENT class
@@ -335,14 +335,14 @@ export function generatePackageJson(opts: ScaffoldOptions): string {
     files: ['index.ts', 'plugin.json', 'README.md'],
     keywords: ['hivekeep-plugin', 'hivekeep'],
     peerDependencies: {
-      '@hivekeep/sdk': '^0.10.0',
+      '@gezy/sdk': '^0.10.0',
     },
     // Empty by default. Add real dependencies (axios, ws, …) as needed.
     // Bun runs `bun install --production` after a git-clone install so
     // these resolve at activation time.
     dependencies: {},
     devDependencies: {
-      '@hivekeep/sdk': '^0.10.0',
+      '@gezy/sdk': '^0.10.0',
     },
   }
   return JSON.stringify(pkg, null, 2) + '\n'

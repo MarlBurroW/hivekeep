@@ -88,7 +88,7 @@ export const LIST_FILTER_THRESHOLD = 1
 /** Default maximum number of concurrency-safe tools that can run in parallel
  *  within a single step batch. Override at runtime with the
  *  HIVEKEEP_MAX_TOOL_USE_CONCURRENCY env var. */
-export const HIVEKEEP_MAX_TOOL_USE_CONCURRENCY_DEFAULT = 10
+export const GEZY_MAX_TOOL_USE_CONCURRENCY_DEFAULT = 10
 
 // ---------------------------------------------------------------------------
 // Provider constants — all derived from PROVIDER_META (single source of truth)
@@ -169,7 +169,7 @@ export interface AvatarPreset {
 }
 
 export const AVATAR_STYLE_PRESETS: readonly AvatarPreset[] = [
-  { id: 'hivekeep', label: 'Hivekeep (robot-bee)', prompt: '2D "serious cartoon" splash-art, in the art direction of Valorant and League of Legends key art: bold confident linework, semi-realistic hand-painted digital illustration, painterly textures, dramatic rim lighting, rich shadows. Dark charcoal-violet background with a subtle hexagon honeycomb pattern and a soft glow. Centered head-and-shoulders avatar composition. Premium, mature, never childish. No text, no letters, no words, no UI elements.' },
+  { id: 'gezy', label: 'Gezy (robot-bee)', prompt: '2D "serious cartoon" splash-art, in the art direction of Valorant and League of Legends key art: bold confident linework, semi-realistic hand-painted digital illustration, painterly textures, dramatic rim lighting, rich shadows. Dark charcoal-violet background with a subtle hexagon honeycomb pattern and a soft glow. Centered head-and-shoulders avatar composition. Premium, mature, never childish. No text, no letters, no words, no UI elements.' },
   { id: 'pixar', label: 'Pixar 3D', prompt: 'Pixar / 3D-animation style, soft lighting' },
   { id: 'anime', label: 'Anime', prompt: 'anime art style, clean linework, cel shading' },
   { id: 'watercolor', label: 'Watercolor', prompt: 'soft watercolor painting style' },
@@ -178,7 +178,7 @@ export const AVATAR_STYLE_PRESETS: readonly AvatarPreset[] = [
 ]
 
 export const AVATAR_SUBJECT_PRESETS: readonly AvatarPreset[] = [
-  { id: 'hivekeep-bee', label: 'Hivekeep robot-bee', prompt: 'An insectoid robot bee: two large faceted glowing compound eyes, a mechanical mandible, segmented antennae with rounded tips, large translucent mechanical wings spread wide behind the shoulders, a robotic thorax with yellow-and-black striped panels, a matte dark charcoal shell with subtle aurora gradient edge accents (indigo to violet to warm orange). Clearly an insect-machine, NOT a humanoid robot, no human face, no human mouth.' },
+  { id: 'gezy-bee', label: 'Gezy robot-bee', prompt: 'An insectoid robot bee: two large faceted glowing compound eyes, a mechanical mandible, segmented antennae with rounded tips, large translucent mechanical wings spread wide behind the shoulders, a robotic thorax with yellow-and-black striped panels, a matte dark charcoal shell with subtle aurora gradient edge accents (indigo to violet to warm orange). Clearly an insect-machine, NOT a humanoid robot, no human face, no human mouth.' },
   { id: 'robot', label: 'Robot', prompt: 'a small, friendly, cute robot' },
   { id: 'human', label: 'Human', prompt: 'a human character' },
   { id: 'elf', label: 'Elf', prompt: 'an elf character with pointed ears' },

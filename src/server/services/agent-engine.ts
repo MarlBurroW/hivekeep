@@ -3138,7 +3138,7 @@ export async function buildMessageHistory(agentId: string): Promise<{ messages: 
       }
     }
 
-    const key = `${platform ?? 'hivekeep'}:${name}`
+    const key = `${platform ?? 'gezy'}:${name}`
     const existing = participantMap.get(key)
     const msgDate = msg.createdAt ? new Date(msg.createdAt as unknown as number) : new Date()
     if (existing) {

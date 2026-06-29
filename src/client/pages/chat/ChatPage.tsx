@@ -66,7 +66,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
   // have a stored slug matching an existing agent.
   useEffect(() => {
     if (selectedAgentSlug) {
-      try { localStorage.setItem('hivekeep:lastSelectedAgentSlug', selectedAgentSlug) } catch { /* ignore */ }
+      try { localStorage.setItem('gezy:lastSelectedAgentSlug', selectedAgentSlug) } catch { /* ignore */ }
     }
   }, [selectedAgentSlug])
 
@@ -74,7 +74,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
     if (selectedAgentSlug || agentsLoading || agents.length === 0) return
     if (location.pathname !== '/') return
     let stored: string | null = null
-    try { stored = localStorage.getItem('hivekeep:lastSelectedAgentSlug') } catch { /* ignore */ }
+    try { stored = localStorage.getItem('gezy:lastSelectedAgentSlug') } catch { /* ignore */ }
     if (!stored) return
     if (!agents.some((k) => k.slug === stored)) return
     navigate(`/agent/${stored}`, { replace: true })

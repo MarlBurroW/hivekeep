@@ -115,7 +115,7 @@
   },
   "login": {
     "title": "欢迎回来",
-    "subtitle": "登录你的 Hivekeep 工作区",
+    "subtitle": "登录你的 Gezy 工作区",
     "email": "邮箱",
     "emailPlaceholder": "you@example.com",
     "password": "密码",
@@ -127,7 +127,7 @@
     "startOnboarding": "设置你的工作区"
   },
   "onboarding": {
-    "title": "欢迎使用 Hivekeep",
+    "title": "欢迎使用 Gezy",
     "subtitle": "让我们来设置你的工作区",
     "queenieGettingReady": "{{name}} 正在准备中…",
     "step": "第 {{current}} 步，共 {{total}} 步",
@@ -880,8 +880,8 @@
     "thinkingEnable": "为此智能体启用扩展思考",
     "thinkingDisable": "为此智能体禁用扩展思考",
     "welcome": {
-      "title": "欢迎使用 Hivekeep",
-      "checklistIntro": "几个简单步骤即可开始。Hivekeep 将引导你组建自己的 AI 团队。",
+      "title": "欢迎使用 Gezy",
+      "checklistIntro": "几个简单步骤即可开始。Gezy 将引导你组建自己的 AI 团队。",
       "allDone": "一切就绪！从侧边栏选择一个智能体开始聊天吧。"
     },
     "shortcutHint": "快速查找智能体",
@@ -1203,7 +1203,7 @@
       "renderAfterRun": "先运行一次测试，才能预览渲染器。"
     },
     "help": {
-      "content": "自定义工具让你用自己的脚本扩展 Hivekeep。",
+      "content": "自定义工具让你用自己的脚本扩展 Gezy。",
       "bullet1": "每个工具都是独立文件夹中的一个脚本；它从 stdin 读取 JSON 参数，并把结果打印到 stdout。",
       "bullet2": "添加 requirements.txt（Python）或 package.json（Node/Bun），然后点击安装来配置依赖。",
       "bullet3": "把 custom_<slug> 加入智能体的某个工具箱，即可将工具授予它。"
@@ -1317,8 +1317,8 @@
       "fetchError": "加载设置失败",
       "publicUrlWarning": {
         "title": "公开 URL 可能配置有误",
-        "body": "你正在通过 {{actual}} 访问 Hivekeep，但配置的公开 URL 是 {{configured}}。邀请链接、webhook 和 OAuth 回调都基于公开 URL 构建，因此它们会指向 {{configured}}，可能无法访问。",
-        "fix": "将 PUBLIC_URL 设置为 {{actual}} 并重启。Docker：-e PUBLIC_URL={{actual}}（或写入 .env）；原生安装：HIVEKEEP_PUBLIC_URL={{actual}}。"
+        "body": "你正在通过 {{actual}} 访问 Gezy，但配置的公开 URL 是 {{configured}}。邀请链接、webhook 和 OAuth 回调都基于公开 URL 构建，因此它们会指向 {{configured}}，可能无法访问。",
+        "fix": "将 PUBLIC_URL 设置为 {{actual}} 并重启。Docker：-e PUBLIC_URL={{actual}}（或写入 .env）；原生安装：GEZY_PUBLIC_URL={{actual}}。"
       },
       "interface": {
         "title": "界面"
@@ -1440,7 +1440,7 @@
       "emptyDescription": "添加 OpenAI、Anthropic 或 Gemini 等 AI 提供商，为你的智能体提供动力。",
       "modelsModal": {
         "title": "浏览 {{name}}",
-        "description": "该提供商当前暴露的模型和语音（实时从其 API 获取）。无需离开 Hivekeep 即可核对哪些可用。",
+        "description": "该提供商当前暴露的模型和语音（实时从其 API 获取）。无需离开 Gezy 即可核对哪些可用。",
         "loading": "加载中…",
         "fetchError": "无法加载",
         "allCapabilities": "全部",
@@ -1862,13 +1862,13 @@
       "typeOrSearch": "输入或搜索...",
       "revokePlatformIdConfirm": "撤销此平台访问？该联系人将无法再通过此平台互动。",
       "deleteNoteConfirm": "永久删除此备注？",
-      "linkToUserTip": "将此联系人关联到现有的 Hivekeep 用户账户。让智能体能跨渠道识别他们。",
+      "linkToUserTip": "将此联系人关联到现有的 Gezy 用户账户。让智能体能跨渠道识别他们。",
       "identifiersTip": "自定义联系人字段（邮箱、手机、Twitter、LinkedIn、Telegram ID 等），让智能体能在不同平台上识别此联系人。",
       "help": {
         "content": "联系人名录让你的智能体在不同平台上识别与之互动的人，并提供个性化回应。",
         "bullet1": "关联平台标识符（Telegram、Discord 等），让智能体自动识别用户",
         "bullet2": "智能体可以在每个联系人上添加私有备注以记住上下文",
-        "bullet3": "将联系人关联到 Hivekeep 用户账户，统一所有渠道的身份",
+        "bullet3": "将联系人关联到 Gezy 用户账户，统一所有渠道的身份",
         "bullet4": "添加多个昵称，无论对方用什么名字，智能体都能认出来"
       }
     },
@@ -1998,7 +1998,7 @@
       },
       "emptyDescription": "邀请其他人协作并使用你的智能体。",
       "help": {
-        "content": "管理可访问你 Hivekeep 实例的用户。邀请朋友或同事，让他们与你的智能体聊天。",
+        "content": "管理可访问你 Gezy 实例的用户。邀请朋友或同事，让他们与你的智能体聊天。",
         "bullet1": "创建可配置过期时间的邀请链接",
         "bullet2": "每个用户拥有自己的账户和对话",
         "bullet3": "邀请在被使用之前可以随时撤销"
@@ -2010,7 +2010,7 @@
       "subtitle": "连接外部通讯录，让你的智能体可以查找联系人（只读）。",
       "add": "添加通讯录",
       "addTitle": "添加通讯录",
-      "addDescription": "连接外部联系人来源。只读：它们永远不会进入 Hivekeep 自己的联系人。",
+      "addDescription": "连接外部联系人来源。只读：它们永远不会进入 Gezy 自己的联系人。",
       "provider": "提供商",
       "connect": "连接 {{provider}}",
       "connected": "已连接 {{provider}} 通讯录",
@@ -2021,7 +2021,7 @@
       "emptyTitle": "未连接通讯录",
       "emptyDescription": "连接 iCloud（或其他 CardDAV 来源），让你的智能体可以查找联系人的电话或邮箱。",
       "help": {
-        "content": "连接外部通讯录（例如通过应用专用密码连接 iCloud）。之后智能体可以只读地查找联系人，例如在发送短信前查找电话号码。这些联系人永远不会被复制到 Hivekeep 自己的联系人中。"
+        "content": "连接外部通讯录（例如通过应用专用密码连接 iCloud）。之后智能体可以只读地查找联系人，例如在发送短信前查找电话号码。这些联系人永远不会被复制到 Gezy 自己的联系人中。"
       }
     },
     "triggers": {
@@ -2106,7 +2106,7 @@
       "configureAppFirst": "请先在上方配置 {{provider}} 应用，再连接账户。",
       "help": {
         "content": "通过 OAuth 连接 Gmail 账户。先配置 Google Cloud OAuth 应用（客户端 ID + 密钥），然后点击连接并授权访问。",
-        "bullet1": "在 Google Cloud Console 创建带 Gmail 权限范围的 OAuth 应用，并注册你的 Hivekeep 主机显示的重定向 URI（…/api/email-accounts/oauth/callback）。",
+        "bullet1": "在 Google Cloud Console 创建带 Gmail 权限范围的 OAuth 应用，并注册你的 Gezy 主机显示的重定向 URI（…/api/email-accounts/oauth/callback）。",
         "bullet2": "在下方粘贴客户端 ID 和密钥，然后点击连接以授权邮箱。",
         "bullet3": "把「email」工具箱授予智能体，让它能通过已连接的账户列出、阅读、搜索和发送邮件。"
       },
@@ -2301,7 +2301,7 @@
       "labelTip": "用于在列表中识别此投递渠道的友好名称。",
       "noChannelsDescription": "添加投递渠道，在 Telegram、Discord、邮件或其他平台上接收通知。",
       "help": {
-        "content": "通知让你随时了解 Hivekeep 中的重要事件。你可以逐项开关通知类型，并设置外部投递渠道，在 Telegram、Discord 或邮件等平台上接收通知。",
+        "content": "通知让你随时了解 Gezy 中的重要事件。你可以逐项开关通知类型，并设置外部投递渠道，在 Telegram、Discord 或邮件等平台上接收通知。",
         "bullet1": "开关通知类型，控制通知铃铛中显示的内容",
         "bullet2": "外部投递渠道把通知转发到你偏好的平台",
         "bullet3": "每个投递渠道可以按通知类型过滤，实现精细控制",
@@ -2332,7 +2332,7 @@
     },
     "plugins": {
       "title": "插件",
-      "description": "管理为 Hivekeep 扩展新工具、钩子和集成的插件。",
+      "description": "管理为 Gezy 扩展新工具、钩子和集成的插件。",
       "reload": "重新加载",
       "reloaded": "插件已重新加载",
       "checkUpdates": "检查更新",
@@ -2383,7 +2383,7 @@
     },
     "marketplace": {
       "title": "浏览插件",
-      "description": "发布到 npm 且带有 `hivekeep-plugin` 关键词的插件。任何人都可以发布。安装前请核查包作者和源码仓库。",
+      "description": "发布到 npm 且带有 `gezy-plugin` 关键词的插件。任何人都可以发布。安装前请核查包作者和源码仓库。",
       "refresh": "刷新",
       "searchPlaceholder": "搜索 npm...",
       "allTags": "全部",
@@ -2463,8 +2463,8 @@
     },
     "updates": {
       "title": "更新",
-      "description": "保持这个 Hivekeep 实例为最新版本。",
-      "help": "Hivekeep 会定期在 GitHub 检查新版本。稳定通道跟随正式发布；edge 通道跟随 main 分支的最新提交（用于测试未发布的改动）。由 install.sh 管理的安装支持自更新；Docker 安装通过拉取新镜像来更新。",
+      "description": "保持这个 Gezy 实例为最新版本。",
+      "help": "Gezy 会定期在 GitHub 检查新版本。稳定通道跟随正式发布；edge 通道跟随 main 分支的最新提交（用于测试未发布的改动）。由 install.sh 管理的安装支持自更新；Docker 安装通过拉取新镜像来更新。",
       "channelLabel": "更新通道",
       "channelTip": "此实例跟随哪条更新流。",
       "channelSaved": "更新通道已保存",
@@ -2983,7 +2983,7 @@
     }
   },
   "invite": {
-    "title": "加入 Hivekeep",
+    "title": "加入 Gezy",
     "subtitle": "你受邀加入这个工作区",
     "invalidToken": "此邀请链接无效或已过期。",
     "backToLogin": "前往登录",
@@ -3146,7 +3146,7 @@
     "channelOnline": "渠道已连接",
     "channelOffline": "渠道已断开",
     "channelError": "渠道连接错误",
-    "updateAvailable": "Hivekeep {{version}} 已发布",
+    "updateAvailable": "Gezy {{version}} 已发布",
     "viewRelease": "查看"
   },
   "errorBoundary": {
@@ -3164,10 +3164,10 @@
     "howToUpdate": "如何更新",
     "dockerInstructions": "在包含 docker-compose.yml 的目录中运行以下命令：",
     "dockerTagNote": "如果你的 compose 文件锁定了特定版本标签，请在拉取前把它改为 {{version}}（或使用 latest 标签）。",
-    "selfUpdateInstructions": "Hivekeep 会先对数据库做快照，然后下载新版本并重启。如果出现任何问题，会自动恢复到之前的版本。",
+    "selfUpdateInstructions": "Gezy 会先对数据库做快照，然后下载新版本并重启。如果出现任何问题，会自动恢复到之前的版本。",
     "adminOnly": "只有管理员可以应用更新。",
     "devModeNote": "此实例运行在开发模式。请从你的 git 检出中更新。",
-    "manualInstallNote": "此安装不由 Hivekeep 管理。请按照当初的安装方式进行更新。",
+    "manualInstallNote": "此安装不由 Gezy 管理。请按照当初的安装方式进行更新。",
     "viewOnGitHub": "在 GitHub 上查看",
     "updateButton": "立即更新",
     "updateSuccess": "已更新到 {{version}}！",
@@ -3291,7 +3291,7 @@
     },
     "disabled": {
       "title": "终端已禁用",
-      "description": "此实例已关闭该功能。设置 HIVEKEEP_TERMINAL_ENABLED=true 并重启服务器即可启用。"
+      "description": "此实例已关闭该功能。设置 GEZY_TERMINAL_ENABLED=true 并重启服务器即可启用。"
     },
     "sessions": {
       "title": "会话",
@@ -3327,7 +3327,7 @@
       "emptyDescription": "创建预设，可在指定目录打开会话并运行启动命令。",
       "nameRequired": "名称为必填项",
       "nameLabel": "名称",
-      "namePlaceholder": "例如 Hivekeep + Claude",
+      "namePlaceholder": "例如 Gezy + Claude",
       "cwdLabel": "工作目录",
       "cwdHelp": "会话从此处开始。~ 表示主目录。留空表示主目录。",
       "initLabel": "初始化脚本",
@@ -3728,7 +3728,7 @@
   },
   "updateProgress": {
     "title": "更新进行中",
-    "keepOpen": "请保持此页面打开。更新期间 Hivekeep 会暂时不可用，完成后页面会自动重新加载。",
+    "keepOpen": "请保持此页面打开。更新期间 Gezy 会暂时不可用，完成后页面会自动重新加载。",
     "waitingForServer": "服务器正在重启…等待它恢复",
     "reloading": "页面将自动重新加载。",
     "failedTitle": "更新失败",
@@ -3868,7 +3868,7 @@
     "resizeTree": "调整文件树宽度"
   },
   "updateOverlay": {
-    "title": "正在更新 Hivekeep",
+    "title": "正在更新 Gezy",
     "successTitle": "更新完成",
     "toVersion": "正在更新到 {{version}}"
   },
@@ -3888,7 +3888,7 @@
   },
   "feedback": {
     "banner": {
-      "message": "喜欢 Hivekeep 吗？一个 Star 或一句反馈都很有帮助。",
+      "message": "喜欢 Gezy 吗？一个 Star 或一句反馈都很有帮助。",
       "star": "Star",
       "give": "提交反馈",
       "later": "稍后",
@@ -3896,7 +3896,7 @@
     },
     "dialog": {
       "title": "分享你的反馈",
-      "description": "Bug、想法或只是你的体验：任何信息都有助于改进 Hivekeep。",
+      "description": "Bug、想法或只是你的体验：任何信息都有助于改进 Gezy。",
       "typeLabel": "关于什么？",
       "messageLabel": "你的留言",
       "messagePlaceholder": {

@@ -27,7 +27,7 @@ import type {
   ImageRequest,
   ImageResult,
 } from '@/server/llm/image/types'
-import type { ImageModelParamsSchema, ImageParamSpec } from '@hivekeep/sdk'
+import type { ImageModelParamsSchema, ImageParamSpec } from '@gezy/sdk'
 import { createLogger } from '@/server/logger'
 
 const log = createLogger('openai-image')

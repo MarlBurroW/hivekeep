@@ -111,7 +111,7 @@ export const AgentList = memo(function AgentList({ agents, llmModels, selectedAg
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${data.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'agent'}.hivekeep.json`
+      a.download = `${data.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'agent'}.gezy.json`
       a.click()
       URL.revokeObjectURL(url)
     } catch {

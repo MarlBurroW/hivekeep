@@ -14,7 +14,7 @@ import * as HostReact from 'react'
 // makes their hooks work — a second React instance would throw "Invalid hook
 // call". See services/custom-tool-renderer.ts (banner const React = …) and
 // components/chat/CustomToolRenderer.tsx.
-;(window as unknown as { __HIVEKEEP_REACT__?: typeof HostReact }).__HIVEKEEP_REACT__ = HostReact
+;(window as unknown as { __GEZY_REACT__?: typeof HostReact }).__GEZY_REACT__ = HostReact
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

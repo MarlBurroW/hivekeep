@@ -23,7 +23,7 @@ import type { MiniAppSummary } from '@/shared/types'
 // SidePanelProvider at the App root, surviving navigation).
 const MiniAppViewer = lazy(() => import('@/client/components/mini-app/MiniAppViewer').then(m => ({ default: m.MiniAppViewer })))
 
-const VIEW_MODE_KEY = 'hivekeep:miniapps-page-view-mode'
+const VIEW_MODE_KEY = 'gezy:miniapps-page-view-mode'
 
 export function MiniAppsPage() {
   const { t } = useTranslation()

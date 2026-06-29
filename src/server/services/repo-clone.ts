@@ -15,7 +15,7 @@
  * polling.
  *
  * Security: the PAT is resolved from the vault on every clone, injected
- * into the child process via `HIVEKEEP_GH_TOKEN`, and read by an inline
+ * into the child process via `GEZY_GH_TOKEN`, and read by an inline
  * credential helper. It never touches the clone URL, the on-disk
  * `.git/config`, or any log line. See the credential helper string below.
  */
@@ -37,7 +37,7 @@ const log = createLogger('repo-clone')
 /**
  * Inline git credential helper. Git invokes the value after `!` via
  * `/bin/sh -c`; the shell inherits the env we pass to Bun.spawn, so
- * `$HIVEKEEP_GH_TOKEN` expands to the PAT. The helper ignores stdin and
+ * `$GEZY_GH_TOKEN` expands to the PAT. The helper ignores stdin and
  * unconditionally returns the GitHub bot username + the token — which is
  * fine because the clone URL is always github.com in this code path.
  *
@@ -48,7 +48,7 @@ const log = createLogger('repo-clone')
  * branches without re-deriving the format).
  */
 export const CREDENTIAL_HELPER =
-  '!f() { echo username=x-access-token; echo "password=$HIVEKEEP_GH_TOKEN"; }; f'
+  '!f() { echo username=x-access-token; echo "password=$GEZY_GH_TOKEN"; }; f'
 
 /**
  * Persist the GitHub credential helper inside the freshly-cloned repo so
@@ -216,7 +216,7 @@ async function runClone(
         dir,
       ],
       {
-        env: { ...process.env, HIVEKEEP_GH_TOKEN: pat },
+        env: { ...process.env, GEZY_GH_TOKEN: pat },
         stdout: 'pipe',
         stderr: 'pipe',
       },

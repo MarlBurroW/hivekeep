@@ -30,7 +30,7 @@ import type {
   ImageProvider,
   ImageModel,
   ImageModelParamsSchema,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'
 
 const FAKE_TYPE = '__test-image-provider__'
 

@@ -47,13 +47,13 @@ import type { TerminalSessionDTO, TerminalPresetDTO } from '@/shared/types'
  * xterm.js renders; a WebSocket at /api/terminal/ws carries input/output.
  */
 
-const SESSION_KEY = 'hivekeep.terminal.sessionId'
+const SESSION_KEY = 'gezy.terminal.sessionId'
 const PING_INTERVAL_MS = 30_000
 
 // Sessions sidebar width: draggable like the main app sidebar, persisted so it
 // survives reloads. The cards now carry a second line (cwd + command), so they
 // need more room than a fixed-narrow rail allowed.
-const SIDEBAR_WIDTH_KEY = 'hivekeep.terminal.sidebarWidth'
+const SIDEBAR_WIDTH_KEY = 'gezy.terminal.sidebarWidth'
 const SIDEBAR_WIDTH_DEFAULT = 300
 const SIDEBAR_WIDTH_MIN = 200
 const SIDEBAR_WIDTH_MAX = 560

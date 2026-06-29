@@ -219,7 +219,7 @@ export function TerminalPresetsDialog({
                 id="preset-cwd"
                 value={cwd}
                 onChange={(e) => setCwd(e.target.value)}
-                placeholder="~/projects/hivekeep"
+                placeholder="~/projects/gezy"
                 className="font-mono"
               />
               <p className="text-[11px] text-muted-foreground">{t('terminal.presets.cwdHelp')}</p>

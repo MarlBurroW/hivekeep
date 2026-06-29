@@ -696,7 +696,7 @@ export function PluginsSettings() {
         >
           <Input
             id="git-url"
-            placeholder="https://github.com/user/hivekeep-plugin-xxx.git"
+            placeholder="https://github.com/user/gezy-plugin-xxx.git"
             value={installUrl}
             onChange={(e) => setInstallUrl(e.target.value)}
           />

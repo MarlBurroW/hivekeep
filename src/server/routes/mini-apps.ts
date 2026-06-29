@@ -908,13 +908,13 @@ const THEME_SYNC_SCRIPT = `<script>
   }
   window.addEventListener('message',function(ev){
     var m=ev.data;
-    if(m&&m.source==='hivekeep-parent'&&m.type==='theme'&&m.data)apply(m.data);
+    if(m&&m.source==='gezy-parent'&&m.type==='theme'&&m.data)apply(m.data);
   });
 })();
 </script>`
 
-const SDK_LINK = '<link rel="stylesheet" href="/api/mini-apps/sdk/hivekeep-sdk.css">'
-const SDK_SCRIPT = '<script src="/api/mini-apps/sdk/hivekeep-sdk.js"></script>'
+const SDK_LINK = '<link rel="stylesheet" href="/api/mini-apps/sdk/gezy-sdk.css">'
+const SDK_SCRIPT = '<script src="/api/mini-apps/sdk/gezy-sdk.js"></script>'
 
 /** Base tag so relative paths (src="app.js", import "./utils.js") resolve to the static directory */
 function baseTag(appId: string): string {
@@ -1169,11 +1169,11 @@ miniAppSdkRoutes.use('*', cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'], 
 // through to the SPA catch-all (which returns index.html as `text/html`), and
 // the browser refuses the module — leaving every legacy mini-app blank.
 const SDK_ASSETS: { file: string; type: string; missing: string }[] = [
-  { file: 'hivekeep-sdk.js', type: 'application/javascript', missing: '/* Hivekeep SDK JS not found */' },
+  { file: 'gezy-sdk.js', type: 'application/javascript', missing: '/* Gezy SDK JS not found */' },
   { file: 'hivekeep-react.js', type: 'application/javascript', missing: '/* Hivekeep React SDK not found */' },
   { file: 'hivekeep-components.js', type: 'application/javascript', missing: '/* Hivekeep Components not found */' },
-  { file: 'hivekeep-sdk.css', type: 'text/css', missing: '/* Hivekeep SDK CSS not found */' },
-  { file: 'hivekeep-sdk.d.ts', type: 'application/typescript', missing: '// Type definitions not found' },
+  { file: 'gezy-sdk.css', type: 'text/css', missing: '/* Gezy SDK CSS not found */' },
+  { file: 'gezy-sdk.d.ts', type: 'application/typescript', missing: '// Type definitions not found' },
   { file: 'hivekeep-react.d.ts', type: 'application/typescript', missing: '// Type definitions not found' },
   { file: 'hivekeep-components.d.ts', type: 'application/typescript', missing: '// Type definitions not found' },
 ]

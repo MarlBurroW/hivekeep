@@ -24,8 +24,8 @@ import {
   NetworkError,
   ProviderServerError,
   InvalidRequestError,
-} from '@hivekeep/sdk'
-import type { AuthResult, ProviderConfig } from '@hivekeep/sdk'
+} from '@gezy/sdk'
+import type { AuthResult, ProviderConfig } from '@gezy/sdk'
 import type {
   STTProvider,
   TranscriptionModel,

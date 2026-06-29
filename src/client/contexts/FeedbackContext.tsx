@@ -38,7 +38,7 @@ const DEFAULT_STATE: FeedbackStateView = {
   enabled: false,
   shouldPrompt: false,
   starred: false,
-  githubUrl: 'https://github.com/MarlBurroW/hivekeep',
+  githubUrl: 'https://github.com/pgun/gezy',
 }
 
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {

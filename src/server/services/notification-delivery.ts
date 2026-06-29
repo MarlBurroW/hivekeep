@@ -309,7 +309,7 @@ export async function testNotificationChannel(id: string, userId: string): Promi
     const cfg = JSON.parse(channel.platformConfig) as Record<string, unknown>
     await adapter.sendMessage(channel.id, cfg, {
       chatId: nc.platformChatId,
-      content: '\uD83D\uDD14 This is a test notification from Hivekeep.',
+      content: '\uD83D\uDD14 This is a test notification from Gezy.',
     })
 
     // Reset errors on successful test

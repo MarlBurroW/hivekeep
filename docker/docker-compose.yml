@@ -4,20 +4,19 @@
 #
 # Configuration:
 #   Copy ../.env.example to .env and customize, or set env vars inline.
-#   See https://github.com/MarlBurroW/hivekeep#configuration for all options.
+#   See https://github.com/MarlBurroW/gezy#configuration for all options.
 
 services:
-  hivekeep:
-    image: ghcr.io/marlburrow/hivekeep:latest
-    # To build from source instead of pulling the image, uncomment:
-    # build:
-    #   context: ..
-    #   dockerfile: docker/Dockerfile
-    container_name: hivekeep
+  gezy:
+    # image: ghcr.io/marlburrow/gezy:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gezy
     ports:
       - "${PORT:-3000}:3000"
     volumes:
-      - hivekeep-data:/app/data
+      - gezy-data:/app/data
     environment:
       - PORT=3000
       - HOST=0.0.0.0
@@ -25,9 +24,15 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       # Uncomment to set the public-facing URL (needed for webhooks, invitations)
-      # - PUBLIC_URL=https://hivekeep.example.com
+      # - PUBLIC_URL=https://gezy.example.com
     healthcheck:
-      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))",
+        ]
       interval: 30s
       timeout: 5s
       start_period: 10s
@@ -35,4 +40,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  hivekeep-data:
+  gezy-data:

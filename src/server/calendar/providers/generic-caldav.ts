@@ -12,7 +12,7 @@ import type {
   CreateEventParams,
   UpdateEventParams,
 } from '@/server/calendar/types'
-import type { ProviderConfig, AuthResult } from '@hivekeep/sdk'
+import type { ProviderConfig, AuthResult } from '@gezy/sdk'
 
 function ops(config: ProviderConfig) {
   return calDavOps(

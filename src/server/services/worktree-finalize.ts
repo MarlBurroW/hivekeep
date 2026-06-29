@@ -268,7 +268,7 @@ async function dirExists(path: string): Promise<boolean> {
 
 async function taskEnv(projectRow: { githubPatVaultKey: string | null }): Promise<Record<string, string>> {
   const pat = await resolvePat(projectRow.githubPatVaultKey)
-  return pat ? { HIVEKEEP_GH_TOKEN: pat } : {}
+  return pat ? { GEZY_GH_TOKEN: pat } : {}
 }
 
 /** Exposed for tests / sub-ticket-tooling. */

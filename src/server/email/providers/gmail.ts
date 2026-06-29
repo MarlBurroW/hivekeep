@@ -22,7 +22,7 @@ import type {
   SendEmailParams,
   SendEmailResult,
 } from '@/server/email/types'
-import type { ProviderConfig, AuthResult } from '@hivekeep/sdk'
+import type { ProviderConfig, AuthResult } from '@gezy/sdk'
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
 

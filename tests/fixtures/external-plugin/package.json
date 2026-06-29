@@ -1,10 +1,10 @@
 {
-  "name": "hivekeep-plugin-external-fixture",
+  "name": "gezy-plugin-external-fixture",
   "version": "0.1.0",
   "description": "Test fixture simulating a third-party plugin published to npm that depends on @hivekeep/sdk as a peer dep. Loaded by src/server/services/plugins-e2e.test.ts.",
   "private": true,
   "main": "./index.ts",
   "peerDependencies": {
-    "@hivekeep/sdk": "^0.1.0"
+    "@gezy/sdk": "^0.1.0"
   }
 }

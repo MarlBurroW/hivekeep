@@ -12,4 +12,4 @@ export type {
   CreateEventParams,
   UpdateEventParams,
   CalendarProvider,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

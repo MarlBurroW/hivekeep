@@ -115,7 +115,7 @@
   },
   "login": {
     "title": "Bem-vindo de volta",
-    "subtitle": "Entre no seu workspace Hivekeep",
+    "subtitle": "Entre no seu workspace Gezy",
     "email": "E-mail",
     "emailPlaceholder": "voce@exemplo.com",
     "password": "Senha",
@@ -127,7 +127,7 @@
     "startOnboarding": "Configure seu workspace"
   },
   "onboarding": {
-    "title": "Bem-vindo ao Hivekeep",
+    "title": "Bem-vindo ao Gezy",
     "subtitle": "Vamos configurar seu workspace",
     "queenieGettingReady": "{{name}} está se preparando…",
     "step": "Etapa {{current}} de {{total}}",
@@ -880,8 +880,8 @@
     "thinkingEnable": "Habilitar raciocínio estendido para este Agente",
     "thinkingDisable": "Desabilitar raciocínio estendido para este Agente",
     "welcome": {
-      "title": "Bem-vindo ao Hivekeep",
-      "checklistIntro": "Comece em poucos passos simples. O Hivekeep vai guiar você na configuração da sua equipe de IA.",
+      "title": "Bem-vindo ao Gezy",
+      "checklistIntro": "Comece em poucos passos simples. O Gezy vai guiar você na configuração da sua equipe de IA.",
       "allDone": "Tudo pronto! Selecione um Agente na barra lateral para começar a conversar."
     },
     "shortcutHint": "para encontrar um Agente rapidamente",
@@ -1203,7 +1203,7 @@
       "renderAfterRun": "Execute um teste primeiro para pré-visualizar o renderizador."
     },
     "help": {
-      "content": "Ferramentas personalizadas permitem estender o Hivekeep com seus próprios scripts.",
+      "content": "Ferramentas personalizadas permitem estender o Gezy com seus próprios scripts.",
       "bullet1": "Cada ferramenta é um script em sua própria pasta; ela lê argumentos como JSON no stdin e imprime o resultado no stdout.",
       "bullet2": "Adicione um requirements.txt (Python) ou package.json (Node/Bun) e clique em Instalar para configurar as dependências.",
       "bullet3": "Conceda uma ferramenta a um Agente adicionando custom_<slug> a uma de suas caixas de ferramentas."
@@ -1317,8 +1317,8 @@
       "fetchError": "Falha ao carregar as configurações",
       "publicUrlWarning": {
         "title": "A URL pública pode estar mal configurada",
-        "body": "Você está acessando o Hivekeep em {{actual}}, mas a URL pública configurada é {{configured}}. Links de convite, webhooks e callbacks OAuth são construídos a partir da URL pública, então apontarão para {{configured}} e podem ficar inacessíveis.",
-        "fix": "Defina PUBLIC_URL como {{actual}} e reinicie. Docker: -e PUBLIC_URL={{actual}} (ou no seu .env); instalação nativa: HIVEKEEP_PUBLIC_URL={{actual}}."
+        "body": "Você está acessando o Gezy em {{actual}}, mas a URL pública configurada é {{configured}}. Links de convite, webhooks e callbacks OAuth são construídos a partir da URL pública, então apontarão para {{configured}} e podem ficar inacessíveis.",
+        "fix": "Defina PUBLIC_URL como {{actual}} e reinicie. Docker: -e PUBLIC_URL={{actual}} (ou no seu .env); instalação nativa: GEZY_PUBLIC_URL={{actual}}."
       },
       "interface": {
         "title": "Interface"
@@ -1440,7 +1440,7 @@
       "emptyDescription": "Adicione um provedor de IA como OpenAI, Anthropic ou Gemini para alimentar seus Agentes.",
       "modelsModal": {
         "title": "Explorar {{name}}",
-        "description": "Modelos e vozes que o provedor expõe agora (obtidos ao vivo da API dele). Use esta lista para verificar o que está disponível sem sair do Hivekeep.",
+        "description": "Modelos e vozes que o provedor expõe agora (obtidos ao vivo da API dele). Use esta lista para verificar o que está disponível sem sair do Gezy.",
         "loading": "Carregando…",
         "fetchError": "Não foi possível carregar",
         "allCapabilities": "Todas",
@@ -1862,13 +1862,13 @@
       "typeOrSearch": "Digite ou busque...",
       "revokePlatformIdConfirm": "Revogar este acesso de plataforma? O contato não poderá mais interagir por esta plataforma.",
       "deleteNoteConfirm": "Excluir permanentemente esta nota?",
-      "linkToUserTip": "Vincule este contato a uma conta de usuário existente do Hivekeep. Permite que os Agentes o reconheçam em todos os canais.",
+      "linkToUserTip": "Vincule este contato a uma conta de usuário existente do Gezy. Permite que os Agentes o reconheçam em todos os canais.",
       "identifiersTip": "Campos de contato personalizados (e-mail, celular, Twitter, LinkedIn, ID do Telegram, etc.) para que os Agentes reconheçam este contato em diferentes plataformas.",
       "help": {
         "content": "O registro de contatos permite que seus Agentes reconheçam as pessoas com quem interagem em diferentes plataformas e personalizem suas respostas.",
         "bullet1": "Vincule identificadores de plataforma (Telegram, Discord, etc.) para que o Agente reconheça usuários automaticamente",
         "bullet2": "Os Agentes podem adicionar notas privadas em cada contato para lembrar o contexto",
-        "bullet3": "Vincule um contato a uma conta de usuário do Hivekeep para unificar a identidade em todos os canais",
+        "bullet3": "Vincule um contato a uma conta de usuário do Gezy para unificar a identidade em todos os canais",
         "bullet4": "Adicione vários apelidos para que o Agente reconheça um contato por qualquer nome que ele use"
       }
     },
@@ -1998,7 +1998,7 @@
       },
       "emptyDescription": "Convide outras pessoas para colaborar e usar seus Agentes.",
       "help": {
-        "content": "Gerencie os usuários que têm acesso à sua instância do Hivekeep. Convide amigos ou colegas para que possam conversar com seus Agentes.",
+        "content": "Gerencie os usuários que têm acesso à sua instância do Gezy. Convide amigos ou colegas para que possam conversar com seus Agentes.",
         "bullet1": "Crie links de convite com prazo de expiração configurável",
         "bullet2": "Cada usuário tem sua própria conta e conversas",
         "bullet3": "Convites podem ser revogados a qualquer momento antes de serem usados"
@@ -2010,7 +2010,7 @@
       "subtitle": "Conecte agendas externas para que seus Agentes possam consultar contatos (somente leitura).",
       "add": "Adicionar agenda",
       "addTitle": "Adicionar uma agenda",
-      "addDescription": "Conecte uma fonte externa de contatos. Somente leitura: eles nunca entram nos contatos do próprio Hivekeep.",
+      "addDescription": "Conecte uma fonte externa de contatos. Somente leitura: eles nunca entram nos contatos do próprio Gezy.",
       "provider": "Provedor",
       "connect": "Conectar {{provider}}",
       "connected": "Agenda {{provider}} conectada",
@@ -2021,7 +2021,7 @@
       "emptyTitle": "Nenhuma agenda conectada",
       "emptyDescription": "Conecte o iCloud (ou outra fonte CardDAV) para que seus Agentes possam consultar o telefone ou e-mail de um contato.",
       "help": {
-        "content": "Conecte uma agenda externa (ex.: iCloud via senha específica de app). Os Agentes podem então consultar contatos em modo somente leitura, por exemplo para encontrar um número de telefone antes de enviar um SMS. Esses contatos nunca são copiados para os contatos do próprio Hivekeep."
+        "content": "Conecte uma agenda externa (ex.: iCloud via senha específica de app). Os Agentes podem então consultar contatos em modo somente leitura, por exemplo para encontrar um número de telefone antes de enviar um SMS. Esses contatos nunca são copiados para os contatos do próprio Gezy."
       }
     },
     "triggers": {
@@ -2106,7 +2106,7 @@
       "configureAppFirst": "Configure o app {{provider}} acima antes de conectar uma conta.",
       "help": {
         "content": "Conecte uma conta Gmail via OAuth. Primeiro configure um app OAuth no Google Cloud (client ID + secret), depois clique em Conectar e autorize o acesso.",
-        "bullet1": "Crie um app OAuth no Google Cloud Console com os escopos do Gmail e registre a URI de redirecionamento exibida pelo seu host Hivekeep (…/api/email-accounts/oauth/callback).",
+        "bullet1": "Crie um app OAuth no Google Cloud Console com os escopos do Gmail e registre a URI de redirecionamento exibida pelo seu host Gezy (…/api/email-accounts/oauth/callback).",
         "bullet2": "Cole o client ID e o secret abaixo, depois clique em Conectar para autorizar a caixa de e-mail.",
         "bullet3": "Conceda a um Agente a caixa de ferramentas \"email\" para que ele liste, leia, busque e envie e-mails pelas contas conectadas."
       },
@@ -2301,7 +2301,7 @@
       "labelTip": "Um nome amigável para identificar este canal de entrega na lista.",
       "noChannelsDescription": "Adicione um canal de entrega para receber notificações no Telegram, Discord, e-mail ou outras plataformas.",
       "help": {
-        "content": "As notificações mantêm você informado sobre eventos importantes no Hivekeep. Você pode ligar ou desligar tipos individuais de notificação e configurar canais de entrega externos para recebê-las em plataformas como Telegram, Discord ou e-mail.",
+        "content": "As notificações mantêm você informado sobre eventos importantes no Gezy. Você pode ligar ou desligar tipos individuais de notificação e configurar canais de entrega externos para recebê-las em plataformas como Telegram, Discord ou e-mail.",
         "bullet1": "Alterne os tipos de notificação para controlar o que aparece no sino de notificações",
         "bullet2": "Canais de entrega externos encaminham notificações para suas plataformas preferidas",
         "bullet3": "Cada canal de entrega pode filtrar por tipo de notificação para um controle refinado",
@@ -2332,7 +2332,7 @@
     },
     "plugins": {
       "title": "Plugins",
-      "description": "Gerencie plugins que estendem o Hivekeep com novas ferramentas, hooks e integrações.",
+      "description": "Gerencie plugins que estendem o Gezy com novas ferramentas, hooks e integrações.",
       "reload": "Recarregar",
       "reloaded": "Plugins recarregados",
       "checkUpdates": "Verificar atualizações",
@@ -2383,7 +2383,7 @@
     },
     "marketplace": {
       "title": "Explorar Plugins",
-      "description": "Plugins publicados no npm com a palavra-chave `hivekeep-plugin`. Qualquer pessoa pode publicar. Revise o autor do pacote e o repositório de origem antes de instalar.",
+      "description": "Plugins publicados no npm com a palavra-chave `gezy-plugin`. Qualquer pessoa pode publicar. Revise o autor do pacote e o repositório de origem antes de instalar.",
       "refresh": "Atualizar",
       "searchPlaceholder": "Buscar no npm...",
       "allTags": "Todos",
@@ -2463,8 +2463,8 @@
     },
     "updates": {
       "title": "Atualizações",
-      "description": "Mantenha esta instância do Hivekeep atualizada.",
-      "help": "O Hivekeep verifica novas versões no GitHub periodicamente. O canal estável segue os lançamentos oficiais; o canal edge segue o commit mais recente da branch main (para testar mudanças não lançadas). A autoatualização está disponível para instalações gerenciadas pelo install.sh; instalações Docker são atualizadas baixando uma imagem mais nova.",
+      "description": "Mantenha esta instância do Gezy atualizada.",
+      "help": "O Gezy verifica novas versões no GitHub periodicamente. O canal estável segue os lançamentos oficiais; o canal edge segue o commit mais recente da branch main (para testar mudanças não lançadas). A autoatualização está disponível para instalações gerenciadas pelo install.sh; instalações Docker são atualizadas baixando uma imagem mais nova.",
       "channelLabel": "Canal de atualização",
       "channelTip": "Qual fluxo de atualizações esta instância segue.",
       "channelSaved": "Canal de atualização salvo",
@@ -2983,7 +2983,7 @@
     }
   },
   "invite": {
-    "title": "Junte-se ao Hivekeep",
+    "title": "Junte-se ao Gezy",
     "subtitle": "Você foi convidado a entrar neste workspace",
     "invalidToken": "Este link de convite é inválido ou expirou.",
     "backToLogin": "Ir para o login",
@@ -3146,7 +3146,7 @@
     "channelOnline": "Canal conectado",
     "channelOffline": "Canal desconectado",
     "channelError": "Erro de conexão do canal",
-    "updateAvailable": "Hivekeep {{version}} está disponível",
+    "updateAvailable": "Gezy {{version}} está disponível",
     "viewRelease": "Ver"
   },
   "errorBoundary": {
@@ -3164,10 +3164,10 @@
     "howToUpdate": "Como atualizar",
     "dockerInstructions": "Execute o comando a seguir no diretório que contém seu docker-compose.yml:",
     "dockerTagNote": "Se o seu arquivo compose fixa uma tag de versão específica, mude-a para {{version}} (ou use a tag latest) antes de baixar.",
-    "selfUpdateInstructions": "O Hivekeep fará um snapshot do banco de dados, baixará a nova versão e reiniciará. Se algo der errado, a versão anterior é restaurada automaticamente.",
+    "selfUpdateInstructions": "O Gezy fará um snapshot do banco de dados, baixará a nova versão e reiniciará. Se algo der errado, a versão anterior é restaurada automaticamente.",
     "adminOnly": "Apenas administradores podem aplicar atualizações.",
     "devModeNote": "Esta instância está rodando em modo de desenvolvimento. Atualize-a a partir do seu checkout git.",
-    "manualInstallNote": "Esta instalação não é gerenciada pelo Hivekeep. Atualize-a da mesma forma que foi instalada.",
+    "manualInstallNote": "Esta instalação não é gerenciada pelo Gezy. Atualize-a da mesma forma que foi instalada.",
     "viewOnGitHub": "Ver no GitHub",
     "updateButton": "Atualizar agora",
     "updateSuccess": "Atualizado para {{version}}!",
@@ -3291,7 +3291,7 @@
     },
     "disabled": {
       "title": "O terminal está desativado",
-      "description": "Este recurso está desativado nesta instância. Defina HIVEKEEP_TERMINAL_ENABLED=true e reinicie o servidor para ativá-lo."
+      "description": "Este recurso está desativado nesta instância. Defina GEZY_TERMINAL_ENABLED=true e reinicie o servidor para ativá-lo."
     },
     "sessions": {
       "title": "Sessões",
@@ -3327,7 +3327,7 @@
       "emptyDescription": "Crie um preset para abrir sessões em um diretório e executar um comando de inicialização.",
       "nameRequired": "Um nome é obrigatório",
       "nameLabel": "Nome",
-      "namePlaceholder": "ex. Hivekeep + Claude",
+      "namePlaceholder": "ex. Gezy + Claude",
       "cwdLabel": "Diretório de trabalho",
       "cwdHelp": "A sessão começa aqui. ~ corresponde à sua pasta pessoal. Vazio = pasta pessoal.",
       "initLabel": "Script de init",
@@ -3728,7 +3728,7 @@
   },
   "updateProgress": {
     "title": "Atualização em andamento",
-    "keepOpen": "Mantenha esta página aberta. O Hivekeep fica indisponível durante a atualização e será recarregado automaticamente ao terminar.",
+    "keepOpen": "Mantenha esta página aberta. O Gezy fica indisponível durante a atualização e será recarregado automaticamente ao terminar.",
     "waitingForServer": "O servidor está reiniciando… aguardando ele voltar",
     "reloading": "A página será recarregada automaticamente.",
     "failedTitle": "Falha na atualização",
@@ -3868,7 +3868,7 @@
     "resizeTree": "Redimensionar a árvore de arquivos"
   },
   "updateOverlay": {
-    "title": "Atualizando o Hivekeep",
+    "title": "Atualizando o Gezy",
     "successTitle": "Atualizacao concluida",
     "toVersion": "Atualizando para {{version}}"
   },
@@ -3888,7 +3888,7 @@
   },
   "feedback": {
     "banner": {
-      "message": "Curtindo o Hivekeep? Uma estrela ou um comentário ajuda muito.",
+      "message": "Curtindo o Gezy? Uma estrela ou um comentário ajuda muito.",
       "star": "Estrela",
       "give": "Dar feedback",
       "later": "Mais tarde",
@@ -3896,7 +3896,7 @@
     },
     "dialog": {
       "title": "Compartilhe seu feedback",
-      "description": "Bug, ideia ou só sua experiência: tudo ajuda a melhorar o Hivekeep.",
+      "description": "Bug, ideia ou só sua experiência: tudo ajuda a melhorar o Gezy.",
       "typeLabel": "Sobre o que é?",
       "messageLabel": "Sua mensagem",
       "messagePlaceholder": {

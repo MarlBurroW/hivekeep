@@ -9,4 +9,4 @@ export type {
   SearchAnswer,
   SearchResult,
   SearchProvider,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

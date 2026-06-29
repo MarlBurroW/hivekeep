@@ -175,7 +175,7 @@ function markDirty(session: TerminalSession) {
 /** Dedicated tmux server socket so Hivekeep's sessions and global options
  *  (history-limit, mouse, clipboard) stay isolated from the user's own tmux on
  *  the default socket. Every tmux call below targets this socket. */
-const TMUX_SOCKET = 'hivekeep'
+const TMUX_SOCKET = 'gezy'
 
 /** Per-pane scrollback tmux keeps (default is only 2000 lines, which makes long
  *  output like Claude Code feel truncated when scrolling back). */
@@ -192,7 +192,7 @@ let tmuxAvail: boolean | null = null
  *  back themselves with tmux when true (true process survival across a
  *  process-only restart), and fall back to a direct PTY when false. */
 export function isTmuxAvailable(): boolean {
-  if (process.env.HIVEKEEP_TERMINAL_TMUX === 'off') return false
+  if (process.env.GEZY_TERMINAL_TMUX === 'off') return false
   if (tmuxAvail !== null) return tmuxAvail
   try {
     execFileSync('tmux', ['-V'], { stdio: 'ignore' })

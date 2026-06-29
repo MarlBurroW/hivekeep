@@ -7,7 +7,7 @@
  * stays minimal on purpose — plugins receive the same context shape
  * at runtime but don't get typed access to host-internal fields they
  * shouldn't be reading. Server-internal tool files import from this
- * module instead of `@hivekeep/sdk` directly so they get the
+ * module instead of `@gezy/sdk` directly so they get the
  * widened context.
  */
 
@@ -16,9 +16,9 @@ import type {
   ToolFactory as SdkToolFactory,
   ToolRegistration as SdkToolRegistration,
   Tool,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'
 
-export type { ToolAvailability } from '@hivekeep/sdk'
+export type { ToolAvailability } from '@gezy/sdk'
 
 /**
  * Server-side widened execution context. Same as the SDK's shape plus a

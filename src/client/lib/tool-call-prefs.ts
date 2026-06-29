@@ -7,7 +7,7 @@
  * a user expands or collapses an individual call, that interaction wins.
  */
 
-const STORAGE_KEY = 'hivekeep-tools-default-open'
+const STORAGE_KEY = 'gezy-tools-default-open'
 
 /** Returns true when tool calls should be expanded by default. Defaults to false. */
 export function getToolCallsDefaultOpen(): boolean {

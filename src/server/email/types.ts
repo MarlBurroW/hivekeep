@@ -17,4 +17,4 @@ export type {
   SendEmailResult,
   OAuthProfile,
   EmailProvider,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

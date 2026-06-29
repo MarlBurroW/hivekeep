@@ -851,7 +851,7 @@ export function AgentFormModal({
                   <input
                     ref={importFileRef}
                     type="file"
-                    accept=".json,.hivekeep.json"
+                    accept=".json,.gezy.json"
                     className="hidden"
                     onChange={handleImportFile}
                   />

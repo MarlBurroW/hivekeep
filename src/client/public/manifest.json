@@ -1,6 +1,6 @@
 {
-  "name": "Hivekeep",
-  "short_name": "Hivekeep",
+  "name": "Gezy",
+  "short_name": "Gezy",
   "description": "Self-hosted platform of specialized AI agents",
   "start_url": "/",
   "display": "standalone",
@@ -8,25 +8,25 @@
   "theme_color": "#7c3aed",
   "icons": [
     {
-      "src": "/hivekeep-192.png",
+      "src": "/gezy-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/hivekeep-512.png",
+      "src": "/gezy-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/hivekeep-maskable-512.png",
+      "src": "/gezy-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/hivekeep.svg",
+      "src": "/gezy.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     }

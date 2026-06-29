@@ -7,4 +7,4 @@ export type {
   ImageRequest,
   ImageResult,
   ImageProvider,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

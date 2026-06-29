@@ -2,7 +2,7 @@
  * LLM provider types — re-exports from the SDK. Single source of truth in
  * `packages/sdk/src/index.ts`.
  */
-export { THINKING_EFFORT_ORDER, downgradeEffort } from '@hivekeep/sdk'
+export { THINKING_EFFORT_ORDER, downgradeEffort } from '@gezy/sdk'
 export type {
   ThinkingEffort,
   LLMModel,
@@ -19,4 +19,4 @@ export type {
   ChatRequest,
   ChatChunk,
   LLMProvider,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

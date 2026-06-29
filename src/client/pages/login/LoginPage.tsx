@@ -4,7 +4,7 @@ import { Input } from '@/client/components/ui/input'
 import { PasswordInput } from '@/client/components/ui/password-input'
 import { Button } from '@/client/components/ui/button'
 import { Label } from '@/client/components/ui/label'
-import { HivekeepLogo } from '@/client/components/common/HivekeepLogo'
+import { GezyLogo } from '@/client/components/common/GezyLogo'
 import { Alert, AlertDescription } from '@/client/components/ui/alert'
 import { AlertCircle, Loader2 } from 'lucide-react'
 
@@ -45,8 +45,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <div className="glass-strong rounded-2xl p-8 shadow-lg">
           {/* Header */}
           <div className="mb-8 text-center">
-            <HivekeepLogo size={64} title={null} className="mx-auto mb-3" />
-            <h1 className="text-3xl font-extrabold text-foreground">Hivekeep</h1>
+            <GezyLogo size={64} title={null} className="mx-auto mb-3" />
+            <h1 className="text-3xl font-extrabold text-foreground">Gezy</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {t('login.subtitle')}
             </p>

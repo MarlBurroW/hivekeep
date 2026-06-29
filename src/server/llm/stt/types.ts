@@ -8,4 +8,4 @@ export type {
   TranscribeResult,
   STTCapabilities,
   STTProvider,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

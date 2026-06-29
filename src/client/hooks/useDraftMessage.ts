@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const DRAFT_PREFIX = 'hivekeep:draft:'
+const DRAFT_PREFIX = 'gezy:draft:'
 const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const SAVE_DEBOUNCE_MS = 300
 

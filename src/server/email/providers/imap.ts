@@ -26,7 +26,7 @@ import type {
   SendEmailParams,
   SendEmailResult,
 } from '@/server/email/types'
-import type { ProviderConfig, AuthResult } from '@hivekeep/sdk'
+import type { ProviderConfig, AuthResult } from '@gezy/sdk'
 import { stripMessageId } from '@/shared/account-triggers'
 
 // ─── Pure helpers (exported for tests) ───────────────────────────────────────

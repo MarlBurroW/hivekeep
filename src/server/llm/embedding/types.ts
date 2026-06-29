@@ -7,4 +7,4 @@ export type {
   EmbedRequest,
   EmbedResult,
   EmbeddingProvider,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

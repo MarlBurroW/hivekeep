@@ -3,7 +3,7 @@
  * @version 1.19.0
  *
  * These types describe the global `Hivekeep` object auto-injected into mini-app iframes.
- * Import type reference: `/// <reference path="hivekeep-sdk.d.ts" />`
+ * Import type reference: `/// <reference path="gezy-sdk.d.ts" />`
  */
 
 // ─── Core Types ─────────────────────────────────────────────────────────────

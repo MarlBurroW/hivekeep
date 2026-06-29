@@ -16,7 +16,7 @@
  * against the copy (see docs/testing-instance.md). NEVER point at the prod env.
  *
  * Usage:
- *   bun scripts/seed-test-db.ts                # seeds ~/.local/share/hivekeep-testdata
+ *   bun scripts/seed-test-db.ts                # seeds ~/.local/share/gezy-testdata
  *   TESTDATA_DIR=/path bun scripts/seed-test-db.ts
  *   FRESH=1 bun scripts/seed-test-db.ts        # wipe + reseed from scratch
  *
@@ -27,7 +27,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 
-const DATA_DIR = process.env.TESTDATA_DIR || join(homedir(), '.local/share/hivekeep-testdata')
+const DATA_DIR = process.env.TESTDATA_DIR || join(homedir(), '.local/share/gezy-testdata')
 const DB_PATH = join(DATA_DIR, 'hivekeep.db')
 const PORT = Number(process.env.TESTDB_PORT || 4178)
 const BASE = `http://localhost:${PORT}`

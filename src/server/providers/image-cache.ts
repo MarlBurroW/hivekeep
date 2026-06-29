@@ -19,7 +19,7 @@
  */
 
 import type { ProviderConfig as HivekeepProviderConfig } from '@/server/llm/core/types'
-import type { ImageModel, ImageModelParamsSchema } from '@hivekeep/sdk'
+import type { ImageModel, ImageModelParamsSchema } from '@gezy/sdk'
 import { getImageProvider } from '@/server/llm/image/registry'
 
 const IMAGE_MODEL_CACHE_TTL_MS = 5 * 60_000

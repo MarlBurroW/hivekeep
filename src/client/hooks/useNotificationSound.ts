@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useSSE } from '@/client/hooks/useSSE'
 
-const STORAGE_KEY = 'hivekeep:notification-sound'
+const STORAGE_KEY = 'gezy:notification-sound'
 
 /** Read the user preference from localStorage (default: enabled). */
 export function getNotificationSoundEnabled(): boolean {

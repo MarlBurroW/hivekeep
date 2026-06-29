@@ -22,7 +22,7 @@ import { createHash, randomBytes } from 'crypto'
 // PkceClient / PkceTokenResponse are declared in the SDK (single source of
 // truth) so plugin providers can declare an `oauth` descriptor too. The runtime
 // dance (mint/build/exchange) stays host-side, here.
-import type { PkceClient, PkceTokenResponse } from '@hivekeep/sdk'
+import type { PkceClient, PkceTokenResponse } from '@gezy/sdk'
 
 export type { PkceClient, PkceTokenResponse }
 

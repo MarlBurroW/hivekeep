@@ -12,7 +12,7 @@ import type {
   Contact,
   ContactSearchQuery,
 } from '@/server/contacts/types'
-import type { ProviderConfig, AuthResult } from '@hivekeep/sdk'
+import type { ProviderConfig, AuthResult } from '@gezy/sdk'
 
 // Re-exported so existing tests (and callers) keep their import path.
 export { parseVCard, vcardToContact, contactMatches } from '@/server/contacts/providers/carddav-core'

@@ -6,7 +6,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY package.json bun.lock ./
-# Workspace members must be present so `@hivekeep/sdk` (workspace:*) resolves.
+# Workspace members must be present so `@gezy/sdk` (workspace:*) resolves.
 COPY packages ./packages
 RUN bun install --frozen-lockfile
 
@@ -21,16 +21,16 @@ RUN bun run build
 FROM oven/bun:1 AS production
 WORKDIR /app
 
-LABEL org.opencontainers.image.title="Hivekeep" \
+LABEL org.opencontainers.image.title="Gezy" \
       org.opencontainers.image.description="Self-hosted AI agents with persistent memory, real identity, and collaboration" \
-      org.opencontainers.image.url="https://github.com/MarlBurroW/hivekeep" \
-      org.opencontainers.image.source="https://github.com/MarlBurroW/hivekeep" \
+      org.opencontainers.image.url="https://github.com/MarlBurroW/gezy" \
+      org.opencontainers.image.source="https://github.com/MarlBurroW/gezy" \
       org.opencontainers.image.licenses="MIT"
 
 # Install production dependencies (better-sqlite3 needs build tools for node-gyp)
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json bun.lock ./
-# The server imports `@hivekeep/sdk` (workspace pkg shipping TS source)
+# The server imports `@gezy/sdk` (workspace pkg shipping TS source)
 # at runtime, so the workspace members must be present for the production install
 # AND must persist in the final image (Bun runs the SDK's src directly).
 COPY packages ./packages
@@ -58,8 +58,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends gosu npm tmux &
 # just above) rather than a pinned `playwright@x.y.z` — the browser build must
 # match the installed library version, and the lockfile range can resolve upward.
 #
-# Install to a global path that the dropped-privilege runtime user (hivekeep,
-# UID 1001) can read — the entrypoint execs the server via `gosu hivekeep`, so a
+# Install to a global path that the dropped-privilege runtime user (gezy,
+# UID 1001) can read — the entrypoint execs the server via `gosu gezy`, so a
 # browser installed under root's $HOME (~/.cache/ms-playwright) would be invisible.
 # `--with-deps` pulls the OS shared libraries Chromium needs via apt; we install
 # only chromium (not firefox/webkit) to keep the image lean, then chmod the
@@ -81,22 +81,22 @@ COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build /app/.env.example ./.env.example
 
 # Create non-root user for security
-RUN groupadd --gid 1001 hivekeep && \
-    useradd --uid 1001 --gid hivekeep --shell /bin/sh --create-home hivekeep
+RUN groupadd --gid 1001 gezy && \
+    useradd --uid 1001 --gid gezy --shell /bin/sh --create-home gezy
 
 # Create data directory with correct ownership
-RUN mkdir -p /app/data && chown -R hivekeep:hivekeep /app/data
+RUN mkdir -p /app/data && chown -R gezy:gezy /app/data
 
 # Environment
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
-ENV HIVEKEEP_DATA_DIR=/app/data
+ENV GEZY_DATA_DIR=/app/data
 
 # Git sha baked by CI — images have no .git, the edge update channel uses
 # this to compare the running code against origin/main.
 ARG GIT_SHA=""
-ENV HIVEKEEP_GIT_SHA=$GIT_SHA
+ENV GEZY_GIT_SHA=$GIT_SHA
 
 EXPOSE 3000
 

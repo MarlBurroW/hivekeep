@@ -1467,7 +1467,7 @@ export function buildEnrichmentBrief(input: {
     `## What to do\n\n` +
     `1. Read the existing ticket title, description, and tags (visible in the "Ticket you are working on" block above).\n` +
     `2. Gather context. Use any tool that helps:\n` +
-    `   - read_file / grep / list_directory on the project repo (hivekeep-dev/) for code and docs\n` +
+    `   - read_file / grep / list_directory on the project repo (gezy-dev/) for code and docs\n` +
     `   - search_history if the ticket might have been discussed in chat\n` +
     `   - list_tickets / get_ticket to cross-check related tickets in the same project\n` +
     `   - If a GitHub URL is set on the project, you may consult GitHub issues for additional context.\n` +

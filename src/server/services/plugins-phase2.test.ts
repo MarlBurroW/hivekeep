@@ -6,7 +6,7 @@ import {
 } from '@/server/llm/llm/registry'
 import { getPluginProviderMeta, getCapabilitiesForType } from '@/server/providers/index'
 import { channelAdapters } from '@/server/channels/index'
-import type { LLMProvider, ChatRequest, ChatChunk } from '@hivekeep/sdk'
+import type { LLMProvider, ChatRequest, ChatChunk } from '@gezy/sdk'
 
 describe('Plugin LLM provider registration (native shape)', () => {
   const fakeType = 'plugin:fake-test-plugin:test-llm'

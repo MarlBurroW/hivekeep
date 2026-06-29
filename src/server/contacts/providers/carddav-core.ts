@@ -12,7 +12,7 @@ import type {
   ContactEmailAddress,
   ContactSearchQuery,
   AuthResult,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'
 
 export interface CardDavCreds {
   serverUrl: string

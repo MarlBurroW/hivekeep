@@ -17,7 +17,7 @@ import { getContactsProvider } from '@/server/contacts/registry'
 import { getFreshAccessToken } from '@/server/services/email-token-manager'
 import { createLogger } from '@/server/logger'
 import type { ContactsProvider } from '@/server/contacts/types'
-import type { ProviderConfig } from '@hivekeep/sdk'
+import type { ProviderConfig } from '@gezy/sdk'
 
 const log = createLogger('contacts-accounts')
 

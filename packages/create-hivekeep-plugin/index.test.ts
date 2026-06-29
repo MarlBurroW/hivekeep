@@ -41,18 +41,18 @@ describe('generatePackageJson', () => {
     expect(pkg.keywords).toContain('hivekeep')
   })
 
-  test('declares @hivekeep/sdk as a peerDependency, NOT a regular dependency', () => {
+  test('declares @gezy/sdk as a peerDependency, NOT a regular dependency', () => {
     // Critical: a regular dependency would let bun install a SECOND
     // copy of the SDK and break instanceof checks across the
     // plugin/host boundary.
     const pkg = JSON.parse(generatePackageJson(defaultOpts))
-    expect(pkg.peerDependencies['@hivekeep/sdk']).toBeTruthy()
-    expect(pkg.dependencies['@hivekeep/sdk']).toBeUndefined()
+    expect(pkg.peerDependencies['@gezy/sdk']).toBeTruthy()
+    expect(pkg.dependencies['@gezy/sdk']).toBeUndefined()
   })
 
   test('lists the SDK in devDependencies so the plugin can compile against types in dev', () => {
     const pkg = JSON.parse(generatePackageJson(defaultOpts))
-    expect(pkg.devDependencies['@hivekeep/sdk']).toBeTruthy()
+    expect(pkg.devDependencies['@gezy/sdk']).toBeTruthy()
   })
 
   test('files array limits what ships in the published tarball', () => {
@@ -84,7 +84,7 @@ describe('generatePackageJson', () => {
 describe('generateIndex', () => {
   test('includes tool boilerplate for tools type', () => {
     const code = generateIndex({ ...defaultOpts, types: ['tools'] })
-    expect(code).toContain("import { tool, z } from '@hivekeep/sdk'")
+    expect(code).toContain("import { tool, z } from '@gezy/sdk'")
     expect(code).toContain('hello:')
     expect(code).toContain('inputSchema')
   })
@@ -95,7 +95,7 @@ describe('generateIndex', () => {
     // Hooks-only does not need any runtime import from the SDK (no tool() / no card.*)
     expect(code).not.toContain("import { tool")
     // But it DOES need the type imports for PluginContext / PluginExports.
-    expect(code).toContain("import type { PluginContext, PluginExports } from '@hivekeep/sdk'")
+    expect(code).toContain("import type { PluginContext, PluginExports } from '@gezy/sdk'")
   })
 
   test('includes a native LLMProvider skeleton for providers type', () => {
@@ -179,7 +179,7 @@ describe('scaffold', () => {
     const raw = readFileSync(join(dir, 'package.json'), 'utf-8')
     const pkg = JSON.parse(raw)
     expect(pkg.keywords).toContain('hivekeep-plugin')
-    expect(pkg.peerDependencies['@hivekeep/sdk']).toBeTruthy()
+    expect(pkg.peerDependencies['@gezy/sdk']).toBeTruthy()
   })
 
   test('plugin.json is valid JSON', () => {

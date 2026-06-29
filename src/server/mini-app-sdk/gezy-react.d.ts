@@ -8,7 +8,7 @@ import type {
   HivekeepApi, HivekeepHttp, HivekeepClipboard, HivekeepEvents, HivekeepApps,
   HivekeepMemory, HivekeepConversation, MiniAppInfo, MemoryResult,
   CreatedMemory, ConversationMessage, SharedData, ToastType,
-} from './hivekeep-sdk';
+} from './gezy-sdk';
 
 // ─── useHivekeep ──────────────────────────────────────────────────────────────
 

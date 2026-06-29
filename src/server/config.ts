@@ -3,13 +3,13 @@ import { join, resolve } from 'path'
 import os from 'os'
 import { parseModelEnv } from '@/shared/model-ref'
 
-const dataDir = process.env.HIVEKEEP_DATA_DIR ?? './data'
+const dataDir = process.env.GEZY_DATA_DIR ?? './data'
 
 /** Read version from package.json (works whether started via `bun run start` or `bun src/server/index.ts`). */
 const appVersion: string = (() => {
   // Highest priority: explicit env var (set by Dockerfile or user)
-  if (process.env.HIVEKEEP_VERSION && process.env.HIVEKEEP_VERSION !== '0.0.0') {
-    return process.env.HIVEKEEP_VERSION.replace(/^v/, '')
+  if (process.env.GEZY_VERSION && process.env.GEZY_VERSION !== '0.0.0') {
+    return process.env.GEZY_VERSION.replace(/^v/, '')
   }
 
   // Try multiple resolution strategies for Docker + dev compatibility
@@ -69,11 +69,11 @@ import type { InstallationType } from '@/shared/types'
 
 function detectInstallationType(): InstallationType {
   // Docker: /.dockerenv file or known Docker data dir
-  if (existsSync('/.dockerenv') || process.env.HIVEKEEP_DATA_DIR === '/app/data') {
+  if (existsSync('/.dockerenv') || process.env.GEZY_DATA_DIR === '/app/data') {
     return 'docker'
   }
   // launchd (macOS service): XPC_SERVICE_NAME is set for launchd-managed jobs
-  if (process.env.XPC_SERVICE_NAME && process.env.XPC_SERVICE_NAME.includes('hivekeep')) {
+  if (process.env.XPC_SERVICE_NAME && process.env.XPC_SERVICE_NAME.includes('gezy')) {
     return 'launchd'
   }
   // systemd: INVOCATION_ID is set by systemd for all service processes
@@ -93,8 +93,8 @@ function detectInstallationType(): InstallationType {
 /** Try to find the env file path for the current installation. */
 function findEnvFilePath(): string | null {
   // 1. Explicit env var
-  if (process.env.HIVEKEEP_ENV_FILE && existsSync(process.env.HIVEKEEP_ENV_FILE)) {
-    return resolve(process.env.HIVEKEEP_ENV_FILE)
+  if (process.env.GEZY_ENV_FILE && existsSync(process.env.GEZY_ENV_FILE)) {
+    return resolve(process.env.GEZY_ENV_FILE)
   }
 
   // 2. .env in CWD
@@ -119,11 +119,11 @@ function findEnvFilePath(): string | null {
   }
 
   // 4. Common locations relative to data dir
-  const dataDirEnv = resolve(dataDir, 'hivekeep.env')
+  const dataDirEnv = resolve(dataDir, 'gezy.env')
   if (existsSync(dataDirEnv)) return dataDirEnv
 
   // 5. XDG data dir (common for systemd-user installs)
-  const xdgEnv = resolve(os.homedir(), '.local', 'share', 'hivekeep', 'hivekeep.env')
+  const xdgEnv = resolve(os.homedir(), '.local', 'share', 'hivekeep', 'gezy.env')
   if (existsSync(xdgEnv)) return xdgEnv
 
   return null
@@ -135,10 +135,10 @@ function findServiceFilePath(): string | null {
 
   const candidates = [
     // User service
-    resolve(os.homedir(), '.config', 'systemd', 'user', 'hivekeep.service'),
+    resolve(os.homedir(), '.config', 'systemd', 'user', 'gezy.service'),
     // System service
-    '/etc/systemd/system/hivekeep.service',
-    '/usr/lib/systemd/system/hivekeep.service',
+    '/etc/systemd/system/gezy.service',
+    '/usr/lib/systemd/system/gezy.service',
   ]
 
   for (const path of candidates) {
@@ -148,10 +148,10 @@ function findServiceFilePath(): string | null {
 }
 
 /** Resolve the server-wide IANA timezone for all schedule interpretation.
- *  Priority: HIVEKEEP_TIMEZONE > TZ > system-resolved IANA > 'UTC'.
+ *  Priority: GEZY_TIMEZONE > TZ > system-resolved IANA > 'UTC'.
  *  Used by croner (recurring crons) and for parsing bare wall-clock datetimes. */
 function resolveServerTimezone(): string {
-  const explicit = process.env.HIVEKEEP_TIMEZONE || process.env.TZ
+  const explicit = process.env.GEZY_TIMEZONE || process.env.TZ
   if (explicit) return explicit
   try {
     const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -176,41 +176,41 @@ export const config = {
   dataDir,
   encryptionKey: resolveEncryptionKey(),
   logLevel: (process.env.LOG_LEVEL ?? 'info') as 'debug' | 'info' | 'warn' | 'error',
-  isDocker: existsSync('/.dockerenv') || process.env.HIVEKEEP_DATA_DIR === '/app/data',
+  isDocker: existsSync('/.dockerenv') || process.env.GEZY_DATA_DIR === '/app/data',
   /** Server-wide IANA timezone (e.g. "Europe/Paris"). Applied to recurring cron
    *  expressions and to bare wall-clock datetimes received from clients. */
   timezone: resolveServerTimezone(),
 
   db: {
-    path: process.env.DB_PATH ?? `${dataDir}/hivekeep.db`,
+    path: process.env.DB_PATH ?? `${dataDir}/gezy.db`,
   },
 
   /** Model registry (models.dev-backed metadata source of truth). ON by default;
-   *  set HIVEKEEP_MODEL_REGISTRY=false to fall back to the legacy path where
+   *  set GEZY_MODEL_REGISTRY=false to fall back to the legacy path where
    *  provider `listModels()` metadata is used as-is. The registry enriches model
    *  metadata (context, modalities, reasoning, pricing) from the bundled
    *  models.dev snapshot + admin overrides. See `model-metadata.md`. */
   modelRegistry: {
-    enabled: process.env.HIVEKEEP_MODEL_REGISTRY !== 'false',
+    enabled: process.env.GEZY_MODEL_REGISTRY !== 'false',
   },
 
   /** In-app feedback (star CTA + written feedback relayed to a central
    *  collector). The endpoint is a public Cloudflare Worker — no secret, since
    *  Hivekeep is open-source and every instance phones home to the same place;
    *  abuse is bounded by the Worker's per-IP rate limit + Cloudflare. Set
-   *  `HIVEKEEP_FEEDBACK_ENDPOINT=` (empty) to disable the feature entirely. */
+   *  `GEZY_FEEDBACK_ENDPOINT=` (empty) to disable the feature entirely. */
   feedback: {
     endpoint:
-      process.env.HIVEKEEP_FEEDBACK_ENDPOINT ??
+      process.env.GEZY_FEEDBACK_ENDPOINT ??
       'https://hivekeep-feedback.hivekeep.workers.dev/feedback',
-    githubRepoUrl: process.env.HIVEKEEP_GITHUB_REPO_URL ?? 'https://github.com/MarlBurroW/hivekeep',
+    githubRepoUrl: process.env.GEZY_GITHUB_REPO_URL ?? 'https://github.com/pgun/gezy',
     /** Max characters accepted in a single feedback message. */
-    maxMessageLength: Number(process.env.HIVEKEEP_FEEDBACK_MAX_LENGTH ?? 5000),
+    maxMessageLength: Number(process.env.GEZY_FEEDBACK_MAX_LENGTH ?? 5000),
     /** Usage thresholds before the proactive banner may appear (either suffices). */
-    promptAfterDays: Number(process.env.HIVEKEEP_FEEDBACK_PROMPT_AFTER_DAYS ?? 7),
-    promptMinMessages: Number(process.env.HIVEKEEP_FEEDBACK_PROMPT_MIN_MESSAGES ?? 30),
+    promptAfterDays: Number(process.env.GEZY_FEEDBACK_PROMPT_AFTER_DAYS ?? 7),
+    promptMinMessages: Number(process.env.GEZY_FEEDBACK_PROMPT_MIN_MESSAGES ?? 30),
     /** Days before the banner reappears after the user clicks "later". */
-    snoozeDays: Number(process.env.HIVEKEEP_FEEDBACK_SNOOZE_DAYS ?? 14),
+    snoozeDays: Number(process.env.GEZY_FEEDBACK_SNOOZE_DAYS ?? 14),
   },
 
   compacting: {
@@ -458,9 +458,9 @@ export const config = {
     // call) — it matches Claude Code and removes the fat thinking block the
     // legacy API forced before EVERY step (the main task-latency cause; see
     // task-latency-analysis.md). The SDK itself deprecates `type:'enabled'` in
-    // favor of `adaptive`. Default on; set HIVEKEEP_ADAPTIVE_THINKING=false to
+    // favor of `adaptive`. Default on; set GEZY_ADAPTIVE_THINKING=false to
     // revert to fixed budgets.
-    adaptiveThinking: process.env.HIVEKEEP_ADAPTIVE_THINKING !== 'false',
+    adaptiveThinking: process.env.GEZY_ADAPTIVE_THINKING !== 'false',
   },
 
   tools: {
@@ -474,11 +474,11 @@ export const config = {
         ? null
         : Number(process.env.TOOLS_TEMPERATURE ?? 0),
     // Max parallel concurrency-safe tool calls within a single batch.
-    // HIVEKEEP_MAX_TOOL_USE_CONCURRENCY is the canonical name (aligned with
+    // GEZY_MAX_TOOL_USE_CONCURRENCY is the canonical name (aligned with
     // Claude Code's CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY). TOOLS_CONCURRENCY_CAP
     // is kept as a fallback for existing deployments.
     concurrencyCap: Number(
-      process.env.HIVEKEEP_MAX_TOOL_USE_CONCURRENCY
+      process.env.GEZY_MAX_TOOL_USE_CONCURRENCY
         ?? process.env.TOOLS_CONCURRENCY_CAP
         ?? 10,
     ),
@@ -489,8 +489,8 @@ export const config = {
   // → defaultTimeoutMs. Raise maxTimeoutMs via env when tasks legitimately need
   // commands longer than the 10-minute default ceiling.
   shell: {
-    defaultTimeoutMs: Number(process.env.HIVEKEEP_SHELL_TIMEOUT ?? 30_000),
-    maxTimeoutMs: Number(process.env.HIVEKEEP_SHELL_MAX_TIMEOUT ?? 600_000),
+    defaultTimeoutMs: Number(process.env.GEZY_SHELL_TIMEOUT ?? 30_000),
+    maxTimeoutMs: Number(process.env.GEZY_SHELL_MAX_TIMEOUT ?? 600_000),
   },
 
   toolOutputs: {
@@ -527,18 +527,18 @@ export const config = {
     /** Local git clones used by sub-task worktrees, one subdir per project
      *  slug (`<baseDir>/<slug>/`) and a shared `<baseDir>/worktrees/` tree
      *  for ephemeral sub-task worktrees. */
-    baseDir: process.env.HIVEKEEP_REPOS_DIR ?? `${dataDir}/repos`,
+    baseDir: process.env.GEZY_REPOS_DIR ?? `${dataDir}/repos`,
     /** Max time we let `git clone` run before aborting (seconds). Default
      *  10min covers most repos; large monorepos may need to bump this. */
-    cloneTimeoutSec: Number(process.env.HIVEKEEP_CLONE_TIMEOUT_SEC ?? 600),
+    cloneTimeoutSec: Number(process.env.GEZY_CLONE_TIMEOUT_SEC ?? 600),
     /** How long worktrees from failed/conflicted sub-tasks are kept on
      *  disk before the cleanup sweep removes them (seconds). Default 1h.
      *  Sub-tasks that succeed and merge cleanly are removed immediately
      *  — this TTL only protects "needs human review" cases. */
-    worktreeKeepFailedSec: Number(process.env.HIVEKEEP_WORKTREE_KEEP_FAILED_SEC ?? 3600),
+    worktreeKeepFailedSec: Number(process.env.GEZY_WORKTREE_KEEP_FAILED_SEC ?? 3600),
     /** How often the stale-worktree sweeper runs (minutes). Default 5.
      *  Lower bound: 1min (anything faster is wasted IO). */
-    worktreeSweepIntervalMin: Number(process.env.HIVEKEEP_WORKTREE_SWEEP_INTERVAL_MIN ?? 5),
+    worktreeSweepIntervalMin: Number(process.env.GEZY_WORKTREE_SWEEP_INTERVAL_MIN ?? 5),
   },
 
   upload: {
@@ -575,19 +575,19 @@ export const config = {
 
   /** Terminal section — admin-only web terminal on the host (see api.md). */
   terminal: {
-    /** Kill-switch: set HIVEKEEP_TERMINAL_ENABLED=false to disable the feature entirely. */
-    enabled: process.env.HIVEKEEP_TERMINAL_ENABLED !== 'false',
+    /** Kill-switch: set GEZY_TERMINAL_ENABLED=false to disable the feature entirely. */
+    enabled: process.env.GEZY_TERMINAL_ENABLED !== 'false',
     /** Shell binary spawned for each session. Defaults to $SHELL, then /bin/bash. */
-    shell: process.env.HIVEKEEP_TERMINAL_SHELL ?? process.env.SHELL ?? '/bin/bash',
+    shell: process.env.GEZY_TERMINAL_SHELL ?? process.env.SHELL ?? '/bin/bash',
     /** Scrollback kept server-side per session, replayed on reattach (KB). */
-    scrollbackKb: Number(process.env.HIVEKEEP_TERMINAL_SCROLLBACK_KB ?? 256),
+    scrollbackKb: Number(process.env.GEZY_TERMINAL_SCROLLBACK_KB ?? 256),
     /** How long a detached session (no client connected) survives before the
      *  shell is killed (seconds). 0 (default) = sessions persist until closed
      *  from the sidebar or the shell exits (tmux-like; they still die with the
      *  server process). Set > 0 to auto-reap idle detached sessions. */
-    detachedTtlSec: Number(process.env.HIVEKEEP_TERMINAL_DETACHED_TTL_SEC ?? 0),
+    detachedTtlSec: Number(process.env.GEZY_TERMINAL_DETACHED_TTL_SEC ?? 0),
     /** Hard cap of concurrently running PTY sessions across all users. */
-    maxSessions: Number(process.env.HIVEKEEP_TERMINAL_MAX_SESSIONS ?? 10),
+    maxSessions: Number(process.env.GEZY_TERMINAL_MAX_SESSIONS ?? 10),
   },
 
   webhooks: {
@@ -715,20 +715,20 @@ export const config = {
   // Global custom tools: user/Agent-authored scripts (any language + own deps)
   // executed by the host. Each tool is a managed directory under `baseDir/<slug>/`
   // holding its entrypoint + deps; the DB holds metadata only. The legacy
-  // HIVEKEEP_CUSTOM_TOOL_TIMEOUT / _MAX_TIMEOUT env vars are kept for back-compat.
+  // GEZY_CUSTOM_TOOL_TIMEOUT / _MAX_TIMEOUT env vars are kept for back-compat.
   customTools: {
-    baseDir: process.env.HIVEKEEP_CUSTOM_TOOLS_DIR ?? `${dataDir}/custom-tools`,
-    defaultTimeoutMs: Number(process.env.HIVEKEEP_CUSTOM_TOOL_TIMEOUT ?? 30_000),
-    maxTimeoutMs: Number(process.env.HIVEKEEP_CUSTOM_TOOL_MAX_TIMEOUT ?? 300_000),
+    baseDir: process.env.GEZY_CUSTOM_TOOLS_DIR ?? `${dataDir}/custom-tools`,
+    defaultTimeoutMs: Number(process.env.GEZY_CUSTOM_TOOL_TIMEOUT ?? 30_000),
+    maxTimeoutMs: Number(process.env.GEZY_CUSTOM_TOOL_MAX_TIMEOUT ?? 300_000),
     // Cap captured stdout+stderr to protect the context window / server memory.
-    maxOutputBytes: Number(process.env.HIVEKEEP_CUSTOM_TOOL_MAX_OUTPUT_BYTES ?? 256 * 1024),
+    maxOutputBytes: Number(process.env.GEZY_CUSTOM_TOOL_MAX_OUTPUT_BYTES ?? 256 * 1024),
     // Longer budget for dependency installs (pip/npm/bun install).
-    setupTimeoutMs: Number(process.env.HIVEKEEP_CUSTOM_TOOL_SETUP_TIMEOUT ?? 600_000),
+    setupTimeoutMs: Number(process.env.GEZY_CUSTOM_TOOL_SETUP_TIMEOUT ?? 600_000),
   },
 
   versionCheck: {
     enabled: process.env.VERSION_CHECK_ENABLED !== 'false',
-    repo: process.env.VERSION_CHECK_REPO ?? 'MarlBurroW/hivekeep',
+    repo: process.env.VERSION_CHECK_REPO ?? 'pgun/gezy',
     /** Branch tracked by the edge update channel */
     branch: process.env.VERSION_CHECK_BRANCH ?? 'main',
     intervalHours: Number(process.env.VERSION_CHECK_INTERVAL_HOURS ?? 1),

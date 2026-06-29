@@ -247,7 +247,7 @@ function SettingsFooter() {
   return (
     <div className="shrink-0 border-t px-4 py-2.5 flex items-center justify-between gap-3 text-[11px] text-muted-foreground/60 sm:px-6">
       <div className="flex items-center gap-3">
-        <span className="font-medium">Hivekeep v{info.version}</span>
+        <span className="font-medium">Gezy v{info.version}</span>
         <span className="flex items-center gap-1">
           <Clock className="size-3" />
           {formatUptime(info.uptimeMs, t)}

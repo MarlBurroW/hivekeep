@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Progress } from '@/client/components/ui/progress'
-import { HivekeepLogo } from '@/client/components/common/HivekeepLogo'
+import { GezyLogo } from '@/client/components/common/GezyLogo'
 import { StepIdentity } from '@/client/pages/onboarding/StepIdentity'
 import { StepPreferences } from '@/client/pages/onboarding/StepPreferences'
 import { StepBootstrapProvider } from '@/client/pages/onboarding/StepBootstrapProvider'
@@ -53,8 +53,8 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
       <div className="relative z-10 w-full max-w-lg animate-fade-in-up">
         {/* Header */}
         <div className="mb-8 text-center">
-          <HivekeepLogo size={64} title={null} className="mx-auto mb-3" />
-          <h1 className="text-3xl font-extrabold text-foreground">Hivekeep</h1>
+          <GezyLogo size={64} title={null} className="mx-auto mb-3" />
+          <h1 className="text-3xl font-extrabold text-foreground">Gezy</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {t('onboarding.subtitle')}
           </p>

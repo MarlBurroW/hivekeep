@@ -30,7 +30,7 @@ import { registerEmailProvider, unregisterEmailProvider } from '@/server/email/r
 import { registerContactsProvider, unregisterContactsProvider } from '@/server/contacts/registry'
 import { registerCalendarProvider, unregisterCalendarProvider } from '@/server/calendar/registry'
 import { channelAdapters } from '@/server/channels/index'
-import type { LLMProvider, EmbeddingProvider, ImageProvider, SearchProvider, TTSProvider, STTProvider, EmailProvider, ContactsProvider, CalendarProvider, PluginProvider, ProviderCapability, ProviderConfig } from '@hivekeep/sdk'
+import type { LLMProvider, EmbeddingProvider, ImageProvider, SearchProvider, TTSProvider, STTProvider, EmailProvider, ContactsProvider, CalendarProvider, PluginProvider, ProviderCapability, ProviderConfig } from '@gezy/sdk'
 import { emitPluginCard, updatePluginCard } from '@/server/services/plugin-cards'
 import { getVaultOAuthToken } from '@/server/llm/llm/_oauth-vault-access'
 import type {
@@ -44,7 +44,7 @@ import type {
   PluginHTTPClient,
   PluginVaultAPI,
   PluginOAuthAPI,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'
 
 // Re-export the plugin-facing surface so other internal modules keep their
 // existing import paths. The SDK is the source of truth.
@@ -678,7 +678,7 @@ class PluginManager {
   private watcher: FSWatcher | null = null
   private reloadTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-  private hivekeepVersion: string | null = null
+  private gezyVersion: string | null = null
 
   constructor() {
     this.pluginsDir = resolve(process.cwd(), 'plugins')
@@ -686,26 +686,26 @@ class PluginManager {
   }
 
   /** Get the current Hivekeep version from package.json (cached) */
-  private async getHivekeepVersion(): Promise<string> {
-    if (this.hivekeepVersion) return this.hivekeepVersion
+  private async getGezyVersion(): Promise<string> {
+    if (this.gezyVersion) return this.gezyVersion
     try {
       const raw = await readFile(resolve(process.cwd(), 'package.json'), 'utf-8')
-      this.hivekeepVersion = JSON.parse(raw).version ?? '0.0.0'
+      this.gezyVersion = JSON.parse(raw).version ?? '0.0.0'
     } catch {
-      this.hivekeepVersion = '0.0.0'
+      this.gezyVersion = '0.0.0'
     }
-    return this.hivekeepVersion!
+    return this.gezyVersion!
   }
 
   /** Check if a plugin's hivekeep version requirement is satisfied */
   private async checkCompatibility(manifest: PluginManifest): Promise<{ compatible: boolean; error?: string }> {
     if (!manifest.hivekeep) return { compatible: true }
-    const version = await this.getHivekeepVersion()
+    const version = await this.getGezyVersion()
     const compatible = satisfiesSemver(version, manifest.hivekeep)
     if (!compatible) {
       return {
         compatible: false,
-        error: `Requires Hivekeep ${manifest.hivekeep} (current: ${version})`,
+        error: `Requires Gezy ${manifest.hivekeep} (current: ${version})`,
       }
     }
     return { compatible: true }
@@ -1502,7 +1502,7 @@ class PluginManager {
 
   /** List all discovered plugins as summaries */
   listPlugins(): PluginSummary[] {
-    const version = this.hivekeepVersion ?? '0.0.0'
+    const version = this.gezyVersion ?? '0.0.0'
     return Array.from(this.plugins.values()).map(p => ({
       name: p.manifest.name,
       displayName: p.manifest.displayName,
@@ -1533,7 +1533,7 @@ class PluginManager {
       installMeta: p.installMeta,
       compatible: p.manifest.hivekeep ? satisfiesSemver(version, p.manifest.hivekeep) : true,
       compatibilityError: p.manifest.hivekeep && !satisfiesSemver(version, p.manifest.hivekeep)
-        ? `Requires Hivekeep ${p.manifest.hivekeep} (current: ${version})`
+        ? `Requires Gezy ${p.manifest.hivekeep} (current: ${version})`
         : undefined,
       health: { ...p.health },
     }))
@@ -1868,7 +1868,7 @@ class PluginManager {
       await mkdir(tempDir, { recursive: true })
 
       // Initialize a minimal package.json and install the package
-      await Bun.write(join(tempDir, 'package.json'), JSON.stringify({ name: 'hivekeep-plugin-install', private: true }))
+      await Bun.write(join(tempDir, 'package.json'), JSON.stringify({ name: 'gezy-plugin-install', private: true }))
 
       log.info({ package: packageName, tempDir }, 'npm install: running npm install (90s timeout)')
 
@@ -2144,7 +2144,7 @@ class PluginManager {
       // times out — without it the workspace accumulates `_update_*`
       // shells forever.
       try {
-        await Bun.write(join(tempDir, 'package.json'), JSON.stringify({ name: 'hivekeep-plugin-update', private: true }))
+        await Bun.write(join(tempDir, 'package.json'), JSON.stringify({ name: 'gezy-plugin-update', private: true }))
 
         // Same `npm install` (rather than `bun add`) trick as installFromNpm —
         // see the comment there for why we can't spawn bun from a bun parent.

@@ -12,7 +12,7 @@ export type {
   FinishReason,
   ProviderUIHints,
   ProviderCapability,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'
 
 export {
   HivekeepProviderError,
@@ -23,4 +23,4 @@ export {
   NetworkError,
   ProviderServerError,
   UnsupportedCapabilityError,
-} from '@hivekeep/sdk'
+} from '@gezy/sdk'

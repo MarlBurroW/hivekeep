@@ -14,7 +14,7 @@ import type {
   ContactEmailAddress,
   ContactSearchQuery,
 } from '@/server/contacts/types'
-import type { ProviderConfig, AuthResult } from '@hivekeep/sdk'
+import type { ProviderConfig, AuthResult } from '@gezy/sdk'
 
 const PEOPLE = 'https://people.googleapis.com/v1'
 const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,organizations'

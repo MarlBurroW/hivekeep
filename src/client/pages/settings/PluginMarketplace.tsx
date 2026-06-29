@@ -62,7 +62,7 @@ export function PluginMarketplace() {
     const set = new Set<string>()
     for (const p of results) {
       for (const k of p.keywords) {
-        if (k !== 'hivekeep-plugin' && k !== 'hivekeep') set.add(k)
+        if (k !== 'gezy-plugin' && k !== 'gezy') set.add(k)
       }
     }
     return Array.from(set).sort()
@@ -208,7 +208,7 @@ function NpmPluginCard({
   onUninstall: () => void
   t: (key: string, opts?: any) => string
 }) {
-  const userTags = plugin.keywords.filter((k) => k !== 'hivekeep-plugin' && k !== 'hivekeep').slice(0, 4)
+  const userTags = plugin.keywords.filter((k) => k !== 'gezy-plugin' && k !== 'gezy').slice(0, 4)
 
   return (
     <div className="flex items-start gap-4 rounded-lg border p-4 surface-card hover:border-primary/50 transition-colors">

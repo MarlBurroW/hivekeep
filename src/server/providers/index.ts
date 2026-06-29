@@ -23,7 +23,7 @@
 
 import type { ProviderConfig as HivekeepProviderConfig } from '@/server/llm/core/types'
 import type { ProviderCapability } from '@/shared/types'
-import type { ConfigField } from '@hivekeep/sdk'
+import type { ConfigField } from '@gezy/sdk'
 import { PROVIDER_META, type ProviderType, type ProviderMeta } from '@/shared/provider-metadata'
 import { createLogger } from '@/server/logger'
 import { getLLMProvider, listLLMProviders } from '@/server/llm/llm/registry'

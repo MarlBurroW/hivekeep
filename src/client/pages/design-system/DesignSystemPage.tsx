@@ -205,7 +205,7 @@ const NAV_SECTIONS = [
   { id: 'toast', label: 'Toast', icon: BellRing },
   { id: 'avatars', label: 'Avatars', icon: User },
   { id: 'animations', label: 'Animations', icon: Play },
-  { id: 'hivekeep-patterns', label: 'Hivekeep Patterns', icon: Shapes },
+  { id: 'gezy-patterns', label: 'Gezy Patterns', icon: Shapes },
   { id: 'tool-calls', label: 'Tool Calls', icon: Wrench },
   { id: 'loading-states', label: 'Loading States', icon: Loader2 },
   { id: 'spacing', label: 'Spacing & Layout', icon: Ruler },
@@ -267,7 +267,7 @@ export function DesignSystemPage() {
                 <Wand2 className="size-4 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold gradient-primary-text">Hivekeep Design System</h1>
+                <h1 className="text-lg font-bold gradient-primary-text">Gezy Design System</h1>
                 <p className="text-[10px] text-muted-foreground">{currentPalette?.name ?? 'Aurora'} &mdash; 32 components &middot; {NAV_SECTIONS.length} sections</p>
               </div>
             </div>
@@ -620,7 +620,7 @@ export function DesignSystemPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="i2">With value</Label>
-                    <Input id="i2" defaultValue="Hello Hivekeep" />
+                    <Input id="i2" defaultValue="Hello Gezy" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="i3">Error</Label>
@@ -1740,8 +1740,8 @@ export function DesignSystemPage() {
               </SubSection>
             </Section>
 
-            {/* ─── HIVEKEEP PATTERNS ──────────────────────────────── */}
-            <Section id="hivekeep-patterns" title="Hivekeep Patterns">
+            {/* ─── GEZY PATTERNS ──────────────────────────────── */}
+            <Section id="gezy-patterns" title="Gezy Patterns">
 
               <SubSection title="Chat Bubbles">
                 <div className="max-w-2xl space-y-4 surface-chat rounded-xl p-6 border">
@@ -2749,7 +2749,7 @@ export function DesignSystemPage() {
             {/* ─── FOOTER ──────────────────────────────────────── */}
             <div className="border-t pt-8 text-center">
               <p className="text-sm text-muted-foreground">
-                <span className="gradient-primary-text font-bold">Hivekeep</span> &mdash; {currentPalette?.name ?? 'Aurora'} Design System &middot; 32 components &middot; Dev only.
+                <span className="gradient-primary-text font-bold">Gezy</span> &mdash; {currentPalette?.name ?? 'Aurora'} Design System &middot; 32 components &middot; Dev only.
               </p>
             </div>
           </main>

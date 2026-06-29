@@ -14,7 +14,7 @@ import {
   setAccountAllowList,
 } from '@/server/services/connected-accounts'
 import { sseManager } from '@/server/sse/index'
-import type { ConfigField, ProviderConfig } from '@hivekeep/sdk'
+import type { ConfigField, ProviderConfig } from '@gezy/sdk'
 
 const log = createLogger('routes:connected-accounts')
 const connectedAccountRoutes = new Hono()

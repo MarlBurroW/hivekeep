@@ -1,17 +1,17 @@
 {
-  "name": "@hivekeep/sdk",
+  "name": "@gezy/sdk",
   "version": "0.12.0",
-  "description": "Plugin SDK for Hivekeep — declare tools, channels, providers, and hooks without depending on Hivekeep internals.",
+  "description": "Plugin SDK for Gezy — declare tools, channels, providers, and hooks without depending on Gezy internals.",
   "license": "MIT",
-  "author": "Hivekeep Team",
-  "homepage": "https://marlburrow.github.io/hivekeep",
+  "author": "Gezy Team",
+  "homepage": "https://marlburrow.github.io/gezy",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MarlBurroW/hivekeep.git",
+    "url": "https://github.com/MarlBurroW/gezy.git",
     "directory": "packages/sdk"
   },
   "keywords": [
-    "hivekeep",
+    "gezy",
     "plugin",
     "sdk",
     "ai-agents"

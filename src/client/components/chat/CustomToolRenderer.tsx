@@ -11,7 +11,7 @@ import i18n from '@/client/lib/i18n'
  *
  * The renderer module is fetched at runtime from
  * `/api/custom-tools/:slug/renderer.js?v=<version>`. It shares the host's single
- * React instance (window.__HIVEKEEP_REACT__, set in main.tsx) so hooks work and it
+ * React instance (window.__GEZY_REACT__, set in main.tsx) so hooks work and it
  * inherits the app theme via cascading `--color-*` CSS variables. It receives
  * `{ result, args, ui }` where `ui` is the themed primitives kit.
  *

@@ -99,7 +99,7 @@ export function UpdatesSettings() {
       <div className="rounded-lg border p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium">
-            Hivekeep v{versionInfo.currentVersion}
+            Gezy v{versionInfo.currentVersion}
           </span>
           {versionInfo.currentSha && (
             <Badge variant="outline" className="font-mono text-[10px]">

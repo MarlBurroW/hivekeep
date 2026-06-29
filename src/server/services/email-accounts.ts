@@ -18,7 +18,7 @@ import { getFreshAccessToken, invalidateAccessToken } from '@/server/services/em
 import { getDefaultEmailProviderId } from '@/server/services/app-settings'
 import { createLogger } from '@/server/logger'
 import type { EmailProvider } from '@/server/email/types'
-import type { ProviderConfig } from '@hivekeep/sdk'
+import type { ProviderConfig } from '@gezy/sdk'
 
 const log = createLogger('email-accounts')
 

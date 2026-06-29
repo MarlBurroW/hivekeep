@@ -15,7 +15,7 @@ import {
 import { sseManager } from '@/server/sse/index'
 import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
-import { HIVEKEEP_MAX_TOOL_USE_CONCURRENCY_DEFAULT } from '@/shared/constants'
+import { GEZY_MAX_TOOL_USE_CONCURRENCY_DEFAULT } from '@/shared/constants'
 import { validateToolArgs } from '@/server/services/tool-arg-validation'
 import { isRawToolArgs } from '@/server/llm/core/parse-tool-args'
 
@@ -106,7 +106,7 @@ export async function executeToolBatch(opts: ExecuteToolBatchOptions): Promise<E
   const { stepToolCalls, tools, abortController, agentId, assistantMessageId, sseExtra } = opts
   const toolCallsLog: ToolLogEntry[] = []
   const toolResults: ToolResultEntry[] = []
-  const concurrencyCap = config.tools?.concurrencyCap ?? HIVEKEEP_MAX_TOOL_USE_CONCURRENCY_DEFAULT
+  const concurrencyCap = config.tools?.concurrencyCap ?? GEZY_MAX_TOOL_USE_CONCURRENCY_DEFAULT
 
   const batches = partitionToolCalls(stepToolCalls)
   const resultMap = new Map<string, unknown>()

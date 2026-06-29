@@ -115,7 +115,7 @@
   },
   "login": {
     "title": "おかえりなさい",
-    "subtitle": "Hivekeepワークスペースにサインイン",
+    "subtitle": "Gezyワークスペースにサインイン",
     "email": "メールアドレス",
     "emailPlaceholder": "you@example.com",
     "password": "パスワード",
@@ -127,7 +127,7 @@
     "startOnboarding": "ワークスペースをセットアップ"
   },
   "onboarding": {
-    "title": "Hivekeepへようこそ",
+    "title": "Gezyへようこそ",
     "subtitle": "ワークスペースをセットアップしましょう",
     "queenieGettingReady": "{{name}}の準備中…",
     "step": "ステップ {{current}} / {{total}}",
@@ -880,8 +880,8 @@
     "thinkingEnable": "このエージェントの拡張思考を有効化",
     "thinkingDisable": "このエージェントの拡張思考を無効化",
     "welcome": {
-      "title": "Hivekeepへようこそ",
-      "checklistIntro": "いくつかの簡単なステップで始められます。HivekeepがAIチームのセットアップをご案内します。",
+      "title": "Gezyへようこそ",
+      "checklistIntro": "いくつかの簡単なステップで始められます。GezyがAIチームのセットアップをご案内します。",
       "allDone": "準備完了です!サイドバーからエージェントを選択してチャットを始めましょう。"
     },
     "shortcutHint": "でエージェントをすばやく検索",
@@ -1203,7 +1203,7 @@
       "renderAfterRun": "レンダラーをプレビューするには、まずテストを実行してください。"
     },
     "help": {
-      "content": "カスタムツールを使うと、独自のスクリプトでHivekeepを拡張できます。",
+      "content": "カスタムツールを使うと、独自のスクリプトでGezyを拡張できます。",
       "bullet1": "各ツールは専用フォルダー内のスクリプトです。stdinからJSONとして引数を読み取り、結果をstdoutに出力します。",
       "bullet2": "requirements.txt(Python)またはpackage.json(Node/Bun)を追加し、「インストール」をクリックして依存関係をセットアップします。",
       "bullet3": "custom_<slug>をツールボックスに追加することで、エージェントにツールを付与します。"
@@ -1317,8 +1317,8 @@
       "fetchError": "設定の読み込みに失敗しました",
       "publicUrlWarning": {
         "title": "公開URLの設定に誤りがある可能性があります",
-        "body": "Hivekeepに{{actual}}でアクセスしていますが、設定されている公開URLは{{configured}}です。招待リンク、Webhook、OAuthコールバックは公開URLから生成されるため、{{configured}}を指してしまい到達できない可能性があります。",
-        "fix": "PUBLIC_URLを{{actual}}に設定して再起動してください。Docker:-e PUBLIC_URL={{actual}}(または.envに記載)。ネイティブインストール:HIVEKEEP_PUBLIC_URL={{actual}}。"
+        "body": "Gezyに{{actual}}でアクセスしていますが、設定されている公開URLは{{configured}}です。招待リンク、Webhook、OAuthコールバックは公開URLから生成されるため、{{configured}}を指してしまい到達できない可能性があります。",
+        "fix": "PUBLIC_URLを{{actual}}に設定して再起動してください。Docker:-e PUBLIC_URL={{actual}}(または.envに記載)。ネイティブインストール:GEZY_PUBLIC_URL={{actual}}。"
       },
       "interface": {
         "title": "インターフェース"
@@ -1440,7 +1440,7 @@
       "emptyDescription": "OpenAI、Anthropic、GeminiなどのAIプロバイダーを追加して、エージェントを動かしましょう。",
       "modelsModal": {
         "title": "{{name}}を参照",
-        "description": "プロバイダーが現在公開しているモデルと音声です(APIからリアルタイムで取得)。Hivekeepから離れずに利用可能なものを確認できます。",
+        "description": "プロバイダーが現在公開しているモデルと音声です(APIからリアルタイムで取得)。Gezyから離れずに利用可能なものを確認できます。",
         "loading": "読み込み中…",
         "fetchError": "読み込みに失敗しました",
         "allCapabilities": "すべて",
@@ -1862,13 +1862,13 @@
       "typeOrSearch": "入力または検索...",
       "revokePlatformIdConfirm": "このプラットフォームアクセスを取り消しますか?この連絡先はこのプラットフォーム経由でやりとりできなくなります。",
       "deleteNoteConfirm": "このメモを完全に削除しますか?",
-      "linkToUserTip": "この連絡先を既存のHivekeepユーザーアカウントにリンクします。エージェントがチャンネルをまたいで相手を認識できるようになります。",
+      "linkToUserTip": "この連絡先を既存のGezyユーザーアカウントにリンクします。エージェントがチャンネルをまたいで相手を認識できるようになります。",
       "identifiersTip": "カスタムの連絡先フィールド(メール、携帯、Twitter、LinkedIn、Telegram IDなど)です。エージェントがさまざまなプラットフォームでこの連絡先を認識できます。",
       "help": {
         "content": "連絡先レジストリにより、エージェントはさまざまなプラットフォームでやりとりする相手を認識し、応答をパーソナライズできます。",
         "bullet1": "プラットフォーム識別子(Telegram、Discordなど)をリンクすると、エージェントがユーザーを自動的に認識します",
         "bullet2": "エージェントは各連絡先にプライベートメモを追加してコンテキストを記憶できます",
-        "bullet3": "連絡先をHivekeepユーザーアカウントにリンクすると、すべてのチャンネルでアイデンティティが統一されます",
+        "bullet3": "連絡先をGezyユーザーアカウントにリンクすると、すべてのチャンネルでアイデンティティが統一されます",
         "bullet4": "複数のニックネームを追加すると、エージェントはどの名前でも連絡先を認識できます"
       }
     },
@@ -1998,7 +1998,7 @@
       },
       "emptyDescription": "他の人を招待して、エージェントを一緒に使いましょう。",
       "help": {
-        "content": "Hivekeepインスタンスにアクセスできるユーザーを管理します。友人や同僚を招待して、エージェントとチャットしてもらいましょう。",
+        "content": "Gezyインスタンスにアクセスできるユーザーを管理します。友人や同僚を招待して、エージェントとチャットしてもらいましょう。",
         "bullet1": "有効期限を設定できる招待リンクを作成できます",
         "bullet2": "各ユーザーは自分のアカウントと会話を持ちます",
         "bullet3": "招待は使用される前ならいつでも取り消せます"
@@ -2010,7 +2010,7 @@
       "subtitle": "外部のアドレス帳を接続して、エージェントが連絡先を検索できるようにします(読み取り専用)。",
       "add": "アドレス帳を追加",
       "addTitle": "アドレス帳を追加",
-      "addDescription": "外部の連絡先ソースを接続します。読み取り専用:これらがHivekeep自体の連絡先に入ることはありません。",
+      "addDescription": "外部の連絡先ソースを接続します。読み取り専用:これらがGezy自体の連絡先に入ることはありません。",
       "provider": "プロバイダー",
       "connect": "{{provider}}を接続",
       "connected": "{{provider}}のアドレス帳を接続しました",
@@ -2021,7 +2021,7 @@
       "emptyTitle": "接続されたアドレス帳はありません",
       "emptyDescription": "iCloud(または他のCardDAVソース)を接続して、エージェントが連絡先の電話番号やメールを検索できるようにしましょう。",
       "help": {
-        "content": "外部のアドレス帳(例:アプリ専用パスワードを使ったiCloud)を接続します。エージェントは連絡先を読み取り専用で検索できます。たとえばSMS送信前に電話番号を調べるなど。これらの連絡先がHivekeep自体の連絡先にコピーされることはありません。"
+        "content": "外部のアドレス帳(例:アプリ専用パスワードを使ったiCloud)を接続します。エージェントは連絡先を読み取り専用で検索できます。たとえばSMS送信前に電話番号を調べるなど。これらの連絡先がGezy自体の連絡先にコピーされることはありません。"
       }
     },
     "triggers": {
@@ -2106,7 +2106,7 @@
       "configureAppFirst": "アカウントを接続する前に、上の{{provider}}アプリを設定してください。",
       "help": {
         "content": "OAuth経由でGmailアカウントを接続します。まずGoogle CloudのOAuthアプリ(クライアントID + シークレット)を設定し、「接続」をクリックしてアクセスを許可してください。",
-        "bullet1": "Google Cloud ConsoleでGmailスコープを持つOAuthアプリを作成し、Hivekeepホストが表示するリダイレクトURI(…/api/email-accounts/oauth/callback)を登録します。",
+        "bullet1": "Google Cloud ConsoleでGmailスコープを持つOAuthアプリを作成し、Gezyホストが表示するリダイレクトURI(…/api/email-accounts/oauth/callback)を登録します。",
         "bullet2": "クライアントIDとシークレットを下に貼り付け、「接続」でメールボックスを承認します。",
         "bullet3": "エージェントに「email」ツールボックスを付与すると、接続済みアカウントを通じてメールの一覧、読み取り、検索、送信ができるようになります。"
       },
@@ -2301,7 +2301,7 @@
       "labelTip": "一覧でこの配信チャンネルを識別するためのわかりやすい名前です。",
       "noChannelsDescription": "配信チャンネルを追加して、Telegram、Discord、メールなどで通知を受け取りましょう。",
       "help": {
-        "content": "通知はHivekeepの重要なイベントをお知らせします。通知の種類ごとにオン/オフを切り替えられ、TelegramやDiscord、メールなどのプラットフォームで受け取るための外部配信チャンネルも設定できます。",
+        "content": "通知はGezyの重要なイベントをお知らせします。通知の種類ごとにオン/オフを切り替えられ、TelegramやDiscord、メールなどのプラットフォームで受け取るための外部配信チャンネルも設定できます。",
         "bullet1": "通知の種類を切り替えて、通知ベルに表示する内容を制御できます",
         "bullet2": "外部配信チャンネルは、お好みのプラットフォームに通知を転送します",
         "bullet3": "各配信チャンネルは通知の種類でフィルタリングでき、細かく制御できます",
@@ -2332,7 +2332,7 @@
     },
     "plugins": {
       "title": "プラグイン",
-      "description": "新しいツール、フック、連携機能でHivekeepを拡張するプラグインを管理します。",
+      "description": "新しいツール、フック、連携機能でGezyを拡張するプラグインを管理します。",
       "reload": "再読み込み",
       "reloaded": "プラグインを再読み込みしました",
       "checkUpdates": "アップデートを確認",
@@ -2383,7 +2383,7 @@
     },
     "marketplace": {
       "title": "プラグインを探す",
-      "description": "`hivekeep-plugin`キーワード付きでnpmに公開されたプラグインです。誰でも公開できます。インストール前にパッケージの作者とソースリポジトリを確認してください。",
+      "description": "`gezy-plugin`キーワード付きでnpmに公開されたプラグインです。誰でも公開できます。インストール前にパッケージの作者とソースリポジトリを確認してください。",
       "refresh": "更新",
       "searchPlaceholder": "npmを検索...",
       "allTags": "すべて",
@@ -2463,8 +2463,8 @@
     },
     "updates": {
       "title": "アップデート",
-      "description": "このHivekeepインスタンスを最新の状態に保ちます。",
-      "help": "HivekeepはGitHubで新しいバージョンを定期的に確認します。stableチャンネルは公式リリースに、edgeチャンネルはmainブランチの最新コミットに追従します(未リリースの変更のテスト用)。セルフアップデートはinstall.shで管理されたインストールで利用可能です。Dockerインストールは新しいイメージをプルして更新します。",
+      "description": "このGezyインスタンスを最新の状態に保ちます。",
+      "help": "GezyはGitHubで新しいバージョンを定期的に確認します。stableチャンネルは公式リリースに、edgeチャンネルはmainブランチの最新コミットに追従します(未リリースの変更のテスト用)。セルフアップデートはinstall.shで管理されたインストールで利用可能です。Dockerインストールは新しいイメージをプルして更新します。",
       "channelLabel": "アップデートチャンネル",
       "channelTip": "このインスタンスが追従するアップデートの系統です。",
       "channelSaved": "アップデートチャンネルを保存しました",
@@ -2983,7 +2983,7 @@
     }
   },
   "invite": {
-    "title": "Hivekeepに参加",
+    "title": "Gezyに参加",
     "subtitle": "このワークスペースに招待されています",
     "invalidToken": "この招待リンクは無効か期限切れです。",
     "backToLogin": "ログインへ",
@@ -3146,7 +3146,7 @@
     "channelOnline": "チャンネルが接続されました",
     "channelOffline": "チャンネルが切断されました",
     "channelError": "チャンネル接続エラー",
-    "updateAvailable": "Hivekeep {{version}}が利用可能です",
+    "updateAvailable": "Gezy {{version}}が利用可能です",
     "viewRelease": "表示"
   },
   "errorBoundary": {
@@ -3164,10 +3164,10 @@
     "howToUpdate": "アップデート方法",
     "dockerInstructions": "docker-compose.ymlのあるディレクトリで次のコマンドを実行してください:",
     "dockerTagNote": "composeファイルが特定のバージョンタグを固定している場合、プルする前に{{version}}に変更する(またはlatestタグを使う)必要があります。",
-    "selfUpdateInstructions": "Hivekeepはデータベースのスナップショットを取り、新しいバージョンをダウンロードして再起動します。問題が発生した場合は、以前のバージョンが自動的に復元されます。",
+    "selfUpdateInstructions": "Gezyはデータベースのスナップショットを取り、新しいバージョンをダウンロードして再起動します。問題が発生した場合は、以前のバージョンが自動的に復元されます。",
     "adminOnly": "アップデートを適用できるのは管理者のみです。",
     "devModeNote": "このインスタンスは開発モードで動作しています。gitチェックアウトから更新してください。",
-    "manualInstallNote": "このインストールはHivekeepの管理対象外です。インストール時と同じ方法で更新してください。",
+    "manualInstallNote": "このインストールはGezyの管理対象外です。インストール時と同じ方法で更新してください。",
     "viewOnGitHub": "GitHubで表示",
     "updateButton": "今すぐアップデート",
     "updateSuccess": "{{version}}にアップデートしました!",
@@ -3291,7 +3291,7 @@
     },
     "disabled": {
       "title": "ターミナルは無効です",
-      "description": "この機能はこのインスタンスで無効化されています。HIVEKEEP_TERMINAL_ENABLED=true を設定してサーバーを再起動すると有効になります。"
+      "description": "この機能はこのインスタンスで無効化されています。GEZY_TERMINAL_ENABLED=true を設定してサーバーを再起動すると有効になります。"
     },
     "sessions": {
       "title": "セッション",
@@ -3327,7 +3327,7 @@
       "emptyDescription": "プリセットを作成すると、指定ディレクトリでセッションを開いて起動コマンドを実行できます。",
       "nameRequired": "名前は必須です",
       "nameLabel": "名前",
-      "namePlaceholder": "例：Hivekeep + Claude",
+      "namePlaceholder": "例：Gezy + Claude",
       "cwdLabel": "作業ディレクトリ",
       "cwdHelp": "セッションはここで開始します。~ はホームを表します。空欄でホーム。",
       "initLabel": "初期化スクリプト",
@@ -3728,7 +3728,7 @@
   },
   "updateProgress": {
     "title": "アップデート進行中",
-    "keepOpen": "このページを開いたままにしてください。更新中、Hivekeepは一時的に利用できなくなり、完了すると自動的に再読み込みされます。",
+    "keepOpen": "このページを開いたままにしてください。更新中、Gezyは一時的に利用できなくなり、完了すると自動的に再読み込みされます。",
     "waitingForServer": "サーバーを再起動中…復帰を待っています",
     "reloading": "ページは自動的に再読み込みされます。",
     "failedTitle": "アップデートに失敗しました",
@@ -3868,7 +3868,7 @@
     "resizeTree": "ファイルツリーの幅を変更"
   },
   "updateOverlay": {
-    "title": "Hivekeep を更新中",
+    "title": "Gezy を更新中",
     "successTitle": "更新が完了しました",
     "toVersion": "{{version}} に更新中"
   },
@@ -3888,7 +3888,7 @@
   },
   "feedback": {
     "banner": {
-      "message": "Hivekeep はいかがですか？スターや一言の感想がとても助かります。",
+      "message": "Gezy はいかがですか？スターや一言の感想がとても助かります。",
       "star": "スター",
       "give": "フィードバック",
       "later": "後で",
@@ -3896,7 +3896,7 @@
     },
     "dialog": {
       "title": "フィードバックを送る",
-      "description": "不具合、アイデア、感想など何でも Hivekeep の改善に役立ちます。",
+      "description": "不具合、アイデア、感想など何でも Gezy の改善に役立ちます。",
       "typeLabel": "内容の種類",
       "messageLabel": "メッセージ",
       "messagePlaceholder": {

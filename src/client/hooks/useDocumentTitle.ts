@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const BASE_TITLE = 'Hivekeep'
+const BASE_TITLE = 'Gezy'
 
 /**
  * Update the browser tab title dynamically.

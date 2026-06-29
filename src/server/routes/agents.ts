@@ -1467,7 +1467,7 @@ agentRoutes.get('/:id/export', async (c) => {
     mcpServers: mcpServerDetails,
   }
 
-  const filename = `${details.slug || details.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.hivekeep.json`
+  const filename = `${details.slug || details.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.gezy.json`
 
   c.header('Content-Disposition', `attachment; filename="${filename}"`)
   c.header('Content-Type', 'application/json')

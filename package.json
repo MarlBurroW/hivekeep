@@ -1,17 +1,17 @@
 {
-  "name": "hivekeep",
+  "name": "gezy",
   "version": "1.9.0",
   "type": "module",
-  "description": "Self-hosted platform of specialized AI agents (Agents) with persistent identity, memory, tools, and collaboration",
+  "description": "Gezy — self-hosted AI agent platform with persistent identity, memory, tools, and collaboration",
   "license": "MIT",
   "author": "marlburrow",
-  "homepage": "https://marlburrow.github.io/hivekeep",
+  "homepage": "https://github.com/pgun/gezy",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MarlBurroW/hivekeep.git"
+    "url": "https://github.com/pgun/gezy.git"
   },
   "bugs": {
-    "url": "https://github.com/MarlBurroW/hivekeep/issues"
+    "url": "https://github.com/pgun/gezy/issues"
   },
   "keywords": [
     "ai-agents",
@@ -22,7 +22,8 @@
     "bun",
     "hono",
     "react",
-    "sqlite"
+    "sqlite",
+    "gezy"
   ],
   "workspaces": [
     "packages/*"
@@ -80,7 +81,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@hivekeep/sdk": "workspace:*",
+    "@gezy/sdk": "workspace:*",
     "@hono/node-server": "^1.19.9",
     "@hookform/resolvers": "^5.2.2",
     "@lobehub/icons": "^5.0.1",

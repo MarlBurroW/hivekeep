@@ -1,12 +1,12 @@
 {
-  "name": "create-hivekeep-plugin",
+  "name": "create-gezy-plugin",
   "version": "1.0.1",
   "description": "Scaffold a new Hivekeep plugin with best-practice boilerplate.",
   "license": "MIT",
   "author": "Hivekeep Team",
   "type": "module",
   "bin": {
-    "create-hivekeep-plugin": "dist/index.js"
+    "create-gezy-plugin": "dist/index.js"
   },
   "files": [
     "dist",
