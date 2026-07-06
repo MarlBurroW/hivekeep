@@ -22,8 +22,9 @@ describe('ollamaSearchProvider.search', () => {
       expect(calls[0]?.auth).toBe('Bearer ollama-test')
       expect(calls[0]?.body).toEqual({ query: 'what is ollama', max_results: 10 })
       expect(result.results).toEqual([{ title: 'Ollama', url: 'https://ollama.com/', snippet: 'Cloud models are now available...', domain: 'ollama.com' }])
-      expect(result.warnings).toContain('Ollama web search does not synthesize answers; returning results only.')
-      expect(result.warnings).toContain('Ollama web search does not support language filtering.')
+      // Capability-mismatch warnings (answer, lang, …) are the host's job — the
+      // provider must not duplicate them (capabilities is empty).
+      expect(result.warnings).toBeUndefined()
     } finally {
       globalThis.fetch = originalFetch
     }

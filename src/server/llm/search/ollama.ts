@@ -99,13 +99,12 @@ export const ollamaSearchProvider: SearchProvider = {
 
   async search(request, config): Promise<SearchResult> {
     const payload = await callSearch(config, request.query, request.count, request.signal)
-    const warnings: string[] = []
-    if (request.answer) warnings.push('Ollama web search does not synthesize answers; returning results only.')
-    if (request.freshness && request.freshness !== 'all') warnings.push('Ollama web search does not support freshness filters.')
-    if (request.domains?.include?.length || request.domains?.exclude?.length) warnings.push('Ollama web search does not support domain filters.')
-    if (request.lang) warnings.push('Ollama web search does not support language filtering.')
-    if (request.location) warnings.push('Ollama web search does not support location filtering.')
-
+    // No provider-emitted capability warnings: `capabilities` is empty, so the
+    // host (search-tools.ts) already warns the agent about every unsupported
+    // request feature (answer, freshness, domains, lang, location). Re-emitting
+    // them here just surfaces each warning twice, since the wording differs and
+    // the host's Set-dedup can't collapse them. Only warn on conditions the host
+    // cannot know (see searxng/perplexity for the precedent).
     const results = (payload.results ?? [])
       .filter((r) => r.url)
       .map((r) => {
@@ -118,6 +117,6 @@ export const ollamaSearchProvider: SearchProvider = {
           ...(domain ? { domain } : {}),
         }
       })
-    return { results, ...(warnings.length ? { warnings } : {}) }
+    return { results }
   },
 }

@@ -250,44 +250,55 @@ describe('TelegramChannelConfig shape', () => {
 // ─── shouldUsePolling tests ─────────────────────────────────────────────────
 
 describe('shouldUsePolling', () => {
-  const originalEnv = process.env.PUBLIC_URL
+  // `config.publicUrl` is snapshotted at config-module load time, and
+  // shouldUsePolling() reads it alongside the live process.env.PUBLIC_URL. In a
+  // single process the two drift apart (config is cached from the ambient env
+  // while the test mutates process.env), which made the old assertions either
+  // tautological or ambient-dependent. Load telegram fresh in a subprocess with
+  // a controlled env instead — the same hermetic pattern config.test.ts uses —
+  // so every case has a fixed expected boolean. See config.test.ts.
+  async function pollingWithEnv(env: Record<string, string | undefined>): Promise<boolean> {
+    // Importing telegram.ts pulls in modules that write structured logs to
+    // stdout, so tag the result with a sentinel and extract that line rather
+    // than parsing all of stdout.
+    const script = `
+      const overrides = JSON.parse(process.argv[1]);
+      for (const [k, v] of Object.entries(overrides)) {
+        if (v === null) delete process.env[k];
+        else process.env[k] = v;
+      }
+      const m = await import('./src/server/channels/telegram.ts');
+      process.stdout.write('\\n__POLL__' + JSON.stringify(m.shouldUsePolling()) + '\\n');
+    `
+    const serialized = JSON.stringify(env, (_, v) => (v === undefined ? null : v))
+    const overrideEnv = Object.fromEntries(
+      Object.entries(env).filter(([, v]) => v !== undefined),
+    ) as Record<string, string>
+    const proc = Bun.spawn([process.execPath, '-e', script, serialized], {
+      cwd: process.cwd(),
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', ...overrideEnv },
+    })
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+    const code = await proc.exited
+    if (code !== 0) throw new Error(`Subprocess failed (${code}): ${stderr}`)
+    const marker = stdout.split('\n').find((l) => l.startsWith('__POLL__'))
+    if (!marker) throw new Error(`No result marker in subprocess output: ${stdout}`)
+    return JSON.parse(marker.slice('__POLL__'.length)) as boolean
+  }
 
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.PUBLIC_URL = originalEnv
-    } else {
-      delete process.env.PUBLIC_URL
-    }
+  it('polls when PUBLIC_URL is not set', async () => {
+    expect(await pollingWithEnv({ PUBLIC_URL: undefined })).toBe(true)
   })
 
-  it('returns true when PUBLIC_URL is not set', async () => {
-    delete process.env.PUBLIC_URL
-    // Re-import to pick up env change
-    const { shouldUsePolling } = await import('@/server/channels/telegram')
-    expect(shouldUsePolling()).toBe(true)
+  it('polls when PUBLIC_URL is set but not https', async () => {
+    expect(await pollingWithEnv({ PUBLIC_URL: 'http://myserver.com:3000' })).toBe(true)
   })
 
-  it('gates on the configured URL scheme when PUBLIC_URL is set', async () => {
-    process.env.PUBLIC_URL = 'http://myserver.com:3000'
-    const { shouldUsePolling } = await import('@/server/channels/telegram')
-    const { config } = await import('@/server/config')
-    // With PUBLIC_URL set, the first check is false, so the result is gated on
-    // whether the *configured* public URL (resolved at load time) is https.
-    // Assert against that rather than a fixed boolean: config.publicUrl reflects
-    // whatever PUBLIC_URL the config module was loaded with (undefined in a clean
-    // env → polling; an https URL on a real host → webhook), so a hard-coded
-    // expectation would be flaky depending on the ambient environment.
-    expect(shouldUsePolling()).toBe(!config.publicUrl?.startsWith('https://'))
-  })
-
-  it('returns false when PUBLIC_URL is https', async () => {
-    process.env.PUBLIC_URL = 'https://myserver.com'
-    const { shouldUsePolling } = await import('@/server/channels/telegram')
-    // PUBLIC_URL is set so first condition is false; config.publicUrl is undefined
-    // in test context, so ?.startsWith returns undefined (falsy) → !undefined = true.
-    // In production config.publicUrl would reflect the env var.
-    // Here we just verify it doesn't throw and returns a boolean.
-    expect(typeof shouldUsePolling()).toBe('boolean')
+  it('uses a webhook (no polling) when PUBLIC_URL is https', async () => {
+    expect(await pollingWithEnv({ PUBLIC_URL: 'https://myserver.com' })).toBe(false)
   })
 })
 

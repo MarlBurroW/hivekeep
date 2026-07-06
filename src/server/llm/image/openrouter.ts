@@ -74,7 +74,6 @@ export interface OpenRouterImageModel {
 
 interface OpenRouterImageEndpoint {
   supported_parameters?: Record<string, CapabilityDescriptor>
-  pricing?: Array<{ billable?: string; unit?: string; cost_usd?: number }>
 }
 
 interface OpenRouterImageResponseItem {
@@ -150,14 +149,6 @@ function maxImageInputsFrom(params: Record<string, CapabilityDescriptor> | undef
   return undefined
 }
 
-function pricingFrom(endpoints?: OpenRouterImageEndpoint[]): ImageModel['pricing'] | undefined {
-  const perImage = endpoints
-    ?.flatMap((e) => e.pricing ?? [])
-    .find((p) => p.billable === 'output_image' && p.unit === 'image' && typeof p.cost_usd === 'number')
-    ?.cost_usd
-  return perImage == null ? undefined : { perImage }
-}
-
 /** @internal exported for tests. */
 export function mapParamSpec(desc: CapabilityDescriptor): ImageParamSpec | null {
   if (desc.type === 'boolean') return { type: 'boolean' }
@@ -185,17 +176,14 @@ function paramsSchemaFrom(params: Record<string, CapabilityDescriptor> | undefin
 }
 
 /** @internal exported for tests. */
-export function mapModel(model: OpenRouterImageModel, endpoints?: OpenRouterImageEndpoint[]): ImageModel | null {
+export function mapModel(model: OpenRouterImageModel): ImageModel | null {
   if (!model.id) return null
   if (!isImageOutputModel(model)) return null
-  const out: ImageModel = {
+  return {
     id: model.id,
     name: model.name ?? model.id,
     maxImageInputs: maxImageInputsFrom(model.supported_parameters) ?? 0,
   }
-  const pricing = pricingFrom(endpoints)
-  if (pricing) out.pricing = pricing
-  return out
 }
 
 function dataUrlFor(input: { data: Uint8Array; mediaType: string }): string {
@@ -296,7 +284,11 @@ export const openrouterImageProvider: ImageProvider = {
       n: 1,
       ...request.params,
     }
-    if (request.size) body['size'] = request.size
+    // OpenRouter image models don't accept a uniform top-level `size`: OpenAI
+    // models use `quality`, Gemini uses `resolution`/`aspect_ratio`, etc. Each
+    // model's real dimension parameter is surfaced through `describeModel`
+    // (from its `supported_parameters`) and flows in via `request.params`, so we
+    // deliberately do not forward the generic `request.size` here.
     if (inputReferences.length > 0) body['input_references'] = inputReferences
 
     try {

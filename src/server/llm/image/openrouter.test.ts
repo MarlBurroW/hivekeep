@@ -27,11 +27,6 @@ describe('OpenRouter image mapModel', () => {
     expect(mapModel({ id: 'unknown-no-modalities' })).toBeNull()
     expect(mapModel({ id: '' })).toBeNull()
   })
-
-  it('maps per-image pricing from endpoint records', () => {
-    const m = mapModel(gptImage, [{ pricing: [{ billable: 'output_image', unit: 'image', cost_usd: 0.04 }] }])!
-    expect(m.pricing).toEqual({ perImage: 0.04 })
-  })
 })
 
 describe('OpenRouter image endpoint paths', () => {
@@ -63,6 +58,8 @@ describe('openrouterImageProvider.generate', () => {
         { id: 'openai/gpt-image-1', name: 'GPT Image', maxImageInputs: 1 },
         {
           prompt: 'a cat',
+          // A generic top-level `size` must NOT be forwarded to OpenRouter image
+          // models; dimensions come from the model's own params (e.g. quality).
           size: '1024x1024',
           params: { quality: 'high' },
           imageInputs: [{ data: new Uint8Array([1, 2, 3]), mediaType: 'image/png' }],
@@ -74,6 +71,7 @@ describe('openrouterImageProvider.generate', () => {
       expect(calls[0]?.body.prompt).toBe('a cat')
       expect(calls[0]?.body.n).toBe(1)
       expect(calls[0]?.body.quality).toBe('high')
+      expect(calls[0]?.body.size).toBeUndefined()
       expect(calls[0]?.body.input_references).toEqual(['data:image/png;base64,AQID'])
       expect(result.mediaType).toBe('image/webp')
       expect(result.data.length).toBe(3)

@@ -11,6 +11,7 @@ import XAI from '@lobehub/icons/es/XAI';
 import DeepSeek from '@lobehub/icons/es/DeepSeek';
 import Minimax from '@lobehub/icons/es/Minimax';
 import Kimi from '@lobehub/icons/es/Kimi';
+import Ollama from '@lobehub/icons/es/Ollama';
 import Perplexity from '@lobehub/icons/es/Perplexity';
 // Mistral & Replicate are plugin-only providers, shown in the plugin cards below (not the built-in chips).
 import Mistral from '@lobehub/icons/es/Mistral';
@@ -49,6 +50,8 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
           <span class="pchip"><Minimax.Color size={S} /> MiniMax</span>
           <span class="pchip"><Kimi.Color size={S} /> Kimi</span>
           <span class="pchip"><OpenRouter size={S} /> OpenRouter</span>
+          <span class="pchip"><Icon name="lucide:route" /> Kilo Gateway</span>
+          <span class="pchip"><Ollama size={S} /> Ollama Cloud</span>
           <span class="pchip"><Icon name="lucide:server" /> OpenAI-compatible</span>
         </div>
       </div>
@@ -58,6 +61,7 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
         <div class="picons">
           <span class="pchip"><OpenAI size={S} /> OpenAI</span>
           <span class="pchip"><Gemini.Color size={S} /> Gemini</span>
+          <span class="pchip"><OpenRouter size={S} /> OpenRouter</span>
         </div>
       </div>
 
@@ -65,6 +69,7 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
         <div class="ptitle"><Icon name="lucide:search" /> {t.groupSearch}</div>
         <div class="picons">
           <span class="pchip"><Perplexity size={S} /> Perplexity</span>
+          <span class="pchip"><Ollama size={S} /> Ollama Cloud</span>
           <span class="pchip"><Icon name="simple-icons:brave" /> Brave</span>
           <span class="pchip"><Icon name="simple-icons:searxng" /> SearXNG</span>
           <span class="pchip more">Tavily</span>
@@ -84,6 +89,7 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
         <div class="ptitle"><Icon name="lucide:vector-square" /> {t.groupEmbeddings}</div>
         <div class="picons">
           <span class="pchip"><OpenAI size={S} /> OpenAI</span>
+          <span class="pchip"><OpenRouter size={S} /> OpenRouter</span>
           <span class="pchip"><Icon name="lucide:server" /> OpenAI-compatible</span>
         </div>
       </div>
