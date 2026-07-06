@@ -11,7 +11,7 @@
  * against the user's ChatGPT subscription (Plus/Pro).
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { isAbsolute, join, normalize } from 'path'
 import { createLogger } from '@/server/logger'
 import type { ProviderConfig } from '@/server/llm/core/types'
 import { decodeJwtClaims, type PkceClient, type PkceTokenResponse } from '@/server/llm/llm/_oauth-pkce'
@@ -72,9 +72,28 @@ function getRealHome(): string {
 
 const REAL_HOME = getRealHome()
 
-const CANDIDATE_PATHS = [
-  join(REAL_HOME, '.codex', 'auth.json'),
-]
+function normalizeAbsoluteHome(home: string | undefined): string | null {
+  if (!home) return null
+  const normalized = normalize(home)
+  return isAbsolute(normalized) ? normalized : null
+}
+
+// Search the plain env HOME first, then the snap-adjusted REAL_HOME. On macOS
+// and nonstandard homes REAL_HOME can resolve to the wrong place (e.g. getRealHome
+// builds /home/$USER while the real home is /Users/$USER), so the env HOME
+// candidate is what actually finds the file there.
+function codexAuthCandidates(): string[] {
+  const paths: string[] = []
+  for (const home of [process.env.HOME, REAL_HOME]) {
+    const base = normalizeAbsoluteHome(home)
+    if (!base) continue
+    const p = join(base, '.codex', 'auth.json')
+    if (!paths.includes(p)) paths.push(p)
+  }
+  return paths
+}
+
+const CANDIDATE_PATHS = codexAuthCandidates()
 
 
 // ---------------------------------------------------------------------------

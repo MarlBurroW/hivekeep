@@ -17,7 +17,7 @@
  */
 
 import { existsSync, readFileSync } from 'fs'
-import { join } from 'path'
+import { isAbsolute, join, normalize } from 'path'
 import {
   getCodexOAuthCredentials,
   CODEX_BASE_URL,
@@ -87,7 +87,31 @@ function getRealHome(): string {
 }
 
 const REAL_HOME = getRealHome()
-const MODELS_CACHE_PATH = join(REAL_HOME, '.codex', 'models_cache.json')
+
+function normalizeAbsoluteHome(home: string | undefined): string | null {
+  if (!home) return null
+  const normalized = normalize(home)
+  return isAbsolute(normalized) ? normalized : null
+}
+
+/**
+ * Candidate cache paths, tried in order. The Codex CLI writes
+ * `~/.codex/models_cache.json`, but the plain env HOME and the snap-adjusted
+ * REAL_HOME can differ (macOS and nonstandard Linux homes), so try the env HOME
+ * first and fall back to REAL_HOME rather than missing a valid cache.
+ * @internal exported for tests.
+ */
+export function modelsCacheCandidates(envHome: string | undefined, realHome: string | undefined): string[] {
+  const candidates: string[] = []
+  for (const home of [envHome, realHome]) {
+    const normalized = normalizeAbsoluteHome(home)
+    if (!normalized) continue
+    const p = join(normalized, '.codex', 'models_cache.json')
+    if (!candidates.includes(p)) candidates.push(p)
+  }
+  return candidates
+}
+const MODELS_CACHE_CANDIDATES = modelsCacheCandidates(process.env.HOME, REAL_HOME)
 
 interface CodexModelCacheEntry {
   slug: string
@@ -160,15 +184,18 @@ async function fetchCodexModelsFromApi(config: ProviderConfig): Promise<CodexMod
  * decide whether to error out or fall back).
  */
 function readCodexModelsFromCache(): CodexModelCacheEntry[] | null {
-  try {
-    if (!existsSync(MODELS_CACHE_PATH)) return null
-    const raw = readFileSync(MODELS_CACHE_PATH, 'utf8')
-    const parsed = JSON.parse(raw) as CodexModelsCacheFile
-    const selected = selectCodexEntries(parsed.models)
-    return selected.length > 0 ? selected : null
-  } catch {
-    return null
+  for (const path of MODELS_CACHE_CANDIDATES) {
+    try {
+      if (!existsSync(path)) continue
+      const raw = readFileSync(path, 'utf8')
+      const parsed = JSON.parse(raw) as CodexModelsCacheFile
+      const selected = selectCodexEntries(parsed.models)
+      if (selected.length > 0) return selected
+    } catch {
+      // try the next candidate path
+    }
   }
+  return null
 }
 
 /**

@@ -28,7 +28,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createHash, randomBytes, randomUUID } from 'crypto'
-import { join } from 'path'
+import { isAbsolute, join, normalize } from 'path'
 import { createLogger } from '@/server/logger'
 import type { ProviderConfig } from '@/server/llm/core/types'
 import type { PkceClient } from '@/server/llm/llm/_oauth-pkce'
@@ -83,11 +83,40 @@ function getRealHome(): string {
 
 const REAL_HOME = getRealHome()
 
-const CANDIDATE_PATHS = [
-  join(REAL_HOME, '.claude', '.credentials.json'),
-  join(REAL_HOME, '.claude.json'),
-  join(REAL_HOME, '.claude', 'credentials.json'),
+function normalizeAbsoluteHome(home: string | undefined): string | null {
+  if (!home) return null
+  const normalized = normalize(home)
+  return isAbsolute(normalized) ? normalized : null
+}
+
+// Credential filenames the Claude CLI may use, relative to a home directory.
+const CLAUDE_CREDENTIAL_RELPATHS: string[][] = [
+  ['.claude', '.credentials.json'],
+  ['.claude.json'],
+  ['.claude', 'credentials.json'],
 ]
+
+// Search the plain env HOME first, then the snap-adjusted REAL_HOME. On macOS
+// and nonstandard homes REAL_HOME can resolve to the wrong place (e.g. getRealHome
+// builds /home/$USER while the real home is /Users/$USER), so the env HOME
+// candidate is what actually finds the credentials there.
+function claudeCredentialCandidates(): string[] {
+  const bases: string[] = []
+  for (const home of [process.env.HOME, REAL_HOME]) {
+    const base = normalizeAbsoluteHome(home)
+    if (base && !bases.includes(base)) bases.push(base)
+  }
+  const paths: string[] = []
+  for (const base of bases) {
+    for (const rel of CLAUDE_CREDENTIAL_RELPATHS) {
+      const p = join(base, ...rel)
+      if (!paths.includes(p)) paths.push(p)
+    }
+  }
+  return paths
+}
+
+const CANDIDATE_PATHS = claudeCredentialCandidates()
 
 // ---------------------------------------------------------------------------
 // Types
