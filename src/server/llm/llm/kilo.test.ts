@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 describe('Kilo Gateway authenticate', () => {
-  it('rejects /models 401/403 as an invalid key with response details', async () => {
+  it('rejects a 401 from the chat probe as an invalid key with response details', async () => {
     const fetchMock = mockFetch(new Response(JSON.stringify({ error: { message: 'bad token' } }), { status: 401 }))
 
     const result = await kiloProvider.authenticate({ apiKey: 'test-key' })
@@ -24,40 +24,50 @@ describe('Kilo Gateway authenticate', () => {
     expect(result.valid).toBe(false)
     expect(result.error).toContain('Invalid Kilo Gateway API key (HTTP 401)')
     expect(result.error).toContain('bad token')
-    expect(fetchMock).toHaveBeenCalledWith('https://api.kilo.ai/api/gateway/models', {
-      headers: { Authorization: 'Bearer test-key' },
-    })
+    // GET /models is anonymous on Kilo, so auth must probe the authenticated
+    // POST /chat/completions endpoint with a bearer token.
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(url).toBe('https://api.kilo.ai/api/gateway/chat/completions')
+    expect((init as RequestInit)?.method).toBe('POST')
+    expect((init as RequestInit)?.headers).toMatchObject({ Authorization: 'Bearer test-key' })
   })
 
-  it('accepts /models 200 without probing a hardcoded paid chat model', async () => {
-    const fetchMock = mockFetch(new Response(JSON.stringify({ data: [{ id: 'kilo-auto/free' }] }), { status: 200 }))
-
-    const result = await kiloProvider.authenticate({ apiKey: 'test-key' })
-
-    expect(result).toEqual({ valid: true })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.kilo.ai/api/gateway/models')
-  })
-
-  it('does not fail setup because anthropic/claude-haiku-latest would return 400', async () => {
-    const fetchMock = mockFetch(new Response(JSON.stringify({ data: [{ id: 'anthropic/claude-haiku-4.5' }] }), { status: 200 }))
-
-    const result = await kiloProvider.authenticate({ apiKey: 'test-key' })
-
-    expect(result.valid).toBe(true)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain('anthropic/claude-haiku-latest')
-    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain('/chat/completions')
-  })
-
-  it('includes response body snippets for unexpected /models failures', async () => {
-    mockFetch(new Response(JSON.stringify({ error: { message: 'maintenance window' } }), { status: 503 }))
+  it('rejects a 403 from the chat probe as an invalid key', async () => {
+    mockFetch(new Response(JSON.stringify({ error: { message: 'forbidden' } }), { status: 403 }))
 
     const result = await kiloProvider.authenticate({ apiKey: 'test-key' })
 
     expect(result.valid).toBe(false)
-    expect(result.error).toContain('Kilo Gateway /models returned an unexpected response (HTTP 503)')
-    expect(result.error).toContain('maintenance window')
+    expect(result.error).toContain('Invalid Kilo Gateway API key (HTTP 403)')
+  })
+
+  it('probes with a non-existent model so a valid key never spends generation tokens', async () => {
+    const fetchMock = mockFetch(new Response(JSON.stringify({ error: { message: 'model not found' } }), { status: 404 }))
+
+    const result = await kiloProvider.authenticate({ apiKey: 'test-key' })
+
+    // A model error (not 401/403) means the key was accepted.
+    expect(result).toEqual({ valid: true })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit)?.body as string) as { model: string }
+    expect(body.model).toBe('__hivekeep_auth_probe__')
+  })
+
+  it('accepts a 200 chat probe as a valid key', async () => {
+    mockFetch(new Response(JSON.stringify({ choices: [] }), { status: 200 }))
+
+    const result = await kiloProvider.authenticate({ apiKey: 'test-key' })
+
+    expect(result).toEqual({ valid: true })
+  })
+
+  it('treats a 5xx from the probe as an accepted key rather than a spurious rejection', async () => {
+    mockFetch(new Response(JSON.stringify({ error: { message: 'maintenance window' } }), { status: 503 }))
+
+    const result = await kiloProvider.authenticate({ apiKey: 'test-key' })
+
+    // Only 401/403 indicate a bad key; a transient server error should not block setup.
+    expect(result.valid).toBe(true)
   })
 })
 

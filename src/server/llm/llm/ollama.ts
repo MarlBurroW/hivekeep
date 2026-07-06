@@ -36,6 +36,12 @@ import { downgradeEffort } from '@/server/llm/llm/types'
 
 const DEFAULT_BASE_URL = 'https://ollama.com/api'
 
+// A non-existent model id used only by the setup auth probe. Ollama Cloud
+// validates the bearer token before the model, so this never resolves to a real
+// (billable) model — it just lets us tell a rejected key (401/403) from an
+// accepted one.
+const PROBE_MODEL = '__hivekeep_auth_probe__'
+
 const CONFIG_SCHEMA: readonly ConfigField[] = [
   {
     key: 'apiKey',
@@ -267,10 +273,25 @@ export const ollamaProvider: LLMProvider = {
 
   async authenticate(config: ProviderConfig): Promise<AuthResult> {
     try {
-      const res = await fetch(`${getBaseUrl(config)}/tags`, { headers: authHeaders(config) })
-      if (res.ok) return { valid: true }
+      // GET /tags is anonymous on Ollama Cloud — it returns 200 for any bearer
+      // token, including a typoed one — so it cannot validate credentials. Probe
+      // the authenticated POST /chat endpoint instead: it checks the bearer token
+      // before the model, so a bad key gets 401/403 regardless of the model. Using
+      // a deliberately non-existent probe model means a valid key returns a model
+      // error (not 401) and no generation tokens are spent.
+      const res = await fetch(`${getBaseUrl(config)}/chat`, {
+        method: 'POST',
+        headers: { ...authHeaders(config), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: PROBE_MODEL,
+          messages: [{ role: 'user', content: 'hi' }],
+          stream: false,
+        }),
+      })
       if (res.status === 401 || res.status === 403) return { valid: false, error: 'Invalid Ollama Cloud API key' }
-      return { valid: false, error: `Ollama Cloud returned HTTP ${res.status}` }
+      // Any other status (including a model-not-found error for PROBE_MODEL)
+      // means the key was accepted.
+      return { valid: true }
     } catch (err) {
       return { valid: false, error: mapApiError(err).message }
     }

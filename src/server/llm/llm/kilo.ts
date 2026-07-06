@@ -46,8 +46,14 @@ import type {
   ThinkingEffort,
 } from '@/server/llm/llm/types'
 import { downgradeEffort } from '@/server/llm/llm/types'
+import { parseToolArguments } from '@/server/llm/core/parse-tool-args'
 
 const DEFAULT_BASE_URL = 'https://api.kilo.ai/api/gateway'
+
+// A non-existent model id used only by the setup auth probe. Kilo validates the
+// bearer token before the model, so this never resolves to a real (billable)
+// model — it just lets us tell a rejected key (401/403) from an accepted one.
+const PROBE_MODEL = '__hivekeep_auth_probe__'
 
 const CONFIG_SCHEMA: readonly ConfigField[] = [
   {
@@ -399,13 +405,14 @@ async function* streamChat(client: OpenAI, params: ChatCompletionCreateParamsStr
     throw mapApiError(err)
   }
 
-  for (const state of toolsByIndex.values()) {
-    if (!state.id || !state.name) continue
-    let args: unknown = {}
-    if (state.args.length > 0) {
-      try { args = JSON.parse(state.args) } catch { args = { _raw: state.args } }
+  for (const [idx, state] of toolsByIndex) {
+    if (!state.name) continue
+    yield {
+      type: 'tool-use',
+      id: state.id || `call_${idx}`,
+      name: state.name,
+      args: parseToolArguments(state.args),
     }
-    yield { type: 'tool-use', id: state.id, name: state.name, args }
   }
   yield { type: 'finish', reason: mapFinishReason(finishReason), usage }
 }
@@ -420,23 +427,28 @@ export const kiloProvider: LLMProvider = {
   async authenticate(config: ProviderConfig): Promise<AuthResult> {
     try {
       const apiKey = getApiKey(config)
-      // Kilo documents GET /models as the canonical model catalogue endpoint
-      // and explicitly says it requires no authentication. Use it as the
-      // lowest-cost setup probe: if Kilo ever rejects the bearer token here,
-      // surface that as invalid credentials; otherwise accept the key format
-      // without spending tokens on an arbitrary paid chat model. A chat probe
-      // tied to one model ID is brittle because Kilo's catalogue changes and
-      // anonymous/free-model behavior means auth cannot be reliably
-      // distinguished without a real generation request.
-      const res = await fetch(`${getBaseUrl(config)}/models`, {
-        headers: authHeaders(apiKey),
+      // GET /models is anonymous on Kilo — it returns 200 for any bearer token,
+      // including a typoed one — so it cannot validate credentials. Probe the
+      // authenticated POST /chat/completions endpoint instead: Kilo checks the
+      // bearer token before the model, so a bad key gets 401/403 regardless of
+      // the model. Using a deliberately non-existent probe model means a valid
+      // key returns a model error (not 401) and no generation tokens are spent.
+      const res = await fetch(`${getBaseUrl(config)}/chat/completions`, {
+        method: 'POST',
+        headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: PROBE_MODEL,
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1,
+        }),
       })
-      if (res.ok) return { valid: true }
-      const snippet = await responseSnippet(res)
       if (res.status === 401 || res.status === 403) {
+        const snippet = await responseSnippet(res)
         return { valid: false, error: withHttpSnippet('Invalid Kilo Gateway API key', res.status, snippet) }
       }
-      return { valid: false, error: withHttpSnippet('Kilo Gateway /models returned an unexpected response', res.status, snippet) }
+      // Any other status (including a model-not-found error for PROBE_MODEL)
+      // means the key was accepted.
+      return { valid: true }
     } catch (err) {
       return { valid: false, error: mapApiError(err).message }
     }

@@ -61,6 +61,8 @@ export function setSnapshot(s: Snapshot): void {
 const PROVIDER_ID_MAP: Record<string, string> = {
   moonshot: 'moonshotai',
   gemini: 'google',
+  ollama: 'ollama-cloud', // Ollama Cloud is keyed as `ollama-cloud` in models.dev
+
   // Subscription / CLI providers serve the SAME underlying models as the base
   // provider, so they match the base provider's models.dev entries.
   'anthropic-oauth': 'anthropic', // Claude Pro/Max (used by Claude Code)
