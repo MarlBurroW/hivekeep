@@ -84,9 +84,7 @@ Limits of the [Files workspace browser](/docs/features/files/).
 
 ## Built-in AI providers
 
-Provider credentials are configured from Queenie or the Providers settings UI, not environment variables. Hivekeep stores secrets in the encrypted vault and auto-detects enabled capabilities from each configured provider.
-
-Current built-in provider types include OpenAI, Anthropic, Google Gemini, OpenRouter, Kilo Gateway, Ollama Cloud, xAI, DeepSeek, MiniMax, Kimi (Moonshot), OpenAI-compatible endpoints, Brave Search, SerpAPI, Tavily, Perplexity Sonar, SearXNG, and ElevenLabs. OpenRouter exposes LLM, embedding, and image capabilities; Kilo Gateway exposes LLM; Ollama Cloud exposes LLM plus web search using `https://ollama.com/api` and API keys from `https://ollama.com/settings/keys`.
+Provider credentials are configured from Queenie or the Providers settings UI, not environment variables — Hivekeep stores secrets in the encrypted vault and auto-detects each provider's capabilities. See [Supported providers](/docs/providers/supported/) for the full list and per-provider capabilities.
 
 ## Advanced options
 

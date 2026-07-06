@@ -44,7 +44,7 @@ export const PROVIDER_META = {
   'openai-codex':     { capabilities: ['llm'],                       displayName: 'OpenAI (Codex CLI)',     lobehubIcon: 'OpenAI',  noApiKey: true },
   gemini:             { capabilities: ['llm', 'image'],              displayName: 'Google Gemini',          lobehubIcon: 'Gemini',  apiKeyUrl: 'https://aistudio.google.com/apikey' },
   openrouter:         { capabilities: ['llm', 'embedding', 'image'], displayName: 'OpenRouter',             lobehubIcon: 'OpenRouter', apiKeyUrl: 'https://openrouter.ai/keys' },
-  kilo:               { capabilities: ['llm'],                       displayName: 'Kilo Gateway',           reactIcon: 'lu/LuRoute', brandColor: '#7C3AED', apiKeyUrl: 'https://kilo.ai' },
+  kilo:               { capabilities: ['llm'],                       displayName: 'Kilo Gateway',           reactIcon: 'lu/LuRoute', brandColor: '#7C3AED', apiKeyUrl: 'https://kilo.ai/gateway' },
   ollama:             { capabilities: ['llm', 'search'],             displayName: 'Ollama Cloud',           lobehubIcon: 'Ollama', apiKeyUrl: 'https://ollama.com/settings/keys' },
   xai:                { capabilities: ['llm'],                       displayName: 'xAI',                    lobehubIcon: 'XAI',       apiKeyUrl: 'https://console.x.ai' },
   deepseek:           { capabilities: ['llm'],                       displayName: 'DeepSeek',               lobehubIcon: 'DeepSeek',  apiKeyUrl: 'https://platform.deepseek.com/api_keys' },

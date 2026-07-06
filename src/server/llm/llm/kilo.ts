@@ -14,7 +14,6 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionAssistantMessageParam,
   ChatCompletionUserMessageParam,
-  ChatCompletionToolMessageParam,
   ChatCompletionSystemMessageParam,
   ChatCompletionContentPart,
   ChatCompletionMessageToolCall,

@@ -230,6 +230,27 @@ async function* streamChat(url: string, body: Record<string, unknown>, config: P
   let buffer = ''
   let usage: Usage = {}
   let doneReason: string | undefined
+  // Ollama identifies a tool call only by its function name, so two parallel
+  // calls to the same tool would otherwise share an id. Suffix with a running
+  // counter to keep every emitted tool-use id unique.
+  let toolSeq = 0
+
+  // Emit the events for one parsed chunk. Shared by the streaming loop and the
+  // trailing-buffer flush so the final partial line can't silently drop
+  // thinking or tool_calls (it previously handled only content/done).
+  function* emitChunk(chunk: OllamaChatChunk): Generator<ChatChunk> {
+    if (chunk.message?.thinking) yield { type: 'thinking-delta', text: chunk.message.thinking }
+    if (chunk.message?.content) yield { type: 'text-delta', text: chunk.message.content }
+    for (const tc of chunk.message?.tool_calls ?? []) {
+      const fn = tc.function
+      if (!fn?.name) continue
+      yield { type: 'tool-use', id: `${fn.name}_${toolSeq++}`, name: fn.name, args: fn.arguments ?? fn.args ?? {} }
+    }
+    if (chunk.done) {
+      doneReason = chunk.done_reason
+      usage = { inputTokens: chunk.prompt_eval_count, outputTokens: chunk.eval_count }
+    }
+  }
 
   try {
     while (true) {
@@ -238,25 +259,11 @@ async function* streamChat(url: string, body: Record<string, unknown>, config: P
       buffer += decoder.decode(value, { stream: true })
       const parsed = parseJsonLines(buffer)
       buffer = parsed.rest
-      for (const chunk of parsed.values) {
-        if (chunk.message?.thinking) yield { type: 'thinking-delta', text: chunk.message.thinking }
-        if (chunk.message?.content) yield { type: 'text-delta', text: chunk.message.content }
-        for (const tc of chunk.message?.tool_calls ?? []) {
-          const fn = tc.function
-          if (!fn?.name) continue
-          yield { type: 'tool-use', id: fn.name, name: fn.name, args: fn.arguments ?? fn.args ?? {} }
-        }
-        if (chunk.done) {
-          doneReason = chunk.done_reason
-          usage = { inputTokens: chunk.prompt_eval_count, outputTokens: chunk.eval_count }
-        }
-      }
+      for (const chunk of parsed.values) yield* emitChunk(chunk)
     }
 
     if (buffer.trim()) {
-      const chunk = JSON.parse(buffer) as OllamaChatChunk
-      if (chunk.message?.content) yield { type: 'text-delta', text: chunk.message.content }
-      if (chunk.done) usage = { inputTokens: chunk.prompt_eval_count, outputTokens: chunk.eval_count }
+      yield* emitChunk(JSON.parse(buffer) as OllamaChatChunk)
     }
   } catch (err) {
     throw mapApiError(err)
@@ -322,7 +329,11 @@ export const ollamaProvider: LLMProvider = {
     if (Object.keys(options).length) body['options'] = options
     if (request.thinkingEffort && model.thinking?.efforts?.length) {
       const chosen = downgradeEffort(request.thinkingEffort, model.thinking.efforts) as ThinkingEffort | undefined
-      if (chosen) body['think'] = chosen === 'minimal' ? false : chosen
+      // Ollama's `think` accepts only a boolean or low/medium/high. Map minimal
+      // to `false` and clamp the higher tiers (max/xhigh) down to high.
+      if (chosen === 'minimal') body['think'] = false
+      else if (chosen === 'max' || chosen === 'xhigh') body['think'] = 'high'
+      else if (chosen) body['think'] = chosen
     }
     return streamChat(`${getBaseUrl(config)}/chat`, body, config, request.signal)
   },
