@@ -95,4 +95,42 @@ describe('openrouterImageProvider.generate', () => {
       globalThis.fetch = originalFetch
     }
   })
+
+  it('does not let request.params override the model, prompt, or n', async () => {
+    const originalFetch = globalThis.fetch
+    let sentBody: Record<string, unknown> = {}
+    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+      sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return new Response(JSON.stringify({ data: [{ b64_json: 'AAAA', media_type: 'image/png' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as typeof fetch
+    try {
+      await openrouterImageProvider.generate(
+        { id: 'openai/gpt-image-1', name: 'GPT Image' },
+        { prompt: 'a cat', params: { n: 5, model: 'evil/model', prompt: 'hacked', quality: 'high' } },
+        { apiKey: 'sk-or-test' },
+      )
+      expect(sentBody.model).toBe('openai/gpt-image-1')
+      expect(sentBody.prompt).toBe('a cat')
+      expect(sentBody.n).toBe(1)
+      expect(sentBody.quality).toBe('high') // a legit model param still passes through
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('rejects a non-http(s) image URL from the upstream response', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async () => new Response(JSON.stringify({ data: [{ url: 'file:///etc/passwd' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch
+    try {
+      await expect(
+        openrouterImageProvider.generate(
+          { id: 'x/image', name: 'Image' },
+          { prompt: 'x' },
+          { apiKey: 'sk-or-test' },
+        ),
+      ).rejects.toThrow(/non-http/)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
 })

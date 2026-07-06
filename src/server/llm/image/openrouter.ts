@@ -227,7 +227,18 @@ async function imageResultFrom(payload: OpenRouterImageResponse, signal?: AbortS
   const base64 = item.b64_json ?? item.image_b64 ?? item.data
   if (base64) return { data: base64ToUint8Array(base64), mediaType: mediaTypeFrom(item) }
   if (item.url) {
-    const res = await fetch(item.url, { signal })
+    // Only fetch over http(s). A bad/compromised upstream response could carry a
+    // file:, data:, or other-scheme URL that we must not dereference.
+    let parsed: URL
+    try {
+      parsed = new URL(item.url)
+    } catch {
+      throw new ProviderServerError('OpenRouter image API returned an invalid image URL')
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new ProviderServerError(`OpenRouter image API returned a non-http(s) image URL (${parsed.protocol})`)
+    }
+    const res = await fetch(parsed, { signal })
     if (!res.ok) throw new ProviderServerError(`OpenRouter image URL returned HTTP ${res.status}`, res.status)
     const bytes = new Uint8Array(await res.arrayBuffer())
     return { data: bytes, mediaType: res.headers.get('content-type') ?? 'image/png' }
@@ -278,11 +289,14 @@ export const openrouterImageProvider: ImageProvider = {
   async generate(model: ImageModel, request: ImageRequest, config: ProviderConfig): Promise<ImageResult> {
     const maxRefs = model.maxImageInputs ?? 0
     const inputReferences = (request.imageInputs ?? []).slice(0, Math.max(0, maxRefs)).map(dataUrlFor)
+    // Spread caller params first, then set the provider-controlled fields, so
+    // request.params can supply model-specific options (quality, resolution, …)
+    // but cannot override the model id, prompt, or force n > 1 (extra cost).
     const body: Record<string, unknown> = {
+      ...request.params,
       model: model.id,
       prompt: request.prompt,
       n: 1,
-      ...request.params,
     }
     // OpenRouter image models don't accept a uniform top-level `size`: OpenAI
     // models use `quality`, Gemini uses `resolution`/`aspect_ratio`, etc. Each
