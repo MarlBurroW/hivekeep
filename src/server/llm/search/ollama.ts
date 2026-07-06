@@ -46,11 +46,15 @@ async function parseError(res: Response): Promise<string> {
 }
 
 async function callSearch(config: ProviderConfig, query: string, count?: number, signal?: AbortSignal): Promise<OllamaSearchResponse> {
+  // Resolve credentials before the try so a missing key surfaces as AuthError
+  // rather than being wrapped as a misleading NetworkError.
+  const baseUrl = getBaseUrl(config)
+  const apiKey = getApiKey(config)
   let res: Response
   try {
-    res = await fetch(`${getBaseUrl(config)}/web_search`, {
+    res = await fetch(`${baseUrl}/web_search`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${getApiKey(config)}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, max_results: Math.max(1, Math.min(10, count ?? 5)) }),
       signal,
     })

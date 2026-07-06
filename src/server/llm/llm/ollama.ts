@@ -165,7 +165,20 @@ function assistantMessage(blocks: HivekeepMessage['content']): Record<string, un
   return { role: 'assistant', content, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) }
 }
 
-function messagesToOllama(messages: HivekeepMessage[], system?: string): Array<Record<string, unknown>> {
+/** @internal exported for tests. */
+export function messagesToOllama(messages: HivekeepMessage[], system?: string): Array<Record<string, unknown>> {
+  // Ollama correlates a tool result by function name (`tool_name`), but a
+  // tool-result block only carries `toolUseId`. Emitted tool-use ids are
+  // suffixed to stay unique across parallel calls to the same tool, so they are
+  // no longer the bare name — map each id back to its original name. Mirrors
+  // messagesToGemini's toolNameById pre-pass.
+  const toolNameById = new Map<string, string>()
+  for (const m of messages) {
+    if (m.role !== 'assistant') continue
+    for (const b of m.content) {
+      if (b.type === 'tool-use') toolNameById.set(b.id, b.name)
+    }
+  }
   const out: Array<Record<string, unknown>> = []
   if (system) out.push({ role: 'system', content: system })
   for (const m of messages) {
@@ -176,7 +189,7 @@ function messagesToOllama(messages: HivekeepMessage[], system?: string): Array<R
     const user = userMessage(m.content)
     if (user) out.push(user)
     for (const b of m.content) {
-      if (b.type === 'tool-result') out.push({ role: 'tool', content: b.content, tool_name: b.toolUseId })
+      if (b.type === 'tool-result') out.push({ role: 'tool', content: b.content, tool_name: toolNameById.get(b.toolUseId) ?? b.toolUseId })
     }
   }
   return out
