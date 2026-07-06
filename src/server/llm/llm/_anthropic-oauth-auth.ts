@@ -28,7 +28,8 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createHash, randomBytes, randomUUID } from 'crypto'
-import { isAbsolute, join, normalize } from 'path'
+import { join } from 'path'
+import { REAL_HOME, normalizeAbsoluteHome } from '@/server/llm/llm/_home-paths'
 import { createLogger } from '@/server/logger'
 import type { ProviderConfig } from '@/server/llm/core/types'
 import type { PkceClient } from '@/server/llm/llm/_oauth-pkce'
@@ -63,31 +64,6 @@ export const ANTHROPIC_PKCE_CLIENT: PkceClient = {
 // releases new versions to avoid being flagged as an outdated client.
 const CLAUDE_CODE_VERSION = '2.1.120'
 const BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
-
-/**
- * Resolve the real user home directory.
- * Bun installed via snap sets HOME to a sandboxed path (e.g. ~/snap/bun-js/87/).
- * We prefer the REAL_HOME or the home from /etc/passwd via the USER env var.
- */
-function getRealHome(): string {
-  // REAL_HOME is set by some snap environments
-  if (process.env.REAL_HOME) return process.env.REAL_HOME
-  // Fall back to HOME, but strip snap paths
-  const home = process.env.HOME ?? ''
-  const snapMatch = home.match(/^(\/home\/[^/]+)\/snap\//)
-  if (snapMatch) return snapMatch[1]!
-  // Last resort: construct from USER
-  if (process.env.USER) return `/home/${process.env.USER}`
-  return home
-}
-
-const REAL_HOME = getRealHome()
-
-function normalizeAbsoluteHome(home: string | undefined): string | null {
-  if (!home) return null
-  const normalized = normalize(home)
-  return isAbsolute(normalized) ? normalized : null
-}
 
 // Credential filenames the Claude CLI may use, relative to a home directory.
 const CLAUDE_CREDENTIAL_RELPATHS: string[][] = [

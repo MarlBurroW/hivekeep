@@ -11,7 +11,8 @@
  * against the user's ChatGPT subscription (Plus/Pro).
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { isAbsolute, join, normalize } from 'path'
+import { join } from 'path'
+import { REAL_HOME, normalizeAbsoluteHome } from '@/server/llm/llm/_home-paths'
 import { createLogger } from '@/server/logger'
 import type { ProviderConfig } from '@/server/llm/core/types'
 import { decodeJwtClaims, type PkceClient, type PkceTokenResponse } from '@/server/llm/llm/_oauth-pkce'
@@ -54,28 +55,6 @@ export function codexAccountIdFromTokens(tokens: PkceTokenResponse): Record<stri
   const auth = claims?.['https://api.openai.com/auth'] as { chatgpt_account_id?: string } | undefined
   const accountId = auth?.chatgpt_account_id
   return accountId ? { accountId } : undefined
-}
-
-/**
- * Resolve the real user home directory.
- * Bun installed via snap sets HOME to a sandboxed path (e.g. ~/snap/bun-js/87/).
- * We prefer the REAL_HOME or the home from /etc/passwd via the USER env var.
- */
-function getRealHome(): string {
-  if (process.env.REAL_HOME) return process.env.REAL_HOME
-  const home = process.env.HOME ?? ''
-  const snapMatch = home.match(/^(\/home\/[^/]+)\/snap\//)
-  if (snapMatch) return snapMatch[1]!
-  if (process.env.USER) return `/home/${process.env.USER}`
-  return home
-}
-
-const REAL_HOME = getRealHome()
-
-function normalizeAbsoluteHome(home: string | undefined): string | null {
-  if (!home) return null
-  const normalized = normalize(home)
-  return isAbsolute(normalized) ? normalized : null
 }
 
 // Search the plain env HOME first, then the snap-adjusted REAL_HOME. On macOS

@@ -17,7 +17,8 @@
  */
 
 import { existsSync, readFileSync } from 'fs'
-import { isAbsolute, join, normalize } from 'path'
+import { join } from 'path'
+import { REAL_HOME, normalizeAbsoluteHome } from '@/server/llm/llm/_home-paths'
 import {
   getCodexOAuthCredentials,
   CODEX_BASE_URL,
@@ -76,23 +77,6 @@ const CONFIG_SCHEMA: readonly ConfigField[] = [
 ]
 
 // ─── Model discovery ─────────────────────────────────────────────────────────
-
-function getRealHome(): string {
-  if (process.env.REAL_HOME) return process.env.REAL_HOME
-  const home = process.env.HOME ?? ''
-  const snapMatch = home.match(/^(\/home\/[^/]+)\/snap\//)
-  if (snapMatch) return snapMatch[1]!
-  if (process.env.USER) return `/home/${process.env.USER}`
-  return home
-}
-
-const REAL_HOME = getRealHome()
-
-function normalizeAbsoluteHome(home: string | undefined): string | null {
-  if (!home) return null
-  const normalized = normalize(home)
-  return isAbsolute(normalized) ? normalized : null
-}
 
 /**
  * Candidate cache paths, tried in order. The Codex CLI writes
