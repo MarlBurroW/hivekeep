@@ -2051,7 +2051,7 @@
       "active": "已启用",
       "pendingApproval": "待批准",
       "oneShot": "一次性",
-      "oneShotHint": "匹配到第一封邮件后自动停用。",
+      "oneShotHint": "匹配到第一封邮件后自动删除。",
       "deleteTitle": "删除触发器",
       "deleteConfirm": "删除此触发器？此操作无法撤销。",
       "errorName": "名称为必填项。",

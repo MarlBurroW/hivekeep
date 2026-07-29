@@ -2051,7 +2051,7 @@
       "active": "Actif",
       "pendingApproval": "En attente d'approbation",
       "oneShot": "Une fois",
-      "oneShotHint": "Se désactive après le premier email correspondant.",
+      "oneShotHint": "Supprimé après le premier email correspondant.",
       "deleteTitle": "Supprimer le déclencheur",
       "deleteConfirm": "Supprimer ce déclencheur ? Cette action est irréversible.",
       "errorName": "Le nom est requis.",

@@ -7,7 +7,7 @@
  * This module is the single source of truth for creating/validating triggers:
  * both the HTTP routes and the Agent tools call through here.
  */
-import { eq, and, desc, lt, count, inArray } from 'drizzle-orm'
+import { eq, and, or, desc, lt, gte, count, inArray } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
@@ -366,6 +366,27 @@ async function insertTriggerLog(triggerId: string, summary: string, matched: boo
   await db.insert(triggerLogs).values({ id: uuid(), triggerId, summary: summary.slice(0, 500), matched, action, createdAt: new Date() })
 }
 
+/**
+ * Retire a one-shot trigger (the send_email reply-watch). It is deleted rather
+ * than deactivated: its condition targets a single thread/Message-ID that has
+ * already been answered, so re-enabling it can never match again, and inactive
+ * rows kept piling up until they exhausted the per-account trigger quota.
+ */
+export async function consumeOneShotTrigger(trigger: TriggerRow, reason: 'fired' | 'superseded'): Promise<void> {
+  await db.delete(accountTriggers).where(eq(accountTriggers.id, trigger.id))
+  sseManager.broadcast({
+    type: 'trigger:deleted',
+    agentId: trigger.targetAgentId,
+    data: { triggerId: trigger.id, accountId: trigger.accountId },
+  })
+  log.info({ triggerId: trigger.id, agentId: trigger.targetAgentId, reason }, 'One-shot trigger consumed')
+}
+
+/** Record a match that deliberately did not dispatch (deduplicated wake-up). */
+export async function logTriggerSkipped(triggerId: string, ref: TriggerEmailRef): Promise<void> {
+  await insertTriggerLog(triggerId, `${ref.from} · ${ref.subject} (skipped: Agent already woken by another trigger)`, true, null)
+}
+
 /** Dispatch a matched email to the trigger's target Agent. */
 export async function fireTrigger(trigger: TriggerRow, ref: TriggerEmailRef): Promise<void> {
   const content = renderEmailContent(trigger, ref)
@@ -392,36 +413,69 @@ export async function fireTrigger(trigger: TriggerRow, ref: TriggerEmailRef): Pr
     })
   }
 
-  // One-shot triggers (the send_email reply-watch) deactivate on first match so
-  // they only catch the first reply, then surface like any other inactive trigger.
+  sseManager.broadcast({ type: 'trigger:fired', agentId: trigger.targetAgentId, data: { triggerId: trigger.id, accountId: trigger.accountId } })
+  log.info({ triggerId: trigger.id, agentId: trigger.targetAgentId, mode, oneShot: trigger.disableAfterFire }, 'Trigger fired')
+
+  if (trigger.disableAfterFire) {
+    // Deleting cascades the logs away, so don't bother writing one.
+    await consumeOneShotTrigger(trigger, 'fired')
+    return
+  }
+
   await db
     .update(accountTriggers)
-    .set({
-      triggerCount: trigger.triggerCount + 1,
-      lastTriggeredAt: new Date(),
-      ...(trigger.disableAfterFire ? { isActive: false } : {}),
-    })
+    .set({ triggerCount: trigger.triggerCount + 1, lastTriggeredAt: new Date() })
     .where(eq(accountTriggers.id, trigger.id))
   await insertTriggerLog(trigger.id, `${ref.from} · ${ref.subject}`, true, mode)
-  sseManager.broadcast({ type: 'trigger:fired', agentId: trigger.targetAgentId, data: { triggerId: trigger.id, accountId: trigger.accountId } })
-  if (trigger.disableAfterFire) {
-    sseManager.broadcast({ type: 'trigger:updated', agentId: trigger.targetAgentId, data: { triggerId: trigger.id, accountId: trigger.accountId } })
-  }
-  log.info({ triggerId: trigger.id, agentId: trigger.targetAgentId, mode, oneShot: trigger.disableAfterFire }, 'Trigger fired')
 }
 
-// ─── Log cleanup (mirrors startWebhookLogCleanup) ─────────────────────────────
+// ─── Cleanup (mirrors startWebhookLogCleanup) ─────────────────────────────────
 
-export function startTriggerLogCleanup(): void {
-  const { logRetentionDays } = config.emailTriggers
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Collect one-shot triggers that will never fire: the ones consumed before
+ * fireTrigger deleted them on the spot, and the watches whose reply never came.
+ * Both would otherwise hold the per-account quota forever.
+ */
+async function purgeDeadOneShotTriggers(ttlDays: number): Promise<void> {
+  const ttlCutoff = new Date(Date.now() - ttlDays * DAY_MS)
+  const dead = db
+    .select()
+    .from(accountTriggers)
+    .where(
+      and(
+        eq(accountTriggers.disableAfterFire, true),
+        or(
+          // Fired before one-shots were deleted on the spot. A re-enabled one is
+          // left alone: switching it back on is a deliberate user action.
+          and(eq(accountTriggers.isActive, false), gte(accountTriggers.triggerCount, 1)),
+          // Never fired, and old enough that the reply is not coming.
+          and(eq(accountTriggers.triggerCount, 0), lt(accountTriggers.createdAt, ttlCutoff)),
+        ),
+      ),
+    )
+    .all()
+  if (dead.length === 0) return
+
+  await db.delete(accountTriggers).where(inArray(accountTriggers.id, dead.map((t) => t.id)))
+  for (const t of dead) {
+    sseManager.broadcast({ type: 'trigger:deleted', agentId: t.targetAgentId, data: { triggerId: t.id, accountId: t.accountId } })
+  }
+  log.info({ count: dead.length }, 'Purged dead one-shot triggers')
+}
+
+export function startTriggerCleanup(): void {
+  const { logRetentionDays, oneShotTtlDays } = config.emailTriggers
   const run = async () => {
     try {
-      const cutoff = new Date(Date.now() - logRetentionDays * 24 * 60 * 60 * 1000)
+      const cutoff = new Date(Date.now() - logRetentionDays * DAY_MS)
       await db.delete(triggerLogs).where(lt(triggerLogs.createdAt, cutoff))
+      await purgeDeadOneShotTriggers(oneShotTtlDays)
     } catch (err) {
-      log.error({ err }, 'Trigger log cleanup failed')
+      log.error({ err }, 'Trigger cleanup failed')
     }
   }
   void run()
-  setInterval(run, 24 * 60 * 60 * 1000)
+  setInterval(run, DAY_MS)
 }

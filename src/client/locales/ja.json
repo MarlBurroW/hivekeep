@@ -2051,7 +2051,7 @@
       "active": "有効",
       "pendingApproval": "承認待ち",
       "oneShot": "一度のみ",
-      "oneShotHint": "最初に一致したメールの後に無効になります。",
+      "oneShotHint": "最初に一致したメールの後に削除されます。",
       "deleteTitle": "トリガーを削除",
       "deleteConfirm": "このトリガーを削除しますか?この操作は元に戻せません。",
       "errorName": "名前は必須です。",

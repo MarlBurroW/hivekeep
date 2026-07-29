@@ -2051,7 +2051,7 @@
       "active": "Active",
       "pendingApproval": "Pending approval",
       "oneShot": "One-shot",
-      "oneShotHint": "Disables itself after the first matching email.",
+      "oneShotHint": "Removed after the first matching email.",
       "deleteTitle": "Delete trigger",
       "deleteConfirm": "Delete this trigger? This cannot be undone.",
       "errorName": "Name is required.",

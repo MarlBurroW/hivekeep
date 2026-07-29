@@ -630,7 +630,7 @@ export const accountTriggers = sqliteTable('account_triggers', {
   dispatchMode: text('dispatch_mode').notNull().default('conversation'), // 'conversation' | 'task'
   maxConcurrentTasks: integer('max_concurrent_tasks').notNull().default(1), // 0 = unlimited
   needsBody: integer('needs_body', { mode: 'boolean' }).notNull().default(false), // tree references body/attachment_*
-  disableAfterFire: integer('disable_after_fire', { mode: 'boolean' }).notNull().default(false), // one-shot: deactivate on first match (send_email reply-watch)
+  disableAfterFire: integer('disable_after_fire', { mode: 'boolean' }).notNull().default(false), // one-shot: row is deleted on first match (send_email reply-watch)
   lastTriggeredAt: integer('last_triggered_at', { mode: 'timestamp_ms' }),
   triggerCount: integer('trigger_count').notNull().default(0),
   createdBy: text('created_by').notNull().default('user'), // 'user' | 'agent'

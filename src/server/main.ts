@@ -211,9 +211,9 @@ startChannelFileCleanup()
 import { startWebhookLogCleanup } from '@/server/services/webhooks'
 startWebhookLogCleanup()
 
-// Trigger log cleanup (prune old trigger evaluation logs)
-import { startTriggerLogCleanup } from '@/server/services/account-triggers'
-startTriggerLogCleanup()
+// Trigger cleanup (prune old evaluation logs + dead one-shot reply watches)
+import { startTriggerCleanup } from '@/server/services/account-triggers'
+startTriggerCleanup()
 
 // External API request GC (prune resolved api_requests past retention)
 import { startExternalApiCleanup } from '@/server/services/external-api'

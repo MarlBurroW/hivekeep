@@ -337,6 +337,7 @@ Triggers on connected email accounts: a matching incoming email prompts a target
 | `EMAIL_TRIGGER_MAX_PER_CYCLE` | `50` | Anti-flood cap: max messages processed per (account, folder) per cycle. |
 | `EMAIL_TRIGGER_LOG_RETENTION_DAYS` | `30` | Retention of trigger evaluation logs. |
 | `EMAIL_TRIGGER_MAX_LOGS_PER_TRIGGER` | `500` | Max log entries retained per trigger. |
+| `EMAIL_TRIGGER_ONE_SHOT_TTL_DAYS` | `30` | Age after which a one-shot reply-watch that never fired is deleted. Fired ones are deleted immediately. |
 | `EMAIL_TRIGGER_SEEN_IDS_RING` | `200` | Size of the per-(account, folder) seen-ids dedup ring. |
 
 > Whether Agent-created triggers need user approval is a runtime setting (`agent_triggers_require_approval` in `app_settings`, default off), not an env var.

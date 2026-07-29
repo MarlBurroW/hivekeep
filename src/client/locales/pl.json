@@ -2067,7 +2067,7 @@
       "active": "Aktywny",
       "pendingApproval": "Oczekuje na zatwierdzenie",
       "oneShot": "Jednorazowo",
-      "oneShotHint": "Wyłącza się po pierwszym pasującym e-mailu.",
+      "oneShotHint": "Usuwany po pierwszym pasującym e-mailu.",
       "deleteTitle": "Usuń wyzwalacz",
       "deleteConfirm": "Usunąć ten wyzwalacz? Tej operacji nie można cofnąć.",
       "errorName": "Nazwa jest wymagana.",

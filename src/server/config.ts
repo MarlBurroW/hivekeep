@@ -619,6 +619,9 @@ export const config = {
     maxPerCycle: Number(process.env.EMAIL_TRIGGER_MAX_PER_CYCLE ?? 50),
     logRetentionDays: Number(process.env.EMAIL_TRIGGER_LOG_RETENTION_DAYS ?? 30),
     maxLogsPerTrigger: Number(process.env.EMAIL_TRIGGER_MAX_LOGS_PER_TRIGGER ?? 500),
+    // One-shot (reply-watch) triggers are deleted as soon as they fire. This TTL
+    // collects the ones whose reply never came, so they stop holding quota.
+    oneShotTtlDays: Number(process.env.EMAIL_TRIGGER_ONE_SHOT_TTL_DAYS ?? 30),
     // Ring buffer of recently-seen message ids per (account, folder), to drop
     // boundary duplicates (provider `after` filters are second-granular/inclusive).
     seenIdsRing: Number(process.env.EMAIL_TRIGGER_SEEN_IDS_RING ?? 200),
