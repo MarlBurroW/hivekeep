@@ -2610,6 +2610,54 @@ export interface PluginOAuthAPI {
   getAccessToken(config: ProviderConfig): Promise<{ accessToken: string; extra?: Record<string, string> } | null>
 }
 
+/**
+ * An HTTP route contributed by a plugin, mounted by the host under
+ * `/api/plugin-hooks/<pluginName><path>`.
+ *
+ * These routes are PUBLIC: the auth middleware does not run for them, because
+ * their whole point is to receive calls from external services (webhooks,
+ * callbacks) that have no Hivekeep session. Authentication is the handler's
+ * job — a secret segment in the path, a token query param, or a signature
+ * check on the body. A handler that skips this accepts input from anyone.
+ */
+export interface PluginRoute {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  /**
+   * Path relative to the plugin's mount point, starting with `/`. Segments
+   * starting with `:` capture a parameter (`/webhook/:key` matches
+   * `/webhook/abc` with `params.key === 'abc'`). No wildcards.
+   */
+  path: string
+  handler(req: Request, params: Record<string, string>): Response | Promise<Response>
+}
+
+/**
+ * Reach an Agent from plugin code — the missing half of inbound routes:
+ * receiving an HTTP call is useless if the plugin cannot wake anyone with it.
+ *
+ * Gated by the `agents` manifest permission. The message lands in the Agent's
+ * MAIN conversation queue, exactly like a native incoming webhook: it wakes
+ * the principal Agent, never a sub-Agent or a task lane.
+ */
+export interface PluginAgentsAPI {
+  enqueueMessage(params: {
+    agentId: string
+    content: string
+    /** Short label shown as the message source (defaults to the plugin name). */
+    sourceLabel?: string
+  }): Promise<{ queueItemId: string }>
+}
+
+/** URL helpers for the plugin's own mounted routes. */
+export interface PluginRoutesAPI {
+  /**
+   * Absolute public URL of one of this plugin's routes, built from the host's
+   * configured public URL: `publicUrl('/webhook/abc')` →
+   * `https://<host>/api/plugin-hooks/<pluginName>/webhook/abc`.
+   */
+  publicUrl(path: string): string
+}
+
 export interface PluginContext<Config = Record<string, unknown>> {
   config: Config
   log: PluginLogger
@@ -2620,6 +2668,10 @@ export interface PluginContext<Config = Record<string, unknown>> {
   cards: PluginCardsAPI
   /** OAuth helper for plugin providers that declare `oauth` (sign-in). */
   oauth: PluginOAuthAPI
+  /** Wake Agents from plugin code. Requires the `agents` manifest permission. */
+  agents: PluginAgentsAPI
+  /** Public URLs of the plugin's own routes. */
+  routes: PluginRoutesAPI
 }
 
 /**
@@ -2647,6 +2699,12 @@ export interface PluginExports {
    */
   providers?: PluginProvider[]
   channels?: Record<string, ChannelAdapter>
+  /**
+   * HTTP routes mounted under `/api/plugin-hooks/<pluginName>`. Public by
+   * design (see {@link PluginRoute}); the typical use is receiving webhooks
+   * from an external service and waking an Agent through {@link PluginAgentsAPI}.
+   */
+  routes?: PluginRoute[]
   /** Hook handlers keyed by hook name. Each handler receives the typed
    *  payload for its hook (see {@link HookPayloadMap}). */
   hooks?: { [H in HookName]?: HookHandler<H> }

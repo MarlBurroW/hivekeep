@@ -43,6 +43,7 @@ import { memoryRoutes } from '@/server/routes/memories'
 import { sharedRoutes } from '@/server/routes/shared'
 import { webhookRoutes } from '@/server/routes/webhooks'
 import { webhookIncomingRoutes } from '@/server/routes/webhooks-incoming'
+import { pluginHookRoutes } from '@/server/routes/plugin-hooks'
 import { accountTriggerRoutes } from '@/server/routes/account-triggers'
 import { channelRoutes } from '@/server/routes/channels'
 import { channelTelegramRoutes } from '@/server/routes/channel-telegram'
@@ -221,6 +222,8 @@ app.route('/api/prompts', promptRoutes)
 app.route('/api/secret-prompts', secretPromptRoutes)
 app.route('/api/memories', memoryRoutes)
 app.route('/api/webhooks/incoming', webhookIncomingRoutes)
+// Plugin-declared HTTP routes (public — handlers authenticate themselves).
+app.route('/api/plugin-hooks', pluginHookRoutes)
 app.route('/api/webhooks', webhookRoutes)
 // External machine-to-machine API (bearer auth) + its admin management surface.
 app.route('/api/v1', externalApiRoutes)

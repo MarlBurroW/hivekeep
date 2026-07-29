@@ -26,7 +26,7 @@ export async function authMiddleware(c: Context, next: Next) {
 
   // Skip auth for Better Auth routes, onboarding, health check, and the public
   // mini-app SDK assets (loaded by the opaque-origin iframe without credentials).
-  if (path.startsWith('/api/auth/') || path.startsWith('/api/onboarding') || path === '/api/health' || path.startsWith('/api/mini-apps/sdk/') || path.startsWith('/s/') || path.startsWith('/api/webhooks/incoming/') || path.startsWith('/api/channels/telegram/') || path.startsWith('/api/channels/slack/') || path.startsWith('/api/channels/whatsapp/') || path.startsWith('/api/channels/signal/') || path.startsWith('/api/channels/plugin/') || /^\/api\/invitations\/[^/]+\/validate$/.test(path)) {
+  if (path.startsWith('/api/auth/') || path.startsWith('/api/onboarding') || path === '/api/health' || path.startsWith('/api/mini-apps/sdk/') || path.startsWith('/s/') || path.startsWith('/api/webhooks/incoming/') || path.startsWith('/api/plugin-hooks/') || path.startsWith('/api/channels/telegram/') || path.startsWith('/api/channels/slack/') || path.startsWith('/api/channels/whatsapp/') || path.startsWith('/api/channels/signal/') || path.startsWith('/api/channels/plugin/') || /^\/api\/invitations\/[^/]+\/validate$/.test(path)) {
     return next()
   }
 
