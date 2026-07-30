@@ -630,7 +630,12 @@ export const config = {
   channels: {
     maxPerAgent: Number(process.env.CHANNELS_MAX_PER_KIN ?? 5),
     telegramWebhookPath: '/api/channels/telegram',
-    pendingOriginTtlMs: Number(process.env.CHANNEL_PENDING_ORIGIN_TTL ?? 300_000),
+    // Freshness guard on the persisted channel origin (`channel_origins`): how
+    // long after the inbound message an Agent reply is still auto-delivered
+    // back to the channel. Sub-Agent chains routinely run for many minutes, so
+    // this is deliberately generous; it only exists to stop a reply from
+    // landing on a conversation nobody remembers.
+    originTtlMs: Number(process.env.CHANNEL_ORIGIN_TTL ?? 86_400_000),
     // Max messages buffered per pending contact while they await approval. On
     // approval the buffer is replayed as a single Agent turn; only the most
     // recent N are kept (older ones are dropped).

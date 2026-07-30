@@ -851,6 +851,23 @@ export const channelMessageLinks = sqliteTable('channel_message_links', {
   index('idx_cml_channel').on(table.channelId),
 ])
 
+// Durable destination of an inbound channel turn, keyed by the queue item id
+// that started the causal chain (`channel_origin_id` on queue items, messages
+// and tasks). A sub-Agent can run for hours before the parent Agent wakes up
+// and writes the reply that must go back to the channel, so this snapshot has
+// to outlive both the turn and a process restart. Rows older than
+// `config.channels.originTtlMs` are treated as stale and pruned.
+export const channelOrigins = sqliteTable('channel_origins', {
+  originId: text('origin_id').primaryKey(),
+  channelId: text('channel_id').notNull().references(() => channels.id, { onDelete: 'cascade' }),
+  platformChatId: text('platform_chat_id').notNull(),
+  platformMessageId: text('platform_message_id').notNull(),
+  platformUserId: text('platform_user_id').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('idx_channel_origins_created_at').on(table.createdAt),
+])
+
 // ─── Invitations ────────────────────────────────────────────────────────────
 
 export const invitations = sqliteTable('invitations', {

@@ -50,6 +50,7 @@ mock.module('@/server/logger', () => ({
 
 mock.module('@/server/services/channels', () => ({
   deleteChannel: mock(async () => {}),
+  reportUndeliveredChannelReply: mock(async () => {}),
 }))
 
 mock.module('@/server/services/crons', () => ({

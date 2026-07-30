@@ -118,6 +118,7 @@ export const fullMockConfig = {
   channels: {
     maxPerAgent: 5,
     telegramWebhookPath: '/api/channels/telegram',
+    originTtlMs: 86_400_000,
   },
 
   quickSessions: {
@@ -243,6 +244,7 @@ export const fullMockSchema = {
   channelUserMappings: {},
   channelMessageLinks: {},
   channelPendingMessages: {},
+  channelOrigins: {},
   invitations: {},
   notifications: {},
   notificationPreferences: {},

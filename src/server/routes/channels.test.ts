@@ -49,6 +49,7 @@ mock.module('@/server/services/channels', () => ({
   popChannelQueueMeta: () => undefined,
   setChannelOriginMeta: () => undefined,
   getChannelOriginMeta: () => undefined,
+  reportUndeliveredChannelReply: async () => {},
   setChannelTransferHint: () => undefined,
   popChannelTransferHint: () => undefined,
   deliverChannelResponse: () => undefined,

@@ -92,6 +92,7 @@ mock.module('@/server/services/channels', () => ({
   setChannelOriginMeta: (id: string, meta: unknown) => { _originMeta.set(id, meta) },
   getChannelOriginMeta: (id: string) => _originMeta.get(id),
   // Stubs for remaining exports
+  reportUndeliveredChannelReply: async () => {},
   createChannel: async () => null,
   getChannel: async () => null,
   listChannels: async () => [],

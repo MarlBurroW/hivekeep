@@ -207,6 +207,10 @@ new Cron('0 * * * *', async () => {
 import { startChannelFileCleanup } from '@/server/services/files'
 startChannelFileCleanup()
 
+// Channel origin cleanup (prune origins past the delivery freshness window)
+import { startChannelOriginCleanup } from '@/server/services/channels'
+startChannelOriginCleanup()
+
 // Webhook log cleanup (prune old/excess logs)
 import { startWebhookLogCleanup } from '@/server/services/webhooks'
 startWebhookLogCleanup()

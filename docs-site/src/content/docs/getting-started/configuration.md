@@ -94,4 +94,4 @@ See [`.env.example`](https://github.com/MarlBurroW/hivekeep/blob/main/.env.examp
 - Queue settings
 - Cron limits
 - Web browsing configuration
-- Channel origin TTL (`CHANNEL_PENDING_ORIGIN_TTL`, default 5min)
+- Channel origin TTL (`CHANNEL_ORIGIN_TTL`, default 24h)

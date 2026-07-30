@@ -1,8 +1,8 @@
-import { eq, and, asc, desc, count, inArray } from 'drizzle-orm'
+import { eq, and, asc, desc, count, inArray, lt } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
-import { messages, channels, channelUserMappings, channelPendingMessages, channelMessageLinks, contactPlatformIds, contactNicknames, agents, contacts, userProfiles } from '@/server/db/schema'
+import { messages, channels, channelUserMappings, channelPendingMessages, channelMessageLinks, channelOrigins, contactPlatformIds, contactNicknames, agents, contacts, userProfiles } from '@/server/db/schema'
 import { enqueueMessage } from '@/server/services/queue'
 import { downloadChannelAttachments } from '@/server/services/files'
 import { createSecret, deleteSecret, getSecretValue, getSecretByKey } from '@/server/services/vault'
@@ -159,30 +159,69 @@ export function popChannelTransferHint(channelId: string): ChannelTransferHint |
 }
 
 // ─── Channel origin store (causal chain tracking for follow-up delivery) ─────
+//
+// Persisted in `channel_origins`, NOT in RAM: the whole point is that a reply
+// written long after the inbound message (sub-Agent finished, wake-up fired,
+// server restarted in between) still knows where to go.
 
-export interface ChannelOriginMeta {
-  channelId: string
-  platformChatId: string
-  platformMessageId: string
-  platformUserId: string
+export interface ChannelOriginMeta extends ChannelQueueMeta {
   createdAt: number
-  ttlMs: number
 }
 
-const channelOriginStore = new Map<string, ChannelOriginMeta>()
-
-export function setChannelOriginMeta(originId: string, meta: ChannelOriginMeta): void {
-  channelOriginStore.set(originId, meta)
+export function setChannelOriginMeta(originId: string, meta: ChannelQueueMeta): void {
+  db.insert(channelOrigins)
+    .values({
+      originId,
+      channelId: meta.channelId,
+      platformChatId: meta.platformChatId,
+      platformMessageId: meta.platformMessageId,
+      platformUserId: meta.platformUserId,
+      createdAt: new Date(),
+    })
+    .onConflictDoNothing()
+    .run()
 }
 
 export function getChannelOriginMeta(originId: string): ChannelOriginMeta | undefined {
-  const meta = channelOriginStore.get(originId)
-  if (!meta) return undefined
-  if (Date.now() - meta.createdAt > meta.ttlMs) {
-    channelOriginStore.delete(originId)
+  const row = db.select().from(channelOrigins).where(eq(channelOrigins.originId, originId)).get()
+  if (!row) return undefined
+  const createdAt = row.createdAt.getTime()
+  if (Date.now() - createdAt > config.channels.originTtlMs) {
+    db.delete(channelOrigins).where(eq(channelOrigins.originId, originId)).run()
     return undefined
   }
-  return meta
+  return {
+    channelId: row.channelId,
+    platformChatId: row.platformChatId,
+    platformMessageId: row.platformMessageId,
+    platformUserId: row.platformUserId,
+    createdAt,
+  }
+}
+
+let originPruneInterval: ReturnType<typeof setInterval> | null = null
+
+/** Drop origin rows past the freshness window. Lazy deletion on read only
+ *  covers origins somebody still asks about; this collects the rest. */
+function pruneChannelOrigins(): void {
+  const cutoff = new Date(Date.now() - config.channels.originTtlMs)
+  const stale = db.select({ originId: channelOrigins.originId }).from(channelOrigins).where(lt(channelOrigins.createdAt, cutoff)).all()
+  if (stale.length === 0) return
+  db.delete(channelOrigins).where(lt(channelOrigins.createdAt, cutoff)).run()
+  log.info({ count: stale.length }, 'Pruned stale channel origins')
+}
+
+export function startChannelOriginCleanup(): void {
+  if (originPruneInterval) return
+  const run = () => {
+    try {
+      pruneChannelOrigins()
+    } catch (err) {
+      log.error({ err }, 'Channel origin cleanup failed')
+    }
+  }
+  setTimeout(run, 60_000)
+  originPruneInterval = setInterval(run, 6 * 60 * 60 * 1000)
 }
 
 // ─── Locale resolution (channel → agent → owner → user_profiles.language) ─────
@@ -772,8 +811,6 @@ async function enqueueChannelTurn(
     platformChatId: last.platformChatId,
     platformMessageId: last.platformMessageId,
     platformUserId: last.platformUserId,
-    createdAt: Date.now(),
-    ttlMs: config.channels.pendingOriginTtlMs,
   })
 
   // Send typing indicator (fire-and-forget)
@@ -1089,6 +1126,59 @@ export async function deliverChannelResponse(
     log.info({ channelId: meta.channelId, agentId: channel.agentId, platform: channel.platform }, 'Channel response delivered')
   } catch (err) {
     log.error({ channelId: meta.channelId, err }, 'Failed to deliver channel response')
+  }
+}
+
+/**
+ * The Agent wrote a reply for a turn that came from an external channel, but no
+ * destination could be resolved (origin row missing or past the freshness
+ * window). Without this the reply vanishes silently and the Agent believes it
+ * answered. Tell it, in its own conversation, so it can resend explicitly.
+ *
+ * Callers must have established that the turn really had a channel origin.
+ * This must never fire for a plain web-UI or external-API reply.
+ */
+export async function reportUndeliveredChannelReply(params: {
+  agentId: string
+  assistantMessageId: string
+  channelOriginId?: string
+  reason: string
+}): Promise<void> {
+  const { agentId, assistantMessageId, channelOriginId, reason } = params
+  const content =
+    '⚠️ Your previous reply was NOT delivered to any external channel: the originating channel context could not be resolved ' +
+    `(${reason}). If it was meant for a contact or a channel, send it again explicitly with send_to_contact() or send_channel_message().`
+
+  const msgId = uuid()
+  const createdAt = new Date()
+  await db.insert(messages).values({
+    id: msgId,
+    agentId,
+    role: 'user',
+    content,
+    sourceType: 'system',
+    metadata: JSON.stringify({ systemEvent: 'channel_delivery_failed', assistantMessageId, channelOriginId: channelOriginId ?? null, reason }),
+    createdAt,
+  })
+
+  sseManager.sendToAgent(agentId, {
+    type: 'chat:message',
+    agentId,
+    data: { id: msgId, role: 'user', content, sourceType: 'system', createdAt: createdAt.getTime() },
+  })
+
+  // Mirror the success path's `channelDelivery` marker so the undelivered state
+  // is visible on the Agent's own message, not only in the follow-up note.
+  try {
+    const existing = await db.select({ metadata: messages.metadata }).from(messages).where(eq(messages.id, assistantMessageId)).get()
+    let merged: Record<string, unknown> = {}
+    if (existing?.metadata) {
+      try { merged = JSON.parse(existing.metadata as string) as Record<string, unknown> } catch { /* corrupted, overwrite */ }
+    }
+    merged.channelDelivery = { status: 'undelivered', reason }
+    await db.update(messages).set({ metadata: JSON.stringify(merged) }).where(eq(messages.id, assistantMessageId))
+  } catch (err) {
+    log.warn({ messageId: assistantMessageId, err }, 'Failed to mark message as undelivered')
   }
 }
 

@@ -42,7 +42,7 @@ import { listAvailableAgents } from '@/server/services/inter-agent'
 import { listContactsForPrompt, findContactByLinkedUserId } from '@/server/services/contacts'
 import { contactNotes as contactNotesTable } from '@/server/db/schema'
 import { linkFilesToMessage, getFilesForMessage, serializeFile } from '@/server/services/files'
-import { popChannelQueueMeta, getChannelQueueMeta, deliverChannelResponse, getActiveChannelsForAgent, getChannel, findContactByPlatformId, getChannelOriginMeta } from '@/server/services/channels'
+import { popChannelQueueMeta, getChannelQueueMeta, deliverChannelResponse, getActiveChannelsForAgent, getChannel, findContactByPlatformId, getChannelOriginMeta, reportUndeliveredChannelReply } from '@/server/services/channels'
 import { popStagedAttachments, clearStagedAttachments } from '@/server/tools/attach-file-tool'
 import { parseMentions, notifyMentionedUsers } from '@/server/services/mentions'
 import { getGlobalPrompt, getSetting, setSetting } from '@/server/services/app-settings'
@@ -1931,33 +1931,37 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         timestamp: Date.now(),
       })
 
-      // Channel response delivery (fire-and-forget)
-      if (queueItem.sourceType === 'channel' && fullContent) {
-        // Direct channel response: one-shot pop of channel queue meta
-        const channelMeta = popChannelQueueMeta(queueItem.id)
-        if (channelMeta) {
-          const stagedFiles = popStagedAttachments(agentId)
-          deliverChannelResponse(channelMeta, assistantMessageId, fullContent, stagedFiles.length > 0 ? stagedFiles : undefined).catch((err) => {
-            log.error({ agentId, channelId: channelMeta.channelId, err }, 'Channel response delivery failed')
-          })
-        } else {
-          clearStagedAttachments(agentId)
-        }
-      } else if (queueItem.channelOriginId && fullContent && shouldAutoDeliverToChannel(queueItem)) {
-        // Follow-up auto-delivery: this turn is part of a causal chain from an external channel
-        const originMeta = getChannelOriginMeta(queueItem.channelOriginId)
-        if (originMeta) {
+      // Channel response delivery (fire-and-forget). Two ways in: a direct
+      // channel turn, or a follow-up turn in a causal chain started by one
+      // (sub-Agent result, wake-up, inter-Agent reply).
+      const isDirectChannelTurn = queueItem.sourceType === 'channel'
+      const isChannelFollowUp = Boolean(queueItem.channelOriginId) && shouldAutoDeliverToChannel(queueItem)
+      if (fullContent && (isDirectChannelTurn || isChannelFollowUp)) {
+        // Direct turns use the one-shot in-memory sideband, falling back to the
+        // persisted origin when the process restarted mid-turn.
+        const target = isDirectChannelTurn
+          ? popChannelQueueMeta(queueItem.id) ?? (queueItem.channelOriginId ? getChannelOriginMeta(queueItem.channelOriginId) : undefined)
+          : getChannelOriginMeta(queueItem.channelOriginId!)
+        if (target) {
           const stagedFiles = popStagedAttachments(agentId)
           deliverChannelResponse(
-            { channelId: originMeta.channelId, platformChatId: originMeta.platformChatId, platformMessageId: originMeta.platformMessageId, platformUserId: originMeta.platformUserId },
+            { channelId: target.channelId, platformChatId: target.platformChatId, platformMessageId: target.platformMessageId, platformUserId: target.platformUserId },
             assistantMessageId,
             fullContent,
             stagedFiles.length > 0 ? stagedFiles : undefined,
           ).catch((err) => {
-            log.error({ agentId, channelOriginId: queueItem!.channelOriginId, err }, 'Follow-up channel delivery failed')
+            log.error({ agentId, channelId: target.channelId, err }, 'Channel response delivery failed')
           })
         } else {
           clearStagedAttachments(agentId)
+          const reason = queueItem.channelOriginId ? 'channel origin not found or expired' : 'no channel origin recorded for this turn'
+          log.warn(
+            { agentId, channelOriginId: queueItem.channelOriginId ?? null, queueItemId: queueItem.id, messageType: queueItem.messageType, sourceType: queueItem.sourceType, contentLength: fullContent.length, reason },
+            'Agent reply had a channel origin but no destination could be resolved, not delivered',
+          )
+          reportUndeliveredChannelReply({ agentId, assistantMessageId, channelOriginId: queueItem.channelOriginId ?? undefined, reason }).catch((err) => {
+            log.error({ agentId, err }, 'Failed to report undelivered channel reply')
+          })
         }
       } else {
         clearStagedAttachments(agentId)
