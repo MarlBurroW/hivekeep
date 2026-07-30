@@ -90,11 +90,15 @@ jobs:
         run: |
           bash -n install.sh
           bash -n docker/entrypoint.sh
+          bash -n tests/install-bun-path.sh
+          bash -s -- --help < install.sh | grep -q '^USAGE$'
 
-      # ShellCheck the two shipped scripts only. severity:error means style/info
-      # findings never fail the build. ignore_paths excludes vendored/tooling
-      # scripts (husky, opencode patches, claude worktrees, node_modules) so the
-      # scan effectively covers install.sh + docker/entrypoint.sh.
+      - name: Test installer Bun service path
+        run: sudo bash tests/install-bun-path.sh
+
+      # ShellCheck the shipped scripts and installer regression test.
+      # severity:error means style/info findings never fail the build.
+      # ignore_paths excludes vendored and tooling scripts.
       - name: ShellCheck
         uses: ludeeus/action-shellcheck@master
         with:
