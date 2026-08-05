@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, utimesSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { maybeSpillToolOutput, wrapToolsWithSpill, cleanupSpilledOutputs } from '@/server/services/tool-output-spill'
+import { maybeSpillToolOutput, wrapToolsWithSpill, cleanupSpilledOutputs, buildPreview } from '@/server/services/tool-output-spill'
 
 const TEST_DIR = join(import.meta.dir, '__test_spill_workspace__')
 const SPILL_DIR = join(TEST_DIR, '.tool-outputs')
@@ -43,7 +43,11 @@ describe('maybeSpillToolOutput', () => {
     expect(out.file).toMatch(/^\.tool-outputs\/tool-result-\d+-[a-f0-9]{8}\.txt$/)
     expect(out.sizeBytes).toBeGreaterThan(20000)
     expect(out.lineCount).toBeGreaterThan(0)
-    expect(typeof out.preview).toBe('string')
+    // The whole point of spilling: the reference must be far cheaper than the
+    // payload it replaces. `typeof preview === 'string'` passes even when the
+    // preview IS the full payload, which is how the unbounded preview shipped.
+    expect(out.preview.length).toBeLessThanOrEqual(4200)
+    expect(out.preview.length).toBeLessThan(largeOutput.length)
     expect(out.hint).toContain('read_file')
 
     // Verify file was created with full content
@@ -89,6 +93,73 @@ describe('maybeSpillToolOutput', () => {
     maybeSpillToolOutput(TEST_DIR, 'run_shell', result)
 
     expect(existsSync(SPILL_DIR)).toBe(true)
+  })
+})
+
+describe('spill preview bounds', () => {
+  beforeEach(() => {
+    teardown()
+    setup()
+  })
+
+  afterEach(() => {
+    teardown()
+  })
+
+  it('bounds the preview of a result whose bulk is one huge string', () => {
+    // The Majordome regression. An email body, a grep hit list or shell stdout
+    // is a single JSON string: JSON.stringify escapes its newlines, so the
+    // serialized form is a handful of very long lines. Slicing by line count
+    // alone kept everything, and a "spilled" 109k-token email still cost 109k
+    // tokens in every later turn.
+    const body = 'Bonjour, '.repeat(60_000) // ~540k chars, no real newlines
+    const out = maybeSpillToolOutput(TEST_DIR, 'read_email', { message: { subject: 'Devis', body } }) as any
+
+    expect(out.__spilled).toBe(true)
+    expect(out.preview.length).toBeLessThanOrEqual(4200)
+    expect(out.preview).toContain('preview truncated')
+    // The full payload is still recoverable from disk.
+    const parsed = JSON.parse(readFileSync(join(TEST_DIR, out.file), 'utf-8'))
+    expect(parsed.message.body).toBe(body)
+  })
+
+  it('keeps the preview cheaper than the threshold that triggered the spill', () => {
+    const out = maybeSpillToolOutput(TEST_DIR, 'run_shell', { preview: 'z'.repeat(200_000) }) as any
+    expect(out.preview.length).toBeLessThan(10_000)
+  })
+
+  it('leaves a genuinely short preview untouched', () => {
+    // Pretty-printed arrays DO produce real newlines, so here the line bound is
+    // the one that bites and the character bound stays slack. Verifies the
+    // char budget does not truncate previews that were already cheap.
+    const out = maybeSpillToolOutput(TEST_DIR, 'get_platform_logs', { entries: Array.from({ length: 3000 }, (_, i) => i) }) as any
+    expect(out.__spilled).toBe(true)
+    expect(out.preview).not.toContain('preview truncated')
+    expect(out.preview.split('\n').length).toBeLessThanOrEqual(200)
+  })
+})
+
+describe('buildPreview', () => {
+  it('returns the input untouched when both bounds are respected', () => {
+    expect(buildPreview(['a', 'b', 'c'], 200, 4000)).toBe('a\nb\nc')
+  })
+
+  it('applies the line bound', () => {
+    expect(buildPreview(['a', 'b', 'c', 'd'], 2, 4000)).toBe('a\nb')
+  })
+
+  it('applies the character bound and reports what was cut', () => {
+    const out = buildPreview(['x'.repeat(1000)], 200, 100)
+    expect(out.startsWith('x'.repeat(100))).toBe(true)
+    expect(out).toContain('900 more characters')
+  })
+
+  it('treats a non-positive character budget as no character bound', () => {
+    expect(buildPreview(['x'.repeat(1000)], 200, 0)).toBe('x'.repeat(1000))
+  })
+
+  it('always keeps at least one line', () => {
+    expect(buildPreview(['only'], 0, 4000)).toBe('only')
   })
 })
 

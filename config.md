@@ -63,6 +63,7 @@ All configurable values of the platform, grouped by domain. These values are def
 |---|---|---|---|
 | `toolOutputs.spillThreshold` | `TOOL_OUTPUT_SPILL_THRESHOLD` | `10000` | Threshold in bytes above which a tool result is saved to a temporary file instead of being included in full in the context |
 | `toolOutputs.previewLines` | `TOOL_OUTPUT_PREVIEW_LINES` | `200` | Number of preview lines included in the compact reference when a result is "spilled" |
+| `toolOutputs.previewMaxChars` | `TOOL_OUTPUT_PREVIEW_MAX_CHARS` | `4000` | Hard size bound on that preview. The line count alone is not a bound: `JSON.stringify` escapes newlines, so a single-string result (email body, grep output, shell stdout) serializes to a few very long lines and "200 lines" keeps the whole payload. Keep it below `spillThreshold`. |
 | `toolOutputs.ttlHours` | `TOOL_OUTPUT_TTL_HOURS` | `24` | Retention duration of temporary files (hours). Older files are deleted automatically |
 
 ---

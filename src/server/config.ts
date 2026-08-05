@@ -496,6 +496,13 @@ export const config = {
   toolOutputs: {
     spillThreshold: Number(process.env.TOOL_OUTPUT_SPILL_THRESHOLD ?? 10000), // bytes before spilling to file
     previewLines: Number(process.env.TOOL_OUTPUT_PREVIEW_LINES ?? 200),       // lines to include in preview
+    // Hard size bound on the preview. The line count alone is not a bound:
+    // JSON.stringify escapes newlines, so a single-string result (an email
+    // body, a grep hit list, shell stdout) serializes to a handful of very
+    // long lines and "200 lines" keeps the ENTIRE payload. Spilled outputs
+    // then cost as much context as if nothing had been spilled.
+    // Must stay below spillThreshold, otherwise spilling saves nothing.
+    previewMaxChars: Number(process.env.TOOL_OUTPUT_PREVIEW_MAX_CHARS ?? 4000),
     ttlHours: Number(process.env.TOOL_OUTPUT_TTL_HOURS ?? 24),                // cleanup after N hours
   },
 

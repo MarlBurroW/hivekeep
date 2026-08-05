@@ -99,6 +99,7 @@ Large tool results are automatically spilled to temporary files instead of being
 |----------|---------|-------------|
 | `TOOL_OUTPUT_SPILL_THRESHOLD` | `10000` | Byte threshold before spilling to file. `0` = disabled |
 | `TOOL_OUTPUT_PREVIEW_LINES` | `200` | Lines included in the compact preview reference |
+| `TOOL_OUTPUT_PREVIEW_MAX_CHARS` | `4000` | Hard size bound on that preview, so a result made of one very long line (email body, shell output) cannot keep its full payload in context |
 | `TOOL_OUTPUT_TTL_HOURS` | `24` | Hours before spilled files are cleaned up |
 
 ## Embedding Provider

@@ -29,6 +29,24 @@ interface SpillReference {
  * serialized result to a temp file and return a compact reference with a
  * preview. Otherwise return the result unchanged.
  */
+/**
+ * Cut a preview out of the serialized result, bounded by BOTH the line count
+ * and a hard character budget.
+ *
+ * The character bound is the one that matters: `JSON.stringify` escapes
+ * newlines, so a result whose bulk is a single string (an email body, grep
+ * output, shell stdout) serializes to a few enormous lines. Slicing by line
+ * count alone then returns the whole payload, and a "spilled" output costs the
+ * same context as an inline one. That is how a 109k-token email survived into
+ * every subsequent turn.
+ */
+export function buildPreview(lines: string[], maxLines: number, maxChars: number): string {
+  const byLines = lines.slice(0, Math.max(1, maxLines)).join('\n')
+  if (maxChars <= 0 || byLines.length <= maxChars) return byLines
+  const omitted = byLines.length - maxChars
+  return `${byLines.slice(0, maxChars)}\n… [preview truncated, ${omitted.toLocaleString()} more characters — read the file for the rest]`
+}
+
 export function maybeSpillToolOutput(
   workspacePath: string,
   toolName: string,
@@ -67,7 +85,8 @@ export function maybeSpillToolOutput(
   const lines = serialized.split('\n')
   const lineCount = lines.length
   const previewLines = config.toolOutputs?.previewLines ?? 200
-  const preview = lines.slice(0, previewLines).join('\n')
+  const previewMaxChars = config.toolOutputs?.previewMaxChars ?? 4000
+  const preview = buildPreview(lines, previewLines, previewMaxChars)
   const relativePath = `${SPILL_DIR_NAME}/${filename}`
 
   const ref: SpillReference = {
