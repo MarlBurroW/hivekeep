@@ -346,6 +346,7 @@ async function generateQueryVariations(query: string, knownSubjects?: string[], 
     const result = await safeGenerateText({
       resolved,
       callSite: 'memory-multi-query',
+      timeoutMs: config.memory.retrievalLlmTimeoutMs,
       agentId,
       prompt:
         `Generate 3 alternative search queries for retrieving relevant memories based on this message. ` +
@@ -393,6 +394,7 @@ async function generateHypotheticalMemory(query: string, agentId?: string): Prom
     const result = await safeGenerateText({
       resolved,
       callSite: 'memory-hyde',
+      timeoutMs: config.memory.retrievalLlmTimeoutMs,
       agentId,
       prompt:
         `You are a personal AI companion that stores memories about its user. ` +
@@ -816,6 +818,7 @@ async function rerankWithLLM(
     const result = await safeGenerateText({
       resolved,
       callSite: 'memory-rerank',
+      timeoutMs: config.memory.retrievalLlmTimeoutMs,
       agentId,
       prompt:
         `You are a relevance judge. Given a user query and a list of memory snippets, ` +
@@ -944,6 +947,7 @@ export async function rewriteQueryWithContext(
     const result = await safeGenerateText({
       resolved,
       callSite: 'memory-contextual-rewrite',
+      timeoutMs: config.memory.retrievalLlmTimeoutMs,
       agentId,
       prompt:
         `Rewrite the user's last message into a standalone search query for retrieving relevant memories. ` +

@@ -19,6 +19,7 @@ import type {
   SendEmailParams,
   SendEmailResult,
 } from '@/server/email/types'
+import { config as config_ } from '@/server/config'
 import type { ProviderConfig, AuthResult } from '@hivekeep/sdk'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
@@ -135,6 +136,9 @@ async function graphFetch(config: ProviderConfig, pathOrUrl: string, init?: Requ
   const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${GRAPH}${pathOrUrl}`
   const res = await fetch(url, {
     ...init,
+    // Bounded: email tools run on the Agent's turn path, where an unbounded
+    // fetch pins the Agent's lock until the process restarts.
+    signal: init?.signal ?? AbortSignal.timeout(config_.email.requestTimeoutMs),
     headers: {
       Authorization: `Bearer ${token}`,
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),

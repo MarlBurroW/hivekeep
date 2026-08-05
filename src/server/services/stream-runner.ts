@@ -22,6 +22,7 @@
  */
 import { sseManager } from '@/server/sse/index'
 import { createLogger } from '@/server/logger'
+import { config } from '@/server/config'
 import type { ChatChunk } from '@/server/llm/llm/types'
 import type { Usage, FinishReason } from '@/server/llm/core/types'
 
@@ -162,6 +163,74 @@ export interface StreamStepContext {
  * call site can apply its own recovery policy. Abort is returned via
  * `outcome.wasAborted`.
  */
+/** Thrown by `withStallTimeout` when a stream goes quiet for too long. */
+export class StreamStallError extends Error {
+  constructor(public readonly idleMs: number) {
+    super(
+      `The model provider stopped sending data for ${Math.round(idleMs / 1000)}s. ` +
+        'The connection was closed and the turn aborted.',
+    )
+    this.name = 'StreamStallError'
+  }
+}
+
+/**
+ * Guard an provider stream against going silent forever.
+ *
+ * Provider SDK timeouts do NOT cover streaming: the Anthropic/OpenAI clients
+ * clear their request timer as soon as response HEADERS arrive, so the whole
+ * SSE body is then read unbounded. A TCP connection that freezes mid-body
+ * leaves `for await` pending forever, the turn never ends, its `finally` never
+ * runs, and the Agent stays locked until the process restarts. That is the
+ * "stuck for hours" failure mode observed in production.
+ *
+ * Every provider funnels into this one loop, so bounding it here covers all of
+ * them. Each `next()` is raced against an inactivity timer (reset per chunk,
+ * NOT a total duration — a legitimately slow generation keeps streaming). On
+ * expiry we abort so the provider tears the connection down, then throw so the
+ * caller reports a real error instead of hanging.
+ */
+export async function* withStallTimeout<T>(
+  source: AsyncIterable<T>,
+  idleMs: number,
+  onStall?: () => void,
+): AsyncGenerator<T> {
+  if (idleMs <= 0) {
+    yield* source
+    return
+  }
+  const iterator = source[Symbol.asyncIterator]()
+  try {
+    for (;;) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const stalled = new Promise<typeof STALL>((resolve) => {
+        timer = setTimeout(() => resolve(STALL), idleMs)
+      })
+      let step: IteratorResult<T> | typeof STALL
+      try {
+        step = await Promise.race([iterator.next(), stalled])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+      if (step === STALL) {
+        // Abort first so the underlying fetch/SDK releases the socket, then
+        // surface the failure. Racing (rather than only aborting) matters: a
+        // provider that ignores its signal would otherwise still hang us.
+        onStall?.()
+        throw new StreamStallError(idleMs)
+      }
+      if (step.done) return
+      yield step.value
+    }
+  } finally {
+    // Best-effort teardown so a stalled or early-exited stream does not leak
+    // its connection.
+    void Promise.resolve(iterator.return?.()).catch(() => {})
+  }
+}
+
+const STALL = Symbol('stream-stalled')
+
 export async function runStreamStep(
   stream: AsyncIterable<ChatChunk>,
   ctx: StreamStepContext,
@@ -239,8 +308,14 @@ export async function runStreamStep(
     }
   }, 200)
 
+  let stalled = false
+  const guardedStream = withStallTimeout(stream, config.llm.streamIdleTimeoutMs, () => {
+    stalled = true
+    ctx.abortController.abort()
+  })
+
   try {
-    for await (const chunk of stream) {
+    for await (const chunk of guardedStream) {
       switch (chunk.type) {
         case 'thinking-delta': {
           if (!inReasoning) {
@@ -309,6 +384,21 @@ export async function runStreamStep(
       }
     }
   } catch (e) {
+    // Checked BEFORE the abort branch: the stall guard aborts the controller on
+    // purpose, so `signal.aborted` is set — but this is a provider failure, not
+    // a user stop, and must surface as an error the caller reports.
+    if (stalled) {
+      if (buffered.length > 0) ctx.onDroppedText?.(buffered, stepIndex)
+      return {
+        stepText: '',
+        stepToolCalls,
+        stepThinking,
+        finishReason,
+        usage,
+        wasAborted: false,
+        error: e instanceof Error ? e : new StreamStallError(config.llm.streamIdleTimeoutMs),
+      }
+    }
     if (ctx.abortController.signal.aborted) {
       if (buffered.length > 0) ctx.onDroppedText?.(buffered, stepIndex)
       return {

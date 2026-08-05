@@ -125,7 +125,8 @@ describe('config', () => {
     })
 
     it('tools defaults', () => {
-      expect(config.tools.maxSteps).toBe(0)
+      expect(config.tools.maxSteps).toBe(100)
+      expect(config.tools.turnTimeoutMs).toBe(1_800_000)
     })
 
     it('humanPrompts defaults', () => {

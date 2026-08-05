@@ -22,6 +22,7 @@ import type {
   SendEmailParams,
   SendEmailResult,
 } from '@/server/email/types'
+import { config as config_ } from '@/server/config'
 import type { ProviderConfig, AuthResult } from '@hivekeep/sdk'
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
@@ -208,6 +209,9 @@ async function gmailFetch(config: ProviderConfig, path: string, init?: RequestIn
   if (!token) throw new Error('Gmail: missing access token')
   const res = await fetch(`${GMAIL_API}${path}`, {
     ...init,
+    // Bounded: email tools run on the Agent's turn path, where an unbounded
+    // fetch pins the Agent's lock until the process restarts.
+    signal: init?.signal ?? AbortSignal.timeout(config_.email.requestTimeoutMs),
     headers: {
       Authorization: `Bearer ${token}`,
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),

@@ -359,6 +359,14 @@ export const config = {
       similarityThreshold: Number(process.env.MEMORY_SIMILARITY_THRESHOLD ?? 0.5),
       embeddingModel: embedding.model ?? 'text-embedding-3-small',
       embeddingProviderId: embedding.providerId,
+      // Embedding calls run under the compacting lock; unbounded, a silent
+      // endpoint pins the Agent with no recovery path. 0 disables.
+      embeddingTimeoutMs: Number(process.env.MEMORY_EMBEDDING_TIMEOUT ?? 60_000),
+      // Ceiling for the retrieval-side LLM calls (multi-query, HyDE, rerank,
+      // contextual rewrite). They sit on the prompt-building path of a turn,
+      // so they must never be the reason a turn hangs. These are optional
+      // enhancements: on timeout the caller falls back to plain retrieval.
+      retrievalLlmTimeoutMs: Number(process.env.MEMORY_RETRIEVAL_LLM_TIMEOUT ?? 45_000),
       embeddingDimension: Number(process.env.MEMORY_EMBEDDING_DIMENSION ?? 1536),
       temporalDecayLambda: Number(process.env.MEMORY_TEMPORAL_DECAY_LAMBDA ?? 0.01),
       temporalDecayFloor: Number(process.env.MEMORY_TEMPORAL_DECAY_FLOOR ?? 0.7),
@@ -461,10 +469,24 @@ export const config = {
     // favor of `adaptive`. Default on; set HIVEKEEP_ADAPTIVE_THINKING=false to
     // revert to fixed budgets.
     adaptiveThinking: process.env.HIVEKEEP_ADAPTIVE_THINKING !== 'false',
+    // Inactivity ceiling while reading a provider's response stream, reset on
+    // every chunk (so a slow-but-alive generation is never cut). Provider SDKs
+    // clear their own request timeout once response HEADERS arrive, leaving the
+    // whole streamed body unbounded: a frozen connection would otherwise pin
+    // the Agent in "processing" until the process restarts. 0 disables.
+    streamIdleTimeoutMs: Number(process.env.LLM_STREAM_IDLE_TIMEOUT ?? 120_000),
   },
 
   tools: {
-    maxSteps: Number(process.env.TOOLS_MAX_STEPS ?? 0), // 0 (default) = truly unlimited (no cap); > 0 = hard cap at this value
+    // Hard cap on tool-call steps in one turn. Was 0 (unlimited): a model that
+    // loops on tool calls then runs until the process restarts. The ceiling is
+    // deliberately high — it is a runaway guard, not a budget.
+    maxSteps: Number(process.env.TOOLS_MAX_STEPS ?? 100), // 0 = truly unlimited (no cap)
+    // Wall-clock ceiling for a single turn, measured from dequeue. Aborts the
+    // turn through its own AbortController so the normal error path runs and
+    // the failure is reported (including back to the originating channel).
+    // Queue waiting time is NOT counted. 0 disables.
+    turnTimeoutMs: Number(process.env.TOOLS_TURN_TIMEOUT ?? 1_800_000),
     // Temperature for tool-enabled turns. Local/self-hosted backends default to
     // ~0.7-0.8, which makes structured tool-call JSON unreliable on small models;
     // a low value steadies it. Reasoning models are exempted in code (they reject
@@ -508,6 +530,24 @@ export const config = {
 
   humanPrompts: {
     maxPendingPerAgent: Number(process.env.HUMAN_PROMPTS_MAX_PENDING ?? 5),
+  },
+
+  search: {
+    // Ceiling for one web_search round-trip. Runs on the turn path.
+    requestTimeoutMs: Number(process.env.SEARCH_REQUEST_TIMEOUT ?? 30_000),
+  },
+
+  email: {
+    // Ceiling for one Gmail / Microsoft Graph API call. IMAP has its own
+    // socket-level timeouts already.
+    requestTimeoutMs: Number(process.env.EMAIL_REQUEST_TIMEOUT ?? 60_000),
+  },
+
+  hooks: {
+    // Ceiling for one plugin hook handler. Handlers run in-process on the
+    // Agent's turn path, so one that never settles would pin the turn (and the
+    // Agent) forever. 0 disables the bound.
+    handlerTimeoutMs: Number(process.env.HOOK_HANDLER_TIMEOUT ?? 30_000),
   },
 
   interAgent: {

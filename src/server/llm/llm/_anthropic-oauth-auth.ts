@@ -61,7 +61,7 @@ export const ANTHROPIC_PKCE_CLIENT: PkceClient = {
 }
 // Track the latest published Claude Code CLI version. Bump when Anthropic
 // releases new versions to avoid being flagged as an outdated client.
-const CLAUDE_CODE_VERSION = '2.1.120'
+const CLAUDE_CODE_VERSION = '2.1.212'
 const BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
 
 /**
@@ -138,6 +138,9 @@ async function refreshToken(
       client_id: CLIENT_ID,
       refresh_token: refreshTok,
     }),
+    // Runs before every Anthropic request, i.e. upstream of the turn. An
+    // unbounded refresh hangs the turn before the stall guard can see it.
+    signal: AbortSignal.timeout(30_000),
   })
 
   if (!resp.ok) {
@@ -229,7 +232,7 @@ export async function getOAuthAccessToken(config: ProviderConfig = {}): Promise<
 
 // Latest published @anthropic-ai/sdk version. The official Claude Code CLI
 // uses this SDK and sends `X-Stainless-Package-Version` accordingly.
-const ANTHROPIC_SDK_VERSION = '0.92.0'
+const ANTHROPIC_SDK_VERSION = '0.94.0'
 
 /**
  * Map Node-style `process.platform` to the Stainless `X-Stainless-OS` value.
@@ -283,7 +286,7 @@ export const STAINLESS_HEADERS: Record<string, string> = {
  * Mirrors what the official Claude Code CLI sends (and the headers that
  * `kristianvast/hermes-claude-auth` confirmed are required to stay on the
  * regular plan-billing pool):
- *   - `anthropic-beta` includes the same 6 betas the CLI enables
+ *   - `anthropic-beta` matches the beta set Claude Code 2.1.212 sends on a chat request
  *   - `user-agent` matches the latest released CLI version
  *   - `x-app: cli` identifies the request shape
  *   - `X-Stainless-*` family identifies the request as coming from the
@@ -311,7 +314,6 @@ export const OAUTH_HEADERS = {
     'redact-thinking-2026-02-12',
     'thinking-token-count-2026-05-13',
     'context-management-2025-06-27',
-    'fine-grained-tool-streaming-2025-05-14',
     'prompt-caching-scope-2026-01-05',
     'mid-conversation-system-2026-04-07',
     'advisor-tool-2026-03-01',
@@ -319,7 +321,6 @@ export const OAUTH_HEADERS = {
     // `thinking:{type:'adaptive'}`) — required for the server to honor effort.
     'effort-2025-11-24',
     'extended-cache-ttl-2025-04-11',
-    'structured-outputs-2025-12-15',
   ].join(','),
   'user-agent': `claude-cli/${CLAUDE_CODE_VERSION} (external, cli)`,
   'x-app': 'cli',
@@ -406,23 +407,26 @@ export function getOAuthAccountUuid(): string | null {
 // ---------------------------------------------------------------------------
 // Billing-header signature
 // ---------------------------------------------------------------------------
-// Anthropic's request router validates a signed billing tag injected as the
-// FIRST text block in the `system` array. Without it, OAuth requests get
-// re-routed to the "extra usage" billing pool. The signature scheme is:
+// Anthropic's request router reads a billing tag injected as the FIRST text
+// block in the `system` array. Without it, OAuth requests can be re-routed to
+// the "extra usage" billing pool. Real Claude Code 2.1.212 emits, on a normal
+// chat request (captured on the wire):
 //
-//   x-anthropic-billing-header: cc_version=<version>.<suffix>; cc_entrypoint=<entrypoint>; cch=<cch>;
+//   x-anthropic-billing-header: cc_version=<version>.<suffix>; cc_entrypoint=cli;
 //
-//   where:
-//     suffix = sha256(SALT + sampled_chars + version).hex.slice(0, 3)
-//     cch    = sha256(first_user_message_text).hex.slice(0, 5)
-//     sampled_chars = chars at positions [4, 7, 20] of the first user message
-//                     text (padded with "0" if shorter)
+// Older builds also appended `cch=<hash>;`; 2.1.212 dropped it. Sub-agent and
+// cron requests append further fields we never send (cc_workload, cc_prev_req,
+// cc_is_subagent).
 //
-// Reverse-engineered from the kristianvast/hermes-claude-auth project, which
-// reverse-engineered the billing scheme by inspecting real Claude Code traffic.
+// The <suffix> is a 3-hex attestation computed inside the CLI's compiled Bun
+// bytecode. We could not reproduce it black-box: for the same request our value
+// diverges from the real one (e.g. d4f vs the real d1d), so computeBillingSuffix
+// below is a best-effort approximation kept for shape only. If the router turns
+// out to validate the suffix, matching it needs the upstream algorithm, not this
+// heuristic. Positions/salt below are the reverse-engineered older scheme.
 
 const BILLING_SALT = '59cf53e54c78'
-const BILLING_ENTRYPOINT = 'sdk-cli'
+const BILLING_ENTRYPOINT = 'cli'
 const BILLING_PREFIX = 'x-anthropic-billing-header'
 
 /** Pull the first user-message text out of a Messages API body. */
@@ -454,21 +458,16 @@ function computeBillingSuffix(messageText: string, version: string): string {
   return createHash('sha256').update(`${BILLING_SALT}${sampled}${version}`).digest('hex').slice(0, 3)
 }
 
-function computeCch(messageText: string): string {
-  return createHash('sha256').update(messageText, 'utf8').digest('hex').slice(0, 5)
-}
-
 /**
- * Build the signed billing tag that goes as a system text block on every
- * OAuth Messages API request. Format mirrors what Anthropic's request router
- * expects to bill OAuth traffic against the user's plan limits instead of
- * the "extra usage" pool.
+ * Build the billing tag that goes as a system text block on every OAuth
+ * Messages API request. Format mirrors what Claude Code 2.1.212 sends so OAuth
+ * traffic bills against the user's plan limits instead of the "extra usage"
+ * pool. See the note above for the suffix caveat.
  */
 export function buildBillingHeaderText(messages: unknown, version: string = CLAUDE_CODE_VERSION): string {
   const text = extractFirstUserMessageText(messages)
   const suffix = computeBillingSuffix(text, version)
-  const cch = computeCch(text)
-  return `${BILLING_PREFIX}: cc_version=${version}.${suffix}; cc_entrypoint=${BILLING_ENTRYPOINT}; cch=${cch};`
+  return `${BILLING_PREFIX}: cc_version=${version}.${suffix}; cc_entrypoint=${BILLING_ENTRYPOINT};`
 }
 
 /**

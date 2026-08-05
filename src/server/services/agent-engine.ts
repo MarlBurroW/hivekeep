@@ -975,6 +975,9 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
 
   // Hoisted so the finally block can guarantee cleanup
   let queueItem: Awaited<ReturnType<typeof dequeueMessage>> = null
+  // Turn-level watchdog state, hoisted for the same reason.
+  let turnDeadlineTimer: ReturnType<typeof setTimeout> | null = null
+  let turnTimedOut = false
 
   try {
     // Don't process if already processing (DB-level check, main slot only)
@@ -989,6 +992,24 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     // the LLM call starts (during prompt building, memory search, etc.)
     const abortController = new AbortController()
     activeAbortControllers.set(agentId, abortController)
+
+    // Wall-clock ceiling on the whole turn. The stall guard in stream-runner
+    // covers a provider going silent, but not a turn that stays technically
+    // alive forever (a model looping on tool calls, a tool with no timeout of
+    // its own). Without this, such a turn holds the Agent's lock until the
+    // process restarts — and a channel user just sees silence. Firing the
+    // turn's own controller routes it through the normal abort path, so all
+    // existing cleanup applies.
+    turnDeadlineTimer = config.tools.turnTimeoutMs > 0
+      ? setTimeout(() => {
+          turnTimedOut = true
+          log.error(
+            { agentId, queueItemId: queueItem?.id, timeoutMs: config.tools.turnTimeoutMs },
+            'Turn exceeded its time ceiling — aborting',
+          )
+          abortController.abort()
+        }, config.tools.turnTimeoutMs)
+      : null
 
     // Notify clients that this Agent started processing
     const pendingCount = await getQueueSize(agentId)
@@ -1802,6 +1823,23 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       }, 'Prompt cache stats')
     }
 
+    // Turn watchdog fired. Deliberately treated as a FAILED turn rather than a
+    // user abort: an abort is silent by design (the user knows, they clicked
+    // stop), but nobody asked for this one. Clearing `wasAborted` lets the
+    // normal completion path persist the partial answer AND deliver it to the
+    // originating channel, so the person waiting on Telegram learns the turn
+    // died instead of waiting forever.
+    if (turnTimedOut) {
+      wasAborted = false
+      const minutes = Math.round(config.tools.turnTimeoutMs / 60_000)
+      const notice = `*(This turn was interrupted after ${minutes} minutes — it exceeded the maximum turn duration. Some work may be incomplete; ask me to continue.)*`
+      fullContent = fullContent ? `${fullContent}\n\n${notice}` : notice
+      log.error(
+        { agentId, messageId: assistantMessageId, steps: step + 1, toolCalls: toolCallsLog.length },
+        'Turn aborted by the time ceiling',
+      )
+    }
+
     log.info({
       agentId,
       messageId: assistantMessageId,
@@ -1810,6 +1848,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       contentLength: fullContent.length,
       toolCalls: toolCallsLog.length,
       wasAborted,
+      turnTimedOut,
       silentStopAfterTools,
     }, 'LLM turn completed')
 
@@ -2159,6 +2198,12 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
 
     return true
   } finally {
+    if (turnDeadlineTimer) clearTimeout(turnDeadlineTimer)
+    // These were only cleared on the nominal and catch paths, so an early
+    // return (e.g. the Agent row vanished) left a dead controller registered
+    // and made /messages/stop claim it had stopped a turn that no longer ran.
+    activeAbortControllers.delete(agentId)
+    activeAgentStreams.delete(agentId)
     // Safety net: guarantee queue item is marked done regardless of exit path.
     // markQueueItemDone is idempotent — safe to call even if already done above.
     if (queueItem) {
