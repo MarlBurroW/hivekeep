@@ -149,6 +149,25 @@ Verified end-to-end (the DeepSeek provider followed exactly these steps). `PROVI
 3. Run `bun run dev` frequently, and `bun run typecheck` + `bun run test` before committing (the pre-commit hook runs both)
 4. **User-facing features ship with their docs**: update `docs-site/` (Starlight) and `api.md` (new routes / SSE events) in the same change, not "later"
 
+### Live instance on the dev machine
+
+A production instance runs on this machine, and it is **not** this checkout. Getting
+this wrong sends you chasing "prod runs old code" theories that are simply false.
+
+| | |
+|---|---|
+| Code | `~/kinbot`, a separate checkout kept current by the edge auto-update, not `~/projects/hivekeep` |
+| Deploy | push to `main`, then run the edge update — no manual pull, no manual migration |
+| Database | `~/.local/share/kinbot/kinbot.db` (WAL: copy `-wal` and `-shm` too, or use `VACUUM INTO`) |
+| Service | systemd user unit `kinbot.service`, logs via `journalctl --user -u kinbot.service` |
+| Port | 3000 |
+
+Never stop it by port or process pattern, and never point a script at the live DB
+in write mode without a `VACUUM INTO` backup first. To verify a change against
+real data, copy the DB and set `DB_PATH` to the copy. Note that stack traces in
+the logs are rooted at `~/kinbot`, which is the quickest way to tell which
+checkout produced them.
+
 ## Commands
 
 ```bash
