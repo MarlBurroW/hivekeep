@@ -683,6 +683,15 @@ export const config = {
     // this is deliberately generous; it only exists to stop a reply from
     // landing on a conversation nobody remembers.
     originTtlMs: Number(process.env.CHANNEL_ORIGIN_TTL ?? 86_400_000),
+    // How often the "typing" hint is refreshed while a turn runs. Platforms
+    // expire it in seconds, so without a refresh a long turn is silent and
+    // indistinguishable from a dead one.
+    typingRefreshMs: Number(process.env.CHANNEL_TYPING_REFRESH ?? 5_000),
+    // Attempts for one outbound send (1 = no retry). A transient 429 or 5xx
+    // used to drop the Agent's reply silently.
+    sendRetries: Number(process.env.CHANNEL_SEND_RETRIES ?? 3),
+    // Upper bound on a backoff wait, including a platform-provided retry_after.
+    maxRetryDelayMs: Number(process.env.CHANNEL_MAX_RETRY_DELAY ?? 60_000),
     // Max messages buffered per pending contact while they await approval. On
     // approval the buffer is replayed as a single Agent turn; only the most
     // recent N are kept (older ones are dropped).

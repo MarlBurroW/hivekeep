@@ -42,7 +42,8 @@ import { listAvailableAgents } from '@/server/services/inter-agent'
 import { listContactsForPrompt, findContactByLinkedUserId } from '@/server/services/contacts'
 import { contactNotes as contactNotesTable } from '@/server/db/schema'
 import { linkFilesToMessage, getFilesForMessage, serializeFile } from '@/server/services/files'
-import { popChannelQueueMeta, getChannelQueueMeta, deliverChannelResponse, getActiveChannelsForAgent, getChannel, findContactByPlatformId, getChannelOriginMeta, reportUndeliveredChannelReply } from '@/server/services/channels'
+import { popChannelQueueMeta, getChannelQueueMeta, deliverChannelResponse, getActiveChannelsForAgent, getChannel, findContactByPlatformId, getChannelOriginMeta, reportUndeliveredChannelReply, peekChannelTarget, startTypingKeepalive, notifyChannelOfFailure } from '@/server/services/channels'
+import type { ChannelQueueMeta } from '@/server/services/channels'
 import { popStagedAttachments, clearStagedAttachments } from '@/server/tools/attach-file-tool'
 import { parseMentions, notifyMentionedUsers } from '@/server/services/mentions'
 import { getGlobalPrompt, getSetting, setSetting } from '@/server/services/app-settings'
@@ -978,6 +979,13 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
   // Turn-level watchdog state, hoisted for the same reason.
   let turnDeadlineTimer: ReturnType<typeof setTimeout> | null = null
   let turnTimedOut = false
+  // Where this turn's outcome must be reported. Resolved once, up front, and
+  // hoisted so the catch/finally can reach it: previously the error path had no
+  // access to the channel at all, so a failed turn was invisible to anyone
+  // whose only view is the chat app.
+  let channelTarget: ChannelQueueMeta | undefined
+  let stopTyping: (() => void) | null = null
+  let turnDelivered = false
 
   try {
     // Don't process if already processing (DB-level check, main slot only)
@@ -987,6 +995,13 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     if (!queueItem) return false
 
     log.info({ agentId, queueItemId: queueItem.id, messageType: queueItem.messageType, sourceType: queueItem.sourceType }, 'Processing message')
+
+    // Resolve the channel destination once, before anything can throw, so every
+    // exit path (success, error, timeout, abort) can report to it.
+    channelTarget =
+      queueItem.sourceType === 'channel' || shouldAutoDeliverToChannel(queueItem)
+        ? peekChannelTarget(queueItem)
+        : undefined
 
     // Create an AbortController early so the stream can be cancelled even before
     // the LLM call starts (during prompt building, memory search, etc.)
@@ -1587,19 +1602,12 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       },
     })
 
-    // Send typing indicator on the channel when LLM processing starts (fire-and-forget)
-    if (queueItem.sourceType === 'channel') {
-      const meta = getChannelQueueMeta(queueItem.id)
-      if (meta) {
-        const ch = await getChannel(meta.channelId)
-        if (ch) {
-          const chAdapter = channelAdapters.get(ch.platform)
-          if (chAdapter?.sendTypingIndicator) {
-            const chCfg = JSON.parse(ch.platformConfig) as Record<string, unknown>
-            chAdapter.sendTypingIndicator(ch.id, chCfg, meta.platformChatId).catch(() => {})
-          }
-        }
-      }
+    // Keep the channel's "typing" hint alive for the whole turn. Covers
+    // follow-up turns too (task_result / wakeup / agent_reply carrying a
+    // channelOriginId), which previously showed no activity at all even though
+    // they were about to deliver on the channel.
+    if (channelTarget) {
+      stopTyping = startTypingKeepalive(channelTarget)
     }
 
     // Call LLM with streaming — custom single-step loop to prevent hallucinated
@@ -1995,26 +2003,25 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         timestamp: Date.now(),
       })
 
-      // Channel response delivery (fire-and-forget). Two ways in: a direct
-      // channel turn, or a follow-up turn in a causal chain started by one
-      // (sub-Agent result, wake-up, inter-Agent reply).
-      const isDirectChannelTurn = queueItem.sourceType === 'channel'
-      const isChannelFollowUp = Boolean(queueItem.channelOriginId) && shouldAutoDeliverToChannel(queueItem)
-      if (fullContent && (isDirectChannelTurn || isChannelFollowUp)) {
-        // Direct turns use the one-shot in-memory sideband, falling back to the
-        // persisted origin when the process restarted mid-turn.
-        const target = isDirectChannelTurn
-          ? popChannelQueueMeta(queueItem.id) ?? (queueItem.channelOriginId ? getChannelOriginMeta(queueItem.channelOriginId) : undefined)
-          : getChannelOriginMeta(queueItem.channelOriginId!)
-        if (target) {
+      // Channel response delivery (fire-and-forget). The destination was
+      // resolved up front (`channelTarget`) so success and failure paths agree
+      // on where this turn is owed an answer.
+      const owesChannelReply =
+        queueItem.sourceType === 'channel' ||
+        (Boolean(queueItem.channelOriginId) && shouldAutoDeliverToChannel(queueItem))
+      if (fullContent && owesChannelReply) {
+        if (channelTarget) {
+          // Consume the one-shot sideband now that we are actually delivering.
+          popChannelQueueMeta(queueItem.id)
           const stagedFiles = popStagedAttachments(agentId)
+          turnDelivered = true
           deliverChannelResponse(
-            { channelId: target.channelId, platformChatId: target.platformChatId, platformMessageId: target.platformMessageId, platformUserId: target.platformUserId },
+            channelTarget,
             assistantMessageId,
             fullContent,
             stagedFiles.length > 0 ? stagedFiles : undefined,
           ).catch((err) => {
-            log.error({ agentId, channelId: target.channelId, err }, 'Channel response delivery failed')
+            log.error({ agentId, channelId: channelTarget!.channelId, err }, 'Channel response delivery failed')
           })
         } else {
           clearStagedAttachments(agentId)
@@ -2189,6 +2196,14 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       createNotification({ type: 'agent:error', title: 'Agent error', body: displayError, agentId, relatedId: agentId, relatedType: 'agent' }),
     ).catch(() => {})
 
+    // Tell the channel the turn failed. Until now this whole block wrote only
+    // to the web timeline, so a user reachable solely through Telegram saw the
+    // Agent go quiet with no explanation and no end.
+    if (channelTarget) {
+      turnDelivered = true
+      await notifyChannelOfFailure(channelTarget, displayError).catch(() => {})
+    }
+
     // Emit queue update to clear processing state on error
     sseManager.sendToAgent(agentId, {
       type: 'queue:update',
@@ -2198,6 +2213,17 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
 
     return true
   } finally {
+    stopTyping?.()
+    // Last-resort guarantee. Any exit that produced neither a reply nor an
+    // error notice (an abort, an empty non-substituted turn, an early return)
+    // still owes the channel an outcome — silence is what made these states
+    // indistinguishable from a hang.
+    if (channelTarget && !turnDelivered) {
+      await notifyChannelOfFailure(
+        channelTarget,
+        'That request ended without a reply. Nothing was lost — send it again, or ask me what happened.',
+      ).catch(() => {})
+    }
     if (turnDeadlineTimer) clearTimeout(turnDeadlineTimer)
     // These were only cleared on the nominal and catch paths, so an early
     // return (e.g. the Agent row vanished) left a dead controller registered

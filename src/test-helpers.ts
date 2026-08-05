@@ -125,6 +125,9 @@ export const fullMockConfig = {
     maxPerAgent: 5,
     telegramWebhookPath: '/api/channels/telegram',
     originTtlMs: 86_400_000,
+    typingRefreshMs: 5_000,
+    sendRetries: 3,
+    maxRetryDelayMs: 60_000,
   },
 
   quickSessions: {

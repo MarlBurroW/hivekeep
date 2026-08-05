@@ -191,7 +191,18 @@ export class TelegramAdapter implements ChannelAdapter {
           try {
             await this.processUpdate(state, message)
           } catch (err) {
+            // The offset already moved past this update, so the message is gone
+            // for good: Telegram will never resend it and the sender gets no
+            // hint that anything went wrong. Tell them, so a dropped message is
+            // never silent.
             log.error({ channelId: state.channelId, err }, 'Error processing Telegram update')
+            const chatId = (message.chat as { id?: number | string } | undefined)?.id
+            if (chatId !== undefined) {
+              telegramApi(state.token, 'sendMessage', {
+                chat_id: chatId,
+                text: '⚠️ Your message could not be processed and was not delivered to the agent. Please send it again.',
+              }).catch(() => {})
+            }
           }
         }
       } catch (err) {
