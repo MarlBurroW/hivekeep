@@ -1053,7 +1053,10 @@
     "quickChat": "Chat rápido",
     "react": "Reaccionar",
     "messageRedacted": "Este mensaje fue censurado",
-    "reactionFailed": "No se pudo cambiar la reacción"
+    "reactionFailed": "No se pudo cambiar la reacción",
+    "forceReset": "Desbloquear",
+    "forceResetHint": "Este turno lleva demasiado tiempo. Desbloquea el Agente para que vuelva a aceptar mensajes.",
+    "forceResetDone": "Agente desbloqueado"
   },
   "quickChat": {
     "title": "Sesión rápida",

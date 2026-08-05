@@ -433,6 +433,14 @@ export const config = {
     agentPriority: 50,
     taskPriority: 50,
     pollIntervalMs: Number(process.env.QUEUE_POLL_INTERVAL ?? 500),
+    // Stuck-Agent detection. Recovery used to run only at boot, so a wedged
+    // Agent could stay mute for hours with nobody informed.
+    stuckSweepIntervalMs: Number(process.env.QUEUE_STUCK_SWEEP_INTERVAL ?? 300_000),
+    // Notify a human but leave the turn alone: it may still be legitimate.
+    stuckWarnMs: Number(process.env.QUEUE_STUCK_WARN ?? 900_000),
+    // Past any plausible turn duration (turnTimeoutMs plus a wide margin),
+    // requeue so the Agent starts answering again. 0 disables.
+    stuckRecoverMs: Number(process.env.QUEUE_STUCK_RECOVER ?? 3_600_000),
   },
 
   tasks: {

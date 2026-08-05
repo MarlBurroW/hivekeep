@@ -1053,7 +1053,10 @@
     "quickChat": "Quick-Chat",
     "react": "Reagieren",
     "messageRedacted": "Diese Nachricht wurde geschwärzt",
-    "reactionFailed": "Reaktion konnte nicht umgeschaltet werden"
+    "reactionFailed": "Reaktion konnte nicht umgeschaltet werden",
+    "forceReset": "Entsperren",
+    "forceResetHint": "Dieser Durchlauf dauert ungewöhnlich lange. Entsperren Sie den Agenten, damit er wieder Nachrichten annimmt.",
+    "forceResetDone": "Agent entsperrt"
   },
   "quickChat": {
     "title": "Quick-Session",

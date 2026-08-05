@@ -1053,7 +1053,10 @@
     "quickChat": "Chat rapide",
     "react": "Réagir",
     "messageRedacted": "Ce message a été supprimé",
-    "reactionFailed": "Impossible de modifier la réaction"
+    "reactionFailed": "Impossible de modifier la réaction",
+    "forceReset": "Débloquer",
+    "forceResetHint": "Ce tour dure anormalement longtemps. Débloquez l'Agent pour qu'il accepte de nouveau les messages.",
+    "forceResetDone": "Agent débloqué"
   },
   "quickChat": {
     "title": "Session rapide",

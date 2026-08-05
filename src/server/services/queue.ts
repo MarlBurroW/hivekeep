@@ -312,3 +312,25 @@ export function recoverStaleProcessingItems() {
     log.warn({ count: result.changes }, 'Recovered stale processing queue items → reset to pending')
   }
 }
+
+/** Reset one Agent's in-flight items so its queue can move again. Used by the
+ *  operator force-reset; scoped to the Agent, unlike the boot-wide recovery. */
+export function requeueProcessingItems(agentId: string): number {
+  const result = sqlite.run(
+    `UPDATE queue_items SET status = 'pending' WHERE status = 'processing' AND agent_id = ?`,
+    [agentId],
+  )
+  return result.changes ?? 0
+}
+
+/** Queue items that have been 'processing' for longer than `olderThanMs`. */
+export function findStuckProcessingItems(olderThanMs: number): Array<{ id: string; agentId: string; ageMs: number }> {
+  const now = Date.now()
+  const rows = sqlite
+    .query(
+      `SELECT id, agent_id as agentId, created_at as createdAt FROM queue_items
+       WHERE status = 'processing' AND created_at < ?`,
+    )
+    .all(now - olderThanMs) as unknown as Array<{ id: string; agentId: string; createdAt: number }>
+  return rows.map((r) => ({ id: r.id, agentId: r.agentId, ageMs: now - r.createdAt }))
+}

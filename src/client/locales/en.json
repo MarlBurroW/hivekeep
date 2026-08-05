@@ -1053,7 +1053,10 @@
     "quickChat": "Quick Chat",
     "react": "React",
     "messageRedacted": "This message was redacted",
-    "reactionFailed": "Failed to toggle reaction"
+    "reactionFailed": "Failed to toggle reaction",
+    "forceReset": "Unblock",
+    "forceResetHint": "This turn has been running unusually long. Unblock the Agent so it can accept messages again.",
+    "forceResetDone": "Agent unblocked"
   },
   "quickChat": {
     "title": "Quick Session",

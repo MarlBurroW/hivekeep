@@ -1065,7 +1065,10 @@
     "quickChat": "Szybki czat",
     "react": "Zareaguj",
     "messageRedacted": "Ta wiadomość została zredagowana",
-    "reactionFailed": "Nie udało się przełączyć reakcji"
+    "reactionFailed": "Nie udało się przełączyć reakcji",
+    "forceReset": "Odblokuj",
+    "forceResetHint": "Ta tura trwa nienaturalnie długo. Odblokuj Agenta, aby ponownie przyjmował wiadomości.",
+    "forceResetDone": "Agent odblokowany"
   },
   "quickChat": {
     "title": "Szybka sesja",

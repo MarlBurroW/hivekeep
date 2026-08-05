@@ -207,6 +207,10 @@ new Cron('0 * * * *', async () => {
 import { startChannelFileCleanup } from '@/server/services/files'
 startChannelFileCleanup()
 
+// Stuck-Agent watch (warn, then requeue an Agent wedged in 'processing')
+import { startStuckAgentWatch } from '@/server/services/stuck-agent-watch'
+startStuckAgentWatch()
+
 // Channel origin cleanup (prune origins past the delivery freshness window)
 import { startChannelOriginCleanup } from '@/server/services/channels'
 startChannelOriginCleanup()

@@ -1041,6 +1041,22 @@ agentRoutes.post('/:id/avatar/generate', async (c) => {
   }
 })
 
+// POST /api/agents/:id/force-reset — break an Agent out of a stuck state
+//
+// The escape hatch that did not exist. `/messages/stop` only works while a
+// stream is live, and force-compact refuses with 409 precisely when compacting
+// is what is stuck — so a wedged Agent required restarting the whole server.
+// Unconditional by design: it has to work when the state is inconsistent.
+agentRoutes.post('/:id/force-reset', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const { forceResetAgent } = await import('@/server/services/agent-engine')
+  const result = await forceResetAgent(existing.id)
+  return c.json({ ok: true, ...result })
+})
+
 // ─── Compacting routes ───────────────────────────────────────────────────────
 
 // POST /api/agents/:id/compacting/run — force compaction immediately

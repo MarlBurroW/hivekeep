@@ -57,7 +57,7 @@ import { cn, getUserInitials } from '@/client/lib/utils'
 import { useSidePanel } from '@/client/contexts/SidePanelContext'
 import { ArrowDown, ArrowUp, Upload, Pin, PinOff, AlertTriangle, Bot, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '@/client/lib/api'
+import { api, getErrorMessage } from '@/client/lib/api'
 
 interface AgentInfo {
   id: string
@@ -230,6 +230,15 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
       } else {
         toast.error(t('chat.compacting.error'))
       }
+    }
+  }, [agent.id, t])
+
+  const handleForceReset = useCallback(async () => {
+    try {
+      await api.post(`/agents/${agent.id}/force-reset`)
+      toast.success(t('chat.forceResetDone'))
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err))
     }
   }, [agent.id, t])
 
@@ -972,10 +981,11 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
                     tokenCount={streamingOutputTokens}
                     toolCallCount={streamingToolCallCount}
                     onOpenToolCalls={openToolCalls}
+                    onForceReset={handleForceReset}
                   />
                 )}
               </div>
-  ), [timeline, openTask, agent, compact, hideThinking, user, userInitials, toolCallsByMessage, liveTasks, toggleReaction, handleQuoteReply, handleEditResend, lastAssistantMsgId, isStreaming, isProcessing, handleRegenerate, deleteMessage, lastDisplayMsgId, setRewindTarget, streamingMessage, streamingReasoning, liveCompacting, pendingPrompts, respondToPrompt, isResponding, queueState, tokenStalled, streamingOutputTokens, streamingToolCallCount, openToolCalls])
+  ), [timeline, openTask, agent, compact, hideThinking, user, userInitials, toolCallsByMessage, liveTasks, toggleReaction, handleQuoteReply, handleEditResend, lastAssistantMsgId, isStreaming, isProcessing, handleRegenerate, deleteMessage, lastDisplayMsgId, setRewindTarget, streamingMessage, streamingReasoning, liveCompacting, pendingPrompts, respondToPrompt, isResponding, queueState, tokenStalled, streamingOutputTokens, streamingToolCallCount, openToolCalls, handleForceReset])
 
   return (
     <WorkspacePathProvider agentId={agent.id}>

@@ -27,7 +27,7 @@ import { buildSegmentedMessages } from '@/server/services/llm-cache-hints'
 import { stringifyToolResultValue } from '@/server/llm/core/vercel-bridge'
 import { DEFAULT_MAX_LLM_TOOLS, getMaxToolsForRequest } from '@/server/services/tool-cap'
 import { toolTurnSampling } from '@/server/services/tool-sampling'
-import { dequeueMessage, markQueueItemDone, isAgentProcessing, getQueueSize, recoverStaleProcessingItems, popQueueMessageMetadata } from '@/server/services/queue'
+import { dequeueMessage, markQueueItemDone, isAgentProcessing, getQueueSize, recoverStaleProcessingItems, requeueProcessingItems, popQueueMessageMetadata } from '@/server/services/queue'
 import { recoverStaleTasks, promoteGlobalQueue } from '@/server/services/tasks'
 import { sseManager } from '@/server/sse/index'
 import { eventBus } from '@/server/services/events'
@@ -945,6 +945,53 @@ export function abortAgentStream(agentId: string): boolean {
   if (!controller) return false
   controller.abort()
   return true
+}
+
+export interface ForceResetResult {
+  abortedStream: boolean
+  clearedLock: boolean
+  clearedCompacting: boolean
+  requeuedItems: number
+}
+
+/**
+ * Break an Agent out of a stuck state, unconditionally.
+ *
+ * Every other recovery path has a precondition that a genuinely stuck Agent
+ * fails: `/messages/stop` needs a live AbortController (gone once the stream
+ * ended, so it cannot help a turn frozen in a post-stream await),
+ * force-compact refuses with 409 while `compactingAgents` is held, and the
+ * queue reset only ran at boot. That left restarting the whole server as the
+ * only cure — for a single Agent — which is exactly what happened in
+ * production. `cancelTask` already proves the pattern for sub-Agents; this is
+ * its equivalent for the main thread.
+ *
+ * Deliberately unconditional: it is an escape hatch, so it must work precisely
+ * when the state is inconsistent. Clearing the in-memory lock is safe because a
+ * still-running turn's `finally` only deletes its own key, and its queue item
+ * is idempotent on re-processing (`created_message_id` prevents duplicates).
+ */
+export async function forceResetAgent(agentId: string): Promise<ForceResetResult> {
+  const abortedStream = abortAgentStream(agentId)
+  const clearedLock = agentLocks.delete(agentId)
+  const clearedCompacting = compactingAgents.delete(agentId)
+  activeAbortControllers.delete(agentId)
+  activeAgentStreams.delete(agentId)
+
+  const requeuedItems = requeueProcessingItems(agentId)
+
+  log.warn(
+    { agentId, abortedStream, clearedLock, clearedCompacting, requeuedItems },
+    'Agent force-reset by an operator',
+  )
+
+  sseManager.sendToAgent(agentId, {
+    type: 'queue:update',
+    agentId,
+    data: { agentId, queueSize: await getQueueSize(agentId), isProcessing: false },
+  })
+
+  return { abortedStream, clearedLock, clearedCompacting, requeuedItems }
 }
 
 /**

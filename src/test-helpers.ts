@@ -69,6 +69,9 @@ export const fullMockConfig = {
     agentPriority: 50,
     taskPriority: 50,
     pollIntervalMs: 500,
+    stuckSweepIntervalMs: 300_000,
+    stuckWarnMs: 900_000,
+    stuckRecoverMs: 3_600_000,
   },
 
   tasks: { maxDepth: 3, maxRequestInput: 3, maxConcurrent: 10 },

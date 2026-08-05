@@ -1053,7 +1053,10 @@
     "quickChat": "Chat rapida",
     "react": "Reagisci",
     "messageRedacted": "Questo messaggio è stato oscurato",
-    "reactionFailed": "Impossibile attivare/disattivare la reazione"
+    "reactionFailed": "Impossibile attivare/disattivare la reazione",
+    "forceReset": "Sblocca",
+    "forceResetHint": "Questo turno dura da troppo tempo. Sblocca l'Agente perché torni ad accettare messaggi.",
+    "forceResetDone": "Agente sbloccato"
   },
   "quickChat": {
     "title": "Sessione rapida",

@@ -1053,7 +1053,10 @@
     "quickChat": "クイックチャット",
     "react": "リアクション",
     "messageRedacted": "このメッセージは秘匿されました",
-    "reactionFailed": "リアクションの切り替えに失敗しました"
+    "reactionFailed": "リアクションの切り替えに失敗しました",
+    "forceReset": "ブロック解除",
+    "forceResetHint": "このターンは異常に長く実行されています。ブロックを解除すると、エージェントが再びメッセージを受け付けます。",
+    "forceResetDone": "エージェントのブロックを解除しました"
   },
   "quickChat": {
     "title": "クイックセッション",

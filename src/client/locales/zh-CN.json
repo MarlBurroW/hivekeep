@@ -1053,7 +1053,10 @@
     "quickChat": "快速聊天",
     "react": "回应",
     "messageRedacted": "此消息已被隐去",
-    "reactionFailed": "切换回应失败"
+    "reactionFailed": "切换回应失败",
+    "forceReset": "解除阻塞",
+    "forceResetHint": "本轮运行时间异常长。解除阻塞后，该 Agent 可以重新接收消息。",
+    "forceResetDone": "Agent 已解除阻塞"
   },
   "quickChat": {
     "title": "快速会话",
