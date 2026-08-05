@@ -46,6 +46,7 @@ import { popChannelQueueMeta, getChannelQueueMeta, deliverChannelResponse, getAc
 import { popStagedAttachments, clearStagedAttachments } from '@/server/tools/attach-file-tool'
 import { parseMentions, notifyMentionedUsers } from '@/server/services/mentions'
 import { getGlobalPrompt, getSetting, setSetting } from '@/server/services/app-settings'
+import { isContextTooLargeError, parseContextOverflowTokens, resolveOverflowCalibration, CALIBRATION_MIN } from '@/server/services/context-overflow'
 import { wrapToolsWithSpill } from '@/server/services/tool-output-spill'
 import { executeToolBatch } from '@/server/services/tool-executor'
 import { recordUsage, aggregateUsages } from '@/server/services/token-usage'
@@ -284,7 +285,6 @@ const lastContextUsage = new Map<string, {
 }>()
 
 const CALIBRATION_EMA_ALPHA = 0.4 // weight given to the new observation
-const CALIBRATION_MIN = 0.7
 const CALIBRATION_MAX = 3.0
 
 function scaleBreakdown(b: ContextTokenBreakdown, factor: number): ContextTokenBreakdown {
@@ -376,6 +376,42 @@ export function recordApiContextSize(agentId: string, peakStepInputTokens: numbe
   setSetting(`context_usage:${agentId}`, JSON.stringify(data)).catch(() => {})
 }
 
+/**
+ * Record the payload size the provider measured when it REJECTED a request for
+ * exceeding the context window. Unlike `recordApiContextSize` (fed by
+ * successful roundtrips) this is the only signal available on the failure path,
+ * where the provider returns no usage at all.
+ *
+ * Differs from the success path on purpose:
+ *  - the observed ratio replaces the EMA instead of blending into it. The
+ *    estimate was just proven wrong by a hard count; averaging it with the
+ *    history that produced the wrong value only slows the correction down.
+ *  - it is bounded by CALIBRATION_OVERFLOW_MAX, not CALIBRATION_MAX, so a
+ *    large divergence can actually be represented.
+ *  - `maxTokens` (the provider's own limit) overrides the cached window when
+ *    present: the registry can disagree with what the account really gets.
+ */
+export function recordApiContextOverflow(agentId: string, actualTokens: number, maxTokens?: number): void {
+  const existing = lastContextUsage.get(agentId)
+  const calibrationFactor = resolveOverflowCalibration(actualTokens, existing?.contextTokensRaw, existing?.calibrationFactor ?? 1)
+  const contextWindow = maxTokens && maxTokens > 0 ? maxTokens : existing?.contextWindow ?? 0
+  const data = {
+    contextTokens: existing?.contextTokensRaw
+      ? Math.round(existing.contextTokensRaw * calibrationFactor)
+      : actualTokens,
+    contextTokensRaw: existing?.contextTokensRaw,
+    apiContextTokens: actualTokens,
+    contextWindow,
+    updatedAt: Date.now(),
+    breakdown: existing?.breakdownRaw ? scaleBreakdown(existing.breakdownRaw, calibrationFactor) : existing?.breakdown,
+    breakdownRaw: existing?.breakdownRaw,
+    pipelineStatus: existing?.pipelineStatus,
+    calibrationFactor,
+  }
+  lastContextUsage.set(agentId, data)
+  setSetting(`context_usage:${agentId}`, JSON.stringify(data)).catch(() => {})
+}
+
 /** Get the cached context usage for an Agent, if available.
  *
  *  `contextTokens` (current usage) is read from the cache.
@@ -454,21 +490,10 @@ export function extractApiErrorMessage(err: unknown): string {
   return JSON.stringify(err)
 }
 
-/**
- * Match the various ways providers report "you sent too many tokens".
- * Anthropic: "prompt is too long: X tokens > Y maximum"
- * OpenAI:    "This model's maximum context length is X tokens..." or `code:context_length_exceeded`
- * Google:    "input token count (X) exceeds the maximum number of tokens allowed (Y)"
- * Generic:   "context window" appears in many provider messages.
- *
- * Used both to friendly-format the error AND to decide whether to fire a
- * background recovery compacting in the catch block.
- */
-const CONTEXT_TOO_LARGE_RE = /prompt is too long|context[\s_-]?length[\s_-]?exceed|maximum context length|context window|exceeds the maximum number of tokens|input token count[^.]{0,40}exceed/i
-
-export function isContextTooLargeError(errorMsg: string): boolean {
-  return CONTEXT_TOO_LARGE_RE.test(errorMsg)
-}
+// Provider "context too large" recognition lives in its own dependency-free
+// module so it can be unit-tested directly. Re-exported here because callers
+// (tasks.ts) have always imported it from the engine.
+export { isContextTooLargeError }
 
 /**
  * Convert a raw error message into a user-friendly display message.
@@ -2051,6 +2076,20 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     // previous turn), trigger a forced compacting in the background so the
     // user can retry without manual intervention.
     if (isContextTooLargeError(errorMsg)) {
+      // The rejection carries the real payload size. Record it before anything
+      // else reads the cache: otherwise recovery runs against the stale count
+      // from the last successful turn, finds it below the compacting trigger,
+      // and does nothing while every retry rebuilds the same oversized prompt.
+      const overflow = parseContextOverflowTokens(errorMsg)
+      if (overflow) {
+        const estimatedTokens = lastContextUsage.get(agentId)?.contextTokensRaw ?? null
+        recordApiContextOverflow(agentId, overflow.actual, overflow.max)
+        log.warn(
+          { agentId, actualTokens: overflow.actual, maxTokens: overflow.max, estimatedTokens },
+          'Provider rejected the prompt as too long; recorded the measured size as ground truth',
+        )
+      }
+
       // Skip recovery if compacting is already running for this Agent — racing
       // would risk duplicate summaries (both reading the same message range)
       // AND the recovery's `finally` would clear the lock the other path
@@ -2065,9 +2104,11 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
             // Re-fetch the Agent since `agent` was scoped to the try block.
             const recoveryAgent = await db.select({ model: agents.model }).from(agents).where(eq(agents.id, agentId)).get()
             if (!recoveryAgent) return
-            const ctxWindow = getModelContextWindow(recoveryAgent.model)
+            // Prefer the provider's own limit: the model registry can advertise
+            // a window the account does not actually get.
+            const ctxWindow = overflow?.max ?? getModelContextWindow(recoveryAgent.model)
             const cached = lastContextUsage.get(agentId)
-            await maybeCompact(agentId, cached?.apiContextTokens ?? cached?.contextTokens, ctxWindow)
+            await maybeCompact(agentId, overflow?.actual ?? cached?.apiContextTokens ?? cached?.contextTokens, ctxWindow)
           } catch (err) {
             log.error({ agentId, err }, 'Recovery compacting after prompt-too-long failed')
           } finally {
