@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, utimesSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { maybeSpillToolOutput, wrapToolsWithSpill, cleanupSpilledOutputs, buildPreview } from '@/server/services/tool-output-spill'
+import { maybeSpillToolOutput, wrapToolsWithSpill, cleanupSpilledOutputs, buildPreview, capToolResultText } from '@/server/services/tool-output-spill'
 
 const TEST_DIR = join(import.meta.dir, '__test_spill_workspace__')
 const SPILL_DIR = join(TEST_DIR, '.tool-outputs')
@@ -262,5 +262,37 @@ describe('cleanupSpilledOutputs', () => {
     expect(count).toBe(1)
     expect(existsSync(oldFile)).toBe(false)
     expect(existsSync(recentFile)).toBe(true)
+  })
+})
+
+describe('capToolResultText', () => {
+  it('leaves a result under the cap untouched', () => {
+    expect(capToolResultText('short output', 'grep', 30000)).toBe('short output')
+  })
+
+  it('replaces an oversized result with a re-runnable placeholder', () => {
+    // Within a turn, results are re-sent at every later step. Uncapped, one
+    // huge result is paid for on each of them.
+    const huge = 'data '.repeat(200_000)
+    const out = capToolResultText(huge, 'read_file', 30000)
+    expect(out.length).toBeLessThan(300)
+    expect(out).toContain('read_file')
+    expect(out).toContain('Re-run the tool')
+  })
+
+  it('names the tool so the model knows what to re-run', () => {
+    expect(capToolResultText('x'.repeat(500_000), 'get_platform_logs', 1000)).toContain('get_platform_logs')
+  })
+
+  it('treats a non-positive cap as disabled', () => {
+    const huge = 'y'.repeat(500_000)
+    expect(capToolResultText(huge, 'grep', 0)).toBe(huge)
+  })
+
+  it('does not count tokens for obviously small results', () => {
+    // The char pre-check must short-circuit: token counting every tool result
+    // on every step would be a real cost on tool-heavy turns.
+    const text = 'a'.repeat(1000)
+    expect(capToolResultText(text, 'grep', 30000)).toBe(text)
   })
 })

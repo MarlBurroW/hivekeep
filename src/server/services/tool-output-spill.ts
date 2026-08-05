@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import type { Tool } from '@/server/tools/tool-helper'
 import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
+import { countTokens } from '@/shared/token-estimator'
 
 const log = createLogger('tool-output-spill')
 
@@ -25,11 +26,6 @@ interface SpillReference {
 }
 
 /**
- * If a tool result exceeds the configured byte threshold, save the full
- * serialized result to a temp file and return a compact reference with a
- * preview. Otherwise return the result unchanged.
- */
-/**
  * Cut a preview out of the serialized result, bounded by BOTH the line count
  * and a hard character budget.
  *
@@ -47,6 +43,30 @@ export function buildPreview(lines: string[], maxLines: number, maxChars: number
   return `${byLines.slice(0, maxChars)}\n… [preview truncated, ${omitted.toLocaleString()} more characters — read the file for the rest]`
 }
 
+/**
+ * Cap a tool result that is about to be replayed to the model.
+ *
+ * The keep-window cap in `buildMessageHistory` only runs when the NEXT turn
+ * rebuilds history from the DB. Within the current turn, results are appended
+ * raw and re-sent at every subsequent step, so one oversized result (a
+ * spill-exempt `read_file`, anything the spill threshold let through) is paid
+ * for again on each step. Same placeholder wording as the rebuild path, so the
+ * model sees a consistent story across turns.
+ */
+export function capToolResultText(text: string, toolName: string, capTokens: number): string {
+  if (capTokens <= 0) return text
+  // ~4 chars/token; cheap guard before paying for a real token count.
+  if (text.length <= capTokens * 4) return text
+  const tokens = countTokens(text)
+  if (tokens <= capTokens) return text
+  return `[Tool result trimmed: ${toolName} returned ~${tokens.toLocaleString()} tokens, exceeding the ${capTokens.toLocaleString()}-token keep-window cap. Re-run the tool if you need the full output.]`
+}
+
+/**
+ * If a tool result exceeds the configured byte threshold, save the full
+ * serialized result to a temp file and return a compact reference with a
+ * preview. Otherwise return the result unchanged.
+ */
 export function maybeSpillToolOutput(
   workspacePath: string,
   toolName: string,

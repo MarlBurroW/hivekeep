@@ -16,7 +16,7 @@ import { toolRegistry } from '@/server/tools/index'
 import { sseManager } from '@/server/sse/index'
 import { config } from '@/server/config'
 import { getGlobalPrompt, getMaxConcurrentTasks, getMaxQueuedTasks } from '@/server/services/app-settings'
-import { wrapToolsWithSpill } from '@/server/services/tool-output-spill'
+import { wrapToolsWithSpill, capToolResultText } from '@/server/services/tool-output-spill'
 import { executeToolBatch } from '@/server/services/tool-executor'
 import { recordUsage, aggregateUsages, getTaskTotals } from '@/server/services/token-usage'
 import { runStreamStep, type ReasoningSegment } from '@/server/services/stream-runner'
@@ -1706,7 +1706,14 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         content: batch.toolResults.map((tr) => ({
           type: 'tool-result',
           toolUseId: tr.toolCallId,
-          content: stringifyToolResultValue(tr.output.value),
+          // Capped here too: within a turn these are re-sent at every later
+          // step, so an oversized result is paid for again and again. The
+          // history rebuild applies the same cap on the next turn.
+          content: capToolResultText(
+            stringifyToolResultValue(tr.output.value),
+            tr.toolName ?? 'unknown',
+            config.toolResultSizeCapTokens,
+          ),
         })),
       })
 

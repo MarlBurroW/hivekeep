@@ -48,7 +48,7 @@ import { popStagedAttachments, clearStagedAttachments } from '@/server/tools/att
 import { parseMentions, notifyMentionedUsers } from '@/server/services/mentions'
 import { getGlobalPrompt, getSetting, setSetting } from '@/server/services/app-settings'
 import { isContextTooLargeError, parseContextOverflowTokens, resolveOverflowCalibration, CALIBRATION_MIN } from '@/server/services/context-overflow'
-import { wrapToolsWithSpill } from '@/server/services/tool-output-spill'
+import { wrapToolsWithSpill, capToolResultText } from '@/server/services/tool-output-spill'
 import { executeToolBatch } from '@/server/services/tool-executor'
 import { recordUsage, aggregateUsages } from '@/server/services/token-usage'
 import { runStreamStep, normalizeToolUseInput, type ReasoningSegment } from '@/server/services/stream-runner'
@@ -283,6 +283,10 @@ const lastContextUsage = new Map<string, {
   /** EMA-smoothed ratio observed from past API roundtrips (api / raw_estimate).
    *  Defaults to 1.0 before any roundtrip. Clamped to [0.7, 3.0] for safety. */
   calibrationFactor?: number
+  /** Window the PROVIDER enforced when it rejected an oversized prompt. The
+   *  model registry only knows what a model can do, not what this account is
+   *  entitled to, so this is the only trustworthy ceiling once observed. */
+  observedContextWindow?: number
 }>()
 
 const CALIBRATION_EMA_ALPHA = 0.4 // weight given to the new observation
@@ -323,6 +327,7 @@ export function setLastContextUsage(
     contextTokensRaw,
     apiContextTokens: existing?.apiContextTokens,
     contextWindow,
+    observedContextWindow: existing?.observedContextWindow,
     updatedAt: Date.now(),
     breakdown: breakdownRaw ? scaleBreakdown(breakdownRaw, calibrationFactor) : undefined,
     breakdownRaw,
@@ -367,6 +372,7 @@ export function recordApiContextSize(agentId: string, peakStepInputTokens: numbe
     contextTokensRaw: existing?.contextTokensRaw,
     apiContextTokens: peakStepInputTokens,
     contextWindow: existing?.contextWindow ?? 0,
+    observedContextWindow: existing?.observedContextWindow,
     updatedAt: Date.now(),
     breakdown: existing?.breakdown,
     breakdownRaw: existing?.breakdownRaw,
@@ -403,6 +409,9 @@ export function recordApiContextOverflow(agentId: string, actualTokens: number, 
     contextTokensRaw: existing?.contextTokensRaw,
     apiContextTokens: actualTokens,
     contextWindow,
+    // Remembered so later reads cannot be talked back up to the registry's
+    // advertised (and for this account, unreachable) window.
+    observedContextWindow: maxTokens && maxTokens > 0 ? maxTokens : existing?.observedContextWindow,
     updatedAt: Date.now(),
     breakdown: existing?.breakdownRaw ? scaleBreakdown(existing.breakdownRaw, calibrationFactor) : existing?.breakdown,
     breakdownRaw: existing?.breakdownRaw,
@@ -462,10 +471,19 @@ export async function getLastContextUsage(agentId: string) {
   }
   if (!cached) return null
 
-  // Refresh contextWindow from the current model.
+  // Refresh contextWindow from the current model, but never ABOVE a limit the
+  // provider itself has already enforced. The registry advertises a model's
+  // capability, not the account's entitlement: it happily reports 1M for a
+  // subscription that is refused the long-context beta and rejects at 200k.
+  // Overwriting unconditionally is what silently discarded the measured window
+  // recorded by `recordApiContextOverflow`, leaving compacting aiming at a
+  // ceiling the account cannot reach.
   const agentRow = db.select({ model: agents.model }).from(agents).where(eq(agents.id, agentId)).get()
   if (agentRow?.model) {
-    return { ...cached, contextWindow: getModelContextWindow(agentRow.model) }
+    const registryWindow = getModelContextWindow(agentRow.model)
+    const observed = cached.observedContextWindow
+    const effective = observed && observed > 0 ? Math.min(registryWindow, observed) : registryWindow
+    return { ...cached, contextWindow: effective }
   }
   return cached
 }
@@ -945,6 +963,25 @@ export function abortAgentStream(agentId: string): boolean {
   if (!controller) return false
   controller.abort()
   return true
+}
+
+/**
+ * Publish a per-step input count while a turn is still running.
+ *
+ * Distinct from `recordApiContextSize`, which also refines the calibration
+ * factor: that comparison is only valid against the PRE-TURN estimate, and by
+ * step N the payload has grown by tool results the estimate never saw. Feeding
+ * those steps into the EMA would teach it that the estimator under-counts by a
+ * factor it does not. So this updates the observed size (and only upward, since
+ * the gauge should track the peak) and leaves calibration to end-of-turn.
+ */
+export function updateLiveApiContextSize(agentId: string, stepInputTokens: number): void {
+  const existing = lastContextUsage.get(agentId)
+  if (!existing) return
+  if (existing.apiContextTokens != null && existing.apiContextTokens >= stepInputTokens) return
+  const data = { ...existing, apiContextTokens: stepInputTokens, updatedAt: Date.now() }
+  lastContextUsage.set(agentId, data)
+  setSetting(`context_usage:${agentId}`, JSON.stringify(data)).catch(() => {})
 }
 
 export interface ForceResetResult {
@@ -1752,6 +1789,15 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       }, step)
       if (outcome.usage) {
         stepUsages.push(outcome.usage)
+        // Record the provider's per-step input count as it arrives. The context
+        // gauge used to be written once, before the turn, and only reconciled
+        // after it ended — so throughout a multi-hour, tool-heavy turn (exactly
+        // when the context grows fastest) the navbar and the compacting
+        // proximity check both read a stale pre-turn number. This is ground
+        // truth and was already in hand; it was simply discarded.
+        if (outcome.usage.inputTokens) {
+          updateLiveApiContextSize(agentId, outcome.usage.inputTokens)
+        }
         // Push the running output-token total to clients so the thinking
         // bubble can show real tokens accumulating across steps. Usage is only
         // known at each step's `finish` chunk, so this increments per step
@@ -1822,7 +1868,14 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         content: batch.toolResults.map((tr) => ({
           type: 'tool-result',
           toolUseId: tr.toolCallId,
-          content: stringifyToolResultValue(tr.output.value),
+          // Capped here too: within a turn these are re-sent at every later
+          // step, so an oversized result is paid for again and again. The
+          // history rebuild applies the same cap on the next turn.
+          content: capToolResultText(
+            stringifyToolResultValue(tr.output.value),
+            tr.toolName ?? 'unknown',
+            config.toolResultSizeCapTokens,
+          ),
         })),
       })
 
@@ -2677,7 +2730,14 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
         content: batch.toolResults.map((tr) => ({
           type: 'tool-result',
           toolUseId: tr.toolCallId,
-          content: stringifyToolResultValue(tr.output.value),
+          // Capped here too: within a turn these are re-sent at every later
+          // step, so an oversized result is paid for again and again. The
+          // history rebuild applies the same cap on the next turn.
+          content: capToolResultText(
+            stringifyToolResultValue(tr.output.value),
+            tr.toolName ?? 'unknown',
+            config.toolResultSizeCapTokens,
+          ),
         })),
       })
 
