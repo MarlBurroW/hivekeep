@@ -5,6 +5,8 @@ import { openaiKeyProvider } from '@/server/llm/llm/openai-key'
 import { openaiCodexProvider } from '@/server/llm/llm/openai-codex'
 import { geminiProvider } from '@/server/llm/llm/gemini'
 import { openrouterProvider } from '@/server/llm/llm/openrouter'
+import { kiloProvider } from '@/server/llm/llm/kilo'
+import { ollamaProvider } from '@/server/llm/llm/ollama'
 import { xaiProvider } from '@/server/llm/llm/xai'
 import { deepseekProvider } from '@/server/llm/llm/deepseek'
 import { minimaxProvider } from '@/server/llm/llm/minimax'
@@ -26,6 +28,8 @@ export function registerBuiltinLLMProviders(): void {
   registerLLMProvider(openaiCodexProvider)
   registerLLMProvider(geminiProvider)
   registerLLMProvider(openrouterProvider)
+  registerLLMProvider(kiloProvider)
+  registerLLMProvider(ollamaProvider)
   registerLLMProvider(xaiProvider)
   registerLLMProvider(deepseekProvider)
   registerLLMProvider(minimaxProvider)

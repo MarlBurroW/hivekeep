@@ -82,6 +82,10 @@ Limits of the [Files workspace browser](/docs/features/files/).
 | `VERSION_CHECK_REPO` | `MarlBurroW/hivekeep` | GitHub repo to check for new releases |
 | `VERSION_CHECK_INTERVAL_HOURS` | `12` | Hours between version checks |
 
+## Built-in AI providers
+
+Provider credentials are configured from Queenie or the Providers settings UI, not environment variables — Hivekeep stores secrets in the encrypted vault and auto-detects each provider's capabilities. See [Supported providers](/docs/providers/supported/) for the full list and per-provider capabilities.
+
 ## Advanced options
 
 See [`.env.example`](https://github.com/MarlBurroW/hivekeep/blob/main/.env.example) for the complete list of all options including:
