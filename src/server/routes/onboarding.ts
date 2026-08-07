@@ -34,6 +34,16 @@ onboardingRoutes.get('/status', async (c) => {
 
   const hasAdmin = !!admin
 
+  // Once an admin exists, the unauthenticated pre-auth window is over: this
+  // route stays reachable forever (the auth middleware exempts it), so stop
+  // disclosing the instance's configuration posture to anonymous callers.
+  if (hasAdmin) {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers })
+    if (!session) {
+      return c.json({ completed: true, hasAdmin: true })
+    }
+  }
+
   const allProviders = await db.select().from(providers).all()
 
   let hasLlm = false
@@ -136,8 +146,8 @@ onboardingRoutes.post('/profile', async (c) => {
     )
   }
 
-  // All users are admin
-  const role = 'admin'
+  // First user becomes admin; everyone joining via invitation is a member.
+  const role = adminExists ? 'member' : 'admin'
 
   await db.insert(userProfiles).values({
     userId,

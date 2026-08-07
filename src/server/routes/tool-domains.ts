@@ -9,6 +9,7 @@ import {
 } from '@/server/services/tool-domains'
 import { createLogger } from '@/server/logger'
 import type { AppVariables } from '@/server/app'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:tool-domains')
 
@@ -18,6 +19,10 @@ const log = createLogger('routes:tool-domains')
  * A domain in use by a custom tool cannot be deleted (TOOL_DOMAIN_IN_USE).
  */
 export const toolDomainRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Reads stay member-accessible (pickers, list views); mutations are platform
+// configuration and admin-only.
+toolDomainRoutes.use('*', (c, next) => (c.req.method === 'GET' ? next() : requireAdmin(c, next)))
 
 function mapDomainError(code: string): { status: 400 | 404 | 409; message: string } {
   switch (code) {

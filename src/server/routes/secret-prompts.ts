@@ -1,8 +1,12 @@
 import { Hono } from 'hono'
 import { respondToSecretPrompt, cancelSecretPrompt, getPendingSecretPrompts } from '@/server/services/secret-prompts'
 import type { AppVariables } from '@/server/app'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 export const secretPromptRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Platform configuration: every route in this family is admin-only.
+secretPromptRoutes.use('*', requireAdmin)
 
 /**
  * POST /api/secret-prompts/:id/respond — submit the secret value(s) for a

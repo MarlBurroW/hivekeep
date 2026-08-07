@@ -9,6 +9,7 @@ import {
 } from '@/server/services/toolboxes'
 import { createLogger } from '@/server/logger'
 import type { AppVariables } from '@/server/app'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:toolboxes')
 
@@ -22,6 +23,10 @@ const log = createLogger('routes:toolboxes')
  * editing or deleting one returns 400 TOOLBOX_BUILTIN_READONLY.
  */
 export const toolboxRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Reads stay member-accessible (pickers, list views); mutations are platform
+// configuration and admin-only.
+toolboxRoutes.use('*', (c, next) => (c.req.method === 'GET' ? next() : requireAdmin(c, next)))
 
 // Map a service-layer error code to an HTTP status + human message.
 function mapToolboxError(code: string): { status: 400 | 404 | 409; message: string } {

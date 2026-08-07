@@ -4,8 +4,12 @@ import { db } from '@/server/db/index'
 import { memories } from '@/server/db/schema'
 
 import type { AppVariables } from '@/server/app'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const memoryRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Platform configuration: every route in this family is admin-only.
+memoryRoutes.use('*', requireAdmin)
 
 // GET /api/memories — list all memories across all Agents
 memoryRoutes.get('/', async (c) => {

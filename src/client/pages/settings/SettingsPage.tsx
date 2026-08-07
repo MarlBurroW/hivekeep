@@ -1,5 +1,6 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, useMemo, createContext, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/client/hooks/useAuth'
 import {
   Dialog,
   DialogContent,
@@ -142,6 +143,10 @@ const sectionGroups: SectionGroup[] = [
 
 const allSections = sectionGroups.flatMap((g) => g.items)
 
+// Sections a member (non-admin) can use. Everything else is platform
+// configuration whose routes reject non-admins, so the nav hides it.
+const MEMBER_SECTIONS = new Set<SectionId>(['general', 'files', 'contacts', 'notifications'])
+
 type SectionId = string
 
 /** Lets any settings sub-section navigate to another (e.g. the Plugins
@@ -280,14 +285,34 @@ function SettingsFooter() {
 
 export function SettingsModal({ open, onOpenChange, initialSection, initialFilters }: SettingsModalProps) {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [activeSection, setActiveSection] = useState<SectionId>('general')
+
+  const visibleGroups = useMemo(
+    () =>
+      isAdmin
+        ? sectionGroups
+        : sectionGroups
+            .map((g) => ({ ...g, items: g.items.filter((s) => MEMBER_SECTIONS.has(s.id)) }))
+            .filter((g) => g.items.length > 0),
+    [isAdmin],
+  )
+  const visibleSections = useMemo(() => visibleGroups.flatMap((g) => g.items), [visibleGroups])
 
   // Navigate to requested section when modal opens
   useEffect(() => {
-    if (open && initialSection && allSections.some((s) => s.id === initialSection)) {
+    if (open && initialSection && visibleSections.some((s) => s.id === initialSection)) {
       setActiveSection(initialSection as SectionId)
     }
-  }, [open, initialSection])
+  }, [open, initialSection, visibleSections])
+
+  // A member can never be left on a hidden section (e.g. after a role change).
+  useEffect(() => {
+    if (!visibleSections.some((s) => s.id === activeSection)) {
+      setActiveSection('general')
+    }
+  }, [visibleSections, activeSection])
 
   const ActiveComponent = sectionComponents[activeSection]
 
@@ -327,7 +352,7 @@ export function SettingsModal({ open, onOpenChange, initialSection, initialFilte
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {sectionGroups.map((group) => (
+                {visibleGroups.map((group) => (
                   <div key={group.groupKey}>
                     <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                       {t(group.groupKey)}
@@ -348,7 +373,7 @@ export function SettingsModal({ open, onOpenChange, initialSection, initialFilte
 
           {/* Desktop settings sidebar */}
           <nav className="hidden md:block w-56 shrink-0 border-r surface-sidebar overflow-y-auto py-4 px-3">
-            {sectionGroups.map((group, gi) => (
+            {visibleGroups.map((group, gi) => (
               <div key={group.groupKey} className={gi > 0 ? 'mt-4' : ''}>
                 <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                   {t(group.groupKey)}

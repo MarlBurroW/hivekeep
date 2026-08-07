@@ -29,10 +29,15 @@ import { refreshAllProviderModels } from '@/server/services/model-info-cache'
 import { refreshModelsDevSnapshot } from '@/server/services/models-dev-snapshot'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:models')
 
 export const modelRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Reads stay member-accessible (pickers, list views); mutations are platform
+// configuration and admin-only.
+modelRoutes.use('*', (c, next) => (c.req.method === 'GET' ? next() : requireAdmin(c, next)))
 
 type Row = typeof modelRegistry.$inferSelect
 

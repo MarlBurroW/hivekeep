@@ -22,6 +22,7 @@ import type { CustomToolTranslations } from '@/shared/types'
 import { createLogger } from '@/server/logger'
 import { sseManager } from '@/server/sse/index'
 import type { AppVariables } from '@/server/app'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:custom-tools')
 
@@ -31,6 +32,9 @@ const log = createLogger('routes:custom-tools')
  * The on-disk script + deps live under config.customTools.baseDir/<slug>/.
  */
 export const customToolRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Platform configuration: every route in this family is admin-only.
+customToolRoutes.use('*', requireAdmin)
 
 function fail(c: any, err: unknown, status: 400 | 404 = 400) {
   const message = err instanceof Error ? err.message : 'Unknown error'

@@ -15,9 +15,13 @@ import {
 } from '@/server/services/connected-accounts'
 import { sseManager } from '@/server/sse/index'
 import type { ConfigField, ProviderConfig } from '@hivekeep/sdk'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:connected-accounts')
 const connectedAccountRoutes = new Hono()
+
+// Platform configuration: every route in this family is admin-only.
+connectedAccountRoutes.use('*', requireAdmin)
 
 interface ConfigProviderLike {
   configSchema: readonly ConfigField[]

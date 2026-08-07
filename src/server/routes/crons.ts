@@ -14,10 +14,15 @@ import {
 } from '@/server/services/crons'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:crons')
 
 export const cronRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Reads stay member-accessible (pickers, list views); mutations are platform
+// configuration and admin-only.
+cronRoutes.use('*', (c, next) => (c.req.method === 'GET' ? next() : requireAdmin(c, next)))
 
 function agentAvatarUrl(agentId: string, avatarPath: string | null): string | null {
   if (!avatarPath) return null

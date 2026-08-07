@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test'
+import { Hono } from 'hono'
 import { fullMockSchema, fullMockDrizzleOrm } from '../../test-helpers'
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ mock.module('@/server/services/channels', () => ({
   countPendingApprovals: mock(() => Promise.resolve(0)),
   countPendingApprovalsForChannel: mock(() => Promise.resolve(0)),
   handleIncomingChannelMessage: mock(() => Promise.resolve()),
+  applyChannelDeliveryStatusUpdate: mock(() => Promise.resolve()),
   transferChannel: mockTransferChannel,
   // Pure in-memory shims for other test files
   setChannelQueueMeta: () => undefined,
@@ -67,12 +69,14 @@ mock.module('@/server/services/agent-resolver', () => ({
   resolveAgentByIdOrSlug: mock(() => null),
 }))
 
-// Minimal DB chain. Agent lookup after a successful transfer reads (name, avatarPath).
+// Minimal DB chain. Agent lookup after a successful transfer reads
+// (name, avatarPath); the requireAdmin guard reads (role). One superset
+// object serves both queries.
 const dbChain: any = {
   select: mock(() => dbChain),
   from: mock(() => dbChain),
   where: mock(() => dbChain),
-  get: mock(() => ({ name: 'Kube Master', avatarPath: null })),
+  get: mock(() => ({ role: 'admin', name: 'Kube Master', avatarPath: null })),
 }
 
 mock.module('@/server/db/index', () => ({ db: dbChain }))
@@ -128,6 +132,16 @@ try {
 
 const itMocked = _mocksWorking ? it : it.skip
 
+// Channel mutations sit behind requireAdmin, which reads c.get('user') plus
+// the profile role from the db chain above. Mount the routes behind a stub
+// session so the guard sees an authenticated admin.
+const app = new Hono()
+app.use('*', (c, next) => {
+  c.set('user' as never, { id: 'user-1' } as never)
+  return next()
+})
+if (channelRoutes) app.route('/', channelRoutes)
+
 beforeEach(() => {
   mockGetChannel.mockReset()
   mockUpdateChannel.mockReset()
@@ -145,19 +159,39 @@ beforeEach(() => {
     toAgentId: 'agent-target',
     toAgentName: 'Kube Master',
   })
-  // Reset DB chain default to the successful-Agent-lookup return.
+  // Reset DB chain default to the successful-Agent-lookup return (superset
+  // carrying the role field requireAdmin reads).
   dbChain.get.mockReset()
-  dbChain.get.mockImplementation(() => ({ name: 'Kube Master', avatarPath: null }))
+  dbChain.get.mockImplementation(() => ({ role: 'admin', name: 'Kube Master', avatarPath: null }))
 })
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('channelRoutes', () => {
+  describe('admin guard', () => {
+    itMocked('rejects channel mutations from non-admin users with 403', async () => {
+      dbChain.get.mockImplementation(() => ({ role: 'member' }))
+
+      const resp = await app.fetch(
+        new Request('http://localhost/ch-1', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'New name' }),
+        }),
+      )
+
+      expect(resp.status).toBe(403)
+      const body = await resp.json()
+      expect(body.error.code).toBe('FORBIDDEN')
+      expect(mockUpdateChannel).not.toHaveBeenCalled()
+    })
+  })
+
   describe('PATCH /:id', () => {
     itMocked('rejects a agentId mutation with 400 KINID_NOT_PATCHABLE', async () => {
       mockGetChannel.mockResolvedValue({ id: 'ch-1', name: 'Test', agentId: 'agent-source' })
 
-      const resp = await channelRoutes.fetch(
+      const resp = await app.fetch(
         new Request('http://localhost/ch-1', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -192,7 +226,7 @@ describe('channelRoutes', () => {
         createdAt: new Date(0),
       })
 
-      const resp = await channelRoutes.fetch(
+      const resp = await app.fetch(
         new Request('http://localhost/ch-1', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -227,7 +261,7 @@ describe('channelRoutes', () => {
         createdAt: new Date(0),
       })
 
-      const resp = await channelRoutes.fetch(
+      const resp = await app.fetch(
         new Request('http://localhost/ch-1', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -262,7 +296,7 @@ describe('channelRoutes', () => {
         })
       mockResolveAgentId.mockReturnValue('agent-target')
 
-      const resp = await channelRoutes.fetch(
+      const resp = await app.fetch(
         new Request('http://localhost/ch-1/transfer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -288,7 +322,7 @@ describe('channelRoutes', () => {
     itMocked('returns 400 when neither targetAgentId nor targetAgentSlug is provided', async () => {
       mockGetChannel.mockResolvedValueOnce({ id: 'ch-1', name: 'Test', agentId: 'agent-source' })
 
-      const resp = await channelRoutes.fetch(
+      const resp = await app.fetch(
         new Request('http://localhost/ch-1/transfer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -306,7 +340,7 @@ describe('channelRoutes', () => {
       mockGetChannel.mockResolvedValueOnce({ id: 'ch-1', name: 'Test', agentId: 'agent-source' })
       mockResolveAgentId.mockReturnValue(null)
 
-      const resp = await channelRoutes.fetch(
+      const resp = await app.fetch(
         new Request('http://localhost/ch-1/transfer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -329,7 +363,7 @@ describe('channelRoutes', () => {
         message: 'Channel is already bound to this Agent.',
       })
 
-      const resp = await channelRoutes.fetch(
+      const resp = await app.fetch(
         new Request('http://localhost/ch-1/transfer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -42,9 +42,19 @@ import { createLogger } from '@/server/logger'
 import { recordUsage } from '@/server/services/token-usage'
 import { getLastContextUsage, compactingAgents, resolveThinkingConfig } from '@/server/services/agent-engine'
 import { getModelContextWindow } from '@/shared/model-context-windows'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:agents')
 const agentRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Agent CRUD and maintenance are platform configuration (admin-only).
+// Members keep conversational usage: all reads, sending messages/reactions
+// (separate routers), launching standalone tasks, and marking read.
+agentRoutes.use('*', (c, next) => {
+  if (c.req.method === 'GET') return next()
+  if (/^\/api\/agents\/[^/]+\/(tasks|mark-read)$/.test(c.req.path)) return next()
+  return requireAdmin(c, next)
+})
 
 /**
  * Parse the stored `agents.toolbox_ids` JSON column into a clean array (or null

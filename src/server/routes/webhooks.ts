@@ -20,10 +20,14 @@ import { webhookLogs } from '@/server/db/schema'
 import { desc } from 'drizzle-orm'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:webhooks')
 
 export const webhookRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Platform configuration: every route in this family is admin-only.
+webhookRoutes.use('*', requireAdmin)
 
 function agentAvatarUrl(agentId: string, avatarPath: string | null): string | null {
   if (!avatarPath) return null

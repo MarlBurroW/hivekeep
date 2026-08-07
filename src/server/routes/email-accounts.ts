@@ -24,9 +24,13 @@ import {
   type SendMode,
 } from '@/server/services/email-accounts'
 import { sseManager } from '@/server/sse/index'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:email-accounts')
 const emailAccountRoutes = new Hono()
+
+// Platform configuration: every route in this family is admin-only.
+emailAccountRoutes.use('*', requireAdmin)
 
 // Short-lived CSRF/state store for in-flight OAuth connects (in-memory).
 const pendingStates = new Map<string, { type: string; capabilities: string[]; createdAt: number }>()

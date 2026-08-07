@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/client/components/ui/alert-dialog'
 import { Input } from '@/client/components/ui/input'
-import { UserPlus, Copy, Trash2, Clock, CheckCircle2, XCircle, Users } from 'lucide-react'
+import { UserPlus, Copy, Trash2, Clock, CheckCircle2, XCircle, Users, ShieldCheck, ShieldOff } from 'lucide-react'
 import { FormDialog } from '@/client/components/common/FormDialog'
 import { FormField } from '@/client/components/common/FormField'
 import { EmptyState } from '@/client/components/common/EmptyState'
@@ -34,6 +34,7 @@ export function UsersSettings() {
   const [users, setUsers] = useState<UserSummary[]>([])
   const [invitations, setInvitations] = useState<InvitationSummary[]>([])
   const [deletingUser, setDeletingUser] = useState<UserSummary | null>(null)
+  const [changingRole, setChangingRole] = useState<{ user: UserSummary; to: 'admin' | 'member' } | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLabel, setInviteLabel] = useState('')
   const [inviteExpiry, setInviteExpiry] = useState(7)
@@ -75,6 +76,19 @@ export function UsersSettings() {
       toastError(err)
     } finally {
       setDeletingUser(null)
+    }
+  }
+
+  const handleChangeRole = async () => {
+    if (!changingRole) return
+    try {
+      await api.patch(`/users/${changingRole.user.id}/role`, { role: changingRole.to })
+      await fetchUsers()
+      toast.success(t('settings.users.roleUpdated'))
+    } catch (err: unknown) {
+      toastError(err)
+    } finally {
+      setChangingRole(null)
     }
   }
 
@@ -203,9 +217,26 @@ export function UsersSettings() {
                   )}
                 </div>
               </div>
+              {u.role === 'admin' && (
+                <Badge variant="default" size="xs">
+                  <ShieldCheck className="size-3 mr-0.5" />
+                  {t('settings.users.roleAdmin')}
+                </Badge>
+              )}
  <Badge variant="secondary" size="xs" className="uppercase">
                 {u.language}
               </Badge>
+              {!isSelf && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground"
+                  title={u.role === 'admin' ? t('settings.users.demote') : t('settings.users.promote')}
+                  onClick={() => setChangingRole({ user: u, to: u.role === 'admin' ? 'member' : 'admin' })}
+                >
+                  {u.role === 'admin' ? <ShieldOff className="size-4" /> : <ShieldCheck className="size-4" />}
+                </Button>
+              )}
               {!isSelf && (
                 <Button
                   variant="ghost"
@@ -360,6 +391,28 @@ export function UsersSettings() {
           </div>
         )}
       </FormDialog>
+
+      {/* Role change confirmation */}
+      <AlertDialog open={!!changingRole} onOpenChange={(v) => { if (!v) setChangingRole(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {changingRole?.to === 'admin' ? t('settings.users.promote') : t('settings.users.demote')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {changingRole?.to === 'admin'
+                ? t('settings.users.promoteConfirm', { name: changingRole?.user.firstName })
+                : t('settings.users.demoteConfirm', { name: changingRole?.user.firstName })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleChangeRole}>
+              {t('common.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete user confirmation */}
       <AlertDialog open={!!deletingUser} onOpenChange={(v) => { if (!v) setDeletingUser(null) }}>
