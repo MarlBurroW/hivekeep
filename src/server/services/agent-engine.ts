@@ -233,6 +233,10 @@ export interface ActiveAgentStreamSnapshot {
   agentId: string
   messageId: string
   content: string
+  /** In-flight provisional text of the current step, mirrored delta-by-delta
+   *  by the stream runner. Served appended to `content` for mid-stream
+   *  rehydration; cleared when the step commits or retracts. */
+  provisional: string
   reasoning: ReasoningSegment[]
   toolCalls: Array<{ id: string; name: string; args: unknown; result?: unknown; offset: number }>
   /** Running sum of output tokens reported so far this turn (one increment per
@@ -1546,6 +1550,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         agentId,
         messageId: mockAssistantId,
         content: '',
+        provisional: '',
         reasoning: [],
         toolCalls: [],
         outputTokens: 0,
@@ -1565,7 +1570,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         sseManager.sendToAgent(agentId, {
           type: 'chat:token',
           agentId,
-          data: { agentId, messageId: mockAssistantId, token: piece },
+          data: { agentId, messageId: mockAssistantId, token: piece, contentLength: mockAccum.length },
         })
         await new Promise((r) => setTimeout(r, mockDelay))
       }
@@ -1706,6 +1711,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       agentId,
       messageId: assistantMessageId,
       content: '',
+      provisional: '',
       reasoning: reasoningSegments,
       toolCalls: toolCallsLog,
       outputTokens: 0,
@@ -1761,9 +1767,9 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         resolved.config,
       )
 
-      // Buffer text per step until finishReason is known — see stream-runner.ts.
-      // Intermediate steps (with tool_use) drop their text; final pure-text
-      // steps flush it. Tool-call / reasoning events are forwarded immediately.
+      // Text streams live as provisional tokens (see stream-runner.ts).
+      // Intermediate steps (with tool_use) retract their text; final pure-text
+      // steps commit it. Tool-call / reasoning events are forwarded immediately.
       const outcome = await runStreamStep(stream, {
         agentId,
         assistantMessageId,
@@ -1993,7 +1999,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         data: {
           messageId: assistantMessageId,
           token: fullContent,
-          isFirst: true,
+          contentLength: fullContent.length,
         },
       })
     }
@@ -2013,7 +2019,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         data: {
           messageId: assistantMessageId,
           token: fullContent,
-          isFirst: true,
+          contentLength: fullContent.length,
         },
       })
     }
@@ -2043,7 +2049,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         data: {
           messageId: assistantMessageId,
           token: fullContent,
-          isFirst: true,
+          contentLength: fullContent.length,
         },
       })
     }
@@ -2696,7 +2702,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
         qsResolved.config,
       )
 
-      // Buffer text per step until finishReason is known — see stream-runner.ts.
+      // Text streams live as provisional tokens (see stream-runner.ts).
       // Quick session has no mid-stream rehydration snapshot (no client-side
       // remount support) and no first-token attribution payload — those are
       // the only differences from the main Agent path.
@@ -2848,7 +2854,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       sseManager.sendToAgent(agentId, {
         type: 'chat:token',
         agentId,
-        data: { messageId: assistantMessageId, token: fullContent, sessionId },
+        data: { messageId: assistantMessageId, token: fullContent, contentLength: fullContent.length, sessionId },
       })
     }
 
@@ -2881,7 +2887,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       sseManager.sendToAgent(agentId, {
         type: 'chat:token',
         agentId,
-        data: { messageId: assistantMessageId, token: fullContent, sessionId },
+        data: { messageId: assistantMessageId, token: fullContent, contentLength: fullContent.length, sessionId },
       })
     }
 

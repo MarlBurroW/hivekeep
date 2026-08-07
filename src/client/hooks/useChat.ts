@@ -158,7 +158,7 @@ export function useChat(agentId: string | null) {
 
   const {
     streamingMessage, isStreaming, tokenStalled, streamingReasoning, streamingOutputTokens,
-    handleToken, handleReasoningToken, handleTokenUsage, handleDone, seedStreaming, resetStreaming, cleanup,
+    handleToken, handleTokenRetract, handleReasoningToken, handleTokenUsage, handleDone, seedStreaming, resetStreaming, cleanup,
   } = useChatStreaming({ trackTokenStall: true })
 
   // Map task title → taskId, populated from SSE events so we can enrich
@@ -400,8 +400,20 @@ export function useChat(agentId: string | null) {
       handleToken({
         messageId: data.messageId as string,
         token: data.token as string,
+        contentLength: typeof data.contentLength === 'number' ? data.contentLength : undefined,
         sourceName: (data.sourceName as string) ?? null,
         sourceAvatarUrl: (data.sourceAvatarUrl as string) ?? null,
+      })
+    },
+
+    'chat:token-retract': (data) => {
+      if (data.agentId !== agentId) return
+      if (data.taskId) return
+      if (data.sessionId) return
+
+      handleTokenRetract({
+        messageId: data.messageId as string,
+        contentLength: data.contentLength as number,
       })
     },
 

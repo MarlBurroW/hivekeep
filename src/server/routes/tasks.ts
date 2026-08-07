@@ -169,7 +169,7 @@ taskRoutes.get('/:id', async (c) => {
       return {
         id: m.id,
         role: m.role,
-        content: isStreaming ? snapshot.content : m.content,
+        content: isStreaming ? snapshot.content + snapshot.provisional : m.content,
         sourceType: m.sourceType,
         sourceId: m.sourceId,
         isRedacted: m.isRedacted,

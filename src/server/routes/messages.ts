@@ -292,7 +292,11 @@ messageRoutes.get('/', async (c) => {
   const streamingMessage = streamSnapshot
     ? {
         messageId: streamSnapshot.messageId,
-        content: streamSnapshot.content,
+        // Committed + provisional: keeps the seeded bubble aligned with the
+        // `contentLength` values on live `chat:token` events (exact dedup). A
+        // later `chat:token-retract` truncates the provisional part if the
+        // step turns out to be an intermediate tool-call step.
+        content: streamSnapshot.content + streamSnapshot.provisional,
         reasoning: streamSnapshot.reasoning.length > 0 ? streamSnapshot.reasoning : null,
         toolCalls: streamSnapshot.toolCalls.length > 0 ? streamSnapshot.toolCalls : null,
         outputTokens: streamSnapshot.outputTokens,

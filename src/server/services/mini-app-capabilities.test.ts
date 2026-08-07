@@ -25,7 +25,7 @@ const SUBSCRIBABLE_EVENT_PREFIXES = new Set([
   'memory', 'trigger', 'webhook', 'workspace', 'miniapp', 'agent',
 ])
 const EVENT_TYPE_DENYLIST = new Set([
-  'chat:token', 'chat:reasoning-token', 'chat:reasoning-done', 'chat:tool-call-start',
+  'chat:token', 'chat:token-retract', 'chat:reasoning-token', 'chat:tool-call-start',
   'chat:tool-call', 'chat:tool-result', 'chat:token-usage', 'task:token-usage',
   'task:todos', 'queue:update', 'agent:read',
 ])

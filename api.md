@@ -1806,8 +1806,18 @@ Returns `201 { "ok": true }`. Errors: `503 FEEDBACK_DISABLED` (feature off), `50
 #### Event types
 
 ```typescript
-// Streaming LLM tokens
-{ event: 'chat:token', data: { agentId: string, token: string } }
+// Streaming LLM text, one event per provider delta. `contentLength` is the
+// total streamed length (committed + provisional) AFTER appending `token`;
+// clients use it to skip tokens already covered by a rehydration snapshot.
+// Text streamed during a step that ends in tool calls is PROVISIONAL
+// (pre-narration) and is followed by a `chat:token-retract`. The first delta
+// of a message also carries attribution fields (sourceName, sourceAvatarUrl…).
+{ event: 'chat:token', data: { agentId: string, messageId: string, token: string, contentLength: number } }
+
+// The current step's streamed text turned out to be pre-narration before
+// tool calls (or the step errored/was aborted): truncate the streaming
+// bubble content back to `contentLength` characters.
+{ event: 'chat:token-retract', data: { agentId: string, messageId: string, contentLength: number } }
 
 // LLM response finished
 { event: 'chat:done', data: { agentId: string, messageId: string, tokenUsage?: { inputTokens: number, outputTokens: number, totalTokens: number } } }

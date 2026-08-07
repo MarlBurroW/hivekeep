@@ -57,8 +57,8 @@ export const MINI_APP_SUBSCRIBABLE_EVENT_PREFIXES = new Set([
 /** Event types never deliverable to a mini-app even if the prefix is allowed (noisy/internal). */
 const EVENT_TYPE_DENYLIST = new Set([
   'chat:token',
+  'chat:token-retract',
   'chat:reasoning-token',
-  'chat:reasoning-done',
   'chat:tool-call-start',
   'chat:tool-call',
   'chat:tool-result',

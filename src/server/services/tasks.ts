@@ -173,6 +173,10 @@ export function isTaskStreaming(taskId: string): boolean {
 export interface ActiveTaskStreamSnapshot {
   messageId: string
   content: string
+  /** In-flight provisional text of the current step, mirrored delta-by-delta
+   *  by the stream runner. Served appended to `content` for mid-stream
+   *  rehydration; cleared when the step commits or retracts. */
+  provisional: string
   toolCalls: Array<{ id: string; name: string; args: unknown; result?: unknown; offset: number }>
   reasoning: ReasoningSegment[]
   /** Running sum of output tokens reported so far this turn (one increment per
@@ -1293,6 +1297,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
     const streamSnapshot: ActiveTaskStreamSnapshot = {
       messageId: assistantMessageId,
       content: '',
+      provisional: '',
       toolCalls: toolCallsLog,
       reasoning: reasoningSegments,
       outputTokens: 0,
@@ -1372,10 +1377,9 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         taskResolved.config,
       )
 
-      // Buffer text per step until finishReason is known — see stream-runner.ts.
-      // The 500ms DB checkpoint that used to live inline in `text-delta` is
-      // now driven by `ctx.checkpoint` and persists only *committed* content
-      // (the in-flight buffer is never written to DB).
+      // Text streams live as provisional tokens (see stream-runner.ts).
+      // The 500ms DB checkpoint is driven by `ctx.checkpoint` and persists
+      // only *committed* content (provisional text is never written to DB).
       const outcome = await runStreamStep(stream, {
         agentId: task.parentAgentId,
         assistantMessageId,

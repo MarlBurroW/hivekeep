@@ -1,12 +1,12 @@
 export type SSEEventType =
   | 'chat:token'
+  | 'chat:token-retract'
   | 'chat:done'
   | 'chat:message'
   | 'chat:tool-call-start'
   | 'chat:tool-call'
   | 'chat:tool-result'
   | 'chat:reasoning-token'
-  | 'chat:reasoning-done'
   | 'chat:token-usage'
   | 'chat:cleared'
   | 'chat:messages-deleted'

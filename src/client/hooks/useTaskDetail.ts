@@ -311,6 +311,24 @@ export function useTaskDetail(taskId: string | null) {
     }
   }
 
+  function handleTokenRetract(data: Record<string, unknown>) {
+    const messageId = data.messageId as string
+    const contentLength = data.contentLength as number
+    if (streamingMessageIdRef.current !== messageId) return
+    if (contentLength >= streamingContentRef.current.length) return
+    // The step's provisional text turned out to be pre-narration before tool
+    // calls: truncate back to committed length and flush immediately so a
+    // pending batch can't resurrect it.
+    streamingContentRef.current = streamingContentRef.current.slice(0, contentLength)
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current)
+      batchTimerRef.current = null
+    }
+    setStreamingMessage((prev) =>
+      prev ? { ...prev, content: streamingContentRef.current } : prev,
+    )
+  }
+
   function handleToolCall(data: Record<string, unknown>) {
     const messageId = data.messageId as string
     if (!streamingMessageIdRef.current) seedStreaming(messageId)
@@ -402,6 +420,7 @@ export function useTaskDetail(taskId: string | null) {
       switch (type) {
         case 'chat:tool-call-start': handleToolCallStart(data); break
         case 'chat:token': handleToken(data); break
+        case 'chat:token-retract': handleTokenRetract(data); break
         case 'chat:reasoning-token': handleReasoningToken(data); break
         case 'chat:tool-call': handleToolCall(data); break
         case 'chat:tool-result': handleToolResult(data); break
@@ -561,6 +580,12 @@ export function useTaskDetail(taskId: string | null) {
       if (data.taskId !== taskId) return
       if (!readyRef.current) { pendingEventsRef.current.push({ type: 'chat:token', data }); return }
       handleToken(data)
+    },
+
+    'chat:token-retract': (data) => {
+      if (data.taskId !== taskId) return
+      if (!readyRef.current) { pendingEventsRef.current.push({ type: 'chat:token-retract', data }); return }
+      handleTokenRetract(data)
     },
 
     'chat:reasoning-token': (data) => {

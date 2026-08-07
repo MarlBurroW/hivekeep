@@ -1,21 +1,27 @@
 /**
- * Per-step consumer for a hivekeep `LLMProvider.chat()` stream that buffers
- * text-delta chunks server-side until the model's `finishReason` is known,
- * so pre-narration written before tool_use blocks in the same step never
- * reaches the client or the database.
+ * Per-step consumer for a hivekeep `LLMProvider.chat()` stream. Text deltas
+ * are streamed to clients live as PROVISIONAL content and only COMMITTED
+ * (persisted, accumulated) once the step's `finishReason` proves the step was
+ * a pure-text final answer.
  *
  * Background: Opus 4.7 occasionally emits a long fabricated narrative in
  * text blocks BEFORE the tool_use blocks of the same response. On Anthropic
  * the protocol guarantees `stop_reason: tool_use` arrives after the last
- * tool_use, so the suspect text always precedes the commit signal. Buffering
- * the text and inspecting `finishReason` post-stream is sufficient:
+ * tool_use, so the suspect text always precedes the commit signal. The step
+ * classification post-stream decides what happens to the streamed text:
  *
- *   - `finishReason === 'stop'` with no tool_use → pure-text final answer
- *     → flush the buffer to SSE + caller's content accumulator.
- *   - `finishReason === 'tool-calls'` (or any step with tool_use) → step is
- *     intermediate; the text is unverified pre-narration → drop it. The
- *     `tool-use` chunks themselves are forwarded immediately (committed
- *     actions) so the UI still renders cards in real time.
+ *   - `finishReason === 'stop'`/`'length'` with no tool_use → pure-text final
+ *     answer → the already-streamed deltas become committed content (caller's
+ *     accumulator + snapshot). No duplicate flush event is emitted.
+ *   - any step with tool_use (or error/abort/stall) → the streamed text was
+ *     unverified pre-narration → emit `chat:token-retract` so clients truncate
+ *     their streaming bubble back to the committed length, and never persist
+ *     it. The `tool-use` chunks themselves are forwarded immediately
+ *     (committed actions) so the UI still renders cards in real time.
+ *
+ * Wire contract: every `chat:token` carries `contentLength` = committed length
+ * + provisional length AFTER appending its token, so clients can dedup against
+ * a rehydration snapshot (which includes provisional text) exactly.
  *
  * Thinking deltas are passed through unchanged: they are drafty by design,
  * client UIs treat them as thinking.
@@ -141,11 +147,14 @@ export interface StreamStepContext {
   firstTokenAttribution?: StreamStepAttribution
   /** Mutated in place when a thinking block ends (one entry per segment). */
   reasoningSegments?: ReasoningSegment[]
-  /** Live snapshot whose `.content` field is updated on each committed text
-   *  flush. The in-flight buffer is NEVER written here. `outputTokens` holds
-   *  the real provider-reported total from completed prior steps — used as the
-   *  base for the live token estimate emitted during the current step. */
-  contentSnapshot?: { content: string; outputTokens?: number }
+  /** Live snapshot: `.content` holds committed text (updated when a step's
+   *  buffer commits), `.provisional` mirrors the current step's in-flight
+   *  buffer delta-by-delta so mid-stream rehydration can serve
+   *  `content + provisional` and stay aligned with the `contentLength` values
+   *  on the wire. `outputTokens` holds the real provider-reported total from
+   *  completed prior steps, used as the base for the live token estimate
+   *  emitted during the current step. */
+  contentSnapshot?: { content: string; provisional?: string; outputTokens?: number }
   /** Optional periodic persistence (sub-Agent only). Fires every `intervalMs`
    *  while the step runs. */
   checkpoint?: { intervalMs: number; persist: () => void | Promise<void> }
@@ -265,6 +274,19 @@ export async function runStreamStep(
     })
   }
 
+  /** Drop this step's provisional text: clear the snapshot mirror and, if any
+   *  deltas already reached clients, tell them to truncate their streaming
+   *  bubble back to the committed length. Called on every non-commit exit
+   *  (tool-call step, error, abort, stall). */
+  const retractProvisional = () => {
+    if (ctx.contentSnapshot) ctx.contentSnapshot.provisional = ''
+    if (buffered.length === 0) return
+    send('chat:token-retract', {
+      messageId: ctx.assistantMessageId,
+      contentLength: prevContentLen,
+    })
+  }
+
   /** Close out an open reasoning block: push the segment. (No SSE event — the
    *  client finalizes reasoning from chat:done/refetch; there was no handler.) */
   const closeReasoning = () => {
@@ -289,12 +311,12 @@ export async function runStreamStep(
   }
 
   // Emit a smoothly-rising output-token estimate while the step generates so
-  // the thinking-bubble counter increments live. Text deltas are buffered here
-  // (never streamed), and reasoning only streams in thinking mode, so the
-  // client can't estimate on its own — only the server sees the in-flight
-  // content. The real per-step usage from each `finish` chunk reconciles the
-  // count upward; the client keeps the running max, so a slight under-estimate
-  // (≈4 chars/token) self-corrects and the counter never visibly ticks back.
+  // the thinking-bubble counter increments live. The estimate covers text AND
+  // reasoning in one place (clients would each have to re-implement the same
+  // chars-per-token heuristic over two streams). The real per-step usage from
+  // each `finish` chunk reconciles the count upward; the client keeps the
+  // running max, so a slight under-estimate (≈4 chars/token) self-corrects and
+  // the counter never visibly ticks back.
   const baseOutputTokens = ctx.contentSnapshot?.outputTokens ?? 0
   const usageEstimateTimer = setInterval(() => {
     const estCurrentStep = Math.ceil((buffered.length + currentReasoning.length) / 4)
@@ -339,9 +361,23 @@ export async function runStreamStep(
         case 'text-delta': {
           // Any reasoning block in flight ends when text starts.
           closeReasoning()
-          // BUFFER ONLY — no SSE emission, no mutation of contentSnapshot.
-          // The decision to flush or drop happens at step finish.
+          const isFirstDelta = buffered.length === 0
           buffered += chunk.text
+          // Mirror the in-flight buffer into the snapshot so a client mounting
+          // mid-step rehydrates the provisional text too (committed content is
+          // only written at the commit decision below).
+          if (ctx.contentSnapshot) ctx.contentSnapshot.provisional = buffered
+          // Stream the delta live as provisional content. If the step turns
+          // out to be an intermediate tool-call step, `retractProvisional`
+          // tells clients to truncate back to `prevContentLen`.
+          send('chat:token', {
+            messageId: ctx.assistantMessageId,
+            token: chunk.text,
+            contentLength: prevContentLen + buffered.length,
+            ...(prevContentLen === 0 && isFirstDelta && ctx.firstTokenAttribution
+              ? ctx.firstTokenAttribution
+              : {}),
+          })
           break
         }
         case 'tool-use': {
@@ -388,6 +424,7 @@ export async function runStreamStep(
     // purpose, so `signal.aborted` is set — but this is a provider failure, not
     // a user stop, and must surface as an error the caller reports.
     if (stalled) {
+      retractProvisional()
       if (buffered.length > 0) ctx.onDroppedText?.(buffered, stepIndex)
       return {
         stepText: '',
@@ -400,6 +437,7 @@ export async function runStreamStep(
       }
     }
     if (ctx.abortController.signal.aborted) {
+      retractProvisional()
       if (buffered.length > 0) ctx.onDroppedText?.(buffered, stepIndex)
       return {
         stepText: '',
@@ -412,6 +450,7 @@ export async function runStreamStep(
       }
     }
     error = e instanceof Error ? e : new Error(String(e))
+    retractProvisional()
     if (buffered.length > 0) ctx.onDroppedText?.(buffered, stepIndex)
     return {
       stepText: '',
@@ -437,16 +476,13 @@ export async function runStreamStep(
     stepToolCalls.length === 0
 
   if (isPureTextFinal && buffered.length > 0) {
+    // The deltas already reached clients live: committing is a local
+    // bookkeeping move (snapshot + caller accumulator), no flush event.
     const newLen = prevContentLen + buffered.length
-    if (ctx.contentSnapshot) ctx.contentSnapshot.content += buffered
-    send('chat:token', {
-      messageId: ctx.assistantMessageId,
-      token: buffered,
-      contentLength: newLen,
-      ...(prevContentLen === 0 && ctx.firstTokenAttribution
-        ? ctx.firstTokenAttribution
-        : {}),
-    })
+    if (ctx.contentSnapshot) {
+      ctx.contentSnapshot.content += buffered
+      ctx.contentSnapshot.provisional = ''
+    }
     ctx.onCommittedText?.(buffered, newLen)
     return {
       stepText: buffered,
@@ -460,7 +496,8 @@ export async function runStreamStep(
   }
 
   // Intermediate step (or pure-text step that emitted no text at all): drop
-  // any buffered content.
+  // any buffered content and tell clients to truncate their bubble.
+  retractProvisional()
   if (buffered.length > 0) ctx.onDroppedText?.(buffered, stepIndex)
   return {
     stepText: '',

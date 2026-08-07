@@ -8,8 +8,18 @@ const TOKEN_STALL_MS = 1500
 export interface StreamingTokenData {
   messageId: string
   token: string
+  /** Total content length (committed + provisional) AFTER this token, as
+   *  computed by the server. Used to skip tokens already covered by a
+   *  rehydration snapshot. Absent on some synthetic fallback events. */
+  contentLength?: number
   sourceName?: string | null
   sourceAvatarUrl?: string | null
+}
+
+export interface StreamingTokenRetractData {
+  messageId: string
+  /** Committed length to truncate the streaming content back to. */
+  contentLength: number
 }
 
 export interface StreamingReasoningTokenData {
@@ -81,7 +91,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
    * Call this from the `chat:token` SSE handler after your own filtering.
    */
   const handleToken = useCallback((data: StreamingTokenData) => {
-    const { messageId, token, sourceName, sourceAvatarUrl } = data
+    const { messageId, token, contentLength, sourceName, sourceAvatarUrl } = data
 
     // Reset token stall timer
     if (trackTokenStall) {
@@ -90,8 +100,15 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
       tokenStallTimerRef.current = setTimeout(() => setTokenStalled(true), TOKEN_STALL_MS)
     }
 
-    if (!streamingMessageIdRef.current) {
-      // First token — create the streaming message
+    if (!streamingMessageIdRef.current || streamingMessageIdRef.current !== messageId) {
+      // First token of a stream, or a NEW messageId while an old one was
+      // still tracked (chat:done was missed, e.g. during a reconnect gap):
+      // start fresh instead of appending a new turn onto a stale bubble.
+      if (streamingMessageIdRef.current && streamingMessageIdRef.current !== messageId) {
+        streamingReasoningRef.current = ''
+        setStreamingReasoning('')
+        setStreamingOutputTokens(0)
+      }
       streamingMessageIdRef.current = messageId
       streamingContentRef.current = token
       setIsStreaming(true)
@@ -121,6 +138,14 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         createdAt: new Date().toISOString(),
       })
     } else {
+      // Skip tokens the local content already covers: the server tags each
+      // token with the total length AFTER appending, and the rehydration
+      // snapshot is always at a token boundary, so this comparison is exact.
+      // Guards the race where a mid-stream mount seeds the snapshot AND the
+      // same tokens arrive live over SSE (they used to double-append).
+      if (contentLength !== undefined && contentLength <= streamingContentRef.current.length) {
+        return
+      }
       // Accumulate token, batch UI updates
       streamingContentRef.current += token
 
@@ -136,14 +161,43 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
   }, [trackTokenStall])
 
   /**
+   * Handle a `chat:token-retract` SSE event: the text streamed during the
+   * current step turned out to be pre-narration before tool calls: truncate
+   * the streaming bubble back to the committed length. The reasoning stream
+   * and tool cards are unaffected.
+   */
+  const handleTokenRetract = useCallback((data: StreamingTokenRetractData) => {
+    if (streamingMessageIdRef.current !== data.messageId) return
+    if (data.contentLength >= streamingContentRef.current.length) return
+    streamingContentRef.current = streamingContentRef.current.slice(0, data.contentLength)
+    // Flush immediately (and cancel any pending batch) so stale provisional
+    // text never reappears after the truncation.
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current)
+      batchTimerRef.current = null
+    }
+    setStreamingMessage((prev) =>
+      prev ? { ...prev, content: streamingContentRef.current } : prev,
+    )
+  }, [])
+
+  /**
    * Handle an incoming reasoning/thinking token from SSE.
    */
   const handleReasoningToken = useCallback((data: StreamingReasoningTokenData) => {
     const { messageId } = data
 
     // If we haven't started streaming yet, initialize the streaming message
-    // (reasoning can arrive before the first text token)
-    if (!streamingMessageIdRef.current) {
+    // (reasoning can arrive before the first text token). A DIFFERENT
+    // messageId while one is still tracked means chat:done was missed:
+    // start fresh instead of appending onto the stale turn.
+    if (!streamingMessageIdRef.current || streamingMessageIdRef.current !== messageId) {
+      if (streamingMessageIdRef.current && streamingMessageIdRef.current !== messageId) {
+        streamingContentRef.current = ''
+        streamingReasoningRef.current = ''
+        setStreamingReasoning('')
+        setStreamingOutputTokens(0)
+      }
       streamingMessageIdRef.current = messageId
       setIsStreaming(true)
       setStreamingMessage({
@@ -378,6 +432,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
     streamingReasoning,
     streamingOutputTokens,
     handleToken,
+    handleTokenRetract,
     handleReasoningToken,
     handleTokenUsage,
     handleDone,
