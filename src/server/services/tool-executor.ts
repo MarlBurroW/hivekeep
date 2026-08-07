@@ -161,14 +161,22 @@ export async function executeToolBatch(opts: ExecuteToolBatchOptions): Promise<E
   // matching tool-result (prevents tool/assistant length mismatches in
   // the next LLM turn).
   for (const tc of stepToolCalls) {
-    const stored = resultMap.get(tc.id)
-    if (stored === undefined) {
-      if (!abortController.signal.aborted) continue
-      const placeholder = { error: 'Tool execution was aborted' }
+    // `has` (not a value check): a custom/MCP/plugin tool whose execute
+    // resolves to undefined DID run — treating that as "not executed" left a
+    // tool_use with no tool_result, which the provider rejects wholesale on
+    // the next step (failing the turn and losing all executed calls).
+    if (!resultMap.has(tc.id)) {
+      if (!abortController.signal.aborted) {
+        log.warn({ toolCallId: tc.id, toolName: tc.name }, 'Tool call has no stored result and no abort — filling error placeholder')
+      }
+      const placeholder = {
+        error: abortController.signal.aborted ? 'Tool execution was aborted' : 'Tool execution produced no result',
+      }
       toolCallsLog.push({ id: tc.id, name: tc.name, args: tc.args, result: placeholder, offset: tc.offset })
       toolResults.push({ type: 'tool-result', toolCallId: tc.id, toolName: tc.name, output: { type: 'json', value: placeholder as JSONValue } })
       continue
     }
+    const stored = resultMap.get(tc.id) ?? null
     toolCallsLog.push({ id: tc.id, name: tc.name, args: tc.args, result: stored, offset: tc.offset })
     toolResults.push({ type: 'tool-result', toolCallId: tc.id, toolName: tc.name, output: { type: 'json', value: stored as JSONValue } })
   }
@@ -426,7 +434,14 @@ async function boundedAll(tasks: Array<() => Promise<void>>, limit: number): Pro
   const executing = new Set<Promise<void>>()
 
   for (const task of tasks) {
-    const p = task().then(() => { executing.delete(p) })
+    // finally, not then: a task that REJECTS must also leave the set and not
+    // poison Promise.race/all for its siblings (executeSingleTool never
+    // rejects today, but one refactor away this becomes a batch-killer).
+    const p = task()
+      .catch((err) => {
+        log.error({ err }, 'Tool batch task rejected unexpectedly')
+      })
+      .finally(() => { executing.delete(p) })
     executing.add(p)
     if (executing.size >= limit) {
       await Promise.race(executing)

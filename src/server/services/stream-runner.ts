@@ -427,9 +427,12 @@ export async function runStreamStep(
     clearInterval(usageEstimateTimer)
   }
 
-  // DECISION POINT — classify the step.
+  // DECISION POINT — classify the step. 'length' (output-token limit) counts
+  // as final too: the buffered text is a legitimate, merely truncated answer.
+  // Routing it to onDroppedText threw away everything the model generated
+  // (and billed), then reported "no visible content" to the user.
   const isPureTextFinal =
-    finishReason === 'stop' &&
+    (finishReason === 'stop' || finishReason === 'length') &&
     !sawCommittedSignal &&
     stepToolCalls.length === 0
 

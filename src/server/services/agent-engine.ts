@@ -1017,10 +1017,30 @@ export async function forceResetAgent(agentId: string): Promise<ForceResetResult
   activeAbortControllers.delete(agentId)
   activeAgentStreams.delete(agentId)
 
+  // The quick/API lane has its own lock + controllers; leaving them out made
+  // the "unconditional" operator escape hatch unable to recover a wedged
+  // quick session (only a restart could).
+  const quickSessionIds = db
+    .select({ id: quickSessions.id })
+    .from(quickSessions)
+    .where(eq(quickSessions.agentId, agentId))
+    .all()
+    .map((s) => s.id)
+  let abortedQuickStreams = 0
+  for (const sid of quickSessionIds) {
+    const controller = quickAbortControllers.get(sid)
+    if (controller) {
+      controller.abort()
+      quickAbortControllers.delete(sid)
+      abortedQuickStreams++
+    }
+  }
+  const clearedQuickLock = quickLocks.delete(agentId)
+
   const requeuedItems = requeueProcessingItems(agentId)
 
   log.warn(
-    { agentId, abortedStream, clearedLock, clearedCompacting, requeuedItems },
+    { agentId, abortedStream, clearedLock, clearedCompacting, clearedQuickLock, abortedQuickStreams, requeuedItems },
     'Agent force-reset by an operator',
   )
 
@@ -1787,7 +1807,29 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         }
       }
 
-      if (outcome.error && !outcome.wasAborted) throw outcome.error
+      if (outcome.error && !outcome.wasAborted) {
+        // Persist what already executed BEFORE failing the turn: earlier
+        // steps may have run tools with real side effects (send_email, file
+        // writes, shell commands). Losing the trace meant the next turn's
+        // history had no record of them, so the model re-did them on retry.
+        if (toolCallsLog.length > 0) {
+          await db.insert(messages).values({
+            id: assistantMessageId,
+            agentId,
+            role: 'assistant',
+            content: '',
+            sourceType: 'agent',
+            sourceId: agentId,
+            toolCalls: JSON.stringify(toolCallsLog),
+            channelOriginId: queueItem.channelOriginId ?? null,
+            metadata: JSON.stringify({ midTurnError: true, toolCallCount: toolCallsLog.length }),
+            createdAt: new Date(),
+          }).catch((persistErr) => {
+            log.error({ agentId, err: persistErr }, 'Failed to persist executed tool calls before surfacing the provider error')
+          })
+        }
+        throw outcome.error
+      }
       if (outcome.wasAborted) wasAborted = true
       if (outcome.finishReason !== undefined) stepFinishReasons.push(outcome.finishReason)
       const stepText = outcome.stepText
@@ -2362,6 +2404,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
   quickLocks.add(agentId)
 
   let queueItem: Awaited<ReturnType<typeof dequeueMessage>> = null
+  let quickDeadlineTimer: ReturnType<typeof setTimeout> | null = null
 
   try {
     if (await isAgentProcessing(agentId, 'quick')) return false
@@ -2376,18 +2419,28 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     const agent = await db.select().from(agents).where(eq(agents.id, agentId)).get()
     if (!agent) return false
 
-    // Save the incoming user message to DB (with sessionId)
-    const userMessageId = uuid()
-    await db.insert(messages).values({
-      id: userMessageId,
-      agentId,
-      sessionId,
-      role: 'user',
-      content: queueItem.content,
-      sourceType: queueItem.sourceType,
-      sourceId: queueItem.sourceId,
-      createdAt: new Date(),
-    })
+    // Save the incoming user message to DB (with sessionId). Reuse the id
+    // recorded on the queue item when this is a crash/requeue recovery —
+    // inserting fresh every time duplicated the user turn in the session
+    // history whenever the item was reprocessed (same mechanism as the main
+    // lane at the top of processNextMessage).
+    const userMessageId = queueItem.createdMessageId ?? uuid()
+    if (!queueItem.createdMessageId) {
+      await db.insert(messages).values({
+        id: userMessageId,
+        agentId,
+        sessionId,
+        role: 'user',
+        content: queueItem.content,
+        sourceType: queueItem.sourceType,
+        sourceId: queueItem.sourceId,
+        createdAt: new Date(),
+      })
+      sqlite.run(
+        `UPDATE queue_items SET created_message_id = ? WHERE id = ?`,
+        [userMessageId, queueItem.id],
+      )
+    }
 
     // Link uploaded files if any
     if (queueItem.fileIds && queueItem.fileIds.length > 0) {
@@ -2589,6 +2642,19 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     const abortController = new AbortController()
     quickAbortControllers.set(sessionId, abortController)
 
+    // Same time ceiling as the main lane. Without it, one hung tool call
+    // pinned quickLocks forever: every later quick/API message for the agent
+    // silently queued, and only a process restart could recover the lane.
+    if (config.tools.turnTimeoutMs > 0) {
+      quickDeadlineTimer = setTimeout(() => {
+        log.error(
+          { agentId, sessionId, timeoutMs: config.tools.turnTimeoutMs },
+          'Quick-session turn exceeded its time ceiling — aborting',
+        )
+        abortController.abort()
+      }, config.tools.turnTimeoutMs)
+    }
+
     // Convert tools to hivekeep shape once.
     const { vercelToolsToHivekeep: qsVercelToolsToHivekeep, markLastHivekeepToolCacheable: qsMarkLastHivekeepToolCacheable } =
       await import('@/server/llm/core/vercel-bridge')
@@ -2648,7 +2714,27 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       }, step)
       if (outcome.usage) stepUsages.push(outcome.usage)
 
-      if (outcome.error && !outcome.wasAborted) throw outcome.error
+      if (outcome.error && !outcome.wasAborted) {
+        // Same guarantee as the main lane: tools already executed this turn
+        // (with real side effects) must survive a mid-turn provider error.
+        if (toolCallsLog.length > 0) {
+          await db.insert(messages).values({
+            id: assistantMessageId,
+            agentId,
+            role: 'assistant',
+            content: '',
+            sourceType: 'agent',
+            sourceId: agentId,
+            sessionId,
+            toolCalls: JSON.stringify(toolCallsLog),
+            metadata: JSON.stringify({ midTurnError: true, toolCallCount: toolCallsLog.length }),
+            createdAt: new Date(),
+          }).catch((persistErr) => {
+            log.error({ agentId, sessionId, err: persistErr }, 'Failed to persist executed tool calls before surfacing the provider error')
+          })
+        }
+        throw outcome.error
+      }
       if (outcome.wasAborted) wasAborted = true
       if (outcome.finishReason !== undefined) stepFinishReasons.push(outcome.finishReason)
       const stepText = outcome.stepText
@@ -2916,6 +3002,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
           .catch(() => {})
       }
     }
+    if (quickDeadlineTimer) clearTimeout(quickDeadlineTimer)
     quickLocks.delete(agentId)
   }
 }
