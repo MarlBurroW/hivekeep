@@ -164,9 +164,9 @@ export async function dequeueMessage(agentId: string, mode: 'main' | 'quick' = '
     created_message_id: string | null
     created_at: number
     processed_at: number | null
-  }, [string]>(`
+  }, [number, string]>(`
     UPDATE queue_items
-    SET status = 'processing'
+    SET status = 'processing', processing_started_at = ?
     WHERE id = (
       SELECT id FROM queue_items
       WHERE agent_id = ? AND status = 'pending' ${sessionFilter}
@@ -174,7 +174,7 @@ export async function dequeueMessage(agentId: string, mode: 'main' | 'quick' = '
       LIMIT 1
     )
     RETURNING *
-  `).get(agentId)
+  `).get(Date.now(), agentId)
 
   if (!row) return null
 
@@ -211,6 +211,17 @@ export async function dequeueMessage(agentId: string, mode: 'main' | 'quick' = '
 /**
  * Mark a queue item as done.
  */
+/** Purge processed queue items older than `olderThanMs`. Done rows are only
+ *  useful for short-term inspection; without a purge they accumulate forever
+ *  and every scan of the table degrades with total history. */
+export function purgeDoneQueueItems(olderThanMs: number): number {
+  const result = sqlite.run(
+    `DELETE FROM queue_items WHERE status = 'done' AND processed_at < ?`,
+    [Date.now() - olderThanMs],
+  )
+  return result.changes ?? 0
+}
+
 export async function markQueueItemDone(itemId: string) {
   await db
     .update(queueItems)
@@ -280,8 +291,11 @@ export async function removeQueueItem(agentId: string, itemId: string): Promise<
   )
 
   if (result.changes > 0) {
-    // Also clean up any sideband file IDs
+    // Clean up ALL sideband maps — leaving the other two behind leaked one
+    // entry per removed item for the life of the process.
     queueFileIds.delete(itemId)
+    queueClientMessageId.delete(itemId)
+    queueMessageMetadata.delete(itemId)
 
     // Emit updated queue state
     const size = await getQueueSize(agentId)
@@ -323,14 +337,20 @@ export function requeueProcessingItems(agentId: string): number {
   return result.changes ?? 0
 }
 
-/** Queue items that have been 'processing' for longer than `olderThanMs`. */
+/** Queue items that have been 'processing' for longer than `olderThanMs`.
+ *  Age is measured from processing_started_at (set at dequeue) — measuring
+ *  from created_at classified healthy turns as stuck the moment they started,
+ *  whenever the item had waited a long time in a deep queue, and then
+ *  requeued them under a live turn on every sweep. created_at only serves as
+ *  a fallback for items dequeued before the column existed. */
 export function findStuckProcessingItems(olderThanMs: number): Array<{ id: string; agentId: string; ageMs: number }> {
   const now = Date.now()
   const rows = sqlite
     .query(
-      `SELECT id, agent_id as agentId, created_at as createdAt FROM queue_items
-       WHERE status = 'processing' AND created_at < ?`,
+      `SELECT id, agent_id as agentId, COALESCE(processing_started_at, created_at) as startedAt
+       FROM queue_items
+       WHERE status = 'processing' AND COALESCE(processing_started_at, created_at) < ?`,
     )
-    .all(now - olderThanMs) as unknown as Array<{ id: string; agentId: string; createdAt: number }>
-  return rows.map((r) => ({ id: r.id, agentId: r.agentId, ageMs: now - r.createdAt }))
+    .all(now - olderThanMs) as unknown as Array<{ id: string; agentId: string; startedAt: number }>
+  return rows.map((r) => ({ id: r.id, agentId: r.agentId, ageMs: now - r.startedAt }))
 }

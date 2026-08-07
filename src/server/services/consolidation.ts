@@ -1,11 +1,12 @@
 import { safeGenerateText } from '@/server/services/llm-helpers'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { db, sqlite } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
 import { memories } from '@/server/db/schema'
 import { generateEmbedding } from '@/server/services/embeddings'
 import { config } from '@/server/config'
-import { deleteMemory, createMemory } from '@/server/services/memory'
+import { deleteVectorRows } from '@/server/services/vector-maintenance'
+import { createMemory } from '@/server/services/memory'
 
 const log = createLogger('consolidation')
 
@@ -305,19 +306,23 @@ export async function consolidateMemories(agentId: string): Promise<number> {
 
     if (!newMemory) continue
 
-    // Update generation and lineage on the new memory
-    await db
-      .update(memories)
-      .set({
-        consolidationGeneration: newGen,
-        consolidatedFromIds: JSON.stringify(sourceIds),
-      })
-      .where(eq(memories.id, newMemory.id))
-
-    // Delete the source memories
-    for (const sourceId of sourceIds) {
-      await deleteMemory(sourceId, agentId)
-    }
+    // Lineage + source removal in ONE transaction: a crash in between used to
+    // leave the merged memory at generation 0 with its sources still present,
+    // so the next dedup pass consolidated it against itself. The FTS rows are
+    // trigger-synced; the vec rows are removed right after commit (a crash
+    // there is repaired by the boot reconciliation sweep).
+    const txn = sqlite.transaction(() => {
+      db.update(memories)
+        .set({
+          consolidationGeneration: newGen,
+          consolidatedFromIds: JSON.stringify(sourceIds),
+        })
+        .where(eq(memories.id, newMemory.id))
+        .run()
+      db.delete(memories).where(inArray(memories.id, sourceIds)).run()
+    })
+    txn()
+    deleteVectorRows('memories_vec', 'memory_id', sourceIds)
 
     totalRemoved += cluster.length - 1 // net reduction (cluster.length removed, 1 added)
     log.info(

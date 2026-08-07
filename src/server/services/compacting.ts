@@ -1,7 +1,7 @@
 import { safeGenerateText } from '@/server/services/llm-helpers'
-import { eq, and, desc, asc, isNull, inArray, ne } from 'drizzle-orm'
+import { eq, and, desc, asc, isNull, inArray, ne, sql } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
-import { db } from '@/server/db/index'
+import { db, sqlite } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
 import {
   messages,
@@ -11,6 +11,7 @@ import {
   userProfiles,
 } from '@/server/db/schema'
 import { config } from '@/server/config'
+import { getQueueSize } from '@/server/services/queue'
 import { getExtractionModel, getExtractionProviderId, getDefaultCompactingModel, getDefaultCompactingProviderId } from '@/server/services/app-settings'
 import { createMemory, updateMemory, isDuplicateMemory, pruneStaleMemories } from '@/server/services/memory'
 import { sseManager } from '@/server/sse/index'
@@ -158,9 +159,8 @@ export async function shouldCompact(agentId: string, contextTokens?: number, con
   // Estimate non-compacted message tokens
   const activeSummaries = await getActiveSummaries(agentId)
   const latestSummary = activeSummaries.length > 0 ? activeSummaries[activeSummaries.length - 1]! : null
-  const cutoffTimestamp = latestSummary ? (latestSummary.lastMessageAt as unknown as number) : null
 
-  const nonCompactedMessages = await getNonCompactedMessages(agentId, cutoffTimestamp)
+  const nonCompactedMessages = await getNonCompactedMessages(agentId, latestSummary)
   // Same reason as in runCompacting: counting only content under-counts
   // tool-heavy Agents by 10-100× and lets shouldCompact silently miss its
   // threshold when there's no fresh apiContextTokens in the cache yet.
@@ -253,24 +253,75 @@ async function getActiveSummaries(agentId: string) {
 }
 
 /** Get non-compacted messages after a cutoff timestamp */
-async function getNonCompactedMessages(agentId: string, cutoffTimestamp: number | null) {
-  const allMessages = await db
+/**
+ * The compaction boundary, resolved to an insertion rowid when possible.
+ *
+ * Timestamps are milliseconds and one LLM step inserts several rows
+ * back-to-back (assistant + tool results often share one ms), so a strict
+ * `createdAt > lastMessageAt` filter can permanently drop a same-ms sibling
+ * that was never summarized — silent context loss. The messages rowid is
+ * insertion-ordered and unique, so "after the boundary" is exactly
+ * "rowid > the boundary row's rowid". Falls back to the timestamp when the
+ * boundary message no longer exists (summaries repaired after deletion).
+ */
+export type CompactionBoundary = { rowid: number } | { timestamp: number } | null
+
+export function resolveCompactionBoundary(
+  latestSummary: { lastMessageAt: unknown; lastMessageId: string | null } | null,
+): CompactionBoundary {
+  if (!latestSummary) return null
+  if (latestSummary.lastMessageId) {
+    const row = sqlite
+      .query<{ rowid: number }, [string]>('SELECT rowid FROM messages WHERE id = ?')
+      .get(latestSummary.lastMessageId)
+    if (row) return { rowid: row.rowid }
+  }
+  const ts = latestSummary.lastMessageAt instanceof Date
+    ? latestSummary.lastMessageAt.getTime()
+    : (latestSummary.lastMessageAt as number)
+  return { timestamp: ts }
+}
+
+/** Row filter matching resolveCompactionBoundary, for callers that already
+ *  hold hydrated rows (engine history load, context preview). */
+export function isAfterCompactionBoundary(
+  boundary: CompactionBoundary,
+  m: { createdAt: unknown; rowid?: number },
+): boolean {
+  if (!boundary) return true
+  if ('rowid' in boundary) return (m.rowid ?? Number.MAX_SAFE_INTEGER) > boundary.rowid
+  const ts = m.createdAt instanceof Date ? m.createdAt.getTime() : (m.createdAt as number | null)
+  return !!ts && ts > boundary.timestamp
+}
+
+async function getNonCompactedMessages(
+  agentId: string,
+  latestSummary: { lastMessageAt: unknown; lastMessageId: string | null } | null,
+) {
+  const boundary = resolveCompactionBoundary(latestSummary)
+  const conditions = [
+    eq(messages.agentId, agentId),
+    isNull(messages.taskId),
+    isNull(messages.sessionId),
+    eq(messages.redactPending, false),
+    ne(messages.sourceType, 'compacting'),
+  ]
+  // Cutoff in SQL: this runs after every LLM turn and messages are never
+  // deleted by design, so loading the full history to filter in JS grew
+  // unboundedly with conversation age.
+  if (boundary) {
+    conditions.push(
+      'rowid' in boundary
+        ? sql`rowid > ${boundary.rowid}`
+        : sql`${messages.createdAt} > ${boundary.timestamp}`,
+    )
+  }
+  return db
     .select()
     .from(messages)
-    .where(
-      and(
-        eq(messages.agentId, agentId),
-        isNull(messages.taskId),
-        isNull(messages.sessionId),
-        eq(messages.redactPending, false),
-        ne(messages.sourceType, 'compacting'),
-      ),
-    )
-    .orderBy(asc(messages.createdAt))
+    .where(and(...conditions))
+    .orderBy(asc(messages.createdAt), asc(sql`rowid`))
     .all()
-
-  if (!cutoffTimestamp) return allMessages
-  return allMessages.filter((m) => m.createdAt && (m.createdAt as unknown as number) > cutoffTimestamp)
 }
 
 // ─── Core Compacting ─────────────────────────────────────────────────────────
@@ -302,10 +353,9 @@ export async function runCompacting(
   // Get the latest summary to determine the cutoff point
   const activeSummaries = await getActiveSummaries(agentId)
   const latestSummary = activeSummaries.length > 0 ? activeSummaries[activeSummaries.length - 1]! : null
-  const cutoffTimestamp = latestSummary ? (latestSummary.lastMessageAt as unknown as number) : null
 
   // Get non-compacted messages
-  const nonCompacted = await getNonCompactedMessages(agentId, cutoffTimestamp)
+  const nonCompacted = await getNonCompactedMessages(agentId, latestSummary)
   if (nonCompacted.length === 0) return null
 
   // Compute keep-window: walk backward from newest, accumulating tokens until keepPercent budget.
@@ -617,7 +667,7 @@ export async function runCompacting(
       // null (not undefined) signals to the client SSE handler that we want
       // to actively clear apiContextTokens, not just "no update for this
       // field". The handler treats null distinctly from omission.
-      data: { agentId, queueSize: 0, isProcessing: false, apiContextTokens: null },
+      data: { agentId, queueSize: await getQueueSize(agentId), isProcessing: false, apiContextTokens: null },
     })
 
     // Check if telescopic merge is needed after adding new summary
@@ -778,28 +828,32 @@ async function maybeMergeSummaries(agentId: string, contextWindow: number): Prom
     const maxDepth = Math.max(...toMerge.map((s) => s.depth ?? 0))
     const sourceIds = toMerge.map((s) => s.id)
 
-    // Insert merged summary
-    await db.insert(compactingSummaries).values({
-      id: uuid(),
-      agentId,
-      summary: mergedSummary,
-      firstMessageAt: firstSummary.firstMessageAt,
-      lastMessageAt: lastSummary.lastMessageAt,
-      firstMessageId: firstSummary.firstMessageId,
-      lastMessageId: lastSummary.lastMessageId,
-      messageCount: toMerge.reduce((sum, s) => sum + (s.messageCount ?? 0), 0),
-      tokenEstimate: estimateTokens(mergedSummary),
-      isInContext: true,
-      depth: maxDepth + 1,
-      sourceSummaryIds: JSON.stringify(sourceIds),
-      createdAt: new Date(),
+    // Insert the merged summary and archive its sources ATOMICALLY: a crash
+    // in between used to leave the merged summary AND all originals active,
+    // doubling that span of context in the prompt with nothing reconciling it
+    // (the next merge compounds the duplication).
+    const txn = sqlite.transaction(() => {
+      db.insert(compactingSummaries).values({
+        id: uuid(),
+        agentId,
+        summary: mergedSummary,
+        firstMessageAt: firstSummary.firstMessageAt,
+        lastMessageAt: lastSummary.lastMessageAt,
+        firstMessageId: firstSummary.firstMessageId,
+        lastMessageId: lastSummary.lastMessageId,
+        messageCount: toMerge.reduce((sum, s) => sum + (s.messageCount ?? 0), 0),
+        tokenEstimate: estimateTokens(mergedSummary),
+        isInContext: true,
+        depth: maxDepth + 1,
+        sourceSummaryIds: JSON.stringify(sourceIds),
+        createdAt: new Date(),
+      }).run()
+      db.update(compactingSummaries)
+        .set({ isInContext: false })
+        .where(inArray(compactingSummaries.id, sourceIds))
+        .run()
     })
-
-    // Archive merged originals
-    await db
-      .update(compactingSummaries)
-      .set({ isInContext: false })
-      .where(inArray(compactingSummaries.id, sourceIds))
+    txn()
 
     log.info({ agentId, mergedCount: toMerge.length, newDepth: maxDepth + 1 }, 'Telescopic summary merge completed')
   } catch (err) {
@@ -1071,7 +1125,7 @@ export async function maybeCompact(agentId: string, contextTokens?: number, cont
           agentId,
           data: {
             agentId,
-            queueSize: 0,
+            queueSize: await getQueueSize(agentId),
             isProcessing: false,
             apiContextTokens: null,
             contextTokens: preview.tokenEstimate.total,

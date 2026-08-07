@@ -1,7 +1,11 @@
 import type { ModelMessage, UserContent, JSONValue } from '@/server/tools/tool-helper'
 import type { Tool } from '@/server/tools/tool-helper'
 import type { HivekeepMessage, HivekeepMessageBlock } from '@/server/llm/llm/types'
-import { eq, and, isNull, ne, asc, desc } from 'drizzle-orm'
+import { eq, and, isNull, ne, asc, desc, sql } from 'drizzle-orm'
+// Submodule specifier on purpose: several test files mock the bare
+// 'drizzle-orm' module with a partial stub, and bun's module mocks leak
+// across files — the submodule id stays intact.
+import { getTableColumns } from 'drizzle-orm/utils'
 import { v4 as uuid } from 'uuid'
 import { db, sqlite } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
@@ -32,7 +36,7 @@ import { eventBus } from '@/server/services/events'
 import { hookRegistry } from '@/server/hooks/index'
 import { config } from '@/server/config'
 import { getRelevantMemories, rewriteQueryWithContext } from '@/server/services/memory'
-import { maybeCompact } from '@/server/services/compacting'
+import { maybeCompact, resolveCompactionBoundary, isAfterCompactionBoundary } from '@/server/services/compacting'
 import { getMCPToolsSummary } from '@/server/services/mcp'
 import { resolveToolset } from '@/server/services/toolset-resolver'
 import type { AgentThinkingConfig, AgentThinkingEffort, ContextTokenBreakdown, ContextPipelineStatus } from '@/shared/types'
@@ -1562,7 +1566,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       sseManager.sendToAgent(agentId, {
         type: 'queue:update',
         agentId,
-        data: { agentId, queueSize: 0, isProcessing: false },
+        data: { agentId, queueSize: await getQueueSize(agentId), isProcessing: false },
       })
       return true
     }
@@ -1640,7 +1644,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       type: 'queue:update',
       agentId,
       data: {
-        agentId, queueSize: 0, isProcessing: true, processingStartedAt,
+        agentId, queueSize: await getQueueSize(agentId), isProcessing: true, processingStartedAt,
         // Send the CALIBRATED estimate + breakdown (raw BPE × the per-Agent
         // real/BPE factor), the same numbers the context visualizer and the
         // /context-usage REST endpoint return — otherwise the navbar tooltip
@@ -2275,11 +2279,12 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       await notifyChannelOfFailure(channelTarget, displayError).catch(() => {})
     }
 
-    // Emit queue update to clear processing state on error
+    // Emit queue update to clear processing state on error. Real queue size:
+    // other items can be pending behind the failed one (sse.md trap #3).
     sseManager.sendToAgent(agentId, {
       type: 'queue:update',
       agentId,
-      data: { agentId, queueSize: 0, isProcessing: false },
+      data: { agentId, queueSize: await getQueueSize(agentId).catch(() => 0), isProcessing: false },
     })
 
     return true
@@ -2937,9 +2942,10 @@ export async function buildMessageHistory(agentId: string): Promise<{ messages: 
     .orderBy(asc(compactingSummaries.lastMessageAt))
     .all()
 
-  // Use the latest summary's lastMessageAt as the cutoff for message filtering
+  // Resolve the boundary of the latest summary (rowid-based: a strict
+  // timestamp compare drops same-millisecond siblings — see compacting.ts).
   const latestSummary = activeSummaries.length > 0 ? activeSummaries[activeSummaries.length - 1]! : null
-  const cutoffTimestamp = latestSummary ? (latestSummary.lastMessageAt as unknown as number) : null
+  const boundary = resolveCompactionBoundary(latestSummary)
 
   // [10] Recent messages (main session only, not task or quick session messages)
   // Limit is configurable via HISTORY_MAX_MESSAGES (default 1000). A low limit
@@ -2948,10 +2954,10 @@ export async function buildMessageHistory(agentId: string): Promise<{ messages: 
   // invalidating cross-turn cache. The compacting service is the proper
   // mechanism for keeping the LLM context within token-window limits.
   const recentMessages = await db
-    .select()
+    .select({ ...getTableColumns(messages), rowid: sql<number>`rowid` })
     .from(messages)
     .where(and(eq(messages.agentId, agentId), isNull(messages.taskId), isNull(messages.sessionId), ne(messages.sourceType, 'compacting')))
-    .orderBy(desc(messages.createdAt))
+    .orderBy(desc(messages.createdAt), desc(sql`rowid`))
     .limit(config.historyMaxMessages)
     .all()
 
@@ -2959,12 +2965,9 @@ export async function buildMessageHistory(agentId: string): Promise<{ messages: 
   recentMessages.reverse()
 
   // Only include messages after the latest summary's cutoff
-  const postSnapshotMessages = (cutoffTimestamp
-    ? recentMessages.filter(
-        (m) => m.createdAt && (m.createdAt as unknown as number) > cutoffTimestamp,
-      )
-    : recentMessages
-  ).filter((m) => {
+  const postSnapshotMessages = recentMessages
+    .filter((m) => isAfterCompactionBoundary(boundary, m))
+    .filter((m) => {
     // UI-only audit markers must not reach the LLM prompt. They live in DB
     // so the conversation view can render them (channel handoff banners),
     // but they have no semantic value for the model and would only confuse

@@ -1,7 +1,7 @@
 import { eq, and, not, inArray, or } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { mkdirSync, existsSync, rmSync } from 'fs'
-import { db } from '@/server/db/index'
+import { db, sqlite } from '@/server/db/index'
 import {
   agents,
   agentMcpServers,
@@ -24,8 +24,13 @@ import {
   miniApps,
   quickSessions,
   providers,
+  secretPrompts,
+  pendingEmailSends,
+  accountTriggers,
+  knowledgeChunks,
 } from '@/server/db/schema'
 import { config } from '@/server/config'
+import { deleteVectorRows } from '@/server/services/vector-maintenance'
 import { generateSlug, ensureUniqueSlug, isValidSlug } from '@/server/utils/slug'
 import { sseManager } from '@/server/sse/index'
 import {
@@ -325,73 +330,91 @@ export async function deleteAgent(agentId: string): Promise<boolean> {
   const affectedCronIds = db.select({ id: crons.id, cronAgentId: crons.agentId }).from(crons).where(eq(crons.targetAgentId, agentId)).all()
   const affectedMcpServerIds = db.select({ id: mcpServers.id }).from(mcpServers).where(eq(mcpServers.createdByAgentId, agentId)).all().map((m) => m.id)
 
-  // Clean up all related records — topological order (leaves first)
-  // humanPrompts must come before messages and tasks (references both)
-  await db.delete(humanPrompts).where(eq(humanPrompts.agentId, agentId))
-  await db.delete(files).where(eq(files.agentId, agentId))
-  await db.delete(compactingSnapshots).where(eq(compactingSnapshots.agentId, agentId))
-  await db.delete(compactingSummaries).where(eq(compactingSummaries.agentId, agentId))
-  await db.delete(memories).where(eq(memories.agentId, agentId))
-
-  // Null out cross-agent references before deleting tasks and crons
-  if (agentTaskIds.length > 0) {
-    // Other agents' queue items referencing this agent's tasks
-    await db.update(queueItems).set({ taskId: null }).where(inArray(queueItems.taskId, agentTaskIds))
-    // Other agents' messages referencing this agent's tasks
-    await db.update(messages).set({ taskId: null }).where(inArray(messages.taskId, agentTaskIds))
-    // Other agents' tasks referencing this agent's tasks as parent
-    await db.update(tasks).set({ parentTaskId: null }).where(inArray(tasks.parentTaskId, agentTaskIds))
-  }
-  if (agentCronIds.length > 0) {
-    // Other agents' tasks referencing this agent's crons
-    await db.update(tasks).set({ cronId: null }).where(inArray(tasks.cronId, agentCronIds))
-  }
-
-  await db.delete(queueItems).where(eq(queueItems.agentId, agentId))
-
-  // Clean up quick sessions referencing this agent
+  const agentKnowledgeChunkIds = db.select({ id: knowledgeChunks.id }).from(knowledgeChunks).where(eq(knowledgeChunks.agentId, agentId)).all().map((k) => k.id)
   const agentQuickSessionIds = db.select({ id: quickSessions.id }).from(quickSessions).where(eq(quickSessions.agentId, agentId)).all().map((s) => s.id)
-  if (agentQuickSessionIds.length > 0) {
-    // Null out session references in messages (including other agents' messages)
-    await db.update(messages).set({ sessionId: null }).where(inArray(messages.sessionId, agentQuickSessionIds))
-  }
 
-  await db.delete(messages).where(eq(messages.agentId, agentId))
-  await db.delete(quickSessions).where(eq(quickSessions.agentId, agentId))
-  await db.update(tasks).set({ parentTaskId: null }).where(eq(tasks.parentAgentId, agentId))
-  await db.delete(tasks).where(eq(tasks.parentAgentId, agentId))
-  await db.update(tasks).set({ sourceAgentId: null }).where(eq(tasks.sourceAgentId, agentId))
-  await db.update(crons).set({ targetAgentId: null }).where(eq(crons.targetAgentId, agentId))
+  // In-memory / external cleanup that must precede row deletion.
   // Stop in-memory cron scheduler jobs before deleting from DB (fixes #168)
   for (const cronId of agentCronIds) {
     stopJob(cronId)
   }
-  await db.delete(crons).where(eq(crons.agentId, agentId))
-  await db.delete(contactNotes).where(eq(contactNotes.agentId, agentId))
-  // Custom tools are GLOBAL now (not per-Agent) — nothing to cascade-delete here.
-  await db.delete(webhooks).where(eq(webhooks.agentId, agentId))
-  // Delete channels with full cleanup (stop adapters, delete vault secrets)
+  // Delete channels with full cleanup (stop adapters, delete vault secrets).
+  // Runs before the transaction because it is async with external side
+  // effects; any row it fails to remove is swept by the fallback delete below.
   for (const channelId of agentChannelIds) {
     try {
       await deleteChannel(channelId)
     } catch (err) {
       log.warn({ channelId, agentId, err }, 'Failed to delete channel during agent cascade delete')
-      // Fallback: raw delete if deleteChannel fails
-      await db.delete(channels).where(eq(channels.id, channelId))
     }
   }
-  await db.delete(fileStorage).where(eq(fileStorage.agentId, agentId))
-  await db.update(fileStorage).set({ createdByAgentId: null }).where(eq(fileStorage.createdByAgentId, agentId))
-  await db.update(vaultSecrets).set({ createdByAgentId: null }).where(eq(vaultSecrets.createdByAgentId, agentId))
-  await db.update(mcpServers).set({ createdByAgentId: null }).where(eq(mcpServers.createdByAgentId, agentId))
-  await db.delete(agentMcpServers).where(eq(agentMcpServers.agentId, agentId))
-  await db.delete(miniApps).where(eq(miniApps.agentId, agentId))
-  await db.delete(scheduledWakeups).where(
-    or(eq(scheduledWakeups.callerAgentId, agentId), eq(scheduledWakeups.targetAgentId, agentId)),
-  )
 
-  // Delete the agent
-  await db.delete(agents).where(eq(agents.id, agentId))
+  // Every row mutation in ONE transaction: the cascade spans ~30 statements
+  // and a crash (or an FK failure) mid-way used to leave a permanently
+  // half-deleted agent whose retry could never succeed.
+  const txn = sqlite.transaction(() => {
+    // Leaves first. Prompt cards reference both the agent and its tasks.
+    db.delete(humanPrompts).where(eq(humanPrompts.agentId, agentId)).run()
+    db.delete(secretPrompts).where(eq(secretPrompts.agentId, agentId)).run()
+    if (agentTaskIds.length > 0) {
+      db.delete(humanPrompts).where(inArray(humanPrompts.taskId, agentTaskIds)).run()
+      db.delete(secretPrompts).where(inArray(secretPrompts.taskId, agentTaskIds)).run()
+    }
+    db.delete(pendingEmailSends).where(eq(pendingEmailSends.agentId, agentId)).run()
+    db.delete(accountTriggers).where(eq(accountTriggers.targetAgentId, agentId)).run()
+    db.delete(files).where(eq(files.agentId, agentId)).run()
+    db.delete(compactingSnapshots).where(eq(compactingSnapshots.agentId, agentId)).run()
+    db.delete(compactingSummaries).where(eq(compactingSummaries.agentId, agentId)).run()
+    db.delete(memories).where(eq(memories.agentId, agentId)).run()
+
+    // Null out cross-agent references before deleting tasks and crons
+    if (agentTaskIds.length > 0) {
+      db.update(queueItems).set({ taskId: null }).where(inArray(queueItems.taskId, agentTaskIds)).run()
+      db.update(messages).set({ taskId: null }).where(inArray(messages.taskId, agentTaskIds)).run()
+      db.update(tasks).set({ parentTaskId: null }).where(inArray(tasks.parentTaskId, agentTaskIds)).run()
+    }
+    if (agentCronIds.length > 0) {
+      db.update(tasks).set({ cronId: null }).where(inArray(tasks.cronId, agentCronIds)).run()
+    }
+
+    db.delete(queueItems).where(eq(queueItems.agentId, agentId)).run()
+
+    if (agentQuickSessionIds.length > 0) {
+      // Null out session references in messages (including other agents' messages)
+      db.update(messages).set({ sessionId: null }).where(inArray(messages.sessionId, agentQuickSessionIds)).run()
+    }
+
+    db.delete(messages).where(eq(messages.agentId, agentId)).run()
+    db.delete(quickSessions).where(eq(quickSessions.agentId, agentId)).run()
+    db.update(tasks).set({ parentTaskId: null }).where(eq(tasks.parentAgentId, agentId)).run()
+    db.delete(tasks).where(eq(tasks.parentAgentId, agentId)).run()
+    db.update(tasks).set({ sourceAgentId: null }).where(eq(tasks.sourceAgentId, agentId)).run()
+    db.update(crons).set({ targetAgentId: null }).where(eq(crons.targetAgentId, agentId)).run()
+    db.delete(crons).where(eq(crons.agentId, agentId)).run()
+    db.delete(contactNotes).where(eq(contactNotes.agentId, agentId)).run()
+    // Custom tools are GLOBAL now (not per-Agent) — nothing to cascade-delete here.
+    db.delete(webhooks).where(eq(webhooks.agentId, agentId)).run()
+    // Fallback for any channel row deleteChannel() above failed to remove.
+    db.delete(channels).where(eq(channels.agentId, agentId)).run()
+    db.delete(fileStorage).where(eq(fileStorage.agentId, agentId)).run()
+    db.update(fileStorage).set({ createdByAgentId: null }).where(eq(fileStorage.createdByAgentId, agentId)).run()
+    db.update(vaultSecrets).set({ createdByAgentId: null }).where(eq(vaultSecrets.createdByAgentId, agentId)).run()
+    db.update(mcpServers).set({ createdByAgentId: null }).where(eq(mcpServers.createdByAgentId, agentId)).run()
+    db.delete(agentMcpServers).where(eq(agentMcpServers.agentId, agentId)).run()
+    db.delete(miniApps).where(eq(miniApps.agentId, agentId)).run()
+    db.delete(scheduledWakeups).where(
+      or(eq(scheduledWakeups.callerAgentId, agentId), eq(scheduledWakeups.targetAgentId, agentId)),
+    ).run()
+
+    // The vec virtual tables have no FK/trigger sync (unlike FTS): rows must
+    // be removed explicitly or they poison KNN search and dedup forever.
+    deleteVectorRows('memories_vec', 'memory_id', agentMemoryIds)
+    deleteVectorRows('knowledge_chunks_vec', 'chunk_id', agentKnowledgeChunkIds)
+
+    // Delete the agent (remaining child tables cascade or SET NULL via FKs)
+    db.delete(agents).where(eq(agents.id, agentId)).run()
+  })
+  txn()
 
   // Remove workspace directory
   if (existing.workspacePath && existsSync(existing.workspacePath)) {

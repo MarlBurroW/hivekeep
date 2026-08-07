@@ -165,8 +165,12 @@ export async function createMemory(agentId: string, input: CreateMemoryInput) {
         'INSERT INTO memories_vec(memory_id, embedding) VALUES (?, ?)',
         [id, embeddingBuf],
       )
-    } catch {
-      // sqlite-vec may not be available
+    } catch (err) {
+      // sqlite-vec unavailable, or a real failure (e.g. dimension mismatch
+      // after an embedding-provider change). Silent loss here degrades vector
+      // search with zero signal, so log it; the boot reconciliation sweep
+      // cannot repair a missing vec row, only orphans.
+      log.warn({ memoryId: id, err }, 'memories_vec insert failed — memory not vector-searchable')
     }
   }
 
@@ -209,8 +213,8 @@ export async function updateMemory(memoryId: string, agentId: string, updates: U
           'INSERT INTO memories_vec(memory_id, embedding) VALUES (?, ?)',
           [memoryId, embeddingBuf],
         )
-      } catch {
-        // sqlite-vec may not be available
+      } catch (err) {
+        log.warn({ memoryId, err }, 'memories_vec update failed — memory not vector-searchable')
       }
     } catch {
       // Embedding provider may not be available
@@ -240,8 +244,8 @@ export async function deleteMemory(memoryId: string, agentId: string) {
   // Remove from sqlite-vec
   try {
     sqlite.run('DELETE FROM memories_vec WHERE memory_id = ?', [memoryId])
-  } catch {
-    // sqlite-vec may not be available
+  } catch (err) {
+    log.warn({ memoryId, err }, 'memories_vec delete failed — orphan repaired by the boot sweep')
   }
 
   await db.delete(memories).where(and(eq(memories.id, memoryId), eq(memories.agentId, agentId)))

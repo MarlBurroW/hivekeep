@@ -1,6 +1,6 @@
 import { db } from '@/server/db/index'
 import { agents, messages, userProfiles, compactingSummaries, tasks } from '@/server/db/schema'
-import { eq, and, isNull, desc, ne, asc } from 'drizzle-orm'
+import { eq, and, isNull, desc, ne, asc, sql } from 'drizzle-orm'
 import { getFilesForMessages } from '@/server/services/files'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
 import { listActiveTriggerSummariesForAgent } from '@/server/services/account-triggers'
@@ -15,7 +15,7 @@ import { fetchCronLearnings } from '@/server/services/cron-learnings'
 import { getActiveChannelsForAgent } from '@/server/services/channels'
 import type { AgentCompactingConfig, ContextTokenBreakdown } from '@/shared/types'
 import { getModelContextWindow } from '@/shared/model-context-windows'
-import { resolveTriggerTokens } from '@/server/services/compacting'
+import { resolveTriggerTokens, resolveCompactionBoundary, isAfterCompactionBoundary } from '@/server/services/compacting'
 import { config } from '@/server/config'
 
 interface MessageMetadataTokenUsage {
@@ -371,9 +371,9 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
       }))
     : null
 
-  // Resolve cutoff timestamp from the latest summary
+  // Resolve the boundary of the latest summary (rowid-based — see compacting.ts)
   const latestSummary = activeSummaries.length > 0 ? activeSummaries[activeSummaries.length - 1]! : null
-  const cutoffTimestamp = latestSummary ? (latestSummary.lastMessageAt as unknown as number) : null
+  const boundary = resolveCompactionBoundary(latestSummary)
 
   // Fetch recent messages for history preview
   const recentMessages = db
@@ -383,6 +383,7 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
       content: messages.content,
       toolCalls: messages.toolCalls,
       createdAt: messages.createdAt,
+      rowid: sql<number>`rowid`,
     })
     .from(messages)
     .where(and(
@@ -403,9 +404,7 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
   recentMessages.reverse()
 
   // Filter to post-snapshot messages (mirrors buildMessageHistory logic)
-  const visibleMessages = cutoffTimestamp
-    ? recentMessages.filter((m) => m.createdAt && (m.createdAt as unknown as number) > cutoffTimestamp)
-    : recentMessages
+  const visibleMessages = recentMessages.filter((m) => isAfterCompactionBoundary(boundary, m))
 
   // Pre-load attached files for all visible messages so we can count their
   // tokens (images, inlined text files, PDFs) — matches what agent-engine sends

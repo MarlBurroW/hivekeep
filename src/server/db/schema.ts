@@ -701,6 +701,10 @@ export const queueItems = sqliteTable('queue_items', {
   sessionId: text('session_id'),
   channelOriginId: text('channel_origin_id'),
   status: text('status').notNull().default('pending'), // 'pending' | 'processing' | 'done'
+  // Set at dequeue. The stuck-agent watch measures turn age from THIS, not
+  // created_at: an item can legitimately sit pending for a long time behind a
+  // deep queue before its (perfectly healthy) turn even starts.
+  processingStartedAt: integer('processing_started_at', { mode: 'timestamp_ms' }),
   createdMessageId: text('created_message_id'), // tracks whether the user message was already inserted (idempotency on recovery)
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   processedAt: integer('processed_at', { mode: 'timestamp_ms' }),

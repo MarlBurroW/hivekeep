@@ -76,6 +76,11 @@ log.info('Initializing virtual tables (FTS5, sqlite-vec)...')
 initVirtualTables()
 log.info('Virtual tables initialized')
 
+// Remove orphaned vector rows (deletion paths that missed the vec tables
+// leave orphans that occupy KNN slots and blind memory dedup).
+import { reconcileVectorTables } from '@/server/services/vector-maintenance'
+reconcileVectorTables()
+
 // One-time migration: backfill missing providerIds on agents/tasks/crons
 import { migrateModelProviders } from '@/server/services/migrate-model-providers'
 await migrateModelProviders()
@@ -228,10 +233,15 @@ startVersionCheckCron()
 
 // Notification cleanup cron (daily)
 import { cleanupOldNotifications } from '@/server/services/notifications'
+import { purgeDoneQueueItems } from '@/server/services/queue'
 new Cron('0 3 * * *', async () => {
   const count = await cleanupOldNotifications()
   if (count > 0) log.info({ count }, 'Notification cleanup completed')
+  const purged = purgeDoneQueueItems(7 * 24 * 60 * 60 * 1000)
+  if (purged > 0) log.info({ purged }, 'Processed queue items purged')
 })
+// One-shot at boot too: installed instances carry months of done rows.
+purgeDoneQueueItems(7 * 24 * 60 * 60 * 1000)
 
 // Install a previously-refreshed models.dev snapshot (data-dir override) over
 // the bundled one, before any reconcile reads it.

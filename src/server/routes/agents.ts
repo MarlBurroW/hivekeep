@@ -92,17 +92,22 @@ function normalizeToolboxIdsInput(raw: unknown): string[] | null | undefined {
 agentRoutes.get('/', async (c) => {
   const [allAgents, allQueueItems] = await Promise.all([
     db.select().from(agents).all(),
-    db.select({ agentId: queueItems.agentId, status: queueItems.status, createdAt: queueItems.createdAt }).from(queueItems).all(),
+    db.select({ agentId: queueItems.agentId, status: queueItems.status, createdAt: queueItems.createdAt, processingStartedAt: queueItems.processingStartedAt })
+      .from(queueItems)
+      .where(inArray(queueItems.status, ['pending', 'processing']))
+      .all(),
   ])
 
-  // Build per-agent queue state from all queue items
+  // Build per-agent queue state from the live queue items (done items are
+  // irrelevant here and reading them all made this hot endpoint scale with
+  // total history instead of current load)
   const queueStateMap = new Map<string, { isProcessing: boolean; queueSize: number; processingStartedAt?: number }>()
   for (const item of allQueueItems) {
     const state = queueStateMap.get(item.agentId) ?? { isProcessing: false, queueSize: 0 }
     if (item.status === 'processing') {
       state.isProcessing = true
-      // Use the queue item's createdAt as a proxy for when processing started
-      state.processingStartedAt = item.createdAt instanceof Date ? item.createdAt.getTime() : Number(item.createdAt)
+      const started = item.processingStartedAt ?? item.createdAt
+      state.processingStartedAt = started instanceof Date ? started.getTime() : Number(started)
     }
     if (item.status === 'pending') state.queueSize++
     queueStateMap.set(item.agentId, state)
