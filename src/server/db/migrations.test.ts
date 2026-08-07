@@ -14,6 +14,12 @@
  *   4. Migrations are IDEMPOTENT: running the migrator a second time on the
  *      already-migrated database is a no-op (no error, no duplicate-table
  *      failure, no extra rows in drizzle's bookkeeping table).
+ *   5. The newest migration applies to a POPULATED database, not just a fresh
+ *      one. Migration 0114 shipped green on fresh DBs but failed on every
+ *      installed instance: the migrator runs inside one transaction where
+ *      `PRAGMA foreign_keys=OFF` is a no-op, so its `DROP TABLE agents`
+ *      violated live FKs. This test applies all-but-the-last migration, seeds
+ *      referencing rows, then runs the head migration over them.
  *
  * Deliberately self-contained: it never imports `@/server/db/index` (that would
  * open the real on-disk DB) and uses NO `mock.module`, so it can't leak mocks
@@ -23,12 +29,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { SQLiteTable } from 'drizzle-orm/sqlite-core'
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 import * as schema from '@/server/db/schema'
+import { runMigrations } from '@/server/db/run-migrations'
 
 // NOTE: deliberately import ONLY from drizzle submodule specifiers
 // (`drizzle-orm/sqlite-core`, `drizzle-orm/bun-sqlite/*`), never from the bare
@@ -129,7 +135,7 @@ describe('database migrations', () => {
     const sqlite = openDb()
     try {
       const db = drizzle(sqlite)
-      expect(() => migrate(db, { migrationsFolder })).not.toThrow()
+      expect(() => runMigrations(sqlite, db, migrationsFolder)).not.toThrow()
 
       // drizzle records applied migrations in __drizzle_migrations; a fresh
       // apply should record every journal entry (one row per migration).
@@ -235,12 +241,97 @@ describe('database migrations', () => {
       const before = countApplied()
       expect(before).toBeGreaterThan(0)
 
-      // A second migrate() on the already-migrated DB must not throw (e.g. no
+      // A second run on the already-migrated DB must not throw (e.g. no
       // "table already exists") and must not re-apply anything.
-      expect(() => migrate(db, { migrationsFolder })).not.toThrow()
+      expect(() => runMigrations(sqlite, db, migrationsFolder)).not.toThrow()
 
       const after = countApplied()
       expect(after).toBe(before)
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  it('applies the newest migration to a populated database', () => {
+    // Build a migrations folder containing everything EXCEPT the newest journal
+    // entry, migrate a scratch DB with it, seed rows that exercise the FK graph
+    // (agents referenced by messages/tasks/memories), then run the full set so
+    // the head migration executes over live data exactly like an upgrade of an
+    // installed instance.
+    const journal = JSON.parse(
+      readFileSync(join(migrationsFolder, 'meta', '_journal.json'), 'utf8'),
+    ) as { entries: Array<{ tag: string }> }
+    expect(journal.entries.length).toBeGreaterThan(1)
+
+    const partialDir = join(tmpDir, 'partial-migrations')
+    mkdirSync(join(partialDir, 'meta'), { recursive: true })
+    const truncated = { ...journal, entries: journal.entries.slice(0, -1) }
+    writeFileSync(join(partialDir, 'meta', '_journal.json'), JSON.stringify(truncated))
+    for (const entry of truncated.entries) {
+      copyFileSync(
+        join(migrationsFolder, `${entry.tag}.sql`),
+        join(partialDir, `${entry.tag}.sql`),
+      )
+    }
+
+    // Insert one row filling every NOT-NULL-without-default column with a
+    // type-appropriate dummy, so the seed keeps working as the previous-version
+    // schema evolves. FK columns must come in via overrides.
+    const seedRow = (
+      sqlite: Database,
+      table: string,
+      overrides: Record<string, string | number>,
+    ) => {
+      const cols = sqlite
+        .query<{ name: string; type: string; notnull: number; dflt_value: string | null; pk: number }, []>(
+          `PRAGMA table_info(${table})`,
+        )
+        .all()
+      const values: Record<string, string | number> = { ...overrides }
+      for (const c of cols) {
+        if (c.name in values) continue
+        if (!c.notnull || c.dflt_value !== null) continue
+        const t = c.type.toLowerCase()
+        values[c.name] = t.includes('int') || t.includes('real') || t.includes('num') ? 0 : 'x'
+      }
+      const names = Object.keys(values)
+      sqlite.run(
+        `INSERT INTO ${table} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})`,
+        names.map((n) => values[n]!),
+      )
+    }
+
+    const popPath = join(tmpDir, 'populated.db')
+    const sqlite = new Database(popPath)
+    sqlite.run('PRAGMA journal_mode = WAL')
+    sqlite.run('PRAGMA foreign_keys = ON')
+    try {
+      const db = drizzle(sqlite)
+      runMigrations(sqlite, db, partialDir)
+
+      seedRow(sqlite, 'agents', { id: 'agent_pop' })
+      seedRow(sqlite, 'messages', { id: 'msg_pop', agent_id: 'agent_pop' })
+      seedRow(sqlite, 'tasks', { id: 'task_pop', parent_agent_id: 'agent_pop' })
+      seedRow(sqlite, 'memories', { id: 'mem_pop', agent_id: 'agent_pop' })
+
+      expect(() => runMigrations(sqlite, db, migrationsFolder)).not.toThrow()
+
+      // The upgrade must preserve the seeded rows and leave the FK graph clean.
+      for (const [table, id] of [
+        ['agents', 'agent_pop'],
+        ['messages', 'msg_pop'],
+        ['tasks', 'task_pop'],
+        ['memories', 'mem_pop'],
+      ] as const) {
+        const row = sqlite
+          .query<{ id: string }, [string]>(`SELECT id FROM ${table} WHERE id = ?`)
+          .get(id)
+        expect(row?.id).toBe(id)
+      }
+      const violations = sqlite
+        .query<Record<string, unknown>, []>('PRAGMA foreign_key_check')
+        .all()
+      expect(violations).toEqual([])
     } finally {
       sqlite.close()
     }

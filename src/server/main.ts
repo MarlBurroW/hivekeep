@@ -1,9 +1,9 @@
 import { serveStatic } from 'hono/bun'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
 import { app } from '@/server/app'
-import { db, initVirtualTables } from '@/server/db/index'
+import { db, sqlite, initVirtualTables } from '@/server/db/index'
+import { runMigrations } from '@/server/db/run-migrations'
 import { startQueueWorker } from '@/server/services/agent-engine'
 import { registerAllTools } from '@/server/tools/register'
 import { seedBuiltinToolboxes } from '@/server/services/toolboxes'
@@ -68,7 +68,7 @@ preloadTokenizer().catch((err) => log.warn({ err }, 'Tokenizer preload failed; e
 
 // Run Drizzle migrations (creates tables if DB is fresh)
 log.info('Running database migrations...')
-migrate(db, { migrationsFolder: './src/server/db/migrations' })
+runMigrations(sqlite, db, './src/server/db/migrations')
 log.info('Database migrations complete')
 
 // Initialize FTS5 and sqlite-vec virtual tables
