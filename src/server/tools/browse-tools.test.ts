@@ -1,6 +1,14 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test'
+import { describe, it, expect, beforeEach, mock, afterAll } from 'bun:test'
 import { fullMockConfig } from '../../test-helpers'
 import type { ToolRegistration } from '@/server/tools/types'
+
+// The SSRF guard resolves DNS and fails closed, so stub the resolver to a
+// public address for determinism (no network in CI).
+const originalDnsLookup = Bun.dns.lookup
+;(Bun.dns as { lookup: unknown }).lookup = async () => [{ address: '93.184.216.34', family: 4 }]
+afterAll(() => {
+  ;(Bun.dns as { lookup: unknown }).lookup = originalDnsLookup
+})
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 // We avoid mock.module('@/server/services/web-browse') to prevent poisoning

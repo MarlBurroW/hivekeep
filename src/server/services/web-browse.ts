@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio'
 import { Readability } from '@mozilla/readability'
 import { parseHTML } from 'linkedom'
 import { config } from '@/server/config'
+import { normalizeIpLiteral, isPrivateIp } from '@/server/services/ip-guard'
 import { createLogger } from '@/server/logger'
 
 const log = createLogger('web-browse')
@@ -26,22 +27,6 @@ export type ExtractMode = 'readability' | 'markdown' | 'raw'
 
 // ─── SSRF Protection ────────────────────────────────────────────────────────
 
-const PRIVATE_IP_RANGES = [
-  /^127\./,                          // 127.0.0.0/8
-  /^10\./,                           // 10.0.0.0/8
-  /^172\.(1[6-9]|2[0-9]|3[01])\./,  // 172.16.0.0/12
-  /^192\.168\./,                     // 192.168.0.0/16
-  /^169\.254\./,                     // link-local
-  /^0\./,                            // 0.0.0.0/8
-]
-
-function isPrivateIp(ip: string): boolean {
-  if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return true
-  // Handle IPv4-mapped IPv6 (::ffff:x.x.x.x)
-  const v4 = ip.startsWith('::ffff:') ? ip.slice(7) : ip
-  return PRIVATE_IP_RANGES.some((re) => re.test(v4))
-}
-
 export async function isBlockedUrl(url: string): Promise<{ blocked: boolean; reason?: string }> {
   let parsed: URL
   try {
@@ -57,14 +42,19 @@ export async function isBlockedUrl(url: string): Promise<{ blocked: boolean; rea
 
   const hostname = parsed.hostname.toLowerCase()
 
-  // Block localhost variants
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]') {
-    return { blocked: true, reason: 'Requests to localhost are blocked' }
+  // Block localhost + cloud metadata by name
+  if (hostname === 'localhost' || hostname === 'metadata.google.internal') {
+    return { blocked: true, reason: 'Requests to localhost or cloud metadata endpoints are blocked' }
   }
 
-  // Block cloud metadata endpoints
-  if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') {
-    return { blocked: true, reason: 'Requests to cloud metadata endpoints are blocked' }
+  // IP-literal hostnames (any form: dotted, decimal, hex, bracketed v6) are
+  // validated without DNS. String comparisons alone are bypassable —
+  // `http://2130706433/` is 127.0.0.1.
+  const literal = normalizeIpLiteral(hostname)
+  if (literal) {
+    if (isPrivateIp(literal)) {
+      return { blocked: true, reason: `IP ${literal} is in a private, loopback, or link-local range` }
+    }
   }
 
   // Check configured blocked domains
@@ -73,25 +63,28 @@ export async function isBlockedUrl(url: string): Promise<{ blocked: boolean; rea
     return { blocked: true, reason: `Domain "${hostname}" is blocked by configuration` }
   }
 
-  // DNS resolution to catch private IPs behind hostnames.
-  // We race the lookup against a short timeout so the SSRF check never blocks
-  // the request path on a stalled resolver (observed in WSL / restricted envs).
-  try {
-    const lookupPromise = Bun.dns.lookup(hostname, { family: 0 })
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
-    const results = await Promise.race([lookupPromise, timeoutPromise])
-    if (results) {
+  // DNS resolution to catch private IPs behind hostnames. Fails CLOSED: a
+  // resolver error or timeout blocks the request — failing open turns any
+  // unresolvable-then-resolvable name (or a stalled resolver) into an SSRF
+  // bypass.
+  if (!literal) {
+    try {
+      const lookupPromise = Bun.dns.lookup(hostname, { family: 0 })
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
+      const results = await Promise.race([lookupPromise, timeoutPromise])
+      if (!results) {
+        log.warn({ hostname }, 'DNS lookup timed out during SSRF check — blocking request')
+        return { blocked: true, reason: `DNS lookup for "${hostname}" timed out` }
+      }
       for (const record of results) {
         if (isPrivateIp(record.address)) {
           return { blocked: true, reason: `Domain "${hostname}" resolves to private IP ${record.address}` }
         }
       }
-    } else {
-      log.debug({ hostname }, 'DNS lookup timed out during SSRF check, allowing request')
+    } catch {
+      log.warn({ hostname }, 'DNS lookup failed during SSRF check — blocking request')
+      return { blocked: true, reason: `DNS lookup for "${hostname}" failed` }
     }
-  } catch {
-    // DNS resolution failed — allow the request to proceed and let fetch handle it
-    log.debug({ hostname }, 'DNS lookup failed during SSRF check, allowing request')
   }
 
   return { blocked: false }
@@ -119,6 +112,8 @@ function releaseSemaphore(): void {
 
 // ─── Fetch ──────────────────────────────────────────────────────────────────
 
+const MAX_REDIRECT_HOPS = 5
+
 async function fetchPage(url: string): Promise<{ html: string; finalUrl: string }> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.webBrowsing.pageTimeout)
@@ -132,10 +127,29 @@ async function fetchPage(url: string): Promise<{ html: string; finalUrl: string 
         'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8',
         'Accept-Encoding': 'gzip, deflate',
       },
-      redirect: 'follow',
+      // Redirects are followed manually so every hop re-passes the SSRF
+      // check — with 'follow', an allowed public URL can 302 straight into
+      // 169.254.169.254 or an internal service.
+      redirect: 'manual',
     }
 
-    const response = await fetch(url, fetchOptions)
+    let currentUrl = url
+    let response: Response
+    for (let hop = 0; ; hop++) {
+      response = await fetch(currentUrl, fetchOptions)
+      if (response.status < 300 || response.status >= 400) break
+      const location = response.headers.get('location')
+      if (!location) break
+      if (hop >= MAX_REDIRECT_HOPS) {
+        throw new Error(`Too many redirects (more than ${MAX_REDIRECT_HOPS})`)
+      }
+      const nextUrl = new URL(location, currentUrl).toString()
+      const blocked = await isBlockedUrl(nextUrl)
+      if (blocked.blocked) {
+        throw new Error(`Redirect target blocked: ${blocked.reason}`)
+      }
+      currentUrl = nextUrl
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} ${response.statusText}`)

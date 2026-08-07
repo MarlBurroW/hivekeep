@@ -47,3 +47,40 @@ export function resolveAppToken(token: string): { appId: string; userId: string 
   }
   return { appId: entry.appId, userId: entry.userId }
 }
+
+/**
+ * Endpoint allowlist for app-token requests. The token is readable by the
+ * app's own (untrusted) JS, so it must only unlock the runtime SDK surface.
+ * Without this, app JS could PUT its own `_server.js` (the backend is
+ * import()ed into the server process) or POST /permissions to self-grant
+ * everything its app.json requested — the approval model would be advisory.
+ * File writes, permission grants, snapshots, console reads and app CRUD stay
+ * cookie-session-only.
+ */
+export function isMiniAppTokenPathAllowed(method: string, path: string, appId: string): boolean {
+  const prefix = `/api/mini-apps/${appId}`
+  if (!path.startsWith(prefix)) return false
+  const rest = path.slice(prefix.length) || '/'
+
+  // The app's own backend API + platform proxy accept any method (both are
+  // permission-gated downstream).
+  if (rest.startsWith('/api/') || rest === '/api' || rest.startsWith('/platform/')) return true
+  // Per-app storage is the SDK's read-write surface.
+  if (rest === '/storage' || rest.startsWith('/storage/')) return true
+
+  if (method === 'GET') {
+    return (
+      rest === '/files' ||
+      rest.startsWith('/files/') ||
+      rest === '/memories/search' ||
+      rest === '/events' ||
+      rest === '/permissions' ||
+      rest === '/serve' ||
+      rest.startsWith('/static/')
+    )
+  }
+  if (method === 'POST') {
+    return rest === '/http' || rest === '/memories' || rest === '/client-event' || rest === '/console'
+  }
+  return false
+}

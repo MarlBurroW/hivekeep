@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { handleIncomingChannelMessage, getChannel } from '@/server/services/channels'
 import { getSecretValue } from '@/server/services/vault'
+import { verifyChannelWebhookToken } from '@/server/channels/webhook-token'
 import { createLogger } from '@/server/logger'
 import type { IncomingAttachment } from '@/server/channels/adapter'
 import { extractAttachments } from '@/server/channels/telegram-utils'
@@ -18,6 +19,14 @@ channelTelegramRoutes.post('/:channelId', async (c) => {
   const channel = await getChannel(channelId)
   if (!channel || channel.platform !== 'telegram' || channel.status !== 'active') {
     return c.json({ ok: true })
+  }
+
+  // In webhook mode the adapter registers a per-channel secret_token via
+  // setWebhook; Telegram echoes it on every delivery. Without this check,
+  // anyone who learns the channelId can inject forged updates.
+  if (!verifyChannelWebhookToken('telegram', channelId, c.req.header('x-telegram-bot-api-secret-token'))) {
+    log.warn({ channelId }, 'Telegram webhook rejected: missing or invalid secret token')
+    return c.json({ error: 'Unauthorized' }, 401)
   }
 
   let update: Record<string, unknown>

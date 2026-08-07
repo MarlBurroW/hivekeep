@@ -4,6 +4,7 @@ import type { ChannelAdapterMeta } from '@/server/channels/adapter'
 import { getSecretValue } from '@/server/services/vault'
 import { extractAttachments } from '@/server/channels/telegram-utils'
 import { config } from '@/server/config'
+import { channelWebhookToken } from '@/server/channels/webhook-token'
 import { createLogger } from '@/server/logger'
 
 const log = createLogger('channel:telegram')
@@ -137,7 +138,10 @@ export class TelegramAdapter implements ChannelAdapter {
       log.info({ channelId, mode: 'polling' }, 'Telegram polling started')
     } else {
       const webhookUrl = `${config.publicUrl}${config.channels.telegramWebhookPath}/${channelId}`
-      await telegramApi(token, 'setWebhook', { url: webhookUrl })
+      await telegramApi(token, 'setWebhook', {
+        url: webhookUrl,
+        secret_token: channelWebhookToken('telegram', channelId),
+      })
       log.info({ channelId, mode: 'webhook', webhookUrl }, 'Telegram webhook set')
     }
   }

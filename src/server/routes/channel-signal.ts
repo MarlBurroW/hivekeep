@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { channelAdapters } from '@/server/channels/index'
 import { SignalAdapter } from '@/server/channels/signal'
 import { getChannel } from '@/server/services/channels'
+import { verifyChannelWebhookToken } from '@/server/channels/webhook-token'
 import { createLogger } from '@/server/logger'
 
 const log = createLogger('routes:channel-signal')
@@ -14,7 +15,15 @@ channelSignalRoutes.post('/:channelId', async (c) => {
 
   const channel = await getChannel(channelId)
   if (!channel || channel.platform !== 'signal' || channel.status !== 'active') {
-    return c.json({ error: 'Channel not found' }, 404)
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Channel not found' } }, 404)
+  }
+
+  // The adapter registers the webhook URL with a derived ?token=; signal-cli
+  // posts back to that exact URL. Reject deliveries without it so a leaked
+  // channelId is not enough to inject forged messages.
+  if (!verifyChannelWebhookToken('signal', channelId, c.req.query('token'))) {
+    log.warn({ channelId }, 'Signal webhook rejected: missing or invalid token')
+    return c.json({ error: { code: 'UNAUTHORIZED', message: 'Invalid webhook token' } }, 401)
   }
 
   let payload: Record<string, unknown>
