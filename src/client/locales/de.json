@@ -2822,6 +2822,7 @@
       "delete_cron": "Zeitplan löschen",
       "list_crons": "Zeitpläne auflisten",
       "create_custom_tool": "Eigenes Tool erstellen",
+      "get_custom_tool_docs": "Custom-Tool-Doku",
       "write_custom_tool_file": "Eigene Tool-Datei schreiben",
       "run_custom_tool_setup": "Abhängigkeiten des eigenen Tools installieren",
       "test_custom_tool": "Eigenes Tool testen",

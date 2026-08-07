@@ -2822,6 +2822,7 @@
       "delete_cron": "Delete Schedule",
       "list_crons": "List Schedules",
       "create_custom_tool": "Create Custom Tool",
+      "get_custom_tool_docs": "Custom Tool Docs",
       "write_custom_tool_file": "Write Custom Tool File",
       "run_custom_tool_setup": "Install Custom Tool Deps",
       "test_custom_tool": "Test Custom Tool",

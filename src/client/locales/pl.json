@@ -2840,6 +2840,7 @@
       "delete_cron": "Usuń harmonogram",
       "list_crons": "Lista harmonogramów",
       "create_custom_tool": "Utwórz własne narzędzie",
+      "get_custom_tool_docs": "Dokumentacja narzędzi własnych",
       "write_custom_tool_file": "Zapisz plik własnego narzędzia",
       "run_custom_tool_setup": "Zainstaluj zależności własnego narzędzia",
       "test_custom_tool": "Testuj własne narzędzie",

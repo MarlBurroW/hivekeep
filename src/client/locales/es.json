@@ -2822,6 +2822,7 @@
       "delete_cron": "Eliminar programación",
       "list_crons": "Listar programaciones",
       "create_custom_tool": "Crear herramienta personalizada",
+      "get_custom_tool_docs": "Docs de herramientas personalizadas",
       "write_custom_tool_file": "Escribir archivo de herramienta personalizada",
       "run_custom_tool_setup": "Instalar dependencias de herramienta personalizada",
       "test_custom_tool": "Probar herramienta personalizada",

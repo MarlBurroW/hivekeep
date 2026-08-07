@@ -144,6 +144,7 @@ import {
   updateToolDomainTool,
   deleteToolDomainTool,
 } from '@/server/tools/custom-tool-tools'
+import { getCustomToolDocsTool } from '@/server/tools/custom-tool-docs'
 import { generateImageTool, listImageModelsTool, describeImageModelTool } from '@/server/tools/image-tools'
 import { listProvidersTool, listModelsTool } from '@/server/tools/provider-tools'
 import {
@@ -438,6 +439,7 @@ export function registerAllTools(): void {
   // Custom tools (GLOBAL, first-class). Authoring/admin tools are main-only;
   // the resulting tools are exposed separately as `custom_<slug>` (resolved by
   // services/custom-tools.ts, MCP-style — not registered here).
+  toolRegistry.register('get_custom_tool_docs', getCustomToolDocsTool, 'custom')
   toolRegistry.register('create_custom_tool', createCustomToolTool, 'custom')
   toolRegistry.register('write_custom_tool_file', writeCustomToolFileTool, 'custom')
   toolRegistry.register('run_custom_tool_setup', runCustomToolSetupTool, 'custom')

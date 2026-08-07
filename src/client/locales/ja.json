@@ -2822,6 +2822,7 @@
       "delete_cron": "スケジュールを削除",
       "list_crons": "スケジュール一覧",
       "create_custom_tool": "カスタムツールを作成",
+      "get_custom_tool_docs": "カスタムツールドキュメント",
       "write_custom_tool_file": "カスタムツールファイルを書く",
       "run_custom_tool_setup": "カスタムツールの依存関係をインストール",
       "test_custom_tool": "カスタムツールをテスト",

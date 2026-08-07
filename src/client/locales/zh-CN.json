@@ -2822,6 +2822,7 @@
       "delete_cron": "删除计划",
       "list_crons": "列出计划",
       "create_custom_tool": "创建自定义工具",
+      "get_custom_tool_docs": "自定义工具文档",
       "write_custom_tool_file": "写入自定义工具文件",
       "run_custom_tool_setup": "安装自定义工具依赖",
       "test_custom_tool": "测试自定义工具",

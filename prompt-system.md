@@ -76,14 +76,14 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 6 | `## Expertise` (`[3]`) | stable | `agent.expertise` (if set) | injected verbatim |
 | 7 | `## Platform directives` (`[3.5]`) | stable | `globalPrompt` (if set) | the admin-set global prompt (see §4) |
 | 8 | `## Configurator mission` + `## Hivekeep knowledge` (`[3.6]`) | stable | `agent.kind === 'configurator'` | Queenie only (see §5) |
-| 9 | `## Known contacts` | volatile | `contacts[]` | shared registry, with aka/system-user/identifier summary |
+| 9 | `## Known contacts` | volatile | `contacts[]` | shared registry (capped at 25, overflow points to `search_contacts`), with aka/system-user/identifier summary |
 | 10 | `## Agent directory` + Collaboration & delegation | stable | `agentDirectory[]` | main-agent variant |
 | 11 | `## Memories` (full code heading: `Memories · what you actually know`) | volatile | `relevantMemories[]` | scored, grouped, relevance/importance legend (see §6 [5]) |
 | 12 | `## Relevant knowledge` | volatile | `relevantKnowledge[]` | knowledge-base chunks |
-| 13 | `## Internal instructions (do not share…)` | stable | hardcoded, gated on `!isSubAgent && toolsEnabled` | large block |
+| 13 | `## Internal instructions (do not share…)` | stable | hardcoded, gated on `!isSubAgent && toolsEnabled` | large block; custom-tool authoring and mini-app SDK detail live behind `get_custom_tool_docs` / `get_mini_app_docs` (progressive disclosure), the prompt keeps short pointers |
 | 14 | `## MCP Tools (external servers)` | stable | `mcpTools[]`, gated on `toolsEnabled` | one summary line per server (counts only) |
-| 15 | `## External channels` + platform formatting guide | stable | `activeChannels[]` | Discord/Telegram/WhatsApp/Slack/Web formatting rules |
-| 16 | `## Current speaker` | volatile | `currentSpeaker{}` | name, role, shared/user/private notes, priority-onboard prompt when unknown |
+| 15 | `## External channels` | stable | `activeChannels[]` | channel list + attach_file/cross-channel notes; per-platform formatting comes from the per-turn `Current message from` hint, not a static guide |
+| 16 | `## Current speaker` | volatile | `currentSpeaker{}` | name, role, shared/user/private notes; when unknown, a soft get-to-know nudge (answer first, learn at natural openings; no MUST/PRIORITY wording, literal models over-triggered on it) |
 | 17 | `## Active participants` | volatile | `participants[]` | group vs 1:1 hint |
 | 18 | `## Conversation state` | volatile | `conversationState{}` | visible/total counts, compaction awareness |
 | 19 | `## Conversation history summaries` | volatile | `compactingSummaries[]` | see §6 [9] |
@@ -92,7 +92,7 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 22 | `## Channel origin context` | volatile | `pendingChannelContext{}` | reply auto-delivered back to the originating channel |
 | 23 | `## Workspace` (+ file tree) | volatile | `workspacePath` → `generateWorkspaceTree()` | depth-limited tree |
 | 24 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | rare on main; primary on sub-Agents |
-| 25 | `## Context` | volatile | `buildContextBlock()` | date/time/tz/version/install/RAM/uptime (see §6 [8]) |
+| 25 | `## Context` | volatile | `buildContextBlock()` | date/time/tz/version/install paths/public URL; host hardware details (RAM/uptime/kernel) were removed; agents use `get_system_info` (see §6 [8]) |
 | 26 | `## Final reminder (most important rule of this turn)` | volatile | hardcoded | recency-positioned tool-discipline tie-breaker |
 
 ### B. Sub-Agent (task) prompt (prompt-builder.ts:974–1087 + shared tail)
@@ -118,7 +118,7 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 
 ### C. Quick session prompt (prompt-builder.ts:1166–1200)
 
-Returns early. Order: `## Memories` (if any, volatile) → `## Platform directives` (if set, stable) → `## Quick session` notice (stable) → `## Language` (volatile) → `## Context` (volatile). Skips contacts, agent directory, internal instructions, and MCP. Quick sessions are stateless one-offs with no main conversation history, no inter-Agent comms, and no admin tools.
+Returns early. Quick sessions first flow through the main branch's [0]-[3.6] blocks, with a shortened `## Platform context` variant (no "continuous and permanent session" facts, which would contradict the Quick session notice) and Platform directives injected once by [3.5]. Then: `## Memories` (if any, volatile) → `## Quick session` notice (stable) → `## Language` (volatile) → `## Context` (volatile). Skips contacts, agent directory, internal instructions, and MCP. Quick sessions are stateless one-offs with no main conversation history, no inter-Agent comms, and no admin tools.
 
 ---
 
@@ -215,7 +215,7 @@ The **authoritative native-tool inventory is `src/server/tools/register.ts`**. D
 | `tasks` | delegation & control (`spawn_self`, `spawn_agent`, `scout`, `respond_to_task`, `cancel_task`, `list_tasks`, `list_active_queues`, `get_task_detail`, `get_task_messages`), sub-Agent side (`report_to_parent`, `update_task_status`, `request_input`), cron learnings (`save/delete_run_learning`), human-in-the-loop (`prompt_human`, `notify`), reasoning (`think`), planning (`task_todos`) |
 | `inter-agent` | `send_message`, `reply`, `list_kins` (registers `listAgentsTool`; the `list_kins` name is the registered identifier the prompt correctly matches) |
 | `crons` | cron CRUD + journal/trigger + wake-up scheduler (`wake_me_in`, `wake_me_every`, `cancel_wakeup`, `list_wakeups`) |
-| `custom` | authoring GLOBAL custom tools (`create/write/test/update/delete_custom_tool`, `run_custom_tool_setup`, `list_custom_tools`) + tool domains |
+| `custom` | authoring GLOBAL custom tools (`get_custom_tool_docs` on-demand reference, `create/write/test/update/delete_custom_tool`, `run_custom_tool_setup`, `list_custom_tools`) + tool domains |
 | `images` | `generate_image`, `list_image_models`, `describe_image_model` |
 | `system` | provider/model discovery, platform-config (`get_platform_logs`, `restart_platform`, `get_system_info`, …), configurator provider/default/avatar/global-prompt config, and secure-input (`request_provider_setup`, `request_channel_setup`, `prompt_secret`) |
 | `mcp` | MCP server management (`add/update/remove/list_mcp_server(s)`) |

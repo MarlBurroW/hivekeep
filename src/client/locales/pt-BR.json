@@ -2822,6 +2822,7 @@
       "delete_cron": "Excluir Agendamento",
       "list_crons": "Listar Agendamentos",
       "create_custom_tool": "Criar Ferramenta Personalizada",
+      "get_custom_tool_docs": "Docs de ferramentas personalizadas",
       "write_custom_tool_file": "Escrever Arquivo de Ferramenta Personalizada",
       "run_custom_tool_setup": "Instalar Dependências da Ferramenta",
       "test_custom_tool": "Testar Ferramenta Personalizada",
