@@ -13,7 +13,7 @@ import {
 import {
   SortableContext,
   sortableKeyboardCoordinates,
-  rectSortingStrategy,
+  verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { Input } from '@/client/components/ui/input'
 import { Button } from '@/client/components/ui/button'
@@ -22,7 +22,7 @@ import {
 } from '@/client/components/ui/select'
 import { useListControls } from '@/client/hooks/useListControls'
 import { LIST_FILTER_THRESHOLD } from '@/shared/constants'
-import { CronCard, SortableCronCard } from '@/client/components/crons/CronCard'
+import { CronRow, SortableCronRow } from '@/client/components/crons/CronRow'
 import { useCronsContext } from '@/client/contexts/CronsContext'
 import { useTasksContext } from '@/client/contexts/TasksContext'
 import { useAgents } from '@/client/hooks/useAgents'
@@ -103,7 +103,7 @@ export function CronsPage() {
   // only enabled when the full list is shown.
   const isDraggable = !isFiltering
 
-  const GRID = 'grid grid-cols-1 gap-3 items-stretch sm:grid-cols-2 xl:grid-cols-3'
+  const LIST = 'surface-card divide-y divide-border/60 overflow-hidden rounded-xl border border-border'
 
   return (
     <div className="surface-base flex h-full flex-col overflow-hidden">
@@ -173,9 +173,9 @@ export function CronsPage() {
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-warning">
                   {t('sidebar.crons.pendingApproval')}
                 </h2>
-                <div className={GRID}>
+                <div className={LIST}>
                   {pendingCrons.map((cron) => (
-                    <CronCard
+                    <CronRow
                       key={cron.id}
                       cron={cron}
                       llmModels={llmModels}
@@ -194,10 +194,10 @@ export function CronsPage() {
             {regularCrons.length > 0 && (
               isDraggable ? (
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={regularCronIds} strategy={rectSortingStrategy}>
-                    <div className={GRID}>
+                  <SortableContext items={regularCronIds} strategy={verticalListSortingStrategy}>
+                    <div className={LIST}>
                       {regularCrons.map((cron) => (
-                        <SortableCronCard
+                        <SortableCronRow
                           key={cron.id}
                           cron={cron}
                           llmModels={llmModels}
@@ -212,9 +212,9 @@ export function CronsPage() {
                   </SortableContext>
                 </DndContext>
               ) : (
-                <div className={GRID}>
+                <div className={LIST}>
                   {regularCrons.map((cron) => (
-                    <CronCard
+                    <CronRow
                       key={cron.id}
                       cron={cron}
                       llmModels={llmModels}
