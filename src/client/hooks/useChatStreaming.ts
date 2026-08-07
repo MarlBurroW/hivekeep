@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
+import { createSmoothReveal, type SmoothReveal } from '@/client/lib/smooth-stream'
 import type { ChatMessage } from '@/client/hooks/useChat'
 
-const STREAMING_BATCH_MS = 50
 /** After this many ms without a text token, consider the output "stalled" (e.g. tool call being generated) */
 const TOKEN_STALL_MS = 1500
 
@@ -82,9 +82,25 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
   const streamingContentRef = useRef('')
   const streamingMessageIdRef = useRef<string | null>(null)
   const streamingReasoningRef = useRef('')
-  const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reasoningBatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tokenStallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Adaptive typewriter (see smooth-stream.ts): refs hold the full received
+  // text; the reveals advance a cursor into them so coarse provider chunks
+  // render as a continuous flow instead of visible jumps.
+  const contentRevealRef = useRef<SmoothReveal | null>(null)
+  if (!contentRevealRef.current) {
+    contentRevealRef.current = createSmoothReveal((len) => {
+      setStreamingMessage((prev) =>
+        prev ? { ...prev, content: streamingContentRef.current.slice(0, len) } : prev,
+      )
+    })
+  }
+  const reasoningRevealRef = useRef<SmoothReveal | null>(null)
+  if (!reasoningRevealRef.current) {
+    reasoningRevealRef.current = createSmoothReveal((len) => {
+      setStreamingReasoning(streamingReasoningRef.current.slice(0, len))
+    })
+  }
 
   /**
    * Handle an incoming text token from SSE.
@@ -108,15 +124,18 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         streamingReasoningRef.current = ''
         setStreamingReasoning('')
         setStreamingOutputTokens(0)
+        reasoningRevealRef.current!.reset()
       }
+      contentRevealRef.current!.reset()
       streamingMessageIdRef.current = messageId
       streamingContentRef.current = token
       setIsStreaming(true)
 
+      // The bubble starts empty; the reveal cursor types the text in.
       setStreamingMessage({
         id: messageId,
         role: 'assistant',
-        content: token,
+        content: '',
         sourceType: 'agent',
         sourceId: null,
         sourceName: sourceName ?? null,
@@ -146,39 +165,23 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
       if (contentLength !== undefined && contentLength <= streamingContentRef.current.length) {
         return
       }
-      // Accumulate token, batch UI updates
       streamingContentRef.current += token
-
-      if (!batchTimerRef.current) {
-        batchTimerRef.current = setTimeout(() => {
-          batchTimerRef.current = null
-          setStreamingMessage((prev) =>
-            prev ? { ...prev, content: streamingContentRef.current } : prev,
-          )
-        }, STREAMING_BATCH_MS)
-      }
     }
+    contentRevealRef.current!.setTarget(streamingContentRef.current.length)
   }, [trackTokenStall])
 
   /**
-   * Handle a `chat:token-retract` SSE event: the text streamed during the
-   * current step turned out to be pre-narration before tool calls: truncate
-   * the streaming bubble back to the committed length. The reasoning stream
-   * and tool cards are unaffected.
+   * Handle a `chat:token-retract` SSE event: the step whose text was being
+   * streamed died (error, abort, stall): truncate the streaming bubble back
+   * to the committed length. The reasoning stream and tool cards are
+   * unaffected.
    */
   const handleTokenRetract = useCallback((data: StreamingTokenRetractData) => {
     if (streamingMessageIdRef.current !== data.messageId) return
     if (data.contentLength >= streamingContentRef.current.length) return
     streamingContentRef.current = streamingContentRef.current.slice(0, data.contentLength)
-    // Flush immediately (and cancel any pending batch) so stale provisional
-    // text never reappears after the truncation.
-    if (batchTimerRef.current) {
-      clearTimeout(batchTimerRef.current)
-      batchTimerRef.current = null
-    }
-    setStreamingMessage((prev) =>
-      prev ? { ...prev, content: streamingContentRef.current } : prev,
-    )
+    // A target below the reveal cursor snaps the visible text down immediately.
+    contentRevealRef.current!.setTarget(data.contentLength)
   }, [])
 
   /**
@@ -197,6 +200,8 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         streamingReasoningRef.current = ''
         setStreamingReasoning('')
         setStreamingOutputTokens(0)
+        contentRevealRef.current!.reset()
+        reasoningRevealRef.current!.reset()
       }
       streamingMessageIdRef.current = messageId
       setIsStreaming(true)
@@ -234,13 +239,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
     }
 
     streamingReasoningRef.current += data.token
-
-    if (!reasoningBatchTimerRef.current) {
-      reasoningBatchTimerRef.current = setTimeout(() => {
-        reasoningBatchTimerRef.current = null
-        setStreamingReasoning(streamingReasoningRef.current)
-      }, STREAMING_BATCH_MS)
-    }
+    reasoningRevealRef.current!.setTarget(streamingReasoningRef.current.length)
   }, [trackTokenStall])
 
   /**
@@ -260,15 +259,8 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
    * messages array and triggering any post-done actions (e.g. fetchMessages).
    */
   const handleDone = useCallback((data?: StreamingDoneData): ChatMessage | null => {
-    // Flush pending timers
-    if (batchTimerRef.current) {
-      clearTimeout(batchTimerRef.current)
-      batchTimerRef.current = null
-    }
-    if (reasoningBatchTimerRef.current) {
-      clearTimeout(reasoningBatchTimerRef.current)
-      reasoningBatchTimerRef.current = null
-    }
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
     if (tokenStallTimerRef.current) {
       clearTimeout(tokenStallTimerRef.current)
       tokenStallTimerRef.current = null
@@ -341,6 +333,9 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
 
     streamingMessageIdRef.current = snapshot.messageId
     streamingContentRef.current = content
+    // Pre-existing text shows at once (no typewriter over old content); only
+    // tokens arriving after the seed animate.
+    contentRevealRef.current!.prime(content.length)
 
     const reasoningText = snapshot.reasoning && snapshot.reasoning.length > 0
       ? snapshot.reasoning.map((r) => r.text).join('')
@@ -348,6 +343,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
     if (reasoningText && streamingReasoningRef.current.length < reasoningText.length) {
       streamingReasoningRef.current = reasoningText
       setStreamingReasoning(reasoningText)
+      reasoningRevealRef.current!.prime(reasoningText.length)
     }
 
     if (typeof snapshot.outputTokens === 'number') {
@@ -394,14 +390,8 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
    * Reset all streaming state. Call when the context changes (e.g. agentId switch).
    */
   const resetStreaming = useCallback(() => {
-    if (batchTimerRef.current) {
-      clearTimeout(batchTimerRef.current)
-      batchTimerRef.current = null
-    }
-    if (reasoningBatchTimerRef.current) {
-      clearTimeout(reasoningBatchTimerRef.current)
-      reasoningBatchTimerRef.current = null
-    }
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
     if (tokenStallTimerRef.current) {
       clearTimeout(tokenStallTimerRef.current)
       tokenStallTimerRef.current = null
@@ -420,8 +410,8 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
    * Cleanup function — call in a useEffect return to clear timers on unmount.
    */
   const cleanup = useCallback(() => {
-    if (batchTimerRef.current) clearTimeout(batchTimerRef.current)
-    if (reasoningBatchTimerRef.current) clearTimeout(reasoningBatchTimerRef.current)
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
     if (tokenStallTimerRef.current) clearTimeout(tokenStallTimerRef.current)
   }, [])
 

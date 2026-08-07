@@ -1767,9 +1767,9 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         resolved.config,
       )
 
-      // Text streams live as provisional tokens (see stream-runner.ts).
-      // Intermediate steps (with tool_use) retract their text; final pure-text
-      // steps commit it. Tool-call / reasoning events are forwarded immediately.
+      // Text streams live and commits at each normal step end (see
+      // stream-runner.ts): pre-tool-call preamble included, interleaved with
+      // tool cards by offset. Tool-call / reasoning events forward immediately.
       const outcome = await runStreamStep(stream, {
         agentId,
         assistantMessageId,
@@ -1785,7 +1785,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         onCommittedText: (delta) => { fullContent += delta },
         onDroppedText: (txt, idx) => log.debug(
           { agentId, assistantMessageId, step: idx, droppedChars: txt.length, preview: txt.slice(0, 200) },
-          'Dropped pre-narration from intermediate step',
+          'Dropped in-flight step text (step died: error/abort/stall)',
         ),
       }, step)
       if (outcome.usage) {
@@ -2010,15 +2010,18 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     if (stepLimitReached) {
       log.warn(
         { agentId, messageId: assistantMessageId, toolCalls: toolCallsLog.length, maxSteps: config.tools.maxSteps },
-        'LLM turn produced tool calls but no text content (step limit truncation)',
+        'LLM turn hit the tool step limit before a final response (step limit truncation)',
       )
-      fullContent = `*(Completed ${toolCallsLog.length} tool call${toolCallsLog.length > 1 ? 's' : ''} but the response was truncated due to the tool step limit of ${config.tools.maxSteps}. You can ask me to continue or summarize the results.)*`
+      // Append (not replace): committed preamble text from earlier steps has
+      // already been streamed to clients and must survive in the persisted row.
+      const notice = `${fullContent ? '\n\n' : ''}*(Completed ${toolCallsLog.length} tool call${toolCallsLog.length > 1 ? 's' : ''} but the response was truncated due to the tool step limit of ${config.tools.maxSteps}. You can ask me to continue or summarize the results.)*`
+      fullContent += notice
       sseManager.sendToAgent(agentId, {
         type: 'chat:token',
         agentId,
         data: {
           messageId: assistantMessageId,
-          token: fullContent,
+          token: notice,
           contentLength: fullContent.length,
         },
       })
@@ -2644,6 +2647,10 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     let fullContent = ''
     const reasoningSegments: ReasoningSegment[] = []
     const toolCallsLog: Array<{ id: string; name: string; args: unknown; result?: unknown; offset: number }> = []
+    // Committed-text state for the stream runner (drives the inter-step
+    // markdown separator). Not registered anywhere: quick sessions have no
+    // mid-stream rehydration route.
+    const qsContentSnapshot = { content: '', provisional: '' }
 
     const abortController = new AbortController()
     quickAbortControllers.set(sessionId, abortController)
@@ -2702,20 +2709,22 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
         qsResolved.config,
       )
 
-      // Text streams live as provisional tokens (see stream-runner.ts).
-      // Quick session has no mid-stream rehydration snapshot (no client-side
-      // remount support) and no first-token attribution payload — those are
-      // the only differences from the main Agent path.
+      // Text streams live and commits at each normal step end (see
+      // stream-runner.ts). Quick sessions have no rehydration route (no
+      // client-side remount support) and no first-token attribution payload;
+      // the local snapshot below only feeds the runner's committed-text state
+      // (inter-step markdown separator).
       const outcome = await runStreamStep(stream, {
         agentId,
         assistantMessageId,
         abortController,
         extraSseFields: { sessionId },
         reasoningSegments,
+        contentSnapshot: qsContentSnapshot,
         onCommittedText: (delta) => { fullContent += delta },
         onDroppedText: (txt, idx) => log.debug(
           { agentId, sessionId, assistantMessageId, step: idx, droppedChars: txt.length, preview: txt.slice(0, 200) },
-          'Dropped pre-narration from intermediate step (quick session)',
+          'Dropped in-flight step text (step died: error/abort/stall, quick session)',
         ),
       }, step)
       if (outcome.usage) stepUsages.push(outcome.usage)
@@ -2863,9 +2872,11 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     if (stepLimitReached) {
       log.warn(
         { agentId, sessionId, toolCalls: toolCallsLog.length, maxSteps: config.tools.maxSteps },
-        'Quick session LLM turn produced tool calls but no text content (step limit truncation)',
+        'Quick session LLM turn hit the tool step limit before a final response (step limit truncation)',
       )
-      fullContent = `*(Completed ${toolCallsLog.length} tool call${toolCallsLog.length > 1 ? 's' : ''} but the response was truncated due to the tool step limit of ${config.tools.maxSteps}. You can ask me to continue or summarize.)*`
+      // Append (not replace): committed preamble from earlier steps was
+      // already streamed to the client.
+      fullContent += `${fullContent ? '\n\n' : ''}*(Completed ${toolCallsLog.length} tool call${toolCallsLog.length > 1 ? 's' : ''} but the response was truncated due to the tool step limit of ${config.tools.maxSteps}. You can ask me to continue or summarize.)*`
     }
 
     // Surface empty turns (same rationale as main path): no text, no tool

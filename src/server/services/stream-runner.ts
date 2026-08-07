@@ -1,27 +1,30 @@
 /**
  * Per-step consumer for a hivekeep `LLMProvider.chat()` stream. Text deltas
- * are streamed to clients live as PROVISIONAL content and only COMMITTED
- * (persisted, accumulated) once the step's `finishReason` proves the step was
- * a pure-text final answer.
+ * are streamed to clients live and committed when the step ends normally,
+ * whether the step is a pure-text final answer or a tool-call step.
  *
- * Background: Opus 4.7 occasionally emits a long fabricated narrative in
- * text blocks BEFORE the tool_use blocks of the same response. On Anthropic
- * the protocol guarantees `stop_reason: tool_use` arrives after the last
- * tool_use, so the suspect text always precedes the commit signal. The step
- * classification post-stream decides what happens to the streamed text:
+ * Text emitted before tool_use blocks is preamble ("Let me check X..."); the
+ * Anthropic tool-use contract treats it as part of the assistant message: it
+ * is displayed, persisted, and replayed in history alongside the tool_use
+ * blocks (the canonical loop appends the FULL response content). Suppressing
+ * it is documented as counterproductive (it pushes models to write tool calls
+ * into plain text). Clients interleave it with tool cards via offsets.
  *
- *   - `finishReason === 'stop'`/`'length'` with no tool_use → pure-text final
- *     answer → the already-streamed deltas become committed content (caller's
- *     accumulator + snapshot). No duplicate flush event is emitted.
- *   - any step with tool_use (or error/abort/stall) → the streamed text was
- *     unverified pre-narration → emit `chat:token-retract` so clients truncate
- *     their streaming bubble back to the committed length, and never persist
- *     it. The `tool-use` chunks themselves are forwarded immediately
- *     (committed actions) so the UI still renders cards in real time.
+ *   - Step ends normally (`stop`/`length`/`tool-calls`) → the streamed deltas
+ *     become committed content (caller's accumulator + snapshot). No duplicate
+ *     flush event is emitted.
+ *   - Step dies (error, abort, stall) → the streamed text is not persisted;
+ *     `chat:token-retract` tells clients to truncate their streaming bubble
+ *     back to the committed length.
+ *
+ * When a step follows committed text that doesn't end in whitespace, a "\n\n"
+ * separator is injected into the first delta so concatenated step texts stay
+ * valid markdown; it flows through the same delta pipe, keeping the
+ * `contentLength` invariant intact.
  *
  * Wire contract: every `chat:token` carries `contentLength` = committed length
- * + provisional length AFTER appending its token, so clients can dedup against
- * a rehydration snapshot (which includes provisional text) exactly.
+ * + in-flight step length AFTER appending its token, so clients can dedup
+ * against a rehydration snapshot exactly.
  *
  * Thinking deltas are passed through unchanged: they are drafty by design,
  * client UIs treat them as thinking.
@@ -99,8 +102,8 @@ export function normalizeToolUseInput(value: unknown, context?: { toolName?: str
 }
 
 export interface StreamStepOutcome {
-  /** Committed text emitted by this step. Empty string when the buffer was
-   *  dropped (intermediate step, error, or abort). */
+  /** Committed text emitted by this step (including pre-tool-call preamble).
+   *  Empty string when the step died (error, abort, stall) or produced none. */
   stepText: string
   /** Tool-call intents collected during this step. Forwarded to SSE as they
    *  arrived; returned here so the caller can run them via `executeToolBatch`. */
@@ -158,10 +161,11 @@ export interface StreamStepContext {
   /** Optional periodic persistence (sub-Agent only). Fires every `intervalMs`
    *  while the step runs. */
   checkpoint?: { intervalMs: number; persist: () => void | Promise<void> }
-  /** Called when this step's buffered text is committed (final pure-text step). */
+  /** Called when this step's buffered text is committed (normal step end). */
   onCommittedText?: (delta: string, newLength: number) => void
-  /** Called when this step's buffered text is dropped (intermediate step,
-   *  error, or abort). Use for debug logging — never expose `droppedText` on SSE. */
+  /** Called when this step's buffered text is dropped because the step died
+   *  (error, abort, stall). Use for debug logging; never expose
+   *  `droppedText` on SSE. */
   onDroppedText?: (droppedText: string, stepIndex: number) => void
 }
 
@@ -256,8 +260,6 @@ export async function runStreamStep(
    *  arrives, consumed (and reset) by `closeReasoning`. */
   let currentSignature: string | undefined
   let inReasoning = false
-  /** True once any tool-use is seen this step. */
-  let sawCommittedSignal = false
   let error: Error | null = null
 
   const checkpointTimer = ctx.checkpoint
@@ -274,10 +276,10 @@ export async function runStreamStep(
     })
   }
 
-  /** Drop this step's provisional text: clear the snapshot mirror and, if any
+  /** Drop this step's in-flight text: clear the snapshot mirror and, if any
    *  deltas already reached clients, tell them to truncate their streaming
-   *  bubble back to the committed length. Called on every non-commit exit
-   *  (tool-call step, error, abort, stall). */
+   *  bubble back to the committed length. Only called when the step DIES
+   *  (error, abort, stall); steps that end normally commit their text. */
   const retractProvisional = () => {
     if (ctx.contentSnapshot) ctx.contentSnapshot.provisional = ''
     if (buffered.length === 0) return
@@ -362,17 +364,23 @@ export async function runStreamStep(
           // Any reasoning block in flight ends when text starts.
           closeReasoning()
           const isFirstDelta = buffered.length === 0
-          buffered += chunk.text
+          let text = chunk.text
+          // Keep concatenated step texts valid markdown: if the previous
+          // step's committed text doesn't end in whitespace, open this step's
+          // text with a paragraph break. Injected into the delta itself so the
+          // contentLength invariant holds on the wire.
+          if (isFirstDelta && prevContentLen > 0) {
+            const committed = ctx.contentSnapshot?.content ?? ''
+            if (committed.length > 0 && !/\s$/.test(committed)) text = '\n\n' + text
+          }
+          buffered += text
           // Mirror the in-flight buffer into the snapshot so a client mounting
-          // mid-step rehydrates the provisional text too (committed content is
-          // only written at the commit decision below).
+          // mid-step rehydrates this step's text too (it moves to `content`
+          // when the step commits).
           if (ctx.contentSnapshot) ctx.contentSnapshot.provisional = buffered
-          // Stream the delta live as provisional content. If the step turns
-          // out to be an intermediate tool-call step, `retractProvisional`
-          // tells clients to truncate back to `prevContentLen`.
           send('chat:token', {
             messageId: ctx.assistantMessageId,
-            token: chunk.text,
+            token: text,
             contentLength: prevContentLen + buffered.length,
             ...(prevContentLen === 0 && isFirstDelta && ctx.firstTokenAttribution
               ? ctx.firstTokenAttribution
@@ -382,16 +390,18 @@ export async function runStreamStep(
         }
         case 'tool-use': {
           closeReasoning()
-          sawCommittedSignal = true
           const normalizedInput = normalizeToolUseInput(chunk.args, {
             toolName: chunk.name,
             toolCallId: chunk.id,
           })
+          // Offset AFTER this step's preamble text, so clients interleave the
+          // tool card below the text the model wrote before calling it.
+          const toolOffset = prevContentLen + buffered.length
           stepToolCalls.push({
             id: chunk.id,
             name: chunk.name,
             args: normalizedInput,
-            offset: prevContentLen,
+            offset: toolOffset,
           })
           // We don't have a separate "tool-call-start" signal from the
           // provider abstraction — emit both events together so the client
@@ -400,14 +410,14 @@ export async function runStreamStep(
             messageId: ctx.assistantMessageId,
             toolCallId: chunk.id,
             toolName: chunk.name,
-            contentOffset: prevContentLen,
+            contentOffset: toolOffset,
           })
           send('chat:tool-call', {
             messageId: ctx.assistantMessageId,
             toolCallId: chunk.id,
             toolName: chunk.name,
             args: normalizedInput,
-            contentOffset: prevContentLen,
+            contentOffset: toolOffset,
           })
           break
         }
@@ -466,41 +476,22 @@ export async function runStreamStep(
     clearInterval(usageEstimateTimer)
   }
 
-  // DECISION POINT — classify the step. 'length' (output-token limit) counts
-  // as final too: the buffered text is a legitimate, merely truncated answer.
-  // Routing it to onDroppedText threw away everything the model generated
-  // (and billed), then reported "no visible content" to the user.
-  const isPureTextFinal =
-    (finishReason === 'stop' || finishReason === 'length') &&
-    !sawCommittedSignal &&
-    stepToolCalls.length === 0
-
-  if (isPureTextFinal && buffered.length > 0) {
-    // The deltas already reached clients live: committing is a local
-    // bookkeeping move (snapshot + caller accumulator), no flush event.
+  // Step ended normally: commit whatever text it streamed, tool calls or
+  // not. Preamble before tool_use is part of the assistant message (displayed,
+  // persisted, replayed in history alongside the tool_use blocks); 'length'
+  // (output-token limit) is a legitimate, merely truncated answer. The deltas
+  // already reached clients live, so committing is a local bookkeeping move
+  // (snapshot + caller accumulator) with no flush event.
+  if (buffered.length > 0) {
     const newLen = prevContentLen + buffered.length
     if (ctx.contentSnapshot) {
       ctx.contentSnapshot.content += buffered
       ctx.contentSnapshot.provisional = ''
     }
     ctx.onCommittedText?.(buffered, newLen)
-    return {
-      stepText: buffered,
-      stepToolCalls: [],
-      stepThinking,
-      finishReason,
-      usage,
-      wasAborted: false,
-      error: null,
-    }
   }
-
-  // Intermediate step (or pure-text step that emitted no text at all): drop
-  // any buffered content and tell clients to truncate their bubble.
-  retractProvisional()
-  if (buffered.length > 0) ctx.onDroppedText?.(buffered, stepIndex)
   return {
-    stepText: '',
+    stepText: buffered,
     stepToolCalls,
     stepThinking,
     finishReason,

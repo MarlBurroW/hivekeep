@@ -47,20 +47,20 @@ async function runCapturing(
 }
 
 describe('runStreamStep — thinking capture for cross-step re-injection', () => {
-  it('captures a signed thinking block on a tool-call step (text is still dropped)', async () => {
+  it('captures a signed thinking block on a tool-call step (preamble text committed)', async () => {
     const chunks: ChatChunk[] = [
       { type: 'thinking-delta', text: 'Let me ' },
       { type: 'thinking-delta', text: 'inspect the file.' },
       { type: 'thinking-signature', signature: 'sig-abc' },
-      { type: 'text-delta', text: 'I will read it now' }, // pre-narration → dropped
+      { type: 'text-delta', text: 'I will read it now' },
       { type: 'tool-use', id: 't1', name: 'read_file', args: { path: 'a.ts' } },
       { type: 'finish', reason: 'tool-calls', usage: { outputTokens: 5 } },
     ]
     const outcome = await runStreamStep(fakeStream(chunks), baseCtx(), 0)
 
-    // Intermediate (tool) step → narration dropped, but the signed thinking
-    // block is exposed so the caller can re-inject it.
-    expect(outcome.stepText).toBe('')
+    // Tool step: preamble text commits, and the signed thinking block is
+    // exposed so the caller can re-inject it.
+    expect(outcome.stepText).toBe('I will read it now')
     expect(outcome.stepToolCalls).toHaveLength(1)
     expect(outcome.stepToolCalls[0]!.name).toBe('read_file')
     expect(outcome.stepThinking).toEqual([
@@ -115,7 +115,7 @@ describe('runStreamStep — thinking capture for cross-step re-injection', () =>
   })
 
   it('streams text deltas live with rising contentLength and no duplicate flush on commit', async () => {
-    const contentSnapshot = { content: 'prior.', provisional: '', outputTokens: 0 }
+    const contentSnapshot = { content: 'prior. ', provisional: '', outputTokens: 0 }
     const chunks: ChatChunk[] = [
       { type: 'text-delta', text: 'Hello ' },
       { type: 'text-delta', text: 'world' },
@@ -131,47 +131,54 @@ describe('runStreamStep — thinking capture for cross-step re-injection', () =>
     // One chat:token per delta, nothing more (the commit is silent).
     expect(events.map((e) => e.type)).toEqual(['chat:token', 'chat:token'])
     expect(events[0]!.data.token).toBe('Hello ')
-    expect(events[0]!.data.contentLength).toBe('prior.'.length + 'Hello '.length)
+    expect(events[0]!.data.contentLength).toBe('prior. '.length + 'Hello '.length)
     expect(events[1]!.data.token).toBe('world')
-    expect(events[1]!.data.contentLength).toBe('prior.'.length + 'Hello world'.length)
+    expect(events[1]!.data.contentLength).toBe('prior. '.length + 'Hello world'.length)
     // Committed into the snapshot, provisional mirror cleared.
-    expect(contentSnapshot.content).toBe('prior.Hello world')
+    expect(contentSnapshot.content).toBe('prior. Hello world')
     expect(contentSnapshot.provisional).toBe('')
   })
 
-  it('retracts streamed provisional text when the step ends in tool calls', async () => {
-    const contentSnapshot = { content: 'done: ', provisional: '', outputTokens: 0 }
+  it('commits pre-tool-call preamble text and places the tool offset after it', async () => {
+    const contentSnapshot = { content: '', provisional: '', outputTokens: 0 }
     const dropped: string[] = []
     const chunks: ChatChunk[] = [
-      { type: 'text-delta', text: 'I will now read the file' },
+      { type: 'text-delta', text: 'Let me read the file.' },
       { type: 'tool-use', id: 't1', name: 'read_file', args: { path: 'a.ts' } },
       { type: 'finish', reason: 'tool-calls', usage: {} },
     ]
     const { outcome, events } = await runCapturing(
       chunks,
       baseCtx({ contentSnapshot, onDroppedText: (txt) => dropped.push(txt) }),
-      ['chat:token', 'chat:token-retract'],
+      ['chat:token', 'chat:token-retract', 'chat:tool-call'],
     )
 
-    expect(outcome.stepText).toBe('')
-    // The pre-narration streamed live, then got retracted to committed length.
-    expect(events.map((e) => e.type)).toEqual(['chat:token', 'chat:token-retract'])
-    expect(events[1]!.data).toMatchObject({
-      messageId: 'msg-test',
-      contentLength: 'done: '.length,
-    })
-    expect(dropped).toEqual(['I will now read the file'])
-    expect(contentSnapshot.content).toBe('done: ')
+    // Preamble is committed content: returned as stepText (for history
+    // replay), accumulated in the snapshot, never dropped or retracted.
+    expect(outcome.stepText).toBe('Let me read the file.')
+    expect(outcome.stepToolCalls[0]!.offset).toBe('Let me read the file.'.length)
+    expect(events.map((e) => e.type)).toEqual(['chat:token', 'chat:tool-call'])
+    expect(events[1]!.data.contentOffset).toBe('Let me read the file.'.length)
+    expect(dropped).toEqual([])
+    expect(contentSnapshot.content).toBe('Let me read the file.')
     expect(contentSnapshot.provisional).toBe('')
   })
 
-  it('does not emit a retract when a tool-call step streamed no text', async () => {
+  it('opens a later step with a paragraph break when committed text lacks trailing whitespace', async () => {
+    const contentSnapshot = { content: 'Checking the config.', provisional: '', outputTokens: 0 }
     const chunks: ChatChunk[] = [
-      { type: 'tool-use', id: 't1', name: 'grep', args: { q: 'x' } },
-      { type: 'finish', reason: 'tool-calls', usage: {} },
+      { type: 'text-delta', text: 'The value is 42.' },
+      { type: 'finish', reason: 'stop', usage: {} },
     ]
-    const { events } = await runCapturing(chunks, baseCtx(), ['chat:token', 'chat:token-retract'])
-    expect(events).toEqual([])
+    const { outcome, events } = await runCapturing(
+      chunks,
+      baseCtx({ contentSnapshot }),
+      ['chat:token'],
+    )
+
+    expect(events[0]!.data.token).toBe('\n\nThe value is 42.')
+    expect(outcome.stepText).toBe('\n\nThe value is 42.')
+    expect(contentSnapshot.content).toBe('Checking the config.\n\nThe value is 42.')
   })
 
   it('attaches first-token attribution only on the very first delta of the message', async () => {

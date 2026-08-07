@@ -41,8 +41,8 @@ Real-time message streaming and conversation events.
 | Event | Description | Scope |
 |-------|-------------|-------|
 | `chat:message` | New message created (user or AI) | Per-Agent |
-| `chat:token` | Streaming text delta during AI response (provisional until the step commits) | Per-Agent |
-| `chat:token-retract` | Truncate streamed text back to committed length (step ended in tool calls) | Per-Agent |
+| `chat:token` | Streaming text delta during AI response | Per-Agent |
+| `chat:token-retract` | Truncate streamed text back to committed length (step died: error/abort/stall) | Per-Agent |
 | `chat:reasoning-token` | Streaming reasoning/thinking token chunk | Per-Agent |
 | `chat:tool-call-start` | Tool call started | Per-Agent |
 | `chat:tool-call` | Tool call arguments resolved | Per-Agent |

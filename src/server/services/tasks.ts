@@ -1390,7 +1390,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         onCommittedText: (delta) => { fullContent += delta },
         onDroppedText: (txt, idx) => log.debug(
           { taskId, agentId: task.parentAgentId, assistantMessageId, step: idx, droppedChars: txt.length, preview: txt.slice(0, 200) },
-          'Dropped pre-narration from intermediate step (sub-Agent)',
+          'Dropped in-flight step text (step died: error/abort/stall, sub-Agent)',
         ),
         checkpoint: {
           intervalMs: 500,

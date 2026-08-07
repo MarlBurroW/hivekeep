@@ -1807,16 +1807,16 @@ Returns `201 { "ok": true }`. Errors: `503 FEEDBACK_DISABLED` (feature off), `50
 
 ```typescript
 // Streaming LLM text, one event per provider delta. `contentLength` is the
-// total streamed length (committed + provisional) AFTER appending `token`;
-// clients use it to skip tokens already covered by a rehydration snapshot.
-// Text streamed during a step that ends in tool calls is PROVISIONAL
-// (pre-narration) and is followed by a `chat:token-retract`. The first delta
-// of a message also carries attribution fields (sourceName, sourceAvatarUrl…).
+// total streamed length AFTER appending `token`; clients use it to skip
+// tokens already covered by a rehydration snapshot. Text commits at each
+// normal step end, pre-tool-call preamble included (interleaved with tool
+// cards via the tool events' `contentOffset`). The first delta of a message
+// also carries attribution fields (sourceName, sourceAvatarUrl…).
 { event: 'chat:token', data: { agentId: string, messageId: string, token: string, contentLength: number } }
 
-// The current step's streamed text turned out to be pre-narration before
-// tool calls (or the step errored/was aborted): truncate the streaming
-// bubble content back to `contentLength` characters.
+// The step whose text was being streamed died (provider error, user abort,
+// stall timeout): truncate the streaming bubble content back to
+// `contentLength` characters. Never emitted for steps that end normally.
 { event: 'chat:token-retract', data: { agentId: string, messageId: string, contentLength: number } }
 
 // LLM response finished
