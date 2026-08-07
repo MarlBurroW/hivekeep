@@ -255,11 +255,23 @@ describe('vault-tools', () => {
   // ── get_vault_entry ───────────────────────────────────────────────────────
 
   describe('get_vault_entry', () => {
-    it('returns entry value when found', async () => {
+    it('returns the entry shape but never the decrypted values', async () => {
       mockVault.getSecretByKey.mockResolvedValueOnce({ id: 'sec-1' })
-      mockVault.getEntryValue.mockResolvedValueOnce({ entryType: 'credential', value: { user: 'a' } })
+      mockVault.getEntryValue.mockResolvedValueOnce({ entryType: 'credential', value: { user: 'a', password: 'hunter2' } })
       const result = await execute(getVaultEntryTool, { key: 'CRED' })
-      expect(result).toEqual({ entryType: 'credential', fields: { user: 'a' } })
+      expect(result).toEqual({
+        entryType: 'credential',
+        fields: ['user', 'password'],
+        placeholder: '{{secret:CRED}}',
+      })
+      expect(JSON.stringify(result)).not.toContain('hunter2')
+    })
+
+    it('returns fields: null for a plain string entry', async () => {
+      mockVault.getSecretByKey.mockResolvedValueOnce({ id: 'sec-1' })
+      mockVault.getEntryValue.mockResolvedValueOnce({ entryType: 'text', value: 'top-secret' })
+      const result = await execute(getVaultEntryTool, { key: 'TXT' })
+      expect(result).toEqual({ entryType: 'text', fields: null, placeholder: '{{secret:TXT}}' })
     })
 
     it('returns error when key not found', async () => {
@@ -329,14 +341,11 @@ describe('vault-tools', () => {
   // ── get_vault_attachment ──────────────────────────────────────────────────
 
   describe('get_vault_attachment', () => {
-    it('returns base64 data when attachment found', async () => {
+    it('returns metadata only, never the attachment bytes', async () => {
       const data = new Uint8Array([72, 101, 108, 108, 111]) // "Hello"
       mockVault.getAttachment.mockResolvedValueOnce({ name: 'file.txt', mimeType: 'text/plain', data })
       const result = await execute(getVaultAttachmentTool, { attachment_id: 'att-1' })
-      expect(result.name).toBe('file.txt')
-      expect(result.mimeType).toBe('text/plain')
-      expect(result.size).toBe(5)
-      expect(result.base64).toBe(btoa('Hello'))
+      expect(result).toEqual({ name: 'file.txt', mimeType: 'text/plain', size: 5 })
     })
 
     it('returns error when attachment not found', async () => {

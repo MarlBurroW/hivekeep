@@ -5,6 +5,7 @@ import { recordGuardFire } from '@/server/services/tool-call-tracker'
 import type { ToolRegistration } from '@/server/tools/types'
 import { resolveToolWorkspace } from '@/server/tools/workspace'
 import { config } from '@/server/config'
+import { subprocessEnv } from '@/server/services/subprocess-env'
 
 const log = createLogger('shell-tools')
 
@@ -318,7 +319,7 @@ export const runShellTool: ToolRegistration = {
             stdout: 'pipe',
             stderr: 'pipe',
             env: {
-              ...process.env,
+              ...subprocessEnv(),
               ...secretEnv,
               HIVEKEEP_KIN_ID: ctx.agentId,
               HIVEKEEP_WORKSPACE: workspace,
