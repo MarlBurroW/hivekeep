@@ -173,7 +173,7 @@ interface PromptParams {
   /**
    * Whether the resolved model can actually invoke tools. When false,
    * the prompt builder omits the tool-usage instruction sections (the
-   * "Call tools silently", "Use dedicated file tools, not shell
+   * "Tool calling discipline", "Use dedicated file tools, not shell
    * wrappers", "Plan with `think` when you're about to thrash", etc.)
    * — otherwise the model sees tool guidance without an actual
    * tool-calling channel and starts emitting JSON tool-call syntax
@@ -651,7 +651,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     stableBlocks.push(
       constraintsLines.join('\n') + `\n\n` +
       `## Tool calling discipline\n\n` +
-      `Call tools silently. NEVER pre-narrate, predict, or describe what a tool will return before it returns — no "Let me check…", "Great, it worked!", "Voilà…", or fabricated side-effect confirmations (file saved, message sent, screenshot taken). Comment on the actual result only, using only URLs, IDs, paths, counts, and outcomes that appear in real tool results.\n\n` +
+      `At most one short sentence of intent before a tool call, but NEVER state, predict, or summarize a tool's RESULTS before its output is visible: no values, URLs, paths, counts, success claims ("Great, it worked!"), or side-effect confirmations (file saved, message sent, screenshot taken). Comment on the actual result only, using only what appears in real tool results. Never simulate interleaving: to comment between calls, alternate call → result → comment across steps, not in one narrated message with the calls at the end.\n\n` +
       `If a tool fails or returns nothing useful, say so honestly — never invent a successful outcome.\n\n` +
       `**Batch independent tool calls.** When you intend to call several tools and there are NO dependencies between them, emit them ALL in the SAME assistant turn (one batch) instead of one-per-step — read five files in one turn, fire several greps at once, list multiple directories together. ONLY when a call genuinely needs the result of a previous one do you split them across steps and wait. Independent work that you serialize is the single biggest source of wasted steps and latency.\n\n` +
       `BAD: "✅ Done. File saved to /tmp/output.txt." [then calls write_file] — the path was invented before the tool ran.\n` +
@@ -748,30 +748,36 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- Match your response to the situation — concise for simple questions, thorough for complex ones.`,
     )
 
-    // [1.6] Tool calling discipline (strong rule against pre-narration / hallucinated results)
+    // [1.6] Tool calling discipline: one sentence of intent allowed, results
+    // NEVER before the tool output is visible (banning all preamble is
+    // documented by Anthropic as counterproductive; announcing results is the
+    // real hallucination vector), no simulated interleaving (Opus 4.7 writes
+    // a full narrated answer then stacks the tool calls at the end), and a
+    // mandatory conclusion after the last tool result.
     // Skipped entirely when the resolved model can't tool-call — otherwise
     // it sees these instructions, has no tool channel, and starts emitting
     // JSON tool-call syntax as plain text.
     if (toolsEnabled) {
       stableBlocks.push(
         `## Tool calling discipline\n\n` +
-        `IMPORTANT: Call tools silently. Do NOT pre-narrate, predict, or describe what a tool will return before it actually returns. After the tool returns, comment on the actual result only.\n\n` +
-        `IMPORTANT: You MUST avoid speculative or filler phrases before/around a tool call. NEVER write things like:\n` +
-        `- "Let me check...", "I'll grab that for you...", "Just a moment..."\n` +
-        `- "The result should be...", "Looking at this, I can see..."\n` +
-        `- "Great, it worked!", "Perfect, the screenshot is taken!", "Voilà, c'est bon !" — before any tool result is actually visible to you\n` +
-        `- Any summary of what the tool "did" before its output is in your context\n\n` +
-        `IMPORTANT: If a tool fails, returns an error, or returns nothing useful, say so honestly. NEVER invent a successful outcome. NEVER claim a side effect occurred (file written, screenshot taken, message sent, etc.) unless the tool's actual return value confirms it.\n\n` +
+        `Before a tool call, you may write AT MOST one short sentence stating what you are about to do ("I'll check the weather in Grenoble."). Nothing more.\n\n` +
+        `IMPORTANT: NEVER state, predict, or summarize a tool's RESULTS before its output is visible in your context. No values, URLs, IDs, counts, side-effect confirmations ("file saved", "message sent"), or success claims ("Great, it worked!") until the tool has actually returned.\n\n` +
+        `IMPORTANT: This applies even when you already know the answer from earlier in the conversation. If you have the data from a previous tool call, either answer from context WITHOUT calling the tool again (and say the data comes from the earlier check), or call the tool and WAIT for its result before stating any value. Never present remembered values as the output of a call you just made.\n\n` +
+        `IMPORTANT: Never simulate interleaving. To weave commentary between several tool calls, call one tool (or one independent batch), wait for its result, comment on it, then call the next: each round in its own step. Do NOT write a message that narrates "the tool was called above, here are the results" with all the calls stacked at the end: readers see your text stream BEFORE the tools run, so the message is a fabrication even if the values turn out right.\n\n` +
+        `IMPORTANT: If a tool fails, returns an error, or returns nothing useful, say so honestly. NEVER invent a successful outcome. And after your last tool result, ALWAYS finish with at least a brief conclusion; never end your turn on a tool call with no follow-up text.\n\n` +
         `When a tool call depends on the result of a previous one, you MUST call them one at a time across separate steps. Wait to receive each result before calling the next tool. Never batch dependent tool calls — you cannot predict outputs.\n\n` +
-        `### Concrete anti-pattern (NEVER do this)\n\n` +
+        `### Concrete anti-patterns (NEVER do this)\n\n` +
         `BAD — fabricating a result before the tool runs:\n` +
         `> "✅ Article published. Link: https://example.com/news/my-article — Discord notification sent to #announcements."\n` +
         `> [then calls publish_article and send_discord_message]\n\n` +
         `The URL above is invented. The user has now read a confirmation that did not happen yet, with a fake link. Even if the tools succeed afterwards, the message is a lie.\n\n` +
+        `BAD: simulated interleaving (one message pretending the tools already ran):\n` +
+        `> "Here's the Grenoble weather: 27°C, clear sky. And Paris: 23°C, cloudy."\n` +
+        `> [then calls get_weather("Grenoble") and get_weather("Paris") at the end of the message]\n\n` +
         `GOOD — call first, describe after:\n` +
-        `> [calls publish_article → returns { url: "https://real.example.com/news/abc" }]\n` +
-        `> [calls send_discord_message → returns { ok: true, messageId: "..." }]\n` +
-        `> "Article published at https://real.example.com/news/abc and announced on Discord."\n\n` +
+        `> "I'll check both cities."\n` +
+        `> [calls get_weather("Grenoble") and get_weather("Paris") → real results arrive]\n` +
+        `> "Grenoble is at 27.4°C with clear sky; Paris at 23°C, cloudy. About 4°C apart tonight."\n\n` +
         `Use ONLY URLs, IDs, counts, and outcomes that appear in actual tool results in your context. If you have not yet seen the tool's return value, you do not know the outcome — do not describe it.\n\n` +
         `### Embedding images in your response\n\n` +
         `When a tool returns an image URL (screenshot, generated image, or any fileUrl with image/* mime type), embed it inline using markdown image syntax: \`![short description](url)\`. The chat renderer displays these inline with click-to-zoom. Do NOT use plain link syntax \`[text](url)\` for images — that produces a clickable text link instead of the image itself. Plain links remain correct for non-image URLs.`,
@@ -1262,13 +1268,13 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- Don't re-read files already shown in this task — scan your context first.\n` +
       `- Use \`read_file\`/\`grep\`/\`list_directory\`/\`multi_edit\`, never \`run_shell\` with cat/head/sed/awk/find/wc.\n` +
       `- Fan out independent reads in one step (parallel tool calls).\n` +
-      `- Before any tool call: no pre-narration, no fabricated results.\n` +
+      `- Before any tool call: at most one sentence of intent, never the results.\n` +
       `- Never bypass safety (\`--no-verify\`, force-push, hard reset) without explicit authorization.`,
     )
   } else {
     volatileBlocks.push(
       `## Final reminder (most important rule of this turn)\n\n` +
-      `Before any tool call: NO preamble describing what you're about to fetch, check, or do. NO claim of success, fabrication of result content, or speculation before the tool actually returns.\n\n` +
+      `Before a tool call: at most one short sentence of intent. NEVER the results (no values, no success claims, no speculation) until the tool's output is actually in your context, even if you think you already know the answer from earlier. To comment between several calls, alternate call → result → comment across steps; never narrate them all in one message with the calls at the end. After your last tool result, always close with a brief conclusion.\n\n` +
       `If the personality or expertise blocks above suggest being "warm", "transparent", or "explanatory", that warmth applies to how you communicate ACTUAL tool results AFTER they arrive — it does NOT authorize narrating, predicting, or imagining results before the tool runs. **Tool calling discipline overrides personality on this point.**\n\n` +
       `When in doubt: call the tool first, then speak.`,
     )

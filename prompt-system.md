@@ -71,7 +71,7 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 1 | `## Platform context` (`[0]`) | stable | hardcoded | continuous session, multi-user, queue model |
 | 2 | `You are {name} (slug: {slug}), {role}.` (`[1]`) | stable | `agent.name/slug/role` | identity line |
 | 3 | `## Core principles` (`[1.5]`) | stable | hardcoded | universal baseline behaviors |
-| 4 | `## Tool calling discipline` (`[1.6]`) | stable | hardcoded, gated on `toolsEnabled` | anti-pre-narration + concrete anti-pattern + image-embedding sub-block |
+| 4 | `## Tool calling discipline` (`[1.6]`) | stable | hardcoded, gated on `toolsEnabled` | intent-sentence-only-before-results rule + anti simulated-interleaving + concrete anti-patterns + image-embedding sub-block |
 | 5 | `## Personality` (`[2]`) | stable | `agent.character` (if set) | injected verbatim, no translation |
 | 6 | `## Expertise` (`[3]`) | stable | `agent.expertise` (if set) | injected verbatim |
 | 7 | `## Platform directives` (`[3.5]`) | stable | `globalPrompt` (if set) | the admin-set global prompt (see §4) |
@@ -143,7 +143,7 @@ The configurator-only tools (`describe_provider_config`, `request_provider_setup
 
 ### [1.6] Tool calling discipline (stable, main; inlined for sub-Agents)
 
-Strong anti-pre-narration rule modeled on Claude Code's `IMPORTANT:` pattern, with explicit forbidden-phrase examples and a concrete BAD/GOOD anti-pattern. Necessary because personality blocks often push warm/conversational tones that fight terse tool discipline. Includes an **Embedding images** sub-block: tools that return an image URL should be embedded with `![alt](url)` markdown so the chat renderer shows them inline with click-to-zoom.
+Result-discipline rule modeled on Claude Code's `IMPORTANT:` pattern. One short sentence of intent before a tool call is allowed (a total preamble ban is documented by Anthropic as counterproductive: it pushes models to write tool calls into plain text). What is forbidden: stating a tool's RESULTS before its output is visible (even values remembered from earlier in the conversation), simulated interleaving (a single narrated message with all the tool calls stacked at the end, the observed Opus 4.7 pathology), and ending a turn on a tool call with no follow-up text. Ships concrete BAD/GOOD anti-patterns. Necessary because personality blocks often push warm/conversational tones that fight terse tool discipline. Includes an **Embedding images** sub-block: tools that return an image URL should be embedded with `![alt](url)` markdown so the chat renderer shows them inline with click-to-zoom.
 
 ### [5] Memories: `buildMemoriesBlock` (volatile)
 
