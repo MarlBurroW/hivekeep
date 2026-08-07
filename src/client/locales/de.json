@@ -427,6 +427,7 @@
       "dangerZoneDesc": "Diesen Agenten und alle seine Daten dauerhaft löschen. Das kann nicht rückgängig gemacht werden.",
       "delete": "Diesen Agenten löschen",
       "deleteConfirm": "Bist du sicher? Das löscht diesen Agenten und alle seine Daten dauerhaft.",
+      "deleteConfiguratorConfirm": "Das ist Queenie, die Konfigurationsassistentin: Sie zu löschen entfernt auch den gesamten Onboarding-Verlauf. Du kannst sie später unter Einstellungen > Allgemein neu erstellen, aber die Unterhaltung ist endgültig verloren.",
       "deleteAction": "Dauerhaft löschen"
     },
     "tabs": {
@@ -1340,6 +1341,13 @@
         "content": "Allgemeine Einstellungen steuern plattformweites Verhalten, das für alle deine Agenten gilt. Mit dem globalen Prompt definierst du Anweisungen, die jeder Agent befolgt.",
         "bullet1": "Der globale Prompt wird in den System-Prompt jedes Agenten eingefügt. Nutze ihn für universelle Regeln oder Richtlinien",
         "bullet2": "Limits für die Aufgabenausführung deckeln gleichzeitige Läufe über alle Agenten. Angehaltene Aufgaben geben ihren Slot frei; ein höheres Limit füllt die Warteschlange sofort, ein niedrigeres greift schrittweise"
+      },
+      "queenie": {
+        "missingTitle": "Queenie fehlt",
+        "missingBody": "Die Konfigurationsassistentin existiert auf dieser Instanz nicht (gelöscht oder der Einrichtungsassistent wurde unterbrochen). Erstelle sie neu, um die geführte Konfiguration zurückzubekommen.",
+        "recreate": "Queenie neu erstellen",
+        "recreated": "Queenie wurde neu erstellt",
+        "noProvider": "Kein gültiger LLM-Provider verfügbar. Verbinde zuerst einen."
       }
     },
     "avatars": {

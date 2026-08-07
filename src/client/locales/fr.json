@@ -427,6 +427,7 @@
       "dangerZoneDesc": "Supprimer définitivement cet Agent et toutes ses données. Cette action est irréversible.",
       "delete": "Supprimer cet Agent",
       "deleteConfirm": "Êtes-vous sûr ? Cela supprimera définitivement cet Agent et toutes ses données.",
+      "deleteConfiguratorConfirm": "C'est Queenie, l'assistante de configuration : supprimer cet Agent efface aussi tout l'historique d'onboarding. Tu pourras la recréer depuis Réglages > Général, mais la conversation sera définitivement perdue.",
       "deleteAction": "Supprimer définitivement"
     },
     "tabs": {
@@ -1340,6 +1341,13 @@
         "content": "Les paramètres généraux contrôlent le comportement global de la plateforme, applicable à tous vos Agents. Le prompt global permet de définir des instructions suivies par chaque Agent.",
         "bullet1": "Le prompt global est injecté dans le prompt système de chaque Agent. Utilisez-le pour des règles ou directives universelles",
         "bullet2": "Les limites d'exécution des tâches plafonnent les exécutions simultanées pour l'ensemble des Agents. Les tâches suspendues libèrent leur emplacement ; augmenter la limite remplit la file immédiatement, la diminuer est progressif"
+      },
+      "queenie": {
+        "missingTitle": "Queenie est absente",
+        "missingBody": "L'assistante de configuration n'existe pas sur cette instance (supprimée, ou assistant de démarrage interrompu). Recrée-la pour retrouver la configuration guidée.",
+        "recreate": "Recréer Queenie",
+        "recreated": "Queenie a été recréée",
+        "noProvider": "Aucun provider LLM valide disponible. Connecte-en un d'abord."
       }
     },
     "avatars": {

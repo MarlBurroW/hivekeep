@@ -427,6 +427,7 @@
       "dangerZoneDesc": "Permanently delete this Agent and all of its data. This cannot be undone.",
       "delete": "Delete this Agent",
       "deleteConfirm": "Are you sure? This will permanently delete this Agent and all its data.",
+      "deleteConfiguratorConfirm": "This is Queenie, the configurator assistant, and this also deletes the whole onboarding history. You can recreate her later from Settings > General, but the conversation is gone for good.",
       "deleteAction": "Delete permanently"
     },
     "tabs": {
@@ -1340,6 +1341,13 @@
         "content": "General settings control platform-wide behavior that applies to all your Agents. The global prompt lets you define instructions every Agent follows.",
         "bullet1": "The global prompt is injected into every Agent's system prompt. Use it for universal rules or guidelines",
         "bullet2": "Task execution limits cap concurrent runs across all Agents. Suspended tasks release their slot; raising the limit fills the queue immediately, lowering it is gradual"
+      },
+      "queenie": {
+        "missingTitle": "Queenie is missing",
+        "missingBody": "The configurator assistant does not exist on this instance (deleted, or the setup wizard was interrupted). Recreate her to get guided configuration back.",
+        "recreate": "Recreate Queenie",
+        "recreated": "Queenie has been recreated",
+        "noProvider": "No valid LLM provider available. Connect one first."
       }
     },
     "avatars": {

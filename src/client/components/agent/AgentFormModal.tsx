@@ -41,7 +41,7 @@ import { useAuth } from '@/client/hooks/useAuth'
 import { useHasCapability } from '@/client/hooks/useHasCapability'
 import { cn } from '@/client/lib/utils'
 import { api, getErrorMessage, toastError } from '@/client/lib/api'
-import type { AgentCompactingConfig, AgentThinkingConfig } from '@/shared/types'
+import type { AgentCompactingConfig, AgentKind, AgentThinkingConfig } from '@/shared/types'
 import type { GeneratedAgentConfig } from '@/client/hooks/useAgents'
 import type { ProviderModel } from '@/client/hooks/useModels'
 import { modelReasoningInfo, clampEffort } from '@/client/lib/model-efforts'
@@ -55,6 +55,7 @@ interface AgentDetail {
   slug: string
   name: string
   role: string
+  kind?: AgentKind
   avatarUrl: string | null
   character: string
   expertise: string
@@ -1215,7 +1216,11 @@ export function AgentFormModal({
                               <ConfirmDeleteButton
                                 onConfirm={handleDelete}
                                 title={t('agent.settings.delete')}
-                                description={t('agent.settings.deleteConfirm')}
+                                description={
+                                  agent?.kind === 'configurator'
+                                    ? t('agent.settings.deleteConfiguratorConfirm')
+                                    : t('agent.settings.deleteConfirm')
+                                }
                                 confirmLabel={t('agent.settings.deleteAction')}
                                 trigger={
                                   <Button type="button" variant="destructive" size="sm" disabled={isDeleting}>

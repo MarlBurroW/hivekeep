@@ -427,6 +427,7 @@
       "dangerZoneDesc": "永久删除此智能体及其所有数据。此操作无法撤销。",
       "delete": "删除此智能体",
       "deleteConfirm": "确定吗？这将永久删除此智能体及其所有数据。",
+      "deleteConfiguratorConfirm": "这是配置助手 Queenie：删除她也会清除全部引导历史。之后可以在 设置 > 通用 中重新创建，但对话将永久丢失。",
       "deleteAction": "永久删除"
     },
     "tabs": {
@@ -1340,6 +1341,13 @@
         "content": "常规设置控制适用于所有智能体的平台级行为。全局提示词可以定义每个智能体都遵循的指令。",
         "bullet1": "全局提示词会注入到每个智能体的系统提示词中。用于通用规则或准则",
         "bullet2": "任务执行限制约束所有智能体的并发运行数。挂起的任务会释放槽位；提高上限会立即消化队列，降低则是渐进的"
+      },
+      "queenie": {
+        "missingTitle": "Queenie 不存在",
+        "missingBody": "此实例上没有配置助手（已被删除，或初始向导被中断）。重新创建即可恢复引导式配置。",
+        "recreate": "重新创建 Queenie",
+        "recreated": "Queenie 已重新创建",
+        "noProvider": "没有可用的有效 LLM 提供商，请先连接一个。"
       }
     },
     "avatars": {

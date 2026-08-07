@@ -427,6 +427,7 @@
       "dangerZoneDesc": "Elimina permanentemente este Agente y todos sus datos. No se puede deshacer.",
       "delete": "Eliminar este Agente",
       "deleteConfirm": "¿Seguro? Esto eliminará permanentemente este Agente y todos sus datos.",
+      "deleteConfiguratorConfirm": "Esta es Queenie, la asistente de configuración: eliminarla también borra todo el historial de onboarding. Podrás recrearla desde Ajustes > General, pero la conversación se perderá para siempre.",
       "deleteAction": "Eliminar permanentemente"
     },
     "tabs": {
@@ -1340,6 +1341,13 @@
         "content": "Los ajustes generales controlan el comportamiento de toda la plataforma para todos tus Agentes. El prompt global te permite definir instrucciones que todos siguen.",
         "bullet1": "El prompt global se inyecta en el prompt de sistema de cada Agente. Úsalo para reglas o pautas universales",
         "bullet2": "Los límites de ejecución de tareas acotan las ejecuciones simultáneas entre todos los Agentes. Las tareas suspendidas liberan su hueco; subir el límite llena la cola de inmediato, bajarlo es gradual"
+      },
+      "queenie": {
+        "missingTitle": "Queenie no está",
+        "missingBody": "La asistente de configuración no existe en esta instancia (eliminada o el asistente inicial se interrumpió). Recréala para recuperar la configuración guiada.",
+        "recreate": "Recrear Queenie",
+        "recreated": "Queenie ha sido recreada",
+        "noProvider": "No hay un proveedor LLM válido disponible. Conecta uno primero."
       }
     },
     "avatars": {

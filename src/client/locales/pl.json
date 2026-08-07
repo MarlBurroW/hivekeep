@@ -429,6 +429,7 @@
       "dangerZoneDesc": "Trwale usuń tego Agenta wraz ze wszystkimi jego danymi. Tej operacji nie można cofnąć.",
       "delete": "Usuń tego Agenta",
       "deleteConfirm": "Na pewno? Spowoduje to trwałe usunięcie tego Agenta i wszystkich jego danych.",
+      "deleteConfiguratorConfirm": "To Queenie, asystentka konfiguracji: jej usunięcie kasuje też całą historię wdrożenia. Możesz ją odtworzyć w Ustawienia > Ogólne, ale rozmowa przepadnie bezpowrotnie.",
       "deleteAction": "Usuń trwale"
     },
     "tabs": {
@@ -1352,6 +1353,13 @@
         "content": "Ustawienia ogólne kontrolują zachowanie całej platformy, obowiązujące wszystkich twoich Agentów. Globalny prompt pozwala zdefiniować instrukcje, których przestrzega każdy Agent.",
         "bullet1": "Globalny prompt jest wstrzykiwany do promptu systemowego każdego Agenta. Użyj go do uniwersalnych zasad lub wytycznych",
         "bullet2": "Limity wykonywania zadań ograniczają równoczesne uruchomienia u wszystkich Agentów. Zadania wstrzymane zwalniają slot; podniesienie limitu natychmiast opróżnia kolejkę, obniżenie działa stopniowo"
+      },
+      "queenie": {
+        "missingTitle": "Brak Queenie",
+        "missingBody": "Asystentka konfiguracji nie istnieje w tej instancji (usunięta lub kreator początkowy został przerwany). Odtwórz ją, aby wrócić do konfiguracji z przewodnikiem.",
+        "recreate": "Odtwórz Queenie",
+        "recreated": "Queenie została odtworzona",
+        "noProvider": "Brak prawidłowego dostawcy LLM. Najpierw go podłącz."
       }
     },
     "avatars": {

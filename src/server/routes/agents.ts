@@ -603,6 +603,7 @@ agentRoutes.get('/:id', async (c) => {
     slug: details.slug,
     name: details.name,
     role: details.role,
+    kind: details.kind,
     avatarUrl: details.avatarUrl,
     character: details.character,
     expertise: details.expertise,
