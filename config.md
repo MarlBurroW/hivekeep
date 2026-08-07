@@ -210,9 +210,8 @@ Limits of the **Files** section (workspace browser/editor — see `files.md`).
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `upload.dir` | `UPLOAD_DIR` | `{dataDir}/uploads` | Storage directory for files (chat, ticket attachments) |
-| `upload.maxFileSizeMb` | `UPLOAD_MAX_FILE_SIZE` | `50` | Max size of an uploaded file (MB). Also serves as the default for ticket attachments |
-| — | `TICKET_ATTACHMENT_MAX_SIZE` | `UPLOAD_MAX_FILE_SIZE` | Specific override for ticket attachments, in MB. Files are stored under `{upload.dir}/tickets/<projectId>/<ticketId>/<id>.<ext>` and cascade-deleted when the ticket is destroyed |
+| `upload.dir` | `UPLOAD_DIR` | `{dataDir}/uploads` | Storage directory for uploaded files (chat, channel media) |
+| `upload.maxFileSizeMb` | `UPLOAD_MAX_FILE_SIZE` | `50` | Max size of an uploaded file (MB) |
 
 ---
 
@@ -428,14 +427,6 @@ Triggers on connected email accounts: a matching incoming email prompts a target
 |---------|---------|-------------|
 | `WAKEUPS_MAX_PENDING_PER_KIN` | `20` | Max number of scheduled wakeups per Agent. |
 | `HUMAN_PROMPTS_MAX_PENDING` | `5` | Max number of pending human prompts per Agent. |
-
-## Projects (Kanban & tickets)
-
-| Env Var | Default | Description |
-|---------|---------|-------------|
-| `PROJECTS_MAX_DESCRIPTION_PROMPT_TOKENS` | `8000` | Strict ceiling on project description tokens injected into the prompt. |
-| `PROJECTS_MAX_TICKETS_IN_PROMPT` | `50` | Max number of non-done tickets injected (sorted by `updated_at` DESC). |
-| `PROJECTS_KANBAN_POSITION_STEP` | `1024` | Step between consecutive positions when inserting at the head of a column. |
 
 ## Mini-apps
 

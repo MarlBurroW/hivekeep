@@ -80,7 +80,7 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 10 | `## Agent directory` + Collaboration & delegation | stable | `agentDirectory[]` | main-agent variant |
 | 11 | `## Memories` (full code heading: `Memories · what you actually know`) | volatile | `relevantMemories[]` | scored, grouped, relevance/importance legend (see §6 [5]) |
 | 12 | `## Relevant knowledge` | volatile | `relevantKnowledge[]` | knowledge-base chunks |
-| 13 | `## Internal instructions (do not share…)` | stable | hardcoded, gated on `!isSubAgent && toolsEnabled` | large block; project-knowledge sub-section only when `activeProject` is set |
+| 13 | `## Internal instructions (do not share…)` | stable | hardcoded, gated on `!isSubAgent && toolsEnabled` | large block |
 | 14 | `## MCP Tools (external servers)` | stable | `mcpTools[]`, gated on `toolsEnabled` | one summary line per server (counts only) |
 | 15 | `## External channels` + platform formatting guide | stable | `activeChannels[]` | Discord/Telegram/WhatsApp/Slack/Web formatting rules |
 | 16 | `## Current speaker` | volatile | `currentSpeaker{}` | name, role, shared/user/private notes, priority-onboard prompt when unknown |
@@ -91,7 +91,6 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 21 | `Current message from: **{platform}**` hint | volatile | `currentMessageSource{}` | one-line origin + per-platform formatting reminder |
 | 22 | `## Channel origin context` | volatile | `pendingChannelContext{}` | reply auto-delivered back to the originating channel |
 | 23 | `## Workspace` (+ file tree) | volatile | `workspacePath` → `generateWorkspaceTree()` | depth-limited tree |
-| 24 | `## Active project` | volatile | `activeProject{}` | knowledge index/pinned, open tickets, tags (see §7) |
 | 25 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | rare on main; primary on sub-Agents |
 | 26 | `## Context` | volatile | `buildContextBlock()` | date/time/tz/version/install/RAM/uptime (see §6 [8]) |
 | 27 | `## Final reminder (most important rule of this turn)` | volatile | hardcoded | recency-positioned tool-discipline tie-breaker |
@@ -102,9 +101,8 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 |---|---|---|---|---|
 | 1 | `You are {name}, a specialized AI agent on Hivekeep, executing a delegated task.` | stable | `agent.name` | + one line on what Hivekeep is |
 | 2 | `## Your mission` | stable | `taskDescription` | |
-| 3 | `## Ticket assignment` | stable | `ticketAssignment{}` | project context, ticket, task history, comments, run-prompt, project knowledge (see §7) |
 | 4 | `## Environment` | stable | `systemContext{}` | platform/arch/available CLIs + workspace cwd; saves probe calls |
-| 5 | `## Constraints` + `## Tool calling discipline` + `## Execution discipline` + `## CRITICAL - Task resolution` | stable | hardcoded | ticket vs non-ticket variants; cron-journal addendum when it's a cron task |
+| 5 | `## Constraints` + `## Tool calling discipline` + `## Execution discipline` + `## CRITICAL - Task resolution` | stable | hardcoded | cron-journal addendum when it's a cron task |
 | 6 | `## Previous runs` | stable | `previousCronRuns[]` | cron continuity (newest first) |
 | 7 | `## Learnings from previous runs` | stable | `cronLearnings[]` | accumulated lessons |
 | 8 | `## Platform directives` | stable | `globalPrompt` | global prompt applies to sub-Agents too |
@@ -112,7 +110,6 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 10 | `## Agent directory` + Inter-Agent comms + Escalation | stable | `agentDirectory[]` | sub-Agent variant; references `send_message`/`list_kins` |
 | 11 | `## Memories` | volatile | `relevantMemories[]` | same renderer as main |
 | 12 | speaker / participants / state / summaries / language / message-hint / channel / workspace | mixed | shared tail | same blocks as main (only those with data render) |
-| 13 | `## Active project` | volatile | `activeProject{}` | if passed |
 | 14 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | primary use case: the live plan, re-shown every turn |
 | 15 | `## Context` | volatile | `buildContextBlock()` | |
 | 16 | `## Final reminder (this turn)` | volatile | hardcoded | execution-efficiency variant (don't re-read, fan out, no shell wrappers, no safety bypass) |
@@ -173,22 +170,11 @@ Recent (not-yet-compacted) messages go into the `messages` array as-is, with the
 |---|---|
 | User | `[{pseudonym}]` |
 | Other Agent | `[Agent: {name}]` (+ request/inform/reply + request_id when applicable) |
-| Task result | `[Task: {description}] Result:` (ticket-linked tasks append the linked-ticket reminder) |
+| Task result | `[Task: {description}] Result:` |
 | Cron result | `[Cron: {name}] Result:` |
 | request_input reply | `[Parent response]:` |
 
 The volatile `<system-reminder>` (per §1) is prepended to the **last user message** specifically.
-
----
-
-## 7. Project context blocks
-
-Two surfaces share the same project-knowledge renderer (`renderProjectKnowledgeBlock`): the main Agent's `## Active project` block and the sub-Agent's `## Ticket assignment` block. Knowledge is project-scoped, so both show the same content.
-
-- **`## Active project`** (main, volatile): title, slug, GitHub URL, description (truncated past `config.projects.maxDescriptionPromptTokens`, default 8000), tags, the project-knowledge section, and open non-`done` tickets (capped at `config.projects.maxTicketsInPrompt`, default 50, sorted `updated_at DESC`). Omitted entirely when there is no active project.
-- **`## Ticket assignment`** (sub-Agent, stable): injected when the task is linked to a ticket. Adds project context, the ticket itself, prior task history on the same ticket, existing comments, an optional run-specific sur-prompt, and the project-knowledge section. Always derived from the live ticket at build time (never a frozen snapshot), except the knowledge index/pinned bodies which are snapshotted at spawn for cache stability.
-
-Project-knowledge rendering: **pinned** entries (cap `config.projectKnowledge.pinCap`, default 10) inline their full markdown body; everything else appears as a title-only index (pinned entries flagged `✦`) the Agent can fetch on demand with `get_project_knowledge(id)` or discover with `search_project_knowledge(query)`.
 
 ---
 
@@ -200,7 +186,7 @@ The builder takes a single `~30`-field params object. Rather than restating it (
 - **Knowledge & people**: `contacts`, `relevantMemories`, `relevantKnowledge`, `agentDirectory`, `currentSpeaker`, `participants`.
 - **Conversation**: `compactingSummaries`, `conversationState`, `currentMessageSource`, `pendingChannelContext`, `userLanguage`.
 - **Platform**: `globalPrompt`, `mcpTools`, `activeChannels`, `workspacePath`.
-- **Projects / tasks**: `activeProject`, `ticketAssignment`, `taskTodos`.
+- **Tasks**: `taskTodos`.
 - **Sub-Agent extras**: `systemContext`, `previousCronRuns`, `cronLearnings`.
 
 ```ts
@@ -229,7 +215,6 @@ The **authoritative native-tool inventory is `src/server/tools/register.ts`**. D
 | `tasks` | delegation & control (`spawn_self`, `spawn_agent`, `scout`, `respond_to_task`, `cancel_task`, `list_tasks`, `list_active_queues`, `get_task_detail`, `get_task_messages`), sub-Agent side (`report_to_parent`, `update_task_status`, `request_input`), cron learnings (`save/delete_run_learning`), human-in-the-loop (`prompt_human`, `notify`), reasoning (`think`), planning (`task_todos`) |
 | `inter-agent` | `send_message`, `reply`, `list_kins` (registers `listAgentsTool`; the `list_kins` name is the registered identifier the prompt correctly matches) |
 | `crons` | cron CRUD + journal/trigger + wake-up scheduler (`wake_me_in`, `wake_me_every`, `cancel_wakeup`, `list_wakeups`) |
-| `projects` | projects, tags, tickets, ticket comments, ticket attachments, `start_ticket_task`, `enrich_ticket`, and project knowledge (`add/search/list/get/update/delete/pin_project_knowledge`) |
 | `custom` | authoring GLOBAL custom tools (`create/write/test/update/delete_custom_tool`, `run_custom_tool_setup`, `list_custom_tools`) + tool domains |
 | `images` | `generate_image`, `list_image_models`, `describe_image_model` |
 | `system` | provider/model discovery, platform-config (`get_platform_logs`, `restart_platform`, `get_system_info`, …), configurator provider/default/avatar/global-prompt config, and secure-input (`request_provider_setup`, `request_channel_setup`, `prompt_secret`) |
@@ -253,7 +238,6 @@ The **authoritative native-tool inventory is `src/server/tools/register.ts`**. D
 Sub-Agent tool availability is governed by the **toolbox system** (and scout-toolbox resolution), not by a fixed table in the prompt builder. There is no hardcoded "sub-Agents only get tools X, Y, Z" list here. Two things the builder *does* do for sub-Agents:
 
 - It injects `## Known contacts` and a sub-Agent `## Agent directory` with inter-Agent communication instructions, so a delegated task can read contacts and message other Agents when its toolbox grants those tools.
-- Project tools are surfaced for ticket-linked tasks via the `## Ticket assignment` block (project knowledge, `update_ticket`, comments, etc.).
 
 For the exact tools a given sub-Agent can call, consult its toolbox configuration and the `defaultDisabled`/opt-in flags in `register.ts`, not this document.
 
@@ -263,8 +247,7 @@ For the exact tools a given sub-Agent can call, consult its toolbox configuratio
 
 The system prompt competes with the message history and the response for the context window.
 
-- Base main-Agent prompt (no project): roughly ~1500–3000 tokens depending on memories, contacts, and the instruction blocks.
-- A large active project (full description + pinned knowledge) can push the stable+volatile total to ~10000 tokens (description hard-capped at `config.projects.maxDescriptionPromptTokens`, default 8000).
+- Base main-Agent prompt: roughly ~1500–3000 tokens depending on memories, contacts, and the instruction blocks.
 - Memories are bounded by `config.memory.tokenBudget` when set; the workspace tree targets ~200–500 tokens.
 
 The compacting service triggers a new summary when the history exceeds its thresholds (see `compacting.md`), keeping the messages segment within budget while older context survives as `## Conversation history summaries`.

@@ -23,8 +23,8 @@ interface KnowledgeItem {
 }
 
 /**
- * Generic renderer for memory / knowledge lookup results — recall, search_knowledge,
- * search_project_knowledge and list_project_knowledge. They all return a list of
+ * Generic renderer for memory / knowledge lookup results — recall and
+ * search_knowledge. They both return a list of
  * "hits" under different keys (memories / chunks / results / entries); each hit is
  * rendered as a compact card with title/snippet and metadata badges. Falls back to
  * JsonViewer for unexpected shapes.

@@ -192,7 +192,7 @@ export interface MiniAppBackendContext {
   agent: MiniAppAgentApi
   /** Platform messaging channels (SMS, Telegram, Discord…) — gated by "channels:send" */
   channels: MiniAppChannelsApi
-  /** Manage platform resources (contacts, projects, tickets, crons) — gated by "platform:<resource>:<read|write>" */
+  /** Manage platform resources (contacts, crons) — gated by "platform:<resource>:<read|write>" */
   platform: MiniAppPlatformApi
   /** SSRF-guarded fetch (http/https only, private hosts blocked, 30s timeout) */
   fetch: (url: string, options?: RequestInit) => Promise<Response>

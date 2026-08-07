@@ -21,13 +21,13 @@ const PLATFORM_GATEWAY_DENIED_RESOURCES = new Set([
 ])
 
 const SUBSCRIBABLE_EVENT_PREFIXES = new Set([
-  'chat', 'task', 'cron', 'channel', 'notification', 'contact', 'project',
-  'ticket', 'memory', 'trigger', 'webhook', 'workspace', 'miniapp', 'agent',
+  'chat', 'task', 'cron', 'channel', 'notification', 'contact',
+  'memory', 'trigger', 'webhook', 'workspace', 'miniapp', 'agent',
 ])
 const EVENT_TYPE_DENYLIST = new Set([
   'chat:token', 'chat:reasoning-token', 'chat:reasoning-done', 'chat:tool-call-start',
   'chat:tool-call', 'chat:tool-result', 'chat:token-usage', 'task:token-usage',
-  'task:todos', 'queue:update', 'agent:read', 'agent:active-project',
+  'task:todos', 'queue:update', 'agent:read',
 ])
 
 function isKnownPermission(permission: string): boolean {
@@ -53,7 +53,7 @@ function checkEventAccess(granted: string[], eventType: string): { code: string 
 }
 
 // Background ctx.platform path parsing + method→operation mapping (replicated).
-const BACKGROUND_PLATFORM_RESOURCES = new Set(['contacts', 'projects', 'tickets', 'crons'])
+const BACKGROUND_PLATFORM_RESOURCES = new Set(['contacts', 'crons'])
 function parseBackgroundPlatform(method: string, path: string) {
   const url = new URL(path.startsWith('/') ? path : `/${path}`, 'http://x')
   const segments = url.pathname.replace(/^\/+/, '').split('/')
@@ -236,11 +236,11 @@ describe('Background ctx.platform: path + method mapping', () => {
   })
 
   it('extracts resource, id (decoded) and query', () => {
-    const p = parseBackgroundPlatform('GET', '/tickets?projectId=p%201&status=todo')
-    expect(p.resource).toBe('tickets')
+    const p = parseBackgroundPlatform('GET', '/contacts?search=jean%20luc&limit=10')
+    expect(p.resource).toBe('contacts')
     expect(p.id).toBeNull()
-    expect(p.query.get('projectId')).toBe('p 1')
-    expect(p.query.get('status')).toBe('todo')
+    expect(p.query.get('search')).toBe('jean luc')
+    expect(p.query.get('limit')).toBe('10')
 
     const g = parseBackgroundPlatform('GET', '/contacts/c%2F1')
     expect(g.resource).toBe('contacts')
@@ -256,7 +256,7 @@ describe('Background ctx.platform: path + method mapping', () => {
 
   it('only registered resources are reachable in background', () => {
     expect(BACKGROUND_PLATFORM_RESOURCES.has('contacts')).toBe(true)
-    expect(BACKGROUND_PLATFORM_RESOURCES.has('tickets')).toBe(true)
+    expect(BACKGROUND_PLATFORM_RESOURCES.has('crons')).toBe(true)
     // notifications/providers/etc. have no background binding
     expect(BACKGROUND_PLATFORM_RESOURCES.has('notifications')).toBe(false)
     expect(BACKGROUND_PLATFORM_RESOURCES.has('providers')).toBe(false)

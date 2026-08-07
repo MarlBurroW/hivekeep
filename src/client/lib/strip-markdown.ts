@@ -1,5 +1,5 @@
 /**
- * Lightweight markdown-to-plaintext stripper for inline previews (project/ticket
+ * Lightweight markdown-to-plaintext stripper for inline previews (task
  * headers, list rows, tooltips). We deliberately do NOT render markdown in those
  * spots, but raw formatting characters (`#`, `**`, backticks, link syntax) look
  * ugly. This collapses a markdown string into a single readable line of plain

@@ -325,7 +325,7 @@ export function ModelsSettings() {
       </div>
 
       {/* Default Scout Model — cheap, fast model the `scout` tool delegates
-          heavy read-only exploration to. An Agent or project can override it. */}
+          heavy read-only exploration to. An Agent can override it. */}
       <div className="space-y-2">
         <Label className="inline-flex items-center gap-1.5">
           {t('settings.models.defaultScout')}

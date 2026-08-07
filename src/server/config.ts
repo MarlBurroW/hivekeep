@@ -412,22 +412,6 @@ export const config = {
     speakerMaxNoteChars: Number(process.env.CONTACTS_SPEAKER_MAX_NOTE_CHARS ?? 500), // 0 = no truncation
   },
 
-  projectKnowledge: {
-    /** Max number of entries that can be pinned per project. Pinned entries
-     *  have their full markdown content injected into the system prompt
-     *  (inline, no tool call needed). The cap keeps prompt token cost
-     *  bounded — unpinned entries are still reachable via the title index
-     *  and get_project_knowledge(id). */
-    pinCap: Number(process.env.PROJECT_KNOWLEDGE_PIN_CAP ?? 10),
-    /** Max titles shipped in the prompt's project-knowledge index. Above
-     *  this, the index renders an "... and N more" footer and the Agent must
-     *  use search_project_knowledge to surface the rest. */
-    maxIndexEntries: Number(process.env.PROJECT_KNOWLEDGE_MAX_INDEX_ENTRIES ?? 100),
-    /** Max results returned by search_project_knowledge (used both for the
-     *  Agent tool and the REST endpoint). */
-    maxSearchResults: Number(process.env.PROJECT_KNOWLEDGE_MAX_SEARCH_RESULTS ?? 10),
-  },
-
   queue: {
     userPriority: 100,
     agentPriority: 50,
@@ -454,16 +438,6 @@ export const config = {
   crons: {
     maxActive: Number(process.env.CRONS_MAX_ACTIVE ?? 50),
     maxConcurrentExecutions: Number(process.env.CRONS_MAX_CONCURRENT_EXEC ?? 5),
-  },
-
-  projects: {
-    /** Hard cap on the active project's description injected into the [7.8] prompt block.
-     *  Beyond this, the first half is kept and a truncation note replaces the rest. */
-    maxDescriptionPromptTokens: Number(process.env.PROJECTS_MAX_DESCRIPTION_PROMPT_TOKENS ?? 8000),
-    /** Max non-`done` tickets injected in the [7.8] prompt block, sorted by updated_at DESC. */
-    maxTicketsInPrompt: Number(process.env.PROJECTS_MAX_TICKETS_IN_PROMPT ?? 50),
-    /** Gap between consecutive ticket positions when inserting at top of a kanban column. */
-    kanbanPositionStep: Number(process.env.PROJECTS_KANBAN_POSITION_STEP ?? 1024),
   },
 
   llm: {
@@ -589,24 +563,6 @@ export const config = {
 
   workspace: {
     baseDir: process.env.WORKSPACE_BASE_DIR ?? `${dataDir}/workspaces`,
-  },
-
-  repos: {
-    /** Local git clones used by sub-task worktrees, one subdir per project
-     *  slug (`<baseDir>/<slug>/`) and a shared `<baseDir>/worktrees/` tree
-     *  for ephemeral sub-task worktrees. */
-    baseDir: process.env.HIVEKEEP_REPOS_DIR ?? `${dataDir}/repos`,
-    /** Max time we let `git clone` run before aborting (seconds). Default
-     *  10min covers most repos; large monorepos may need to bump this. */
-    cloneTimeoutSec: Number(process.env.HIVEKEEP_CLONE_TIMEOUT_SEC ?? 600),
-    /** How long worktrees from failed/conflicted sub-tasks are kept on
-     *  disk before the cleanup sweep removes them (seconds). Default 1h.
-     *  Sub-tasks that succeed and merge cleanly are removed immediately
-     *  — this TTL only protects "needs human review" cases. */
-    worktreeKeepFailedSec: Number(process.env.HIVEKEEP_WORKTREE_KEEP_FAILED_SEC ?? 3600),
-    /** How often the stale-worktree sweeper runs (minutes). Default 5.
-     *  Lower bound: 1min (anything faster is wasted IO). */
-    worktreeSweepIntervalMin: Number(process.env.HIVEKEEP_WORKTREE_SWEEP_INTERVAL_MIN ?? 5),
   },
 
   upload: {

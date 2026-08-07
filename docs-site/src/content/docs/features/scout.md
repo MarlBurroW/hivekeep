@@ -30,15 +30,9 @@ The `scout` tool is included in the built-in `code`, `research`, and `ops` toolb
 The scout model is resolved through a fallback chain, most specific first. The first tier that has a non-empty model wins:
 
 1. **Per-call override**: an explicit `model` (plus its `provider_id`) passed to the `scout` tool for that call only.
-2. **Project scout**: when the scout runs in a project context (a ticket task, or the Agent's active project), the project's `scoutModel` / `scoutProviderId`.
-3. **Agent scout**: the Agent's own `scoutModel` / `scoutProviderId`.
-4. **Global scout default**: the platform-wide default (`default_scout_model` / `default_scout_provider_id`).
-5. **The Agent's own main model**: the safety net.
-
-The project beats the Agent on purpose: a project-level default homogenizes
-every Agent working on that project, exactly like the main-task chain
-(explicit override → project default → Agent). Only the per-call override
-outranks a project default.
+2. **Agent scout**: the Agent's own `scoutModel` / `scoutProviderId`.
+3. **Global scout default**: the platform-wide default (`default_scout_model` / `default_scout_provider_id`).
+4. **The Agent's own main model**: the safety net.
 
 Because the chain ends at the Agent's own model, scout is **purely additive**: on an install with no scout configuration at all, every scout simply runs on the calling Agent's main model. Nothing breaks; you just do not get the cost savings until you point scout at a cheaper model.
 
@@ -48,11 +42,10 @@ When you override the scout model on a single `scout` call, you must pass `provi
 
 ## Configuring scout
 
-Scout is configured through the UI, at three levels matching the resolution chain. (There is no environment variable for the scout default; it is stored as a platform setting.)
+Scout is configured through the UI, at two levels matching the resolution chain. (There is no environment variable for the scout default; it is stored as a platform setting.)
 
 - **Global default**: in **Settings → Models & services**, set the **Default Scout Model**. A small, fast model is ideal here. When unset, scouts fall back to the calling Agent's own model.
-- **Per Agent**: in an Agent's settings, set its **Scout model**. A project scout default (when the work runs in a project context) takes precedence over it; leave it on inherit to fall back to the global default, then the Agent's own model.
-- **Per project**: in a project's settings, set its **Default scout model**. It takes precedence over each Agent's scout setting and the global default for work in that project.
+- **Per Agent**: in an Agent's settings, set its **Scout model**. Leave it on inherit to fall back to the global default, then the Agent's own model.
 
 These can also be set programmatically. The global default is one of the model-bearing services handled by the `set_default_model` tool, alongside `llm`, `embedding`, `image`, `compacting`, and `extraction`:
 
@@ -69,12 +62,10 @@ shape as the scout model:
 
 1. **Per-call override**: the `scout` tool accepts a `thinking_effort` argument
    (`off`, `minimal` … `max`) for that call only.
-2. **Project scout reasoning**: in a project's settings, next to its scout
-   model.
-3. **Agent scout reasoning**: in an Agent's settings, next to its scout model.
-4. **Global scout reasoning**: in **Settings → Models & services**, next to the
+2. **Agent scout reasoning**: in an Agent's settings, next to its scout model.
+3. **Global scout reasoning**: in **Settings → Models & services**, next to the
    default scout model.
-5. **The calling Agent's own thinking config**: the fallback at execution time
+4. **The calling Agent's own thinking config**: the fallback at execution time
    when no tier is set anywhere.
 
 Scouts are meant to be fast and cheap; `low` (or `off`) is usually the right

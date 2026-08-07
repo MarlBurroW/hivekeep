@@ -516,7 +516,7 @@ export const ConversationHeader = memo(function ConversationHeader({
             <Pencil className="mr-2 size-4" />
             {t('sidebar.agents.contextMenu.edit')}
           </DropdownMenuItem>
-          {/* Launch a standalone (orphan) task on this Agent — no project/ticket. */}
+          {/* Launch a standalone (orphan) task on this Agent. */}
           {onStartTask && (
             <DropdownMenuItem onClick={onStartTask}>
               <ListPlus className="mr-2 size-4" />

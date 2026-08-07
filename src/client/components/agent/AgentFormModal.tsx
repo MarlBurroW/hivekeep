@@ -282,7 +282,7 @@ export function AgentFormModal({
   const [providerId, setProviderId] = useState<string | null>(null)
   const [scoutModel, setScoutModel] = useState<string | null>(null)
   const [scoutProviderId, setScoutProviderId] = useState<string | null>(null)
-  // 'inherit' = unset tier (scouts fall back to project/global/Agent config)
+  // 'inherit' = unset tier (scouts fall back to the global/Agent config)
   const [scoutThinking, setScoutThinking] = useState<ThinkingChoice>('inherit')
   const [toolboxIds, setToolboxIds] = useState<string[] | null>(null)
   const [extraToolNames, setExtraToolNames] = useState<string[] | null>(null)
@@ -525,7 +525,7 @@ export function AgentFormModal({
 
     // Tool grants are managed exclusively through toolboxes. An Agent with no
     // toolbox selected has only the core floor — pick toolboxes in the Tools
-    // tab to grant web/memory/projects/etc. (the resolver no longer treats an
+    // tab to grant web/memory/etc. (the resolver no longer treats an
     // empty selection as "all").
 
     markDirty()
@@ -1144,7 +1144,7 @@ export function AgentFormModal({
                           {/* Scout model — cheap, fast model the `scout` tool
                               delegates heavy read-only exploration to. Clearing
                               it (the "inherit" option) falls back to the
-                              project → global → main-model chain. */}
+                              global → main-model chain. */}
                           <FormField
                             className="border-t border-border/40 pt-4"
                             label={t('agent.create.scoutModel')}
@@ -1166,8 +1166,8 @@ export function AgentFormModal({
                           </FormField>
 
                           {/* Scout reasoning — per-Agent tier of the scout
-                              thinking chain (project beats this; per-call
-                              override beats everything). 'inherit' = unset. */}
+                              thinking chain (a per-call override beats it).
+                              'inherit' = unset. */}
                           <FormField
                             label={t('agent.create.scoutThinking')}
                             tip={t('agent.create.scoutThinkingTip')}

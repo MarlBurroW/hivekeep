@@ -61,7 +61,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
   // Derive selected agent from URL (/agent/:slug)
   const selectedAgentSlug = location.pathname.match(/^\/agent\/([^/]+)/)?.[1] ?? null
 
-  // Persist the last selected agent so navigating away (Projects, etc.) and back
+  // Persist the last selected agent so navigating away and back
   // doesn't drop the selection. Restored once on first visit to "/" when we
   // have a stored slug matching an existing agent.
   useEffect(() => {
@@ -241,8 +241,8 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
   // `transform: translateZ(0)` turns this wrapper into the containing block for
   // the shadcn Sidebar's `position: fixed` (cf. ui/sidebar.tsx:260) so it anchors
   // to the chat content area instead of the viewport. Scoped to ChatPage only:
-  // applying it higher (App.tsx) would also hijack @dnd-kit's DragOverlay on the
-  // Projects kanban (position: fixed) and offset the drag ghost.
+  // applying it higher (App.tsx) would also hijack @dnd-kit's DragOverlay
+  // (position: fixed) and offset the drag ghost.
   return (
     <div className="h-full overflow-hidden" style={{ transform: 'translateZ(0)' }}>
     <SidebarProvider className="!min-h-0 !h-full">
@@ -304,7 +304,6 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
                       model: selectedAgent.model,
                       providerId: selectedAgent.providerId ?? null,
                       avatarUrl: selectedAgent.avatarUrl,
-                      activeProjectId: selectedAgent.activeProjectId,
                       thinkingEnabled: selectedAgent.thinkingEnabled,
                       thinkingEffort: selectedAgent.thinkingEffort,
                     }}
@@ -372,7 +371,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
             />
           </Routes>
         </div>
-        {/* Side panel (task / ticket / mini-app) — mounted at page level so
+        {/* Side panel (task / mini-app) — mounted at page level so
             it works even when no Agent is selected (selecting a task from the
             sidebar still opens its detail view). */}
         <Suspense fallback={null}>
@@ -448,7 +447,6 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
             model: configuratorAgent.model,
             providerId: configuratorAgent.providerId ?? null,
             avatarUrl: configuratorAgent.avatarUrl,
-            activeProjectId: configuratorAgent.activeProjectId,
             thinkingEnabled: configuratorAgent.thinkingEnabled,
             thinkingEffort: configuratorAgent.thinkingEffort,
           }}

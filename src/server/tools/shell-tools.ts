@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createLogger } from '@/server/logger'
 import { recordGuardFire } from '@/server/services/tool-call-tracker'
 import type { ToolRegistration } from '@/server/tools/types'
-import { resolveToolWorkspace, resolveToolEnv } from '@/server/tools/workspace'
+import { resolveToolWorkspace } from '@/server/tools/workspace'
 import { config } from '@/server/config'
 
 const log = createLogger('shell-tools')
@@ -317,15 +317,12 @@ export const runShellTool: ToolRegistration = {
             cwd: effectiveCwd,
             stdout: 'pipe',
             stderr: 'pipe',
-            // resolveToolEnv layers the per-task env (e.g. HIVEKEEP_GH_TOKEN
-            // for worktree git ops) on top of the default base — the PAT
-            // never appears as a literal here.
-            env: resolveToolEnv(ctx, {
+            env: {
               ...process.env,
               ...secretEnv,
               HIVEKEEP_KIN_ID: ctx.agentId,
               HIVEKEEP_WORKSPACE: workspace,
-            }),
+            },
           })
 
           const timeoutPromise = new Promise<never>((_, reject) => {

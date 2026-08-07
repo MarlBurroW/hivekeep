@@ -61,8 +61,8 @@ const schemaTableNames: string[] = Object.values(schema)
 // case `schemaTableNames` comes back empty. We detect that and skip ONLY the
 // schema<->DB completeness comparison (which needs the real schema); the
 // migration apply, FK, idempotency, and core-table-by-name checks all still run
-// and are immune to the leak. Mirrors the `schemaIsReal` guard in
-// ticket-attachments.test.ts.
+// and are immune to the leak. Mirrors the `schemaIsReal` guard used in the
+// other schema-touching test files.
 const schemaIsReal = schemaTableNames.length > 0
 
 // A representative subset of core domain tables. These are spot-checked by name
@@ -77,8 +77,8 @@ const CORE_TABLES = [
   'tasks',
   'crons',
   'providers',
-  'projects',
-  'tickets',
+  'toolboxes',
+  'channels',
   'vault_secrets',
   'app_settings',
   'user_profiles',

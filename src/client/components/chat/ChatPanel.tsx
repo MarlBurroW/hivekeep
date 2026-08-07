@@ -10,7 +10,6 @@ import { FeedbackBanner } from '@/client/components/feedback/FeedbackBanner'
 import { useAgentTools } from '@/client/hooks/useAgentTools'
 import { TypingIndicator } from '@/client/components/chat/TypingIndicator'
 import { ConversationHeader } from '@/client/components/chat/ConversationHeader'
-import { ActiveProjectChip } from '@/client/components/project/ActiveProjectChip'
 import { ToolCallsViewer } from '@/client/components/chat/ToolCallsViewer'
 import { TaskResultCard } from '@/client/components/chat/TaskResultCard'
 import { CompactingCard } from '@/client/components/chat/CompactingCard'
@@ -52,7 +51,6 @@ import { TimeGapIndicator } from '@/client/components/chat/TimeGapIndicator'
 import { SearchHighlightProvider } from '@/client/components/chat/SearchHighlightContext'
 import { MentionLookupProvider } from '@/client/components/chat/MentionContext'
 import { useMentionables } from '@/client/hooks/useMentionables'
-import { useProject } from '@/client/hooks/useProjects'
 import { cn, getUserInitials } from '@/client/lib/utils'
 import { useSidePanel } from '@/client/contexts/SidePanelContext'
 import { ArrowDown, ArrowUp, Upload, Pin, PinOff, AlertTriangle, Bot, Loader2 } from 'lucide-react'
@@ -66,7 +64,6 @@ interface AgentInfo {
   model: string
   providerId: string | null
   avatarUrl: string | null
-  activeProjectId?: string | null
   thinkingEnabled?: boolean
   thinkingEffort?: AgentThinkingEffort | null
 }
@@ -113,10 +110,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   const [showQuickHistory, setShowQuickHistory] = useState(false)
   const { exportAsMarkdown, exportAsJSON } = useExportConversation(messages, agent.name)
   const { users: mentionableUsers, agents: mentionableAgents } = useMentionables()
-  // Active project (if any) drives the `#ticket` autocomplete: it gives us
-  // the projectId to scope search to + the slug so the popover knows when a
-  // hit can use the short form (`#42`) vs. the qualified form (`slug#42`).
-  const { project: activeProject } = useProject(agent.activeProjectId ?? null)
   const { toggleReaction } = useReactions(agent.id)
   const [thinkingEnabled, setThinkingEnabled] = useState(agent.thinkingEnabled ?? false)
   const [isToolCallsOpen, setIsToolCallsOpen] = useState(false)
@@ -679,7 +672,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
     // tokens arrive before the first text token, since reasoning lives in a
     // separate batched state), so merging it unconditionally flashed a blank
     // bubble *alongside* the typing indicator until the first token landed.
-    // Same guard as the task panel (TaskPanelContent). See ticket hivekeep#55 / #44.
+    // Same guard as the task panel (TaskPanelContent).
     const hasContent = streamingMessage.content.length > 0
     // When thinking is hidden (onboarding), reasoning-only doesn't count toward
     // showing the bubble — otherwise a blank bubble would flash next to the
@@ -1008,15 +1001,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         </div>
       )}
 
-      {/* Active project chip — only rendered when this Agent has an activeProjectId */}
-      {agent.activeProjectId && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card/40 px-4 py-1">
-          <Suspense fallback={null}>
-            <ActiveProjectChip projectId={agent.activeProjectId} />
-          </Suspense>
-        </div>
-      )}
-
       {/* Conversation header — minimal in compact (onboarding modal) mode */}
       {compact ? (
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
@@ -1091,7 +1075,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         </Suspense>
       )}
 
-      {/* Orphan task launcher — standalone task on this Agent (no project/ticket) */}
+      {/* Orphan task launcher — standalone task on this Agent */}
       {isOrphanTaskOpen && (
         <Suspense fallback={null}>
           <OrphanTaskDialog
@@ -1229,7 +1213,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
           />
         </div>
 
-        {/* Mini-app / task / ticket side panel is mounted at ChatPage level
+        {/* Mini-app / task side panel is mounted at ChatPage level
             so it works even when no Agent is selected (an empty Agents page can
             still preview a task or open a mini-app from the sidebar). */}
       </div>
@@ -1286,8 +1270,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         agentId={agent.id}
         mentionableUsers={mentionableUsers}
         mentionableAgents={mentionableAgents}
-        activeProjectId={agent.activeProjectId ?? null}
-        activeProjectSlug={activeProject?.slug ?? null}
         llmModels={llmModels}
         model={agent.model}
         providerId={agent.providerId}

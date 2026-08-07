@@ -336,7 +336,7 @@ Assign toolboxes in the Agent's settings page in the UI.
 | Toolbox | Purpose |
 |---|---|
 | `all` | All native tools plus all enabled custom tools (MCP/plugin tools still granted by name) |
-| `code` | Ticket-bound implementation: project/ticket tools, web docs lookup, read-only memory, project knowledge |
+| `code` | Implementation work: task introspection, web docs lookup, read-only memory |
 | `research` | Web browsing, history/summaries, full memory read/write |
 | `ops` | Memory, vault secrets, redaction, HTTP requests, system info |
 | `scout` | Read-only exploration: grep, file/directory reads, web lookups (no writes) |

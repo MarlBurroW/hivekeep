@@ -14,16 +14,16 @@ import {
   searchInTarget,
   type WorkspaceTarget,
 } from '@/server/services/workspace-files'
-import { resolveWorkspaceSource, WorkspaceSourceError, type ResolveSourceOpts } from '@/server/services/workspace-sources'
-import { listProjectWorktrees, gitStatusSummary, gitDiffFile, gitChangedFiles } from '@/server/services/workspace-git'
+import { resolveWorkspaceSource, WorkspaceSourceError } from '@/server/services/workspace-sources'
+import { gitStatusSummary, gitDiffFile, gitChangedFiles } from '@/server/services/workspace-git'
 import { isInlineSafeMime } from '@/server/services/file-kind'
 import { playwrightManager } from '@/server/services/playwright-manager'
 import type { WorkspaceSourceRef } from '@/shared/types'
 import type { AppVariables } from '@/server/app'
 
 /**
- * Generalized Files API — browses any workspace source (agent / project /
- * folder), see files.md (extended). Mounted on /api/workspace/:sourceType/:sourceId.
+ * Generalized Files API — browses any workspace source (agent / folder /
+ * mini-app), see files.md. Mounted on /api/workspace/:sourceType/:sourceId.
  *
  * Agent-scoped chat integrations (search palette, resolve-paths) keep their own
  * /api/agents/:agentId/workspace/* routes; this family powers the Files PAGE for
@@ -53,14 +53,9 @@ function handleError(c: Context, err: unknown) {
   throw err
 }
 
-function sourceOpts(c: Context): ResolveSourceOpts {
-  const worktree = c.req.query('worktree')
-  return worktree ? { worktree } : {}
-}
-
-/** Resolve the route's :sourceType/:sourceId (+ ?worktree) to a target. */
+/** Resolve the route's :sourceType/:sourceId to a target. */
 function resolveRouteTarget(c: Context): Promise<WorkspaceTarget> {
-  return resolveWorkspaceSource(c.req.param('sourceType') ?? '', c.req.param('sourceId') ?? '', sourceOpts(c))
+  return resolveWorkspaceSource(c.req.param('sourceType') ?? '', c.req.param('sourceId') ?? '')
 }
 
 // GET /api/workspace/:type/:id/ls?path=docs
@@ -118,7 +113,7 @@ workspaceSourceRoutes.post('/mkdir', async (c) => {
 /** Build the source target for the `fromSource` of a cross-source move/copy. */
 async function resolveFromSource(c: Context, fromSource: WorkspaceSourceRef | undefined, dest: WorkspaceTarget): Promise<WorkspaceTarget> {
   if (!fromSource) return dest
-  return resolveWorkspaceSource(fromSource.type, fromSource.id, fromSource.worktree ? { worktree: fromSource.worktree } : {})
+  return resolveWorkspaceSource(fromSource.type, fromSource.id)
 }
 
 // POST /api/workspace/:type/:id/move — cross-source via body.fromSource
@@ -189,16 +184,6 @@ workspaceSourceRoutes.get('/search', async (c) => {
     const target = await resolveRouteTarget(c)
     const hits = await searchInTarget(target, q, Number.isFinite(limit) ? limit : 20)
     return c.json({ hits })
-  } catch (err) {
-    return handleError(c, err)
-  }
-})
-
-// GET /api/workspace/project/:projectId/worktrees — live worktrees of a repo
-workspaceSourceRoutes.get('/worktrees', async (c) => {
-  if (c.req.param('sourceType') !== 'project') return c.json({ worktrees: [] })
-  try {
-    return c.json({ worktrees: await listProjectWorktrees(c.req.param('sourceId') ?? '') })
   } catch (err) {
     return handleError(c, err)
   }

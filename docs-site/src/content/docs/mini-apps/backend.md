@@ -158,20 +158,19 @@ When the app panel is open and permissions are missing, Hivekeep shows an approv
 `ctx.platform` lets a backend read and mutate platform resources, the background counterpart of the frontend `Hivekeep.platform`. The frontend gateway re-dispatches to the full REST API with the user's session; a background backend has no user session and runs unattended, so `ctx.platform` instead routes through an explicit, service-backed set of resources (the safer trust model for autonomous code).
 
 ```javascript
-// app.json: { "permissions": ["platform:tickets:write", "platform:contacts:read"] }
+// app.json: { "permissions": ["platform:contacts:write", "platform:crons:read"] }
 export function onClientEvent(ctx, event, data) {
-  // e.g. turn an inbound request into a ticket
-  return ctx.platform.post("/tickets", { projectId: data.projectId, title: data.title })
+  // e.g. turn an inbound request into a contact
+  return ctx.platform.post("/contacts", { firstName: data.firstName, lastName: data.lastName })
 }
 
-await ctx.platform.get("/contacts")               // list
-await ctx.platform.get("/contacts/" + id)         // one
-await ctx.platform.get("/tickets?projectId=" + p) // tickets need a projectId
+await ctx.platform.get("/contacts")       // list
+await ctx.platform.get("/contacts/" + id) // one
 await ctx.platform.patch("/contacts/" + id, { lastName: "King" })
 await ctx.platform.delete("/crons/" + id)
 ```
 
-- Available resources: **contacts**, **projects**, **tickets**, **crons** (more can be added). Anything else throws "not available from a background mini-app".
+- Available resources: **contacts**, **crons** (more can be added). Anything else throws "not available from a background mini-app".
 - Method → operation: `GET` (no id) = list, `GET /res/:id` = get, `POST` = create, `PUT`/`PATCH /res/:id` = update, `DELETE /res/:id` = remove.
 - Gated by `platform:<resource>:<read|write>` (a `write` grant implies `read`), same permission ids as the frontend gateway.
 - Writes act with the maintainer Agent's identity. Crons created this way are Agent-created and require user approval before they activate.

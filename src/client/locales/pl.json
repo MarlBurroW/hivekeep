@@ -967,11 +967,6 @@
       "noResults": "Brak wyników",
       "files": "Pliki"
     },
-    "ticketMention": {
-      "loading": "Wyszukiwanie ticketów...",
-      "noResults": "Brak pasujących ticketów",
-      "scope": "Projekt: {{slug}}"
-    },
     "emptyState": {
       "greeting": "Porozmawiaj z {{name}}",
       "defaultRole": "Twój asystent AI, gotowy do pomocy.",
@@ -1110,7 +1105,6 @@
       "callCount_other": "{{count}} wywołania LLM"
     },
     "description": "Opis",
-    "ticketTooltip": "Otwórz ticket nadrzędny",
     "mode": "Tryb",
     "modeAwait": "Await",
     "modeAsync": "Async",
@@ -1127,8 +1121,6 @@
     "close": "Zamknij",
     "viewPrompt": "Prompt",
     "viewPromptTooltip": "Zobacz pełny prompt zadania",
-    "runPrompt": "Instrukcje uruchomienia",
-    "runPromptTooltip": "Instrukcje specyficzne dla uruchomienia, przekazane przy starcie",
     "prompt": "Prompt zadania",
     "promptDescription": "Pełna treść promptu zadania",
     "forceStart": "Wymuś start",
@@ -2659,8 +2651,7 @@
       "users": "Użytkownicy",
       "database": "Baza danych",
       "mini-apps": "Mini-aplikacje",
-      "plugins": "Wtyczki",
-      "projects": "Projekty"
+      "plugins": "Wtyczki"
     },
     "names": {
       "web_search": "Wyszukiwanie w internecie",
@@ -2892,36 +2883,9 @@
       "list_mini_app_files": "Lista plików aplikacji",
       "get_task_messages": "Wiadomości zadania",
       "transfer_channel": "Przenieś kanał",
-      "list_projects": "Lista projektów",
-      "get_project": "Pobierz projekt",
-      "create_project": "Utwórz projekt",
-      "update_project": "Aktualizuj projekt",
-      "delete_project": "Usuń projekt",
-      "update_project_description": "Aktualizuj opis projektu",
-      "append_project_description": "Dopisz do opisu projektu",
-      "patch_project_description": "Popraw opis projektu",
-      "set_active_project": "Ustaw aktywny projekt",
-      "list_project_tags": "Lista tagów projektu",
       "create_tag": "Utwórz tag",
       "update_tag": "Aktualizuj tag",
       "delete_tag": "Usuń tag",
-      "list_tickets": "Lista zgłoszeń",
-      "get_ticket": "Pobierz zgłoszenie",
-      "create_ticket": "Utwórz zgłoszenie",
-      "update_ticket": "Aktualizuj zgłoszenie",
-      "add_ticket_tag": "Dodaj tag zgłoszenia",
-      "remove_ticket_tag": "Usuń tag zgłoszenia",
-      "delete_ticket": "Usuń zgłoszenie",
-      "start_ticket_task": "Rozpocznij zadanie zgłoszenia",
-      "enrich_ticket": "Wzbogać zgłoszenie",
-      "add_ticket_comment": "Dodaj komentarz do zgłoszenia",
-      "list_ticket_comments": "Lista komentarzy zgłoszenia",
-      "delete_ticket_comment": "Usuń komentarz zgłoszenia",
-      "list_ticket_attachments": "Lista załączników zgłoszenia",
-      "read_ticket_attachment": "Odczytaj załącznik zgłoszenia",
-      "add_ticket_attachment": "Dodaj załącznik do zgłoszenia",
-      "update_ticket_attachment": "Aktualizuj załącznik zgłoszenia",
-      "delete_ticket_attachment": "Usuń załącznik zgłoszenia",
       "describe_image_model": "Opisz model obrazów",
       "list_endpoints": "Lista punktów końcowych kanałów",
       "send_to_contact": "Wyślij do kontaktu",
@@ -2934,13 +2898,6 @@
       "transcribe_audio": "Transkrybuj audio",
       "reload_mini_app": "Przeładuj mini-aplikację",
       "set_mini_app_maintainer": "Ustaw opiekuna mini-aplikacji",
-      "add_project_knowledge": "Dodaj wiedzę projektu",
-      "search_project_knowledge": "Szukaj w wiedzy projektu",
-      "list_project_knowledge": "Lista wiedzy projektu",
-      "get_project_knowledge": "Pobierz wiedzę projektu",
-      "update_project_knowledge": "Aktualizuj wiedzę projektu",
-      "delete_project_knowledge": "Usuń wiedzę projektu",
-      "pin_project_knowledge": "Przypnij wiedzę projektu",
       "get_mini_app_backend_status": "Status backendu mini-aplikacji"
     },
     "renderers": {
@@ -3354,7 +3311,6 @@
   },
   "activityBar": {
     "agents": "Agenci",
-    "projects": "Projekty",
     "tasks": "Zadania",
     "crons": "Zaplanowane zadania",
     "apps": "Mini-aplikacje",
@@ -3454,379 +3410,6 @@
     "start": "Uruchom zadanie",
     "started": "Zadanie uruchomione na {{name}}. Wynik pojawi się w tym wątku po zakończeniu."
   },
-  "projects": {
-    "page": {
-      "title": "Projekty",
-      "comingSoon": "Widok Kanban już wkrótce: backend jest gotowy, frontend w trakcie prac."
-    },
-    "sidebar": {
-      "title": "Projekty",
-      "create": "Nowy projekt",
-      "empty": "Brak projektów. Utwórz pierwszy projekt, aby zacząć.",
-      "emptyTitle": "Brak projektów",
-      "emptyDescription": "Grupuj zgłoszenia, uruchamiaj zadania i śledź pracę swoich Agentów.",
-      "search": "Szukaj projektów..."
-    },
-    "empty": {
-      "title": "Brak projektów",
-      "description": "Utwórz projekt w panelu bocznym, aby zacząć śledzić pracę."
-    },
-    "kanban": {
-      "newTicket": "Nowe zgłoszenie",
-      "searchPlaceholder": "Filtruj zgłoszenia po tytule lub tagu…",
-      "searchClear": "Wyczyść wyszukiwanie",
-      "searchResults_one": "{{count}} trafienie",
-      "searchResults_few": "{{count}} trafienia",
-      "searchResults_many": "{{count}} trafień",
-      "searchResults_other": "{{count}} trafienia",
-      "progress": "{{done}} z {{total}} ukończone",
-      "progressEmpty": "Brak zgłoszeń",
-      "columnRunning_one": "{{count}} zgłoszenie z aktywnym zadaniem",
-      "columnRunning_few": "{{count}} zgłoszenia z aktywnymi zadaniami",
-      "columnRunning_many": "{{count}} zgłoszeń z aktywnymi zadaniami",
-      "columnRunning_other": "{{count}} zgłoszenia z aktywnymi zadaniami",
-      "empty": {
-        "backlog": "Tu lądują pomysły. Zapisz je teraz, zaplanuj później.",
-        "todo": "Gotowe do startu? Przeciągnij tu zgłoszenia, gdy się na nie zdecydujesz.",
-        "in_progress": "Tu pojawia się aktywna praca.",
-        "blocked": "Coś utknęło? Przenieś tu zablokowane zgłoszenia, aby pozostały widoczne.",
-        "done": "Tu zbierają się ukończone zgłoszenia."
-      },
-      "emptySearchInColumn": "Brak trafień w tej kolumnie.",
-      "quickAdd": {
-        "label": "Dodaj zgłoszenie",
-        "inputPlaceholder": "Tytuł zgłoszenia (Enter, aby dodać, Esc, aby anulować)"
-      }
-    },
-    "status": {
-      "backlog": "Backlog",
-      "todo": "Do zrobienia",
-      "in_progress": "W toku",
-      "blocked": "Zablokowane",
-      "done": "Ukończone"
-    },
-    "view": {
-      "kanban": "Kanban",
-      "knowledge": "Wiedza"
-    },
-    "knowledge": {
-      "add": "Dodaj wiedzę",
-      "searchPlaceholder": "Szukaj w wiedzy projektu…",
-      "clearSearch": "Wyczyść wyszukiwanie",
-      "summary": "{{pinned}} przypiętych · {{total}} łącznie",
-      "totalCount_one": "{{count}} wpis",
-      "totalCount_few": "{{count}} wpisy",
-      "totalCount_many": "{{count}} wpisów",
-      "totalCount_other": "{{count}} wpisu",
-      "pinnedCount_one": "{{count}} przypięty",
-      "pinnedCount_few": "{{count}} przypięte",
-      "pinnedCount_many": "{{count}} przypiętych",
-      "pinnedCount_other": "{{count}} przypiętego",
-      "searchResults": "{{count}} trafień ({{total}} łącznie)",
-      "pagination": "{{from}}–{{to}} z {{total}}",
-      "pinnedBadge": "Przypięte",
-      "byUser": "przez ciebie",
-      "byAgent": "przez {{name}}",
-      "pin": "Przypnij",
-      "unpin": "Odepnij",
-      "edit": "Edytuj",
-      "delete": "Usuń",
-      "confirmDelete": "Usunąć ten wpis wiedzy? Tej operacji nie można cofnąć.",
-      "filter": {
-        "all": "Wszystkie",
-        "pinned": "Przypięte",
-        "unpinned": "Nieprzypięte"
-      },
-      "help": {
-        "title": "Jak działa wiedza projektu",
-        "show": "Jak to działa",
-        "pinnedLead": "Przypięte",
-        "pinned": "wpisy mają pełną treść automatycznie wstrzykiwaną do promptu każdego Agenta (bez wywołania narzędzia). Używaj oszczędnie (maks. 10 na projekt).",
-        "unpinnedLead": "Pozostałe wpisy",
-        "unpinned": "pokazują w indeksie promptu tylko swój tytuł. Agenci pobierają treść na żądanie narzędziem get_project_knowledge albo szukają po temacie przez search_project_knowledge.",
-        "scope": "Wszystkie wpisy są wspólne dla każdego Agenta i każdego zadania ze zgłoszeń w tym projekcie: traktuj to jak wspólną wiki."
-      },
-      "empty": {
-        "title": "Brak wiedzy",
-        "description": "Zapisuj tu decyzje architektoniczne, konwencje, pułapki i reguły domenowe. Każdy Agent pracujący nad tym projektem zobaczy tytuły w swoim prompcie i może pobrać treść dowolnego wpisu na żądanie.",
-        "searchTitle": "Brak trafień",
-        "searchDescription": "Spróbuj innego zapytania: wyszukiwanie korzysta zarówno z podobieństwa semantycznego, jak i ze słów kluczowych."
-      },
-      "dialog": {
-        "createTitle": "Dodaj wiedzę projektu",
-        "editTitle": "Edytuj wiedzę projektu",
-        "description": "Widoczne dla każdego Agenta pracującego nad tym projektem. Tytuł każdego wpisu trafia do promptu Agenta; treść markdown jest wstrzykiwana tylko po przypięciu.",
-        "titleLabel": "Tytuł",
-        "titlePlaceholder": "Krótki, samodzielnie zrozumiały nagłówek (np. „Używaj Drizzle ORM, nie Prismy”)",
-        "titleHint": "To właśnie domyślnie zobaczy każdy Agent w swoim prompcie. Niech jedna linia mówi wszystko.",
-        "contentLabel": "Treść (Markdown)",
-        "contentPlaceholder": "## Kontekst\nDlaczego to ważne…\n\n## Szczegóły\nPrzykłady kodu, linki, uzasadnienie…",
-        "contentHint": "Dowolny markdown, tak długi, jak potrzebujesz. Wstawiany do promptów Agentów tylko po przypięciu; w przeciwnym razie pobierany na żądanie.",
-        "categoryLabel": "Kategoria (opcjonalnie)",
-        "categoryPlaceholder": "np. arch, decyzja, pułapka, konwencja",
-        "pinnedLabel": "Przypnij do promptu systemowego",
-        "pinnedOnHint": "Przypięte: pełna treść markdown zostanie wstrzyknięta do promptu systemowego każdego Agenta w tym projekcie. Agent może z niej korzystać od razu, bez wywołania narzędzia. Limit: 10 przypiętych wpisów na projekt.",
-        "pinnedOffHint": "Nieprzypięte: w prompcie Agenta pojawia się tylko tytuł. Agent pobierze treść narzędziem get_project_knowledge, gdy tytuł będzie wyglądał na istotny."
-      },
-      "metadata": {
-        "created": "Utworzono {{time}}",
-        "updated": "Zaktualizowano {{time}}",
-        "createdAt": "Utworzono {{date}}",
-        "updatedAt": "Zaktualizowano {{date}}",
-        "chars_one": "{{count}} znak",
-        "chars_few": "{{count}} znaki",
-        "chars_many": "{{count}} znaków",
-        "chars_other": "{{count}} znaku",
-        "copyId": "Kopiuj id",
-        "idCopied": "ID skopiowane do schowka."
-      },
-      "toast": {
-        "created": "Dodano wpis wiedzy.",
-        "updated": "Zaktualizowano wpis wiedzy.",
-        "deleted": "Usunięto wpis wiedzy."
-      }
-    },
-    "taskStatus": {
-      "queued": "W kolejce",
-      "pending": "Oczekuje",
-      "in_progress": "Działa",
-      "paused": "Wstrzymane",
-      "awaiting_human_input": "Czeka na ciebie",
-      "awaiting_agent_response": "Czeka na Agenta",
-      "awaiting_subtask": "Czeka na zwiadowcę",
-      "completed": "Ukończone",
-      "failed": "Niepowodzenie",
-      "cancelled": "Anulowane"
-    },
-    "create": {
-      "title": "Utwórz nowy projekt",
-      "description": "Domyślna paleta tagów (bug, feature, chore, doc) zostanie dodana automatycznie. Możesz ją później dostosować.",
-      "titleField": "Tytuł projektu",
-      "titlePlaceholder": "np. Refaktoryzacja backendu",
-      "descriptionField": "Opis",
-      "descriptionPlaceholder": "Kontekst, cele, linki, ograniczenia: wszystko, co przyda się Agentowi pracującemu nad tym projektem.",
-      "descriptionHint": "Obsługa Markdown. Ten opis jest wstrzykiwany do promptu systemowego każdego Agenta, który ma ten projekt aktywny."
-    },
-    "ticket": {
-      "create": {
-        "title": "Nowe zgłoszenie",
-        "description": "Dodaj nowe zgłoszenie do tego projektu. Domyślny status to Backlog. Przeciągnij je do innej kolumny, gdy zaczniesz nad nim pracę.",
-        "titleField": "Tytuł zgłoszenia",
-        "titlePlaceholder": "np. Napraw pętlę przekierowań przy logowaniu",
-        "descriptionField": "Opis",
-        "descriptionPlaceholder": "Co trzeba zrobić? Każdy kontekst przydatny dla osoby, która się tym zajmie.",
-        "tagsField": "Tagi"
-      },
-      "panel": {
-        "heading": "Zgłoszenie",
-        "description": "Opis",
-        "descriptionExpand": "Pokaż więcej",
-        "descriptionCollapse": "Pokaż mniej",
-        "noDescription": "Brak opisu.",
-        "tasksHistory": "Zadania ({{count}})",
-        "taskKind": {
-          "execute": "Zadanie",
-          "enrich": "Wzbogacenie"
-        },
-        "startTask": "Uruchom zadanie",
-        "noTasks": "Na tym zgłoszeniu nie uruchomiono jeszcze żadnych zadań.",
-        "noTasksTitle": "Brak zadań",
-        "noTasksDescription": "Uruchom Agenta do pracy nad tym zgłoszeniem i śledź tutaj jego przebieg.",
-        "notFound": "Nie znaleziono tego zgłoszenia. Mogło zostać usunięte.",
-        "back": "Wróć do {{type}}",
-        "ticketRef": "Zgłoszenie {{ref}}",
-        "editAction": "Edytuj zgłoszenie",
-        "status": "Status",
-        "tags": "Tagi",
-        "delete": "Usuń zgłoszenie",
-        "deleteConfirm": {
-          "title": "Usunąć to zgłoszenie?",
-          "description": "„{{title}}” zostanie trwale usunięte. Historia powiązanych zadań zostanie zachowana.",
-          "confirm": "Usuń zgłoszenie"
-        }
-      },
-      "edit": {
-        "title": "Edytuj zgłoszenie",
-        "description": "Zaktualizuj tytuł, opis, status lub tagi. Kanban odświeży się w czasie rzeczywistym."
-      },
-      "comments": {
-        "title": "Komentarze",
-        "empty": "Brak komentarzy. Dodaj pierwszy.",
-        "placeholder": "Napisz komentarz. Obsługa Markdown.",
-        "submit": "Opublikuj komentarz",
-        "submitting": "Publikowanie...",
-        "edit": "Edytuj",
-        "save": "Zapisz",
-        "cancel": "Anuluj",
-        "delete": "Usuń",
-        "auto": "auto",
-        "autoTooltip": "Opublikowano automatycznie na podstawie wyniku zadania.",
-        "agentTag": "Agent",
-        "edited": "edytowano",
-        "loading": "Wczytywanie komentarzy...",
-        "showAll": "Pokaż jeszcze {{count}}",
-        "showLess": "Pokaż mniej",
-        "deleteConfirm": {
-          "title": "Usunąć ten komentarz?",
-          "description": "Komentarz zostanie trwale usunięty. Tej operacji nie można cofnąć.",
-          "confirm": "Usuń komentarz"
-        }
-      },
-      "attachments": {
-        "title": "Załączniki",
-        "empty": "Brak załączonych plików.",
-        "dropHint": "Przeciągnij i upuść pliki tutaj albo",
-        "addFile": "Dodaj plik",
-        "preview": "Podgląd",
-        "download": "Pobierz",
-        "rename": "Zmień nazwę",
-        "delete": "Usuń",
-        "noPreview": "Podgląd niedostępny. Pobierz plik, aby go otworzyć.",
-        "renameTitle": "Zmień nazwę załącznika",
-        "renameDescription": "Wybierz nową nazwę pliku. Zawartość pliku nie zostanie zmieniona.",
-        "renamePlaceholder": "Nowa nazwa pliku",
-        "deleteConfirm": {
-          "title": "Usunąć ten załącznik?",
-          "description": "„{{name}}” zostanie trwale usunięty z dysku i z tego zgłoszenia.",
-          "confirm": "Usuń załącznik"
-        }
-      }
-    },
-    "startTask": {
-      "title": "Uruchom zadanie",
-      "description": "Uruchom pod-Agenta do pracy nad tym zgłoszeniem. Wstępnie wybrany jest Agent, który ma ten projekt aktywny. Zadanie działa w trybie await: po jego zakończeniu dostaniesz turę w wątku Agenta.",
-      "agentField": "Który Agent ma wykonać to zadanie?",
-      "agentPlaceholder": "Wybierz Agenta",
-      "activeOnProject": "aktywny tutaj",
-      "runPromptField": "Instrukcje dla tego uruchomienia (opcjonalnie)",
-      "runPromptPlaceholder": "np. skup się tylko na backendzie, UI zostaw dla następnego Agenta",
-      "runPromptHelp": "Opcjonalne. Zawęża to konkretne uruchomienie ponad treść zgłoszenia. Przydatne przy równoległym rozdzielaniu pracy na kilku agentów albo przy zatrzymaniu na konkretnym etapie. Maks. 500 znaków.",
-      "runPromptCounter": "{{count}} / 500",
-      "toolboxesField": "Zestawy narzędzi",
-      "toolboxesHelp": "Z których zestawów narzędzi może korzystać to zadanie. Zadanie zawsze zachowuje obowiązkowy zestaw podstawowy; wybrane zestawy go uzupełniają. Domyślnie zestaw Code.",
-      "modelField": "Model (opcjonalnie)",
-      "modelInherit": "Dziedzicz (projekt / Agent)",
-      "modelHelp": "Nadpisz model tylko dla tego uruchomienia. Zostaw dziedziczenie, aby użyć domyślnego ustawienia projektu, a potem własnego modelu Agenta.",
-      "thinkingField": "Wysiłek rozumowania (opcjonalnie)",
-      "thinkingInherit": "Dziedzicz (projekt / Agent)",
-      "thinkingHelp": "Nadpisz wysiłek rozumowania tylko dla tego uruchomienia. Zostaw dziedziczenie, aby użyć domyślnego ustawienia projektu, a potem własnego ustawienia Agenta.",
-      "start": "Uruchom"
-    },
-    "enrich": {
-      "action": "Wzbogać zgłoszenie",
-      "alreadyRunning": "Wzbogacanie tego zgłoszenia już trwa.",
-      "title": "Wzbogać to zgłoszenie",
-      "description": "Uruchom dedykowanego agenta, który przeczyta repozytorium, powiązane zgłoszenia i historię, a następnie przepisze tytuł, opis i tagi, aby zgłoszenie nadawało się do realizacji.",
-      "focusField": "Konkretny obszar (opcjonalnie)",
-      "focusPlaceholder": "np. zgłęb strategię testów albo zaproponuj podejście do migracji bazy danych",
-      "focusHelp": "Opcjonalne. Krótka wskazówka przekazywana agentowi.",
-      "start": "Wzbogać",
-      "started": "Wzbogacanie rozpoczęte. Zgłoszenie zaktualizuje się na żywo, gdy agent zapisze zmiany."
-    },
-    "chip": {
-      "tooltip": "Aktywny projekt: {{title}}. Kliknij, aby zobaczyć kanban."
-    },
-    "activeAgents": {
-      "tooltip": "{{name}} ma ten projekt aktywny",
-      "openThread": "Otwórz wątek: {{name}}"
-    },
-    "ticketCard": {
-      "running_one": "{{count}} w toku",
-      "running_few": "{{count}} w toku",
-      "running_many": "{{count}} w toku",
-      "running_other": "{{count}} w toku",
-      "awaitingInput_one": "{{count}} czeka na ciebie",
-      "awaitingInput_few": "{{count}} czekają na ciebie",
-      "awaitingInput_many": "{{count}} czeka na ciebie",
-      "awaitingInput_other": "{{count}} czeka na ciebie",
-      "taskCount_one": "{{count}} zadanie",
-      "taskCount_few": "{{count}} zadania",
-      "taskCount_many": "{{count}} zadań",
-      "taskCount_other": "{{count}} zadania",
-      "attachments_one": "{{count}} plik",
-      "attachments_few": "{{count}} pliki",
-      "attachments_many": "{{count}} plików",
-      "attachments_other": "{{count}} pliku",
-      "attachmentsTooltip_one": "{{count}} załącznik w tym zgłoszeniu",
-      "attachmentsTooltip_few": "{{count}} załączniki w tym zgłoszeniu",
-      "attachmentsTooltip_many": "{{count}} załączników w tym zgłoszeniu",
-      "attachmentsTooltip_other": "{{count}} załącznika w tym zgłoszeniu",
-      "agentRunning": "{{name}} nad tym pracuje",
-      "runningSince": "Działa od {{date}}",
-      "createdAt": "Utworzono {{date}}",
-      "updatedAt": "Zaktualizowano {{date}}"
-    },
-    "reporter": {
-      "label": "Zgłoszone przez",
-      "byUser": "Zgłoszone przez {{name}}",
-      "byAgent": "Zgłoszone przez Agenta {{name}}",
-      "tooltip": "{{name}}",
-      "unknown": "Nieznany"
-    },
-    "edit": {
-      "title": "Edytuj projekt",
-      "description": "Zmień szczegóły projektu, zarządzaj tagami lub usuń projekt całkowicie.",
-      "openEdit": "Edytuj projekt",
-      "tagsSection": "Tagi",
-      "modelField": "Domyślny model",
-      "modelPlaceholder": "Użyj własnego modelu każdego Agenta",
-      "modelHint": "Używany przez zadania pod-Agentów uruchamiane na ticketach tego projektu: nadpisuje własny model każdego Agenta. Model wybrany jawnie przy uruchamianiu zadania nadal ma pierwszeństwo. Pozostaw puste, aby wrócić do modelu Agenta.",
-      "scoutModelField": "Domyślny model zwiadowczy",
-      "scoutModelPlaceholder": "Dziedzicz (globalny / model Agenta)",
-      "scoutModelHint": "Szybki i tani model używany przez narzędzie `scout` do pracy w tym projekcie: ma pierwszeństwo przed ustawieniem scout każdego Agenta i globalnym domyślnym. Pozostaw puste, aby wrócić do scouta Agenta, potem globalnego domyślnego, a na końcu modelu Agenta.",
-      "thinkingField": "Domyślny poziom rozumowania",
-      "thinkingInherit": "Użyj własnego ustawienia każdego Agenta",
-      "thinkingHint": "Stosowany do zadań pod-Agentów uruchamianych na ticketach tego projektu: nadpisuje własną konfigurację rozumowania każdego Agenta. Wartość wybrana jawnie przy uruchamianiu zadania nadal ma pierwszeństwo.",
-      "toolboxesField": "Domyślne zestawy narzędzi dla zadań",
-      "toolboxesHint": "Zestawy narzędzi przydzielane domyślnie zadaniom uruchamianym na ticketach tego projektu. Zestawy wybrane jawnie przy uruchamianiu zadania nadal mają pierwszeństwo. Pozostaw puste, aby użyć wbudowanego ustawienia domyślnego.",
-      "delete": "Usuń projekt",
-      "deleteConfirm": {
-        "title": "Usunąć ten projekt?",
-        "description": "\"{{title}}\" oraz wszystkie jego tickety, tagi i historia ticketów zostaną trwale usunięte. Historia zadań zostanie zachowana (ich powiązanie z ticketem zostanie usunięte).",
-        "confirm": "Usuń projekt"
-      },
-      "scoutThinkingField": "Domyślne rozumowanie scoutów",
-      "scoutThinkingHint": "Wysiłek rozumowania scoutów wysyłanych w tym projekcie: ma pierwszeństwo przed ustawieniem scout każdego Agenta i globalnym domyślnym. Dziedzicz = wróć do scouta Agenta, potem globalnego domyślnego.",
-      "scoutThinkingInherit": "Dziedzicz (scout Agenta, potem globalne)"
-    },
-    "tags": {
-      "empty": "Brak tagów. Dodaj kilka poniżej.",
-      "newLabel": "Etykieta nowego tagu"
-    },
-    "github": {
-      "sectionTitle": "Integracja z GitHub",
-      "sectionHint": "Wybierz token GitHub i repozytorium do sklonowania. Worktree pod-zadań będą tworzone z tego klona, dzięki czemu wiele zadań może działać równolegle, nie wchodząc sobie w drogę.",
-      "patField": "Token GitHub",
-      "patPlaceholder": "Wybierz token ze swojego sejfu",
-      "patSearchPlaceholder": "Szukaj wpisów w sejfie…",
-      "patNoneFound": "Brak danych dostępowych w sejfie. Dodaj je w Ustawienia → Sejf (wpis typu 'credential' lub 'text').",
-      "patClear": "Brak tokenu",
-      "patSectionTitle": "Sugerowane (powiązane z GitHub)",
-      "patOtherSection": "Pozostałe dane dostępowe",
-      "repoField": "Repozytorium",
-      "repoPlaceholder": "Wybierz repozytorium",
-      "repoSearchPlaceholder": "Szukaj repozytoriów GitHub…",
-      "repoNoResults": "Żadne repozytorium nie pasuje do \"{{query}}\".",
-      "repoNoneAccessible": "Brak repozytoriów dostępnych dla tego tokenu. Sprawdź jego uprawnienia (scopes).",
-      "repoSearchResults": "Wyniki wyszukiwania",
-      "repoAccessible": "Dostępne repozytoria",
-      "repoNeedsPat": "Najpierw wybierz token, aby odblokować wybór repozytorium.",
-      "repoReadOnly": "Tylko do odczytu",
-      "defaultBranchField": "Domyślna gałąź",
-      "defaultBranchHint": "Gałąź, z której tworzone są worktree pod-zadań. Domyślnie jest to domyślna gałąź repozytorium.",
-      "statusNone": "Brak klona",
-      "statusCloning": "Klonowanie",
-      "statusReady": "Gotowy",
-      "statusError": "Klonowanie nie powiodło się",
-      "statusBlock": {
-        "none": "Nie skonfigurowano jeszcze klona.",
-        "cloning": "Klonowanie repozytorium w tle: pod-zadania będą wstrzymane do czasu zakończenia.",
-        "ready": "Lokalny klon jest gotowy. Można uruchamiać pod-zadania w tym projekcie.",
-        "error": "Klonowanie nie powiodło się. Sprawdź komunikat poniżej i kliknij Ponów po rozwiązaniu problemu."
-      },
-      "retry": "Ponów klonowanie"
-    }
-  },
   "updateChannel": {
     "stable": "Stabilny (wydania)",
     "edge": "Edge (gałąź main)"
@@ -3859,7 +3442,6 @@
     "openError": "Nie udało się otworzyć tego pliku",
     "sources": {
       "agents": "Agenci",
-      "projects": "Projekty",
       "folders": "Foldery",
       "addFolder": "Dodaj folder…",
       "all": "Wszystkie",
@@ -3876,10 +3458,6 @@
       "labelPlaceholder": "Mój projekt",
       "pathField": "Ścieżka bezwzględna",
       "pathHint": "Bezwzględna ścieżka do istniejącego katalogu na serwerze."
-    },
-    "worktree": {
-      "base": "Klon bazowy",
-      "ticket": "#{{number}} · {{branch}}"
     },
     "git": {
       "dirty": "{{count}} niezacommitowanych zmian",

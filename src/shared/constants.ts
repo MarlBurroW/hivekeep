@@ -203,33 +203,6 @@ export const KNOWN_CHANNEL_PLATFORMS = ['telegram', 'discord', 'slack', 'whatsap
 
 export const TASK_STATUSES = ['pending', 'in_progress', 'awaiting_human_input', 'completed', 'failed', 'cancelled'] as const
 
-/**
- * Task statuses that mean "this task is still actively attached to its ticket"
- * and must therefore keep the ticket framed as running (primary ring + spinner
- * + live chrono).
- *
- * Crucially this includes the SUSPENDED-BUT-ALIVE states a task enters while it
- * delegates work downward or waits on something:
- *   - `paused`               — manually paused, still owns the slot
- *   - `awaiting_agent_response`— blocked on an inter-Agent request it sent
- *   - `awaiting_subtask`     — blocked on a child it spawned (e.g. the `scout`
- *                              tool) via suspendTaskForChild
- *
- * Without these, a ticket whose task spawns a scout would briefly lose its
- * "running" framing even though the work is merely delegated one level down.
- *
- * `awaiting_human_input` is deliberately EXCLUDED: it gets its own (louder,
- * warning-colored) treatment via `awaitingHumanInputCount`, and the card/panel
- * surface that state separately. */
-export const TICKET_RUNNING_TASK_STATUSES = [
-  'queued',
-  'pending',
-  'in_progress',
-  'paused',
-  'awaiting_agent_response',
-  'awaiting_subtask',
-] as const
-
 export const NOTIFICATION_TYPES = [
   'prompt:pending',
   'channel:user-pending',
@@ -342,7 +315,6 @@ export const TOOL_DOMAIN_META: Record<BuiltinToolDomain, ToolDomainMeta> = {
   database:        { icon: 'Database',    bg: 'bg-destructive/20', text: 'text-destructive',      border: 'border-destructive/20',       labelKey: 'tools.domains.database' },
   'mini-apps':     { icon: 'AppWindow',  bg: 'bg-chart-3/40',    text: 'text-chart-3',          border: 'border-chart-3/40',           labelKey: 'tools.domains.mini-apps' },
   plugins:         { icon: 'Puzzle',      bg: 'bg-chart-4/40',   text: 'text-chart-4',          border: 'border-chart-4/40',           labelKey: 'tools.domains.plugins' },
-  projects:        { icon: 'Kanban',      bg: 'bg-chart-2/40',   text: 'text-chart-2',          border: 'border-chart-2/40',           labelKey: 'tools.domains.projects' },
 } as const
 
 // ---------------------------------------------------------------------------
@@ -474,62 +446,6 @@ export const CONTACT_IDENTIFIER_SUGGESTIONS = [
   'twitter', 'instagram', 'linkedin', 'github',
   'slack', 'website',
 ] as const
-
-// ─── Projects ─────────────────────────────────────────────────────────────────
-
-export const TICKET_STATUSES = ['backlog', 'todo', 'in_progress', 'blocked', 'done'] as const
-
-/** Validation regex for project slugs.
- *  - lowercase alphanumeric + hyphens
- *  - starts with a letter
- *  - 2-32 chars total
- *  - no leading hyphen (handled by leading-letter rule)
- *  Examples: `hivekeep`, `soupcon-de-magie`, `x-1`. */
-export const PROJECT_SLUG_REGEX = /^[a-z][a-z0-9-]{1,31}$/
-
-/** Regex to capture a ticket reference in free text. Two shapes:
- *  - `slug#42` (qualified) — group 1 = slug, group 2 = number
- *  - `#42` (bare) — group 1 = undefined, group 2 = number
- *  Anchored as a token: preceded by start-of-string or non-word, followed by
- *  end-of-string or non-word. Use with the `g` flag when scanning. */
-export const TICKET_MENTION_REGEX = /(?:^|(?<=[^\w-]))(?:([a-z][a-z0-9-]{1,31})#|#)(\d{1,10})(?=$|[^\w-])/g
-
-/** GitHub `owner/name` shape. GitHub itself allows letters, digits, `-`, `_`,
- *  and `.` in both segments. We validate at the API boundary so we can safely
- *  interpolate into a clone URL and a filesystem path. Length capped at 100
- *  per segment to match GitHub's own limit. */
-export const GITHUB_REPO_REGEX = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/
-
-/** Conservative git branch name validator used at the API boundary so the
- *  `defaultBranch` field can be safely interpolated into `git fetch / rebase
- *  / worktree add` argv without git arg injection (e.g. `--upload-pack=…`).
- *  Stricter than git's own rules: must start with `[A-Za-z0-9_]`, then the
- *  usual ref-name char set, no `..`/`@{` substrings, capped at 128. */
-export const GIT_BRANCH_REGEX = /^[A-Za-z0-9_][A-Za-z0-9._/-]{0,127}$/
-
-/** Returns true if `name` is a safe git branch reference per the V1 policy.
- *  Wrapper around `GIT_BRANCH_REGEX` plus the substring blacklist git itself
- *  enforces — kept as a function so callers don't duplicate the post-checks. */
-export function isValidGitBranch(name: string): boolean {
-  if (!GIT_BRANCH_REGEX.test(name)) return false
-  if (name.includes('..')) return false
-  if (name.includes('@{')) return false
-  if (name.endsWith('.') || name.endsWith('/') || name.endsWith('.lock')) return false
-  return true
-}
-
-/** Lifecycle states of the per-project local clone. Kept as a `const` tuple
- *  so the `CloneStatus` type in `types.ts` and any runtime guard stay in
- *  sync. */
-export const CLONE_STATUSES = ['none', 'cloning', 'ready', 'error'] as const
-
-/** Tags applied to every newly created project. Editable by user/Agent afterward. */
-export const DEFAULT_PROJECT_TAGS: ReadonlyArray<{ label: string; color: string }> = [
-  { label: 'bug', color: '#ef4444' },
-  { label: 'feature', color: '#3b82f6' },
-  { label: 'chore', color: '#6b7280' },
-  { label: 'doc', color: '#f59e0b' },
-]
 
 /**
  * Mandatory tool floor present in EVERY resolved toolset (main Agents and tasks)

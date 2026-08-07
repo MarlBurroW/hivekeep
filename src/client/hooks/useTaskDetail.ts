@@ -25,14 +25,6 @@ interface TaskDetail {
   concurrencyGroup: string | null
   concurrencyMax: number | null
   cronId: string | null
-  /** Parent ticket this task was spawned on, if any. Null for non-ticket
-   *  tasks. Used by the task panel to show the ticket ref (e.g. hivekeep#42)
-   *  and offer a jump-back to the ticket. */
-  ticket?: { id: string; number: number | null; projectSlug: string | null } | null
-  /** Optional run-specific sur-prompt captured at spawn time for ticket tasks.
-   *  Surfaced in the task panel so the user can audit what scope this run
-   *  was given, distinct from the ticket description itself. */
-  runPrompt?: string | null
   /** Roll-up of every LLM call billed to this task. Null until the first step
    *  records usage. Pushed live via `task:token-usage` SSE so the running
    *  counter updates without polling. */

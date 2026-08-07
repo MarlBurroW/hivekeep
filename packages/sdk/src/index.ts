@@ -161,8 +161,6 @@ export interface ToolExecutionContext {
   channelOriginId?: string
   /** Cron ID when executing a cron-triggered task. */
   cronId?: string
-  /** Ticket ID when executing a ticket-linked task. */
-  ticketId?: string
 }
 
 export type ToolFactory = (ctx: ToolExecutionContext) => Tool<any, any>
@@ -2257,7 +2255,6 @@ export interface HookPayloadMap {
     /** Originating channel queue item ID (causal chain tracking). */
     channelOriginId?: string
     cronId?: string
-    ticketId?: string
   }
   /** Fired after each tool call. `toolResult` is whatever the tool returned. */
   afterToolCall: {
@@ -2270,7 +2267,6 @@ export interface HookPayloadMap {
     toolResult: unknown
     channelOriginId?: string
     cronId?: string
-    ticketId?: string
   }
 }
 

@@ -7,6 +7,12 @@
 > Cette spec a été vérifiée contre le codebase (passe adversariale multi-agents) : chaque symbole/fichier cité existe sauf mention « nouveau » ou « à exporter ».
 >
 > **Statut : SHIPPED** — toutes les phases P1–P9 (§ 11) sont implémentées, livrables périphériques compris.
+>
+> **Note historique** : cette spec cite comme modèle le pipeline des mentions de
+> tickets (`remarkTicketMentions`, `TicketMentionContext`, `useTicketSearch`,
+> le trigger `#` du composer) et la source de browse « projet ». La gestion de
+> projet a depuis été retirée du produit : ces références décrivent l'état du
+> codebase au moment de la conception, plus le code actuel.
 
 ---
 
@@ -190,7 +196,7 @@ Deux usages distincts, deux mécanismes :
 
 ### 5.1 Palette `@` : groupe « Files » (composer → fichier)
 
-Le composer (`MessageInput.tsx`) a déjà trois triggers (`@` users+agents, `#` tickets avec recherche serveur débouncée, `/` commandes). On étend `@` — avec trois changements précis dans `MessageInput` (vérifiés nécessaires, ils ne sont pas optionnels) :
+Le composer (`MessageInput.tsx`) a déjà deux triggers (`@` users+agents, `/` commandes). On étend `@` — avec trois changements précis dans `MessageInput` (vérifiés nécessaires, ils ne sont pas optionnels) :
 
 1. **`detectMention`** : la classe de caractères du walk arrière (`[a-zA-Z0-9_-]`) doit accepter `.` et `/`, sinon taper `@rapports/` ou `@analyse.md` ferme la popover (le walk bute sur le caractère et ne trouve plus le `@`). Attention à ce que les mentions `@user` simples terminent toujours correctement.
 2. **`isMentionOpen`** : la gate actuelle n'ouvre la popover que si users/agents matchent — elle doit aussi s'ouvrir sur des hits fichiers seuls (et la garde de nav clavier associée).

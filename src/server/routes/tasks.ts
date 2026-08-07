@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { eq, and, asc } from 'drizzle-orm'
 import { db } from '@/server/db/index'
-import { tasks, messages, agents, tickets, projects } from '@/server/db/schema'
+import { tasks, messages, agents } from '@/server/db/schema'
 import { getTask, listTasksPaginated, cancelTask, forcePromoteTask, pauseTask, resumeTask, injectIntoTask, getActiveTaskSnapshot, retryTask, TaskNotRetryableError, TaskNotFoundError } from '@/server/services/tasks'
 import { resolveThinkingConfig } from '@/server/services/agent-engine'
 import { fetchCronLearningsByTask } from '@/server/services/cron-learnings'
@@ -133,22 +133,6 @@ taskRoutes.get('/:id', async (c) => {
   const tokenUsage = getTaskTotals(taskId)
   const providerType = effectiveModel ? guessProviderType(effectiveModel) : null
 
-  // Parent ticket info — surfaced so the task panel can show the ticket ref
-  // (e.g. hivekeep#42) and let the user jump back to the ticket. Null for tasks
-  // not bound to a ticket (spawn_self, cron, channel-origin, etc.).
-  let ticketInfo: { id: string; number: number | null; projectSlug: string | null } | null = null
-  if (task.ticketId) {
-    const row = await db
-      .select({ id: tickets.id, number: tickets.number, projectSlug: projects.slug })
-      .from(tickets)
-      .leftJoin(projects, eq(tickets.projectId, projects.id))
-      .where(eq(tickets.id, task.ticketId))
-      .get()
-    if (row) {
-      ticketInfo = { id: row.id, number: row.number ?? null, projectSlug: row.projectSlug ?? null }
-    }
-  }
-
   return c.json({
     task: {
       id: task.id,
@@ -167,8 +151,6 @@ taskRoutes.get('/:id', async (c) => {
       concurrencyGroup: task.concurrencyGroup ?? null,
       concurrencyMax: task.concurrencyMax ?? null,
       cronId: task.cronId ?? null,
-      ticket: ticketInfo,
-      runPrompt: task.runPrompt ?? null,
       tokenUsage,
       startedAt: task.startedAt ?? null,
       endedAt: task.endedAt ?? null,

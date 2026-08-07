@@ -215,7 +215,7 @@ const res = await Hivekeep.api("/path", opts?)          // Raw Response
 
 ## Platform API Client
 
-Call Hivekeep's **own** REST API (the same endpoints the settings pages use) to build a mini-app that manages a platform resource (a contacts manager, a crons board, a projects dashboard) instead of sending the user into settings.
+Call Hivekeep's **own** REST API (the same endpoints the settings pages use) to build a mini-app that manages a platform resource (a contacts manager, a crons board) instead of sending the user into settings.
 
 ```javascript
 const { contacts } = await Hivekeep.platform.get("/contacts")

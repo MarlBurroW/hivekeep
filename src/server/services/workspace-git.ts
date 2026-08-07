@@ -1,67 +1,26 @@
-import { realpathSync } from 'node:fs'
-import { basename, resolve, sep } from 'node:path'
-import { getProject } from '@/server/services/projects'
-import { getCloneDir } from '@/server/services/repo-clone'
-import { runGit } from '@/server/services/worktree'
-import type { WorkspaceWorktreeDTO, WorkspaceGitStatusDTO } from '@/shared/types'
+import { resolve, sep } from 'node:path'
+import type { WorkspaceGitStatusDTO } from '@/shared/types'
 
 /**
- * Git info for the Files section when browsing a project repo: the list of live
- * worktrees (base clone + per-task worktrees) for the worktree sub-selector, and
- * a lightweight status badge (branch + dirty count). Worktrees are ephemeral —
- * this reflects whatever `git worktree list` reports right now.
+ * Git helpers for the Files section: a per-file working-tree diff, the list of
+ * changed files, and a lightweight status badge (branch + dirty count). All of
+ * them are read-only and take a plain directory, so they work for any browse
+ * source that happens to be a git repo.
  */
 
-/** task/<slug>-<num>-<8hex> → the ticket number, when derivable. */
-function parseTicketNumber(branch: string): number | undefined {
-  const m = branch.match(/-(\d+)-[0-9a-f]{8}$/)
-  return m ? Number(m[1]) : undefined
+interface GitResult {
+  exitCode: number
+  stdout: string
+  stderr: string
 }
 
-function parseWorktreeList(porcelain: string, cloneDir: string): WorkspaceWorktreeDTO[] {
-  let mainReal: string
-  try {
-    mainReal = realpathSync(cloneDir)
-  } catch {
-    mainReal = cloneDir
-  }
-
-  const out: WorkspaceWorktreeDTO[] = []
-  for (const block of porcelain.split('\n\n')) {
-    let path = ''
-    let branch = ''
-    let detached = false
-    for (const line of block.split('\n')) {
-      if (line.startsWith('worktree ')) path = line.slice('worktree '.length).trim()
-      else if (line.startsWith('branch ')) branch = line.slice('branch '.length).trim().replace(/^refs\/heads\//, '')
-      else if (line.trim() === 'detached') detached = true
-    }
-    if (!path) continue
-    let isMain = false
-    try {
-      isMain = realpathSync(path) === mainReal
-    } catch {
-      isMain = path === cloneDir
-    }
-    out.push({
-      id: isMain ? '' : basename(path),
-      branch: branch || (detached ? 'detached' : ''),
-      isMain,
-      ticketNumber: parseTicketNumber(branch),
-    })
-  }
-  // Main clone first, then worktrees in git's order.
-  out.sort((a, b) => (a.isMain === b.isMain ? 0 : a.isMain ? -1 : 1))
-  return out
-}
-
-export async function listProjectWorktrees(projectId: string): Promise<WorkspaceWorktreeDTO[]> {
-  const project = await getProject(projectId)
-  if (!project?.slug || project.cloneStatus !== 'ready') return []
-  const cloneDir = getCloneDir(project.slug)
-  const res = await runGit(cloneDir, ['worktree', 'list', '--porcelain'])
-  if (res.exitCode !== 0) return []
-  return parseWorktreeList(res.stdout, cloneDir)
+async function runGit(cwd: string, args: string[]): Promise<GitResult> {
+  const proc = Bun.spawn(['git', '-C', cwd, ...args], { stdout: 'pipe', stderr: 'pipe' })
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ])
+  return { exitCode: await proc.exited, stdout, stderr }
 }
 
 /**
@@ -119,6 +78,8 @@ export async function gitStatusSummary(dir: string): Promise<WorkspaceGitStatusD
   if (head.exitCode !== 0) return null
   const branch = head.stdout.trim() || 'HEAD'
   const status = await runGit(dir, ['status', '--porcelain'])
-  const dirtyCount = status.exitCode === 0 ? status.stdout.split('\n').filter((l) => l.trim().length > 0).length : 0
+  const dirtyCount = status.exitCode === 0
+    ? status.stdout.split('\n').filter((line) => line.trim().length > 0).length
+    : 0
   return { branch, dirtyCount }
 }

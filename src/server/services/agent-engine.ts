@@ -15,10 +15,8 @@ import {
   queueItems,
   channels,
   tasks,
-  tickets,
   quickSessions,
 } from '@/server/db/schema'
-import { buildActiveProjectInfo } from '@/server/services/projects'
 import { getContactDisplayName } from '@/shared/contact-display'
 import { decrypt } from '@/server/services/encryption'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
@@ -1456,32 +1454,6 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       }
     }
 
-    // Resolve active project for the [7.8] block.
-    // If the current message is a ticket-linked task_result, override the agent's
-    // persistent active project with the ticket's project for this turn only
-    // (projects.md § 4 — temporary override on task-completed turns).
-    let resolvedActiveProjectId: string | null = agent.activeProjectId ?? null
-    if (queueItem.taskId && queueItem.messageType === 'task_result') {
-      const taskRow = await db
-        .select({ ticketId: tasks.ticketId })
-        .from(tasks)
-        .where(eq(tasks.id, queueItem.taskId))
-        .get()
-      if (taskRow?.ticketId) {
-        const ticketRow = await db
-          .select({ projectId: tickets.projectId })
-          .from(tickets)
-          .where(eq(tickets.id, taskRow.ticketId))
-          .get()
-        if (ticketRow) {
-          resolvedActiveProjectId = ticketRow.projectId
-        }
-      }
-    }
-    const activeProject = resolvedActiveProjectId
-      ? await buildActiveProjectInfo(resolvedActiveProjectId)
-      : null
-
     // Resolve LLM (provider + model + decrypted config) BEFORE building
     // the system prompt — the prompt's tool-gating decision needs to
     // see `resolved.model.maxTools`. The provider/model are
@@ -1529,7 +1501,6 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         oldestVisibleMessageAt,
       },
       workspacePath: agent.workspacePath,
-      activeProject: activeProject ?? undefined,
       // When the model declares maxTools=0 (Replicate-style non-tool-
       // calling completion model), strip every tool-related section
       // of the prompt — otherwise the model sees "use these tools"
@@ -2449,11 +2420,6 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     // Build quick session system prompt (minimal — no contacts, no agent directory, no hidden instructions)
     const globalPrompt = await getGlobalPrompt()
 
-    // Active project applies to quick sessions too — the Agent's state is the same regardless of session type.
-    const quickSessionActiveProject = agent.activeProjectId
-      ? await buildActiveProjectInfo(agent.activeProjectId)
-      : null
-
     // Per-session overrides (model/provider/thinking) — quick sessions can run
     // on a different model than the agent without touching its configuration.
     // Null columns mean "inherit the agent's settings".
@@ -2523,7 +2489,6 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       globalPrompt,
       userLanguage,
       workspacePath: agent.workspacePath,
-      activeProject: quickSessionActiveProject ?? undefined,
       // Same model-driven tool gating as the main queue path.
       toolsEnabled: getMaxToolsForRequest(qsResolved.providerRow.type, qsResolved.model) > 0,
     })

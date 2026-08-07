@@ -148,7 +148,7 @@ export const agents = sqliteTable('agents', {
   scoutProviderId: text('scout_provider_id').references(() => providers.id, { onDelete: 'set null' }),
   /** Optional reasoning config for this Agent's scouts (JSON:
    *  AgentThinkingConfig). One step in resolveScoutThinking()'s chain:
-   *  per-call override → project scout thinking → THIS → global default →
+   *  per-call override → THIS → global default →
    *  the calling Agent's own general thinking config. Null = unset tier. */
   scoutThinkingConfig: text('scout_thinking_config'),
   workspacePath: text('workspace_path').notNull(),
@@ -158,7 +158,6 @@ export const agents = sqliteTable('agents', {
   extraToolNames: text('extra_tool_names'),
   compactingConfig: text('compacting_config'), // JSON: AgentCompactingConfig
   thinkingConfig: text('thinking_config'), // JSON: AgentThinkingConfig
-  activeProjectId: text('active_project_id').references((): AnySQLiteColumn => projects.id, { onDelete: 'set null' }),
   createdBy: text('created_by').references(() => user.id),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
@@ -427,10 +426,6 @@ export const tasks = sqliteTable('tasks', {
   parentAgentId: text('parent_agent_id').notNull().references(() => agents.id),
   sourceAgentId: text('source_agent_id').references(() => agents.id),
   spawnType: text('spawn_type').notNull(), // 'self' | 'other'
-  /** Specialized variant of a task. 'execute' (default) is the regular sub-Agent
-   *  run; 'enrich' is a ticket-enrichment task that rewrites title/description/tags
-   *  rather than executing the ticket. Always paired with a non-null ticketId. */
-  kind: text('kind').notNull().default('execute'), // 'execute' | 'enrich'
   mode: text('mode').notNull().default('await'), // 'await' | 'async'
   model: text('model'),
   providerId: text('provider_id'),
@@ -453,20 +448,11 @@ export const tasks = sqliteTable('tasks', {
   pendingChildTaskId: text('pending_child_task_id'),
   channelOriginId: text('channel_origin_id'),
   webhookId: text('webhook_id').references(() => webhooks.id, { onDelete: 'set null' }),
-  ticketId: text('ticket_id').references((): AnySQLiteColumn => tickets.id, { onDelete: 'set null' }),
-  /** Frozen JSON snapshot of `TicketAssignmentInfo` captured at spawn time.
-   *  Used to keep the sub-Agent's system prompt stable for the lifetime of the
-   *  task — external changes to the ticket (new comments, status flips, tag
-   *  edits) won't invalidate the Anthropic prompt cache mid-execution. Null
-   *  for non-ticket tasks and for legacy ticket tasks spawned before this
-   *  column existed (those fall back to a live fetch). */
-  ticketAssignmentSnapshot: text('ticket_assignment_snapshot'),
   /** Frozen JSON snapshot of the rest of the prompt context captured at spawn
    *  time: Agent identity (name/slug/role/character/expertise/workspacePath +
    *  model/provider/thinkingConfig), global platform prompt, Agent
    *  directory, and cron context (previous runs + accumulated learnings) when
-   *  the task is cron-bound. Together with `ticketAssignmentSnapshot` this
-   *  freezes the entire stable system prefix for the task's lifetime, so the
+   *  the task is cron-bound. This freezes the entire stable system prefix for the task's lifetime, so the
    *  Anthropic prompt cache survives all re-entries (request_input replies,
    *  sub-sub-task completions, human-prompt answers, nudges, parent replies).
    *  The shape is `TaskPromptContextSnapshot` in services/tasks.ts. Null on
@@ -481,15 +467,9 @@ export const tasks = sqliteTable('tasks', {
   /** Optional array of toolbox ids (JSON string[]) defining the task's native
    *  toolset. The resolved native allow-list is CORE_TOOLS unioned with every
    *  referenced toolbox's tool_names ("*" expands to all native tools). Null
-   *  falls back to the built-in toolbox matching the legacy `toolPreset`
-   *  (or 'code' for tickets / 'all' otherwise) to preserve old behaviour. */
+   *  falls back to the built-in toolbox matching the legacy `toolPreset`,
+   *  then to 'all', to preserve old behaviour. */
   toolboxIds: text('toolbox_ids'), // JSON string[] of toolbox ids
-  /** Optional run-specific instructions provided at task spawn (ticket tasks).
-   *  Injected as a dedicated block in the sub-Agent's brief so the agent can be
-   *  scoped to a slice of the ticket (e.g. "focus only on backend",
-   *  "stop after the DB migration phase"). Soft-limit 500 chars at the API
-   *  surface. Null on tasks spawned without a sur-prompt. */
-  runPrompt: text('run_prompt'),
   concurrencyGroup: text('concurrency_group'),
   concurrencyMax: integer('concurrency_max'),
   /** Provider-reported peak input tokens from the most recent LLM turn of
@@ -516,7 +496,6 @@ export const tasks = sqliteTable('tasks', {
   index('idx_tasks_cron').on(table.cronId),
   index('idx_tasks_concurrency').on(table.concurrencyGroup, table.status, table.queuedAt),
   index('idx_tasks_webhook').on(table.webhookId),
-  index('idx_tasks_ticket').on(table.ticketId),
 ])
 
 export const crons = sqliteTable('crons', {
@@ -971,7 +950,7 @@ export const appSettings = sqliteTable('app_settings', {
 
 // ─── Workspace folders (Files section — user-added arbitrary FS sources) ──────
 // Absolute on-disk folders surfaced in the Files selector alongside agent
-// workspaces and project repos. Path is canonicalized (realpath) on create.
+// workspaces. Path is canonicalized (realpath) on create.
 
 export const workspaceFolders = sqliteTable('workspace_folders', {
   id: text('id').primaryKey(),
@@ -1241,191 +1220,6 @@ export const agentReadState = sqliteTable('agent_read_state', {
 }, (table) => [
   primaryKey({ columns: [table.userId, table.agentId] }),
   index('idx_agent_read_state_user').on(table.userId),
-])
-
-// ─── Projects ─────────────────────────────────────────────────────────────────
-// Independent entities shared across all users. Any Agent can select any project
-// via agents.active_project_id. See projects.md for the full spec.
-
-export const projects = sqliteTable('projects', {
-  id: text('id').primaryKey(),
-  // Human-readable identifier used to qualify ticket numbers (e.g. hivekeep#42).
-  // Nullable in the schema for migration purposes; backfilled at startup and
-  // enforced at the application layer (createProject always sets one).
-  slug: text('slug').unique(),
-  title: text('title').notNull(),
-  description: text('description').notNull().default(''),
-  githubUrl: text('github_url'),
-  // GitHub integration for sub-task worktree isolation.
-  // `githubRepo` is the authoritative "owner/name" used by the clone +
-  // worktree pipeline; `githubUrl` (above) stays a free-form display link.
-  githubPatVaultKey: text('github_pat_vault_key'),
-  githubRepo: text('github_repo'),
-  defaultBranch: text('default_branch').notNull().default('main'),
-  // 'none' | 'cloning' | 'ready' | 'error'. 'none' means no repo configured
-  // OR repo configured but clone has not been kicked off yet.
-  cloneStatus: text('clone_status').notNull().default('none'),
-  cloneError: text('clone_error'),
-  clonedAt: integer('cloned_at', { mode: 'timestamp_ms' }),
-  /** Optional default model for sub-Agent tasks spawned on tickets of this
-   *  project. Frozen into `tasks.model` at spawn time when no explicit task
-   *  override is provided. Falls back to the parent Agent's own model. */
-  model: text('model'),
-  providerId: text('provider_id'),
-  /** Optional default scout model for work in a project context (ticket tasks
-   *  + active-project sessions). One step in resolveScoutModel()'s chain,
-   *  BETWEEN the per-call override and the per-Agent scout (project beats
-   *  Agent, like the main-task model chain). Coupled with `scoutProviderId`.
-   *  Null falls through to the Agent scout → global default → Agent main
-   *  model. */
-  scoutModel: text('scout_model'),
-  scoutProviderId: text('scout_provider_id'),
-  /** Optional reasoning config for scouts dispatched in this project's context
-   *  (JSON: AgentThinkingConfig). Beats the per-Agent scout thinking, like the
-   *  scout model chain. Null = unset tier. */
-  scoutThinkingConfig: text('scout_thinking_config'),
-  /** Optional default thinking/reasoning config for sub-Agent tasks spawned on
-   *  tickets of this project. JSON: AgentThinkingConfig. Same freeze-at-spawn
-   *  pattern as `model`: copied into `tasks.thinking_config` if no explicit
-   *  task override is given. Falls back to the parent Agent's own config.
-   *  (Scouts use the dedicated `scoutThinkingConfig` instead.) */
-  thinkingConfig: text('thinking_config'),
-  /** Optional default toolbox selection for sub-Agent tasks spawned on tickets
-   *  of this project. JSON: string[] of toolbox ids. Frozen into
-   *  `tasks.toolbox_ids` at spawn when no explicit task override is provided.
-   *  Null means "inherit the runtime default" ('code' for ticket tasks via
-   *  resolveTaskToolboxIds). An explicit toolbox selection passed at spawn
-   *  still wins. */
-  defaultToolboxIds: text('default_toolbox_ids'),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  index('idx_projects_created').on(table.createdAt),
-])
-
-export const projectTags = sqliteTable('project_tags', {
-  id: text('id').primaryKey(),
-  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  label: text('label').notNull(),
-  color: text('color').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  uniqueIndex('uniq_project_tags_label').on(table.projectId, table.label),
-  index('idx_project_tags_project').on(table.projectId),
-])
-
-export const tickets = sqliteTable('tickets', {
-  id: text('id').primaryKey(),
-  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  // Per-project monotonic ticket number (GitHub-style #42). Nullable for
-  // migration purposes; backfilled at startup and enforced at the application
-  // layer (createTicket always assigns one).
-  number: integer('number'),
-  title: text('title').notNull(),
-  description: text('description').notNull().default(''),
-  status: text('status').notNull().default('backlog'), // 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done'
-  position: integer('position').notNull().default(0),
-  /** Reporter — who created this ticket. Exactly one of reporter_user_id /
-   *  reporter_agent_id is set (or both NULL for legacy/seeded rows). */
-  reporterUserId: text('reporter_user_id').references(() => user.id, { onDelete: 'set null' }),
-  reporterAgentId: text('reporter_agent_id').references(() => agents.id, { onDelete: 'set null' }),
-  /** When the ticket last entered the 'in_progress' column. Updated on every
-   *  transition into 'in_progress' (and cleared when it leaves). Drives the
-   *  "in progress since" duration on the kanban card. Null for tickets that
-   *  have never been moved to in_progress. */
-  inProgressAt: integer('in_progress_at', { mode: 'timestamp_ms' }),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  index('idx_tickets_project_status_position').on(table.projectId, table.status, table.position),
-  index('idx_tickets_project_updated').on(table.projectId, table.updatedAt),
-  uniqueIndex('uniq_tickets_project_number').on(table.projectId, table.number),
-])
-
-export const ticketTags = sqliteTable('ticket_tags', {
-  ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
-  tagId: text('tag_id').notNull().references(() => projectTags.id, { onDelete: 'cascade' }),
-}, (table) => [
-  primaryKey({ columns: [table.ticketId, table.tagId] }),
-  index('idx_ticket_tags_ticket').on(table.ticketId),
-  index('idx_ticket_tags_tag').on(table.tagId),
-])
-
-export const ticketComments = sqliteTable('ticket_comments', {
-  id: text('id').primaryKey(),
-  ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
-  authorType: text('author_type').notNull(), // 'user' | 'agent'
-  authorUserId: text('author_user_id').references(() => user.id, { onDelete: 'set null' }),
-  authorAgentId: text('author_agent_id').references(() => agents.id, { onDelete: 'set null' }),
-  content: text('content').notNull(),
-  metadata: text('metadata'), // JSON: { fromTaskId?: string; autoGenerated?: boolean }
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  index('idx_ticket_comments_ticket_created').on(table.ticketId, table.createdAt),
-])
-
-/**
- * Files attached to a ticket. Stored on disk under
- * `${UPLOAD_DIR}/tickets/<projectId>/<ticketId>/<id>.<ext>` and rows here
- * carry the metadata + back-reference. The disk file is removed by the
- * service when the row is deleted; ticket deletion cascades via the FK so
- * the service's cleanup hook runs on `deleteTicket`.
- *
- * Distinct from the `files` table (chat message attachments, channel media)
- * and the `file_storage` table (public share-link storage with access tokens).
- */
-export const ticketAttachments = sqliteTable('ticket_attachments', {
-  id: text('id').primaryKey(),
-  ticketId: text('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
-  originalName: text('original_name').notNull(),
-  storedPath: text('stored_path').notNull(),
-  mimeType: text('mime_type').notNull(),
-  size: integer('size').notNull(),
-  description: text('description'),
-  uploadedByUserId: text('uploaded_by_user_id').references(() => user.id, { onDelete: 'set null' }),
-  uploadedByAgentId: text('uploaded_by_agent_id').references(() => agents.id, { onDelete: 'set null' }),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  index('idx_ticket_attachments_ticket').on(table.ticketId),
-  index('idx_ticket_attachments_ticket_created').on(table.ticketId, table.createdAt),
-])
-
-/**
- * Durable, curated knowledge entries scoped to a project. Shared across all
- * Agents acting on the project (main Agent with active_project_id, or sub-Agent of
- * a ticket-bound task). Distinct from `memories` (agent-scoped, decay-aware)
- * and `knowledge_chunks` (agent-scoped, ingested docs).
- *
- * Pinned entries (max 10/project, enforced at the service layer) are injected
- * into the system prompt's Active project / Ticket assignment block. The rest
- * is reachable via the `search_project_knowledge` tool.
- *
- * authorAgentId is nullable: a NULL value means the entry was created by the
- * end-user via the REST API / UI rather than by an Agent tool call.
- */
-export const projectKnowledge = sqliteTable('project_knowledge', {
-  id: text('id').primaryKey(),
-  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  /** Short human-readable title. Rendered in the system-prompt knowledge
-   *  index for every entry (pinned or not). Service layer rejects empty
-   *  or whitespace-only titles. */
-  title: text('title').notNull().default(''),
-  content: text('content').notNull(),
-  embedding: blob('embedding'), // nullable — FTS5 still works if embedding fails
-  category: text('category'), // free-text (e.g. 'arch', 'decision', 'gotcha', 'convention')
-  /** When true, the full markdown content is injected inline in the system
-   *  prompt. When false, only the title appears in the index and the Agent
-   *  reads the body via get_project_knowledge(id). */
-  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
-  authorAgentId: text('author_agent_id').references(() => agents.id, { onDelete: 'set null' }),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  index('idx_project_knowledge_project').on(table.projectId),
-  index('idx_project_knowledge_project_pinned').on(table.projectId, table.pinned),
 ])
 
 // ─── External API (machine-to-machine conversational access) ───────────────────

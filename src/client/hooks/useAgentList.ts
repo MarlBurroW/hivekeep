@@ -8,16 +8,12 @@ export interface AgentListItem {
   name: string
   role?: string
   avatarUrl: string | null
-  activeProjectId?: string | null
 }
 
 /**
  * Lightweight hook to fetch the agent list for selectors and display.
  * Unlike the full `useAgents` hook, this doesn't include ordering, CRUD, or models.
  * Use this in settings pages that just need an agent list for dropdowns or name/avatar display.
- *
- * Listens to `agent:active-project` so consumers (e.g. project avatars stack) reflect
- * project-activation changes live.
  */
 export function useAgentList() {
   const [agents, setAgents] = useState<AgentListItem[]>([])
@@ -37,15 +33,6 @@ export function useAgentList() {
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
-
-  // Keep activeProjectId in sync without a full refetch
-  useSSE({
-    'agent:active-project': (data) => {
-      const agentId = data.agentId as string
-      const activeProjectId = (data.activeProjectId as string | null) ?? null
-      setAgents((prev) => prev.map((k) => (k.id === agentId ? { ...k, activeProjectId } : k)))
-    },
-  })
 
   /** Map of agentId → name */
   const agentNames = new Map(agents.map((k) => [k.id, k.name]))

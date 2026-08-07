@@ -41,11 +41,11 @@ How to run it:
 - **Offer search early** — a search provider lets me look things up (like a provider's API-key page) while we set up.
 - **Avatars (two axes + a base, empirically).** Once an image provider is connected, Agents get generated avatars. There are two global axes: the art STYLE (\`set_avatar_style\` — Pixar 3D / anime / watercolor…) and the SUBJECT/type (\`set_avatar_subject\` — robot / human / dragon…). Call \`list_avatar_presets\` to offer the user a few of each (they can also type their own). For consistency, once style+type are chosen, call \`generate_avatar_base\` to make a NEUTRAL base image all Agent avatars derive from (img2img). Show it, iterate if needed. (\`set_avatar_base_enabled false\` switches to pure text-to-image; \`reset_avatar_base\` restores the default.) Don't over-generate — image credits cost money.
 - **Conduct rules.** Ask if there are rules all their Agents should follow; if so, merge them into the global prompt (read with \`get_global_prompt\`, then \`set_global_prompt\`).
-- **Be a proactive (not pushy) guide.** Match suggestions to who the user is (read their contact "fiche"). Lead with the core value — a team of AI agents that remember them and get better over time — then surface amplifiers when relevant: messaging channels (text your Agents from your phone), self-building tools & mini-apps, automation (crons / sub-Agents / email triggers that react to incoming mail), and projects for big long-term work. Propose, explain the benefit, don't force.
+- **Be a proactive (not pushy) guide.** Match suggestions to who the user is (read their contact "fiche"). Lead with the core value — a team of AI agents that remember them and get better over time — then surface amplifiers when relevant: messaging channels (text your Agents from your phone), self-building tools & mini-apps, automation (crons / sub-Agents / email triggers that react to incoming mail). Propose, explain the benefit, don't force.
 - Keep the user's profile current. As you get to know them during onboarding, save what you learn with \`set_contact_note(contactId, "global", …)\` — **global** scope so every other Agent inherits the context and never has to re-learn who they are (reserve \`"private"\` for observations specific to your own interactions). Create the contact first with \`create_contact\` if none exists, and \`memorize\` their preferences.
 
 - Cover the WHOLE setup — never silently skip a category. Over the conversation (one thing at a time, at natural moments — never dump them all at once), make sure you OFFER each of these. The user may decline any, but you should have proposed it; use your read tools to see what is still missing before deciding what to suggest next:
-  (1) their profile / fiche (notes + memory); (2) a WEB SEARCH provider — offer it EARLY so you can look things up for them (e.g. a provider's API-key page); (3) an EMBEDDING model (long-term memory); (4) an IMAGE provider, then avatar style + type + optional neutral base; (5) the GLOBAL PROMPT — universal conduct rules every Agent must follow ("anything all your Agents should know or respect?"); read it first, then merge; (6) a VOICE provider (TTS / STT) for voice generation + transcription — heads-up: not yet wired into channels, but planned, say so honestly; (7) CHANNELS (Discord / Telegram); (8) their first real Agent; (9) inform about self-building tools, mini-apps, and projects.
+  (1) their profile / fiche (notes + memory); (2) a WEB SEARCH provider — offer it EARLY so you can look things up for them (e.g. a provider's API-key page); (3) an EMBEDDING model (long-term memory); (4) an IMAGE provider, then avatar style + type + optional neutral base; (5) the GLOBAL PROMPT — universal conduct rules every Agent must follow ("anything all your Agents should know or respect?"); read it first, then merge; (6) a VOICE provider (TTS / STT) for voice generation + transcription — heads-up: not yet wired into channels, but planned, say so honestly; (7) CHANNELS (Discord / Telegram); (8) their first real Agent; (9) inform about self-building tools and mini-apps.
   At every "what's next?" moment, propose the categories you have NOT covered yet — not just channels + create-a-Agent. WEB SEARCH, the GLOBAL PROMPT, and VOICE are the easiest to forget: don't.
 
 You are admin-facing: provider/channel/default/global config is admin-only and will be refused otherwise — that's expected.`
@@ -156,13 +156,6 @@ interface PromptParams {
   }
   /** Absolute path to the Agent's workspace directory */
   workspacePath?: string
-  /** Active project context — injected as volatile [7.8] block for main agent.
-   *  For sub-Agents linked to a ticket, use `ticketAssignment` instead. */
-  activeProject?: ActiveProjectPromptInfo
-  /** Ticket assignment context — injected as stable block in sub-Agent prompts
-   *  when `task.ticket_id !== null`. Always derived from the ticket at prompt-build
-   *  time (current state, not frozen at spawn). */
-  ticketAssignment?: TicketAssignmentInfo
   /** Host system context (platform, arch, available CLIs). Injected as a stable
    *  block in sub-Agent prompts so delegated tasks don't waste tool calls probing
    *  the environment. Cached at the service level — same value reused across
@@ -192,122 +185,6 @@ interface PromptParams {
    * `LLMModel.maxTools: 0` flowing through `getMaxToolsForRequest`.
    */
   toolsEnabled?: boolean
-}
-
-export interface ActiveProjectPromptInfo {
-  id: string
-  slug: string
-  title: string
-  description: string
-  githubUrl: string | null
-  tags: Array<{ label: string; color: string }>
-  openTickets: Array<{
-    idShort: string
-    /** Per-project ticket number (e.g. 42 → rendered as `#42`).
-     *  Null only on legacy rows that pre-date the backfill. */
-    number: number | null
-    title: string
-    status: string
-    tagLabels: string[]
-  }>
-  totalOpenTickets: number
-  /** True if description was truncated to fit `config.projects.maxDescriptionPromptTokens`. */
-  descriptionTruncated: boolean
-  /** Pinned project knowledge entries — full title + markdown body inlined
-   *  in the prompt so the Agent can act on them without an extra tool call.
-   *  Capped at `config.projectKnowledge.pinCap` (default 10).
-   *  Sorted by updatedAt DESC for deterministic, cache-stable rendering. */
-  pinnedKnowledge?: Array<{
-    id: string
-    title: string
-    content: string
-    category: string | null
-    authorAgentName: string | null
-  }>
-  /** Lightweight index of every entry (titles only). Pinned entries also
-   *  appear in `pinnedKnowledge` above with their full body — they're
-   *  flagged here so the Agent can tell which titles already have inline
-   *  content and which need `get_project_knowledge(id)`. */
-  knowledgeIndex?: Array<{
-    id: string
-    title: string
-    category: string | null
-    pinned: boolean
-    authorAgentName: string | null
-  }>
-  /** Total entries in `project_knowledge` for this project. Used to render
-   *  the "... and N more — use search_project_knowledge" footer when the
-   *  index is truncated to `config.projectKnowledge.maxIndexEntries`. */
-  totalKnowledgeCount?: number
-}
-
-export interface TicketAssignmentInfo {
-  ticketId: string
-  ticketNumber: number | null
-  ticketTitle: string
-  ticketDescription: string
-  ticketStatus: string
-  ticketTags: string[]
-  projectId: string
-  projectSlug: string
-  projectTitle: string
-  projectDescription: string
-  projectGithubUrl: string | null
-  /** Existing task executions linked to the same ticket, newest first. Injected
-   *  into the sub-Agent prompt so a restarted ticket task can resume with context
-   *  from prior completed, failed, and currently running work. */
-  taskHistory?: Array<{
-    id: string
-    title: string | null
-    description: string
-    status: string
-    kind: string
-    parentAgentName: string
-    createdAt: number
-    updatedAt: number
-    result: string | null
-    error: string | null
-    isCurrent: boolean
-  }>
-  /** Existing ticket comments in chronological order, injected into the sub-Agent
-   *  prompt so it picks up the conversation (clarifications, prior auto-reports,
-   *  follow-up questions) without having to call `list_ticket_comments`. */
-  comments?: Array<{
-    authorName: string
-    authorType: 'user' | 'agent'
-    createdAt: number
-    content: string
-    autoGenerated: boolean
-  }>
-  /** Optional run-specific sur-prompt provided at task spawn. Rendered as a
-   *  dedicated block right after existing comments and before the standard
-   *  sub-task instructions, so the agent can scope its run to a slice of the
-   *  ticket without conflating it with the ticket description itself. */
-  runPrompt?: string | null
-  /** Pinned project knowledge captured at spawn time — full title + body.
-   *  Frozen into the ticketAssignmentSnapshot to keep the sub-Agent prompt
-   *  cache stable across re-entries (request_input replies, sub-sub-task
-   *  returns). Newly pinned entries don't appear here until the sub-Agent
-   *  completes and the parent picks them up; the live `search_project_knowledge`
-   *  and `get_project_knowledge` tools always reflect the current state. */
-  pinnedKnowledge?: Array<{
-    id: string
-    title: string
-    content: string
-    category: string | null
-    authorAgentName: string | null
-  }>
-  /** Lightweight knowledge index captured at spawn time (titles only). Same
-   *  freeze-at-spawn rationale as `pinnedKnowledge`. */
-  knowledgeIndex?: Array<{
-    id: string
-    title: string
-    category: string | null
-    pinned: boolean
-    authorAgentName: string | null
-  }>
-  /** Total entries in the project's knowledge store at spawn time. */
-  totalKnowledgeCount?: number
 }
 
 /**
@@ -650,141 +527,6 @@ function buildCategoryGroupedMemories(header: string, memories: Memory[]): strin
 // agent-language list so the picker and the prompt always agree.
 const LANGUAGE_NAMES: Record<string, string> = AGENT_LANGUAGE_NAMES
 
-// ─── Project blocks ──────────────────────────────────────────────────────────
-
-/**
- * Render the project knowledge sub-sections. Shared between the main Agent's
- * Active project block and the sub-Agent's Ticket assignment block — knowledge
- * is project-scoped, so both surfaces show the same content.
- *
- * Two sub-sections rendered in this order:
- *   1. **Pinned knowledge** — full markdown body inlined per entry. The Agent
- *      can act on these without any tool call. Order = updatedAt DESC.
- *   2. **Knowledge index** — every entry as a single line `[id] title — category`.
- *      Pinned entries are flagged (✦) so the Agent knows their body is already
- *      visible above. Order = pinned-first, then updatedAt DESC.
- *
- * Returns null when the project has zero knowledge entries — no point
- * polluting the prompt with empty headers.
- */
-function renderProjectKnowledgeBlock(
-  pinned: ActiveProjectPromptInfo['pinnedKnowledge'],
-  index: ActiveProjectPromptInfo['knowledgeIndex'],
-  total: number | undefined,
-): string | null {
-  const pinnedItems = pinned ?? []
-  const indexItems = index ?? []
-  const totalCount = total ?? Math.max(pinnedItems.length, indexItems.length)
-  if (pinnedItems.length === 0 && indexItems.length === 0 && totalCount === 0) return null
-
-  const sections: string[] = []
-
-  // ── Pinned entries: full body inline ─────────────────────────────────────
-  if (pinnedItems.length > 0) {
-    const pinnedLines: string[] = [`### Pinned knowledge (${pinnedItems.length})`, '']
-    pinnedLines.push(
-      '_These entries are pinned — their full markdown content is included below so you can act on them immediately, no tool call needed._',
-    )
-    pinnedLines.push('')
-    for (const item of pinnedItems) {
-      const meta: string[] = []
-      if (item.category) meta.push(item.category)
-      if (item.authorAgentName) meta.push(`by ${item.authorAgentName}`)
-      const metaPart = meta.length > 0 ? ` _(${meta.join(' · ')})_` : ''
-      pinnedLines.push(`#### ${item.title}${metaPart}`)
-      pinnedLines.push('')
-      pinnedLines.push(item.content)
-      pinnedLines.push('')
-    }
-    sections.push(pinnedLines.join('\n').trimEnd())
-  }
-
-  // ── Index: title only, pinned ones flagged ───────────────────────────────
-  if (indexItems.length > 0) {
-    const indexLines: string[] = [`### Knowledge index (${totalCount})`, '']
-    if (pinnedItems.length > 0) {
-      indexLines.push(
-        '_Full list of titles. ✦ marks entries whose body is already inlined above; for the others, call `get_project_knowledge(id)` to read the markdown body, or `search_project_knowledge(query)` for topic-based discovery._',
-      )
-    } else {
-      indexLines.push(
-        '_Full list of titles. Call `get_project_knowledge(id)` to read any entry\'s markdown body, or `search_project_knowledge(query)` for topic-based discovery._',
-      )
-    }
-    indexLines.push('')
-    for (const item of indexItems) {
-      const flag = item.pinned ? '✦ ' : ''
-      const categoryPart = item.category ? ` — _${item.category}_` : ''
-      indexLines.push(`- ${flag}[${item.id}] ${item.title}${categoryPart}`)
-    }
-    const remainder = Math.max(0, totalCount - indexItems.length)
-    if (remainder > 0) {
-      indexLines.push('')
-      indexLines.push(
-        `> ${remainder} more ${remainder === 1 ? 'entry' : 'entries'} not shown — use \`search_project_knowledge(query)\` to surface them.`,
-      )
-    }
-    sections.push(indexLines.join('\n'))
-  }
-
-  return sections.join('\n\n')
-}
-
-function buildActiveProjectBlock(info: ActiveProjectPromptInfo): string {
-  const sections: string[] = []
-
-  sections.push('## Active project')
-  sections.push(
-    'You are currently working on the following project. Use the project tools to inspect tickets, update their status, and start tasks.',
-  )
-
-  let header = `Title: ${info.title}`
-  if (info.slug) header += `\nSlug: ${info.slug} (use as 'projectSlug#number' to qualify tickets across projects)`
-  if (info.githubUrl) header += `\nGitHub: ${info.githubUrl}`
-  sections.push(header)
-
-  const description = info.descriptionTruncated
-    ? `${info.description}\n\n[Description truncated — call get_project() to read the full text]`
-    : info.description
-  if (description.trim().length > 0) {
-    sections.push(`### Description\n\n${description}`)
-  }
-
-  if (info.tags.length > 0) {
-    const tagLines = info.tags.map((t) => `- ${t.label} (${t.color})`).join('\n')
-    sections.push(`### Tags\n\n${tagLines}`)
-  }
-
-  const knowledgeBlock = renderProjectKnowledgeBlock(info.pinnedKnowledge, info.knowledgeIndex, info.totalKnowledgeCount)
-  if (knowledgeBlock) sections.push(knowledgeBlock)
-
-  if (info.openTickets.length > 0) {
-    const ticketLines = info.openTickets
-      .map((t) => {
-        const tagPart = t.tagLabels.length > 0 ? ` — ${t.tagLabels.join(', ')}` : ''
-        // Prefer the human-readable number when available; fall back to the
-        // short UUID prefix for legacy rows still awaiting backfill.
-        const idLabel = t.number !== null ? `#${t.number}` : `#${t.idShort}`
-        return `- [${t.status}] [${idLabel}] ${t.title}${tagPart}`
-      })
-      .join('\n')
-    let body = ticketLines
-    const remainder = info.totalOpenTickets - info.openTickets.length
-    if (remainder > 0) {
-      body += `\n... and ${remainder} more — call list_tickets() to inspect`
-    }
-    sections.push(`### Open tickets (${info.totalOpenTickets})\n\n${body}`)
-  } else if (info.totalOpenTickets === 0) {
-    sections.push('### Open tickets\n\nNone — the kanban currently has no non-done tickets.')
-  }
-
-  sections.push(
-    '> To switch project, call set_active_project(other_project_id) or set_active_project(null) to deactivate.',
-  )
-
-  return sections.join('\n\n')
-}
-
 function buildTaskTodosBlock(
   todos: ReadonlyArray<{ id: string; subject: string; status: 'pending' | 'in_progress' | 'completed' | 'cancelled' }>,
 ): string {
@@ -831,107 +573,6 @@ function buildSystemContextBlock(ctx: SystemContext, workspacePath?: string): st
   )
   return lines.join('\n')
 }
-
-function buildTicketAssignmentBlock(info: TicketAssignmentInfo): string {
-  const sections: string[] = []
-  sections.push('## Ticket assignment')
-  sections.push('You are executing a delegated task for a specific ticket.')
-
-  let projectHeader = `Title: ${info.projectTitle}`
-  if (info.projectSlug) projectHeader += `\nSlug: ${info.projectSlug}`
-  if (info.projectGithubUrl) projectHeader += `\nGitHub: ${info.projectGithubUrl}`
-  const projectDesc = info.projectDescription.trim().length > 0
-    ? `\n\nDescription:\n${info.projectDescription}`
-    : ''
-  sections.push(`### Project context\n\n${projectHeader}${projectDesc}`)
-
-  const knowledgeBlock = renderProjectKnowledgeBlock(info.pinnedKnowledge, info.knowledgeIndex, info.totalKnowledgeCount)
-  if (knowledgeBlock) sections.push(knowledgeBlock)
-
-  const tagsLine = info.ticketTags.length > 0 ? `\nTags: ${info.ticketTags.join(', ')}` : ''
-  const descriptionLine = info.ticketDescription.trim().length > 0
-    ? `\n\nDescription:\n${info.ticketDescription}`
-    : ''
-  // Compose a human-readable identifier preferring `slug#N`, falling back to
-  // bare `#N`, falling back to nothing when neither is set yet (legacy rows).
-  const idParts: string[] = []
-  if (info.ticketNumber !== null && info.projectSlug) {
-    idParts.push(`Id: ${info.projectSlug}#${info.ticketNumber}`)
-  } else if (info.ticketNumber !== null) {
-    idParts.push(`Id: #${info.ticketNumber}`)
-  }
-  const idLine = idParts.length > 0 ? `${idParts.join('\n')}\n` : ''
-  sections.push(
-    `### Ticket you are working on\n\n` +
-    `Title: ${info.ticketTitle}\n` +
-    `${idLine}` +
-    `Status: ${info.ticketStatus}${tagsLine}${descriptionLine}`,
-  )
-
-  // Linked task executions, newest first. Include task ids and terminal output
-  // so a restarted ticket task can resume without guessing. Absolute ISO
-  // timestamps keep this stable when the assignment block is snapshotted.
-  if (info.taskHistory && info.taskHistory.length > 0) {
-    const blocks: string[] = ['### Ticket task history (most recent first)']
-    for (const task of info.taskHistory) {
-      const created = new Date(task.createdAt).toISOString()
-      const updated = new Date(task.updatedAt).toISOString()
-      const currentTag = task.isCurrent ? ' (current task)' : ''
-      const title = task.title?.trim() || task.description
-      const lines = [
-        `- Task ${task.id}${currentTag}: ${task.status}, kind: ${task.kind}, Agent: ${task.parentAgentName}, created ${created}, updated ${updated}`,
-        `  Title: ${title}`,
-      ]
-      if (task.result?.trim()) {
-        lines.push(`  Result summary: ${task.result.trim()}`)
-      } else if (task.error?.trim()) {
-        lines.push(`  Error summary: ${task.error.trim()}`)
-      } else if (!task.isCurrent) {
-        lines.push(`  No result or error summary is stored. Use get_task_detail(task_id: "${task.id}") or get_task_messages(task_id: "${task.id}", offset: -20) if you need to inspect where this task stopped.`)
-      }
-      blocks.push(lines.join('\n'))
-    }
-    sections.push(blocks.join('\n\n'))
-  }
-
-  // Existing comments, chronological. Absolute ISO timestamps (not relative)
-  // so this block is stable across re-entries of the same task and stays in
-  // the Anthropic prompt cache. Relative times like "5 min ago" change every
-  // minute and would bust the stable system prefix on every re-entry.
-  // Auto-generated comments (typically prior task results) are marked so the
-  // agent can distinguish them from human input.
-  if (info.comments && info.comments.length > 0) {
-    const blocks: string[] = ['### Existing comments on this ticket (chronological)']
-    for (const c of info.comments) {
-      const when = new Date(c.createdAt).toISOString()
-      const tag = c.autoGenerated ? ' [auto]' : ''
-      const kind = c.authorType === 'agent' ? 'Agent' : 'User'
-      blocks.push(`**${c.authorName}** (${kind}, ${when})${tag}:\n\n${c.content}`)
-    }
-    sections.push(blocks.join('\n\n'))
-  }
-
-  // Run-specific sur-prompt (optional). Rendered as its own labelled block so
-  // the sub-Agent clearly separates per-run scoping from the ticket description.
-  if (info.runPrompt && info.runPrompt.trim().length > 0) {
-    sections.push(
-      `### Run-specific instructions for this task\n\n` +
-      `The caller spawned this task with the following extra instructions. Treat them as a scoping or focus hint on top of the ticket: ` +
-      `they narrow your scope or split work across several agents, but they do NOT override the ticket's acceptance criteria unless they explicitly say so.\n\n` +
-      `> ${info.runPrompt.trim().split('\n').join('\n> ')}`,
-    )
-  }
-
-  sections.push(
-    '> Use update_ticket() to update the ticket as you progress (status, description, tags).\n' +
-    '> Report back to the parent Agent with report_to_parent() / update_task_status() as usual.\n' +
-    '>\n' +
-    '> **Auto-comment of final result:** when this task finishes, your `update_task_status` result (or error message on failure) is automatically posted as a comment on this ticket, signed as you. Do NOT call `add_ticket_comment` to repeat the final report, it would create a duplicate. You may still use `add_ticket_comment` mid-task to flag something that does not belong in the final report (e.g. a side-bug discovered along the way).',
-  )
-
-  return sections.join('\n\n')
-}
-
 /**
  * System prompt assembly result.
  *
@@ -989,12 +630,6 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     )
     stableBlocks.push(`## Your mission\n\n${params.taskDescription}`)
 
-    // Ticket assignment block — only for sub-Agents linked to a ticket.
-    // Stable for the lifetime of this sub-Agent task instance.
-    if (params.ticketAssignment) {
-      stableBlocks.push(buildTicketAssignmentBlock(params.ticketAssignment))
-    }
-
     // Environment block — platform, arch, available CLIs. Stable: the host
     // doesn't change during a task. Saves the sub-Agent a handful of probe calls.
     if (params.systemContext) {
@@ -1006,21 +641,12 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       ? `\n- This is a recurring scheduled task. End your final result with a concise summary of what you did and found, so the next run can pick up where you left off.` +
         `\n- When you encounter errors, unexpected behavior, or discover a useful approach, use save_run_learning() to record it for future runs. Use delete_run_learning() to remove stale or incorrect learnings.`
       : ''
-    const onTicketTask = Boolean(params.ticketAssignment)
     const constraintsLines: string[] = [
       `## Constraints`,
       `- Focus exclusively on this task.`,
+      `- Use report_to_parent() to send intermediate progress updates if useful.`,
+      `- If you need a free-form answer from your parent Agent, call request_input() (max ${config.tasks?.maxRequestInput ?? 3} times). For structured choices, use prompt_human() instead — it routes through the human prompt UI.`,
     ]
-    if (!onTicketTask) {
-      constraintsLines.push(`- Use report_to_parent() to send intermediate progress updates if useful.`)
-      constraintsLines.push(`- If you need a free-form answer from your parent Agent, call request_input() (max ${config.tasks?.maxRequestInput ?? 3} times). For structured choices, use prompt_human() instead — it routes through the human prompt UI.`)
-    } else {
-      constraintsLines.push(`- Communicate via the ticket. Use update_ticket() to update status/description/tags; use prompt_human() to ask the user a question (the task is suspended with a yellow "awaiting input" badge on the ticket until they answer). For structured choices use prompt_human's confirm/select/multi_select; for free-form answers use prompt_type="text" — or call request_input() which routes through the same human-prompt flow on ticket tasks.`)
-      constraintsLines.push(`- Do NOT report intermediate progress to a parent Agent — there is none on ticket tasks. Your audience is the user reading the ticket.`)
-      constraintsLines.push(
-        `- **Mine and feed the project knowledge base.** The "Knowledge index" above lists every entry's title and id. Pinned entries (✦) have their full markdown body inlined above the index — read them; you have them for free. For unpinned entries, the title alone may already tell you what you need; if the title looks relevant, call get_project_knowledge(id) to read the body. Use search_project_knowledge(query) when no title matches your need or you're discovering by topic. The whole list is frozen at spawn time — newly added entries won't appear in your index until the next ticket task, but get/search always hit the live state. When you discover something durable that future agents working on this project would need to know — an architectural decision you make, a non-obvious convention you uncover, a gotcha that cost you time — call add_project_knowledge(title, content, category?) with a self-explanatory title (it lands in every future Agent's prompt) and a markdown body. Set pinned=true only when the content itself must be visible in-prompt for every Agent (cap: 10); otherwise leave it unpinned — the title alone surfaces it.`,
-      )
-    }
     constraintsLines.push(`- Be honest about uncertainty. Do not fabricate facts or details — use tools to verify when unsure.`)
     stableBlocks.push(
       constraintsLines.join('\n') + `\n\n` +
@@ -1034,7 +660,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `## Execution discipline\n\n` +
       `These rules keep your work efficient. Most wasted tool calls come from violating one of them.\n\n` +
       `- **Don't re-read what's already in your context.** Before calling \`read_file\` or \`grep\`, scan up: if the file content or match was already shown in this task, reuse it.\n` +
-      `- **Use the dedicated file tools, not shell wrappers.** \`read_file\` (with \`offset\`/\`limit\` for partial reads), \`grep\`, \`list_directory\`, \`edit_file\`, \`multi_edit\` — NEVER \`run_shell\` with cat/head/tail/sed/awk/wc/ls/find/echo. They have dedicated tools that integrate with project context and cost fewer tokens.\n` +
+      `- **Use the dedicated file tools, not shell wrappers.** \`read_file\` (with \`offset\`/\`limit\` for partial reads), \`grep\`, \`list_directory\`, \`edit_file\`, \`multi_edit\` — NEVER \`run_shell\` with cat/head/tail/sed/awk/wc/ls/find/echo. They have dedicated tools that cost fewer tokens.\n` +
       `- **Use \`multi_edit\` for >1 change to the same file.** Never chain multiple \`edit_file\` calls on the same path.\n` +
       `- **Fan out independent reads in one step.** \`read_file\`, \`grep\`, \`list_directory\` are parallel-safe — emit several tool calls in the same assistant turn rather than waiting for each result.\n` +
       `- **Broaden before narrowing, and scan your prior greps first.** One \`grep\` with regex alternation \`(foo|bar|baz)\` or a wider pattern beats three sequential narrow greps. Before issuing a new \`grep\`, look at the ones you've already run this task — if the pattern overlaps, the matches are probably already in your context.\n` +
@@ -1043,7 +669,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- **Never bypass safety.** Do NOT use \`--no-verify\`, \`--no-gpg-sign\`, \`HUSKY=0\`, \`SKIP_HOOKS=1\`, \`git reset --hard\`, \`git push --force\`, or push directly to protected branches without explicit authorization in your mission. If a hook fails, fix the underlying issue. The runner refuses bypass markers at execution time.\n` +
       `- **Don't spelunk git history to understand the current state.** \`git log -S\`, \`git log -p\`, \`git show <hash>\`, \`git log --all\` are debugging tools for tracking down a regression — not the way to discover what the code looks like *now*. Read the current files instead; the present state is the source of truth.\n` +
       `- **Plan with \`think\` when you're about to thrash.** When the next move isn't obvious (failing test, ambiguous results, choosing between refactors), call the \`think\` tool with a paragraph or two of reasoning instead of issuing speculative reads. It has no side effects; it just makes your plan visible to the user and to yourself on the next step.\n` +
-      `- **Use \`task_todos\` for multi-step work (≥3 steps).** Set the full list at the start, advance one item to \`in_progress\` as you begin it (at most one in-flight), and mark each \`completed\` AS SOON AS it's done — never batch completions at the end. Skip for trivial single-step tasks. The list is visible to the user on the ticket.\n\n` +
+      `- **Use \`task_todos\` for multi-step work (≥3 steps).** Set the full list at the start, advance one item to \`in_progress\` as you begin it (at most one in-flight), and mark each \`completed\` AS SOON AS it's done — never batch completions at the end. Skip for trivial single-step tasks. The list is visible to the user.\n\n` +
       `## CRITICAL — Task resolution (MANDATORY)\n` +
       `You MUST call update_task_status() before you finish. There is no auto-completion.\n` +
       `- Call update_task_status("completed", result) with a summary of what you accomplished.\n` +
@@ -1334,27 +960,6 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- You can create, update, and delete secrets. Use create_secret() to store new credentials and delete_secret() to remove secrets you created.\n\n` +
       `### User identification\n` +
       `- Each user message is prefixed with the sender's identity. Address the right person and adapt your responses based on what you know about them.\n\n` +
-      `### Project and ticket management\n` +
-      `- The kanban status of a ticket is YOUR responsibility, not automatic. start_ticket_task() does NOT change the ticket's status or position.\n` +
-      `- When you decide to take ownership of a ticket, update its status BEFORE starting work: update_ticket(id, { status: 'in_progress' }). This keeps the kanban honest about what is being worked on.\n` +
-      `- After a task you spawned on a ticket completes, you will receive its result as a new turn. Decide explicitly: update_ticket(status: 'done') if the work is finished, 'blocked' if you need user input or external dependency, 'in_progress' if there is more to do (e.g., you will spawn another task), or back to 'todo' if you abandoned the attempt. Never leave the ticket in a stale state after a task returns.\n` +
-      `- start_ticket_task always runs in await mode — you will get a turn when it finishes. Do not assume async/fire-and-forget for ticket-linked work.\n\n` +
-      // Project knowledge instructions are scoped to "has an active project":
-      // without one, add_/search_/list_/pin_project_knowledge all return
-      // NO_ACTIVE_PROJECT — instructing the Agent to use them would be misleading.
-      // Cost: a project toggle invalidates the cached stable prefix on the
-      // next turn. Project switches are rare, so this is acceptable.
-      (params.activeProject
-        ? `### Project knowledge (shared, durable facts about "${params.activeProject.title}")\n` +
-          `- The active project has a dedicated knowledge base, distinct from your personal memories. It is **shared across every Agent and every sub-task that works on this project**, now and in the future. Treat it as a collective wiki you are co-authoring with future agents.\n` +
-          `- **How it shows up in your prompt.** The "Knowledge index" sub-section in the Active project block above lists every entry's id and title. Pinned entries (✦) also have their full markdown body inlined above the index — they are visible without any tool call. Unpinned entries appear only as a title in the index; read their body with get_project_knowledge(id).\n` +
-          `- **Capture knowledge proactively with add_project_knowledge(title, content) when you learn something durable** that another agent — yourself in a week, a sub-Agent spawned tomorrow, a different Agent entirely — would otherwise have to rediscover. Good candidates: architectural decisions ("we use Drizzle, not Prisma"), conventions ("commits don't use Co-Authored-By"), gotchas ("Better Auth manages user/session tables — never edit"), domain rules, non-obvious constraints, deliberate trade-offs. Bad candidates: your own current-task scratchpad, transient debugging state, anything that only matters within a single task — those belong in memories or task_todos.\n` +
-          `- **Write self-explanatory titles.** The title is what every future Agent sees by default. "Auth tokens" is useless; "Tokens are stored encrypted in the vault, never on disk" is great. The markdown body can be as detailed as you want — code samples, links, multi-paragraph reasoning — because it only enters a prompt when pinned or fetched.\n` +
-          `- **Pin (pinned=true) sparingly** — only when an entry's content itself must be visible in-prompt for every Agent from the first turn (cap: ${config.projectKnowledge.pinCap}). For most entries, the title-in-index is sufficient; the body is a get_project_knowledge call away when the title looks relevant.\n` +
-          `- **Discover with search_project_knowledge(query)** when no title in your index matches what you need, or for topic-based exploration (semantic + keyword hybrid). Use get_project_knowledge(id) to fetch a specific entry's body once you have its id.\n` +
-          `- Knowledge is project-scoped: these tools act on **"${params.activeProject.title}"** as long as it stays your active project. set_active_project() swaps the entire knowledge base.\n` +
-          `- Edit and prune: when a piece of knowledge is superseded, update or delete it. Stale knowledge is worse than no knowledge.\n\n`
-        : '') +
       `### Conversation context\n` +
       `- The messages in this conversation are your EXACT transcript — the verbatim record of everything said. You can read and quote them word for word.\n` +
       `- When someone asks about recent messages, simply look at the messages above. They are not a summary — they are the real messages, exactly as written.\n` +
@@ -1427,7 +1032,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- Bare ES imports (react, @hivekeep/react, …) resolve ONLY via an app.json import map — NOT inline HTML. Pass \`dependencies\` (or a \`files\` map incl. app.json) to create_mini_app to set it up in one call.\n` +
       `- Mini-apps are not just UIs: a \`_server.js\` backend with \`"background": true\` in app.json runs as a LIVE service (loads at server boot, onStart/onStop lifecycle) — it can schedule local cron jobs (ctx.schedule), REACT to platform events (ctx.on("task:done" | "channel:message-received" | "contact:created" | … — gated by events:<prefix>), push platform notifications (ctx.notify), fetch external APIs (ctx.fetch), persist files (ctx.files), and talk to the UI over SSE both ways (ctx.events.emit / onClientEvent). When a user wants something watched, reacted to, or automated with a visual front, a background mini-app is often the right shape (cheaper than a cron spawning you: no LLM turn per tick).\n` +
       `- With user-approved permissions declared in app.json, a backend can also read vault secrets (ctx.secrets), run LLM completions (ctx.llm), message you or spawn tasks on you (ctx.agent), and send through the platform's EXISTING messaging channels (ctx.channels.send / ctx.channels.sendToContact — e.g. an SMS via an already-configured Twilio channel; prefer that over re-wiring a provider API with raw secrets) — see the backend section of get_mini_app_docs.\n` +
-      `- Mini-apps can EXTEND the Hivekeep UI: \`Hivekeep.platform.get/post/put/delete("/contacts" | "/crons" | "/projects" | …)\` calls Hivekeep's own REST API (the same one the settings pages use), so you can build an app that manages any resource (a contacts manager, a crons board) instead of sending the user into settings. Gated by \`platform:<resource>:<read|write>\` permissions in app.json (e.g. platform:contacts:read/write); read api.md for each resource's routes/shapes. A background backend has the same thing as \`ctx.platform.*\` (service-backed: contacts, projects, tickets, crons) to mutate resources in reaction to events.\n` +
+      `- Mini-apps can EXTEND the Hivekeep UI: \`Hivekeep.platform.get/post/put/delete("/contacts" | "/crons" | …)\` calls Hivekeep's own REST API (the same one the settings pages use), so you can build an app that manages any resource (a contacts manager, a crons board) instead of sending the user into settings. Gated by \`platform:<resource>:<read|write>\` permissions in app.json (e.g. platform:contacts:read/write); read api.md for each resource's routes/shapes. A background backend has the same thing as \`ctx.platform.*\` (service-backed: contacts, crons) to mutate resources in reaction to events.\n` +
       `- NEVER hardcode API keys in app code or storage: declare \`"permissions": ["secrets:<NAME>"]\` and read them via ctx.secrets.get().\n` +
       `- Console output is only captured while the app is open in a browser tab (backend ctx.log entries are captured too, tagged \`source: backend\`). After writing files, check get_mini_app_console \`lastServedAt\`; use reload_mini_app to force a reload. Use get_mini_app_backend_status to inspect a backend (loaded?, jobs + next runs, permissions).\n` +
       `- Persistence: use Hivekeep.storage / useStorage (server-backed) for anything that must survive a reload. The app runs in a sandboxed opaque-origin iframe so browser localStorage / useLocalStorage is in-session only and does NOT persist.\n` +
@@ -1629,11 +1234,6 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `> Always create files, clone repos, and store data inside your workspace. Never write to the home folder or other system paths.\n\n` +
       `The user can browse and edit your workspace at any time through the Files screen of the app — files you create are directly visible, editable and shareable by them. When you mention one of your workspace files in a message, write its relative path in backticks (e.g. \`reports/analysis.md\`): it becomes a clickable link that opens the file for the user. Don't paste full file contents into the chat when pointing at the file is enough.`,
     )
-  }
-
-  // [7.8] Active project — volatile (changes when Agent switches project)
-  if (params.activeProject) {
-    volatileBlocks.push(buildActiveProjectBlock(params.activeProject))
   }
 
   // [7.9] Current sub-Agent plan — volatile (mutates each time the agent calls

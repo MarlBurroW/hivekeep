@@ -30,7 +30,7 @@ const log = createLogger('workspace-files')
  * included). Known residual limit: hardlinks (files.md § 7.6).
  *
  * The core is **root-based** (`…InTarget(target, …)`): the Files page browses
- * not just agent workspaces but also project repos and arbitrary FS folders
+ * not just agent workspaces but also mini-app dirs and arbitrary FS folders
  * (see workspace-sources.ts). Every legacy `…(agentId, …)` export is kept as a
  * thin adapter so agent routes, native tools and tests are untouched.
  */
@@ -415,7 +415,7 @@ function boundChanges(changes: WorkspaceChange[]): WorkspaceChange[] {
 
 /**
  * Emit a `workspace:changed` event for a resolved target. Agent sources keep the
- * legacy per-agent scope (`sendToAgent`); project/folder sources broadcast with a
+ * legacy per-agent scope (`sendToAgent`); folder/mini-app sources broadcast with a
  * `source` discriminator the client filters on (files.md § 8.1).
  */
 export function emitForTarget(target: WorkspaceTarget, changes: WorkspaceChange[]): void {
@@ -470,16 +470,15 @@ function commonParentOf(paths: string[]): string {
 
 /**
  * Tool-side emission: native tools pass their execution context + the absolute
- * path they wrote. Skipped for per-task worktrees (workspaceOverride) and for
- * writes outside the static workspace (agents are allowed to write elsewhere).
+ * path they wrote. Skipped for writes outside the static workspace (agents are
+ * allowed to write elsewhere).
  */
 export function emitWorkspaceChangedForTool(
-  ctx: { agentId: string; workspaceOverride?: { path: string } },
+  ctx: { agentId: string },
   absPath: string,
   type: WorkspaceChange['type'],
   opts: { isDirectory?: boolean } = {},
 ): void {
-  if (ctx.workspaceOverride) return
   const root = resolve(workspaceRootFor(ctx.agentId))
   const abs = resolve(absPath)
   if (abs !== root && !abs.startsWith(root + sep)) return

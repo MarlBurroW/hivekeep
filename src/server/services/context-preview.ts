@@ -455,16 +455,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     userLanguage = firstProfile.agentLanguage ?? firstProfile.language
   }
 
-  // Active project block — mirrors agent-engine.processAgentQueue so the preview
-  // shows the exact prompt the Agent will receive (including pinned project
-  // knowledge). Without it, the preview misleads users editing knowledge in
-  // the UI because they wouldn't see their pins land in the prompt.
-  let activeProject: import('@/server/services/prompt-builder').ActiveProjectPromptInfo | null = null
-  if (agent.activeProjectId) {
-    const { buildActiveProjectInfo } = await import('@/server/services/projects')
-    activeProject = await buildActiveProjectInfo(agent.activeProjectId)
-  }
-
   const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agentId)
 
   // Build system prompt
@@ -487,7 +477,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
       hasCompactedHistory,
     },
     workspacePath: agent.workspacePath,
-    activeProject: activeProject ?? undefined,
   }))
 
   // Resolve tools — unified resolver (toolbox is the sole grant primitive
@@ -784,28 +773,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
         : fetchCronLearnings(task.cronId))
     : undefined
 
-  // Ticket assignment context — mirror executeSubAgent: prefer the spawn-time
-  // snapshot so the visualizer shows exactly what the sub-Agent is actually
-  // seeing (frozen for cache stability), and fall back to a live fetch for
-  // legacy ticket tasks without a snapshot.
-  let ticketAssignment: import('@/server/services/prompt-builder').TicketAssignmentInfo | null = null
-  if (task.ticketId) {
-    if (task.ticketAssignmentSnapshot) {
-      try {
-        ticketAssignment = JSON.parse(task.ticketAssignmentSnapshot) as import('@/server/services/prompt-builder').TicketAssignmentInfo
-      } catch {
-        // Corrupt snapshot, fall through to live fetch
-      }
-    }
-    if (!ticketAssignment) {
-      const { buildTicketAssignmentInfo } = await import('@/server/services/tickets')
-      ticketAssignment = await buildTicketAssignmentInfo(task.ticketId, {
-        runPrompt: task.runPrompt ?? null,
-        currentTaskId: task.id,
-      })
-    }
-  }
-
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agentIdentity.name, slug: agentIdentity.slug, role: agentIdentity.role, character: agentIdentity.character, expertise: agentIdentity.expertise },
     contacts: [],
@@ -818,7 +785,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
     globalPrompt,
     userLanguage: 'en',
     workspacePath: agentIdentity.workspacePath,
-    ticketAssignment: ticketAssignment ?? undefined,
   }))
 
   // Messages: only this task's messages
@@ -867,7 +833,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
   const taskToolboxIds = await resolveTaskToolboxIds({
     toolboxIds: task.toolboxIds as string | null,
     toolPreset: task.toolPreset as string | null,
-    ticketId: task.ticketId ?? null,
   })
   const mainSurface = await resolveToolset({
     agentId: agentIdentity.id,
@@ -881,11 +846,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
   }
 
   const subAgentTools = toolRegistry.resolve({ agentId: task.parentAgentId, taskId, taskDepth: task.depth, isSubAgent: true })
-  // Mirror executeSubAgent: ticket sub-Agents drop report_to_parent (the parent has
-  // nothing actionable to do with intermediate reports — the user reads the UI).
-  if (task.ticketId) {
-    delete subAgentTools['report_to_parent']
-  }
   const allTools = { ...mainSurface, ...subAgentTools }
   const taskSourceMap = buildSourceMap(allTools)
 
@@ -980,14 +940,6 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
 
   const globalPrompt = await getGlobalPrompt()
 
-  // Mirror agent-engine's quick-session path: include the active project block
-  // (with pinned knowledge) so the preview matches the real prompt.
-  let quickSessionActiveProject: import('@/server/services/prompt-builder').ActiveProjectPromptInfo | null = null
-  if (agent.activeProjectId) {
-    const { buildActiveProjectInfo } = await import('@/server/services/projects')
-    quickSessionActiveProject = await buildActiveProjectInfo(agent.activeProjectId)
-  }
-
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: [],
@@ -999,7 +951,6 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
     globalPrompt,
     userLanguage,
     workspacePath: agent.workspacePath,
-    activeProject: quickSessionActiveProject ?? undefined,
   }))
 
   // Messages: only this session

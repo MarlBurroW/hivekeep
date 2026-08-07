@@ -71,17 +71,13 @@ Most AI tools treat every conversation as disposable. You explain yourself on Mo
       <sub><b>Your agents build apps</b><br />Real mini-apps, hosted right inside Hivekeep.</sub>
     </td>
     <td width="50%" align="center" valign="top">
-      <img src="docs/assets/screenshots/kanban.webp" alt="A shared kanban board with tickets across backlog, to do and in progress" /><br />
-      <sub><b>A shared kanban</b><br />Projects and tickets your agents work alongside you.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top">
       <img src="docs/assets/screenshots/files.webp" alt="A file browser and code editor for an agent's workspace" /><br />
       <sub><b>A real workspace</b><br />Browse and edit every agent's files, with a proper editor.</sub>
     </td>
-    <td width="50%" align="center" valign="top">
-      <img src="docs/assets/screenshots/token-usage.webp" alt="A token-usage dashboard with cost per agent, model and day" /><br />
+  </tr>
+  <tr>
+    <td colspan="2" align="center" valign="top">
+      <img src="docs/assets/screenshots/token-usage.webp" width="50%" alt="A token-usage dashboard with cost per agent, model and day" /><br />
       <sub><b>Every token on record</b><br />Cost per agent, per model, per day. No surprises.</sub>
     </td>
   </tr>
@@ -166,7 +162,7 @@ Self-hosted AI assistants like **OpenClaw** and **Hermes** are excellent: they w
 | A team of agents that collaborate | yes | no | no |
 | Polished web app (PWA) | yes | partial | partial |
 | Rendered tool calls (UI, not JSON) | yes | no | no |
-| Mini-apps and projects (Kanban) | yes | no | no |
+| Mini-apps your agents build | yes | no | no |
 | Conversational setup (no CLI) | yes | no | no |
 | Secrets never sent to the LLM | yes | partial | partial |
 | Token and context transparency | yes | no | no |
@@ -304,34 +300,31 @@ Minimal 3-screen onboarding, then a permanent configurator Agent (`kind=configur
 #### 6. Auto-generated avatars
 End-to-end image generation: an LLM prompt-writer rewrites each prompt from the global style, subject type, and Agent identity. Text-to-image or image-to-image with a neutral base for cross-Agent consistency. Three UI modes (upload + crop, auto, manual).
 
-#### 7. Projects, Kanban, tickets, GitHub
-Projects with injectable context, 5-column Kanban (drag-and-drop, optimistic, SSE), tickets (tags, comments, attachments, history, mentions), per-project tags. Ticket sub-tasks in mandatory `await` with project + ticket context. Automated enrichment. GitHub integration (background clone, isolated worktree per sub-task, PAT in vault via credential helper).
-
-#### 8. Connected accounts (mail, calendar, contacts)
+#### 7. Connected accounts (mail, calendar, contacts)
 Generic multi-provider OAuth2 (Google, Microsoft 365, Apple). Mail (Gmail, Outlook/365, IMAP/SMTP). Calendar events (Google, M365, iCloud CalDAV, generic CalDAV). Read-only contact search (iCloud, Google People, MS Graph, CardDAV). Tokens cached server-side, never seen by Agents. Optional send-approval mode, per-Agent allow-list, encryption at rest. **Email triggers**: per-account condition trees (sender, domain, subject, body, attachment…, nested AND/OR) that automatically prompt a target Agent (injected into its conversation or spawned as an isolated task) when matching mail arrives (polled, with cold-start and anti-flood guards; Agents can set them up via tools).
 
-#### 9. Plugins, SDK, marketplace
+#### 8. Plugins, SDK, marketplace
 NPM-based plugins, typed TypeScript SDK (`@hivekeep/sdk`). Built-in marketplace (keyword `hivekeep-plugin`, live npm search) + Git install. Strict declarative manifest with granular permissions. Native AI tools, native provider families (LLM, embedding, image, search, TTS, STT + email/contacts/calendar), channel adapters, lifecycle hooks, interactive cards, per-plugin storage, permission-controlled HTTP, namespaced vault, scaffold CLI (`create-hivekeep-plugin`), auto-disable on error.
 
-#### 10. Toolboxes and tool scoping
+#### 9. Toolboxes and tool scoping
 Dynamic composition of `CORE_TOOLS` plus toolboxes, resolved each turn (hot reload). Nine built-in toolboxes (code, research, ops, scout, all, email, calendar, address-book, configurator). Smart wildcard (`all`/`*` covers natives + enabled custom, never MCP/plugin). Flexible assignment (Agent, task, cron, webhook), sub-Agent hard floor, scout delegation to a cheap read-only model.
 
-#### 11. Context and token transparency
+#### 10. Context and token transparency
 Context Viewer (stacked multicolor bar by section + detailed table). Granular per-section estimation. Provider-agnostic cache observability (read/write/fresh tokens, hit rate, residual TTL). Per-Agent EMA calibration. Exhaustive per-call usage tracking (`llm_usage`). Sensitive tool-result masking before summarization. Budget-based history trimming.
 
-#### 12. Channels and multi-Agent binding
+#### 11. Channels and multi-Agent binding
 Six platforms (Telegram, Discord, Slack, WhatsApp, Signal, Matrix). Real-time channel transfer (`transfer_channel`, atomic mutation, audit messages, SSE, sideband hint). Mutable Agent-channel binding, inter-Agent sending with auto prefix, transfer context injected into `<channel-context>`, causal chain (`channelOriginId`), async delivery statuses, attachments + vision.
 
-#### 13. Vault and secret security
+#### 12. Vault and secret security
 AES-256-GCM (random 12-byte IV + auth tag, auto-generated 256-bit key, `chmod 0600`). Secure UI-to-vault input (create + test + store atomically, no return to the LLM). Deterministic config references (`$vault:`). Message redaction that blocks compacting leakage. Typed vault entries (credential, card, note, identity, custom), metadata-only search, encrypted attachments.
 
-#### 14. Memory system
+#### 13. Memory system
 Dual-channel capture (automatic with KNN dedup + explicit with category/importance/subject/scope). Hybrid search (KNN cosine + FTS5, RRF, multi-query + optional HyDE). Post-fusion ranking (decay, importance, retrieval boost, subject boost, category intent). Optional LLM rerank + adaptive-K trimming, auto consolidation of near-duplicates, importance recalibration, conservative stale pruning, pluggable embeddings with FTS-only graceful degradation, scoped memories.
 
-#### 15. Automation
+#### 14. Automation
 Crons (POSIX/ISO8601, one-shot, croner in-process; Agent-created crons need user approval; cron learnings auto-saved). Webhooks (SHA256 token, simple/regex filters, templates, rate-limited). Human-in-the-loop (`prompt_human`: confirm/select/text). Scout (read-only delegation to a cheap model). Wakeups (`wake_me_in` / `wake_me_every`). Persistent task queue with concurrency groups and frozen snapshots.
 
-#### 16. Platform and power-user
+#### 15. Platform and power-user
 Dynamic MCP servers (Agents manage their own). Real-time system logs (ring buffer, filterable, SSE). Direct SQL (opt-in, bound params, row cap). Platform config with secret redaction. Centralized contacts with scoped notes. Shareable files (public/password/expiring/burn). Quick private sessions per user. Multi-channel notifications. Pluggable provider resolver (one config, auto-detected capabilities).
 
 #### Built-in tools (120+)

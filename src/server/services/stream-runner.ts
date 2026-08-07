@@ -60,8 +60,8 @@ export interface ReasoningSegment {
  * requires `input` to be a JSON object — anything else makes the next turn
  * fail and permanently bricks the task (the bad entry survives in history).
  *
- * Real-world failure mode that motivated this guard (prod task on ticket
- * #25, read_file call #49): Opus 4.7 occasionally emits invalid JSON in
+ * Real-world failure mode that motivated this guard (prod task, read_file
+ * call #49): Opus 4.7 occasionally emits invalid JSON in
  * tool_use inputs — e.g. `{"path": "...", "offset": 1, 100, "limit": 80}`
  * where it meant to express a range. Without normalization, the string
  * round-trips through history and trips the API on the next step.

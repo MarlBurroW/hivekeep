@@ -23,8 +23,8 @@ import type { Root } from 'mdast'
 /**
  * Conservative text-node candidate: `dir/sub/file ext` requires word-ish chars
  * (no spaces — a sentence in French would match wildly otherwise), either with
- * a `/` or a bare filename with an extension. Boundaries modeled on
- * TICKET_MENTION_REGEX (lookbehind/lookahead on non-word).
+ * a `/` or a bare filename with an extension. Boundaries are token-anchored
+ * (lookbehind/lookahead on non-word).
  */
 export const WORKSPACE_PATH_TEXT_REGEX =
   /(?:^|(?<=[\s({[«"']))((?:[\w.-]+\/)+[\w][\w.-]*|[\w][\w-]*\.[A-Za-z0-9]{1,8})(?=$|[\s)}\],.;:!?»"'])/g

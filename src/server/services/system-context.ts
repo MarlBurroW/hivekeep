@@ -144,7 +144,7 @@ function probe(tool: string): ProbeResult | null {
  * Side effect on first call: augments `process.env.PATH` with `process.execPath`,
  * operator-defined `HIVEKEEP_AUGMENT_PATH`, and well-known user-local bin
  * dirs, THEN probes each tool. The augmentation is what fixes the prod
- * scenario observed on ticket #25 task `e6c9d6f1`: the systemd user
+ * scenario observed on prod task `e6c9d6f1`: the systemd user
  * service started with the default PATH and `bun` lived in `~/.bun/bin`,
  * which neither the inherited PATH nor `bash -lc`'s login profile knew
  * about, so the agent burned ~10 calls re-discovering it.

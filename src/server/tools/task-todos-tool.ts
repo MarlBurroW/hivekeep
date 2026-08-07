@@ -54,10 +54,7 @@ export const taskTodosTool: ToolRegistration = {
         if (!task) return { error: 'Task not found.' }
 
         try {
-          const stored = setTodosForTask(ctx.taskId, todos, {
-            parentAgentId: task.parentAgentId,
-            ticketId: task.ticketId ?? null,
-          })
+          const stored = setTodosForTask(ctx.taskId, todos, { parentAgentId: task.parentAgentId })
           recordGuardFire(ctx.taskId, 'todoUpdate')
           log.debug({ taskId: ctx.taskId, count: stored.length }, 'task_todos updated')
           return {

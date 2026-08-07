@@ -961,11 +961,6 @@
       "noResults": "无结果",
       "files": "文件"
     },
-    "ticketMention": {
-      "loading": "正在搜索工单...",
-      "noResults": "无匹配工单",
-      "scope": "项目：{{slug}}"
-    },
     "emptyState": {
       "greeting": "与 {{name}} 聊天",
       "defaultRole": "你的 AI 助手，随时待命。",
@@ -1098,7 +1093,6 @@
       "callCount_other": "{{count}} 次 LLM 调用"
     },
     "description": "描述",
-    "ticketTooltip": "打开父级工单",
     "mode": "模式",
     "modeAwait": "等待",
     "modeAsync": "异步",
@@ -1115,8 +1109,6 @@
     "close": "关闭",
     "viewPrompt": "提示词",
     "viewPromptTooltip": "查看完整任务提示词",
-    "runPrompt": "运行说明",
-    "runPromptTooltip": "派生任务时传入的本次运行说明",
     "prompt": "任务提示词",
     "promptDescription": "完整的任务提示词内容",
     "forceStart": "强制启动",
@@ -2641,8 +2633,7 @@
       "users": "用户",
       "database": "数据库",
       "mini-apps": "迷你应用",
-      "plugins": "插件",
-      "projects": "项目"
+      "plugins": "插件"
     },
     "names": {
       "web_search": "网页搜索",
@@ -2874,36 +2865,9 @@
       "list_mini_app_files": "列出应用文件",
       "get_task_messages": "任务消息",
       "transfer_channel": "转移渠道",
-      "list_projects": "列出项目",
-      "get_project": "获取项目",
-      "create_project": "创建项目",
-      "update_project": "更新项目",
-      "delete_project": "删除项目",
-      "update_project_description": "更新项目描述",
-      "append_project_description": "追加项目描述",
-      "patch_project_description": "修补项目描述",
-      "set_active_project": "设置活跃项目",
-      "list_project_tags": "列出项目标签",
       "create_tag": "创建标签",
       "update_tag": "更新标签",
       "delete_tag": "删除标签",
-      "list_tickets": "列出工单",
-      "get_ticket": "获取工单",
-      "create_ticket": "创建工单",
-      "update_ticket": "更新工单",
-      "add_ticket_tag": "添加工单标签",
-      "remove_ticket_tag": "移除工单标签",
-      "delete_ticket": "删除工单",
-      "start_ticket_task": "启动工单任务",
-      "enrich_ticket": "充实工单",
-      "add_ticket_comment": "添加工单评论",
-      "list_ticket_comments": "列出工单评论",
-      "delete_ticket_comment": "删除工单评论",
-      "list_ticket_attachments": "列出工单附件",
-      "read_ticket_attachment": "读取工单附件",
-      "add_ticket_attachment": "添加工单附件",
-      "update_ticket_attachment": "更新工单附件",
-      "delete_ticket_attachment": "删除工单附件",
       "describe_image_model": "描述图像模型",
       "list_endpoints": "列出渠道端点",
       "send_to_contact": "发送给联系人",
@@ -2916,13 +2880,6 @@
       "transcribe_audio": "转写音频",
       "reload_mini_app": "重新加载迷你应用",
       "set_mini_app_maintainer": "设置迷你应用维护者",
-      "add_project_knowledge": "添加项目知识",
-      "search_project_knowledge": "搜索项目知识",
-      "list_project_knowledge": "列出项目知识",
-      "get_project_knowledge": "获取项目知识",
-      "update_project_knowledge": "更新项目知识",
-      "delete_project_knowledge": "删除项目知识",
-      "pin_project_knowledge": "置顶项目知识",
       "get_mini_app_backend_status": "迷你应用后端状态"
     },
     "renderers": {
@@ -3336,7 +3293,6 @@
   },
   "activityBar": {
     "agents": "智能体",
-    "projects": "项目",
     "tasks": "任务",
     "crons": "定时任务",
     "apps": "迷你应用",
@@ -3436,359 +3392,6 @@
     "start": "启动任务",
     "started": "任务已在 {{name}} 上启动。完成后结果会显示在这个对话中。"
   },
-  "projects": {
-    "page": {
-      "title": "项目",
-      "comingSoon": "看板视图即将推出：后端已就绪，前端开发中。"
-    },
-    "sidebar": {
-      "title": "项目",
-      "create": "新建项目",
-      "empty": "还没有项目。创建你的第一个项目开始使用。",
-      "emptyTitle": "还没有项目",
-      "emptyDescription": "归组工单、运行任务，并跟踪各智能体的工作。",
-      "search": "搜索项目..."
-    },
-    "empty": {
-      "title": "没有项目",
-      "description": "从侧边栏创建一个项目，开始跟踪工作。"
-    },
-    "kanban": {
-      "newTicket": "新建工单",
-      "searchPlaceholder": "按标题或标签筛选工单…",
-      "searchClear": "清除搜索",
-      "searchResults_one": "{{count}} 个匹配",
-      "searchResults_other": "{{count}} 个匹配",
-      "progress": "{{done}} / {{total}} 已完成",
-      "progressEmpty": "还没有工单",
-      "columnRunning_one": "{{count}} 个工单有进行中的任务",
-      "columnRunning_other": "{{count}} 个工单有进行中的任务",
-      "empty": {
-        "backlog": "想法都先放这里。现在记下来，以后再规划。",
-        "todo": "准备开工了？确定要做的工单拖到这里。",
-        "in_progress": "进行中的工作显示在这里。",
-        "blocked": "卡住了？把被阻塞的工单放到这里，保持可见。",
-        "done": "完成的工单会堆在这里。"
-      },
-      "emptySearchInColumn": "此列中没有匹配项。",
-      "quickAdd": {
-        "label": "添加工单",
-        "inputPlaceholder": "工单标题（回车添加，Esc 取消）"
-      }
-    },
-    "status": {
-      "backlog": "待规划",
-      "todo": "待办",
-      "in_progress": "进行中",
-      "blocked": "已阻塞",
-      "done": "已完成"
-    },
-    "view": {
-      "kanban": "看板",
-      "knowledge": "知识"
-    },
-    "knowledge": {
-      "add": "添加知识",
-      "searchPlaceholder": "搜索项目知识…",
-      "clearSearch": "清除搜索",
-      "summary": "{{pinned}} 已置顶 · 共 {{total}}",
-      "totalCount_one": "{{count}} 个条目",
-      "totalCount_other": "{{count}} 个条目",
-      "pinnedCount_one": "{{count}} 个已置顶",
-      "pinnedCount_other": "{{count}} 个已置顶",
-      "searchResults": "{{count}} 个匹配（共 {{total}}）",
-      "pagination": "{{from}}–{{to}}，共 {{total}}",
-      "pinnedBadge": "已置顶",
-      "byUser": "来自你",
-      "byAgent": "来自 {{name}}",
-      "pin": "置顶",
-      "unpin": "取消置顶",
-      "edit": "编辑",
-      "delete": "删除",
-      "confirmDelete": "删除这条知识？此操作无法撤销。",
-      "filter": {
-        "all": "全部",
-        "pinned": "已置顶",
-        "unpinned": "未置顶"
-      },
-      "help": {
-        "title": "项目知识如何运作",
-        "show": "工作原理",
-        "pinnedLead": "已置顶",
-        "pinned": "的条目会把完整内容自动注入每个智能体的提示词（无需工具调用）。请节制使用（每个项目最多 10 条）。",
-        "unpinnedLead": "其他条目",
-        "unpinned": "只在提示词索引中显示标题。智能体可用 get_project_knowledge 按需获取正文，或用 search_project_knowledge 按主题搜索。",
-        "scope": "所有条目对此项目上的每个智能体和工单任务共享：把它当作团队共享的 wiki。"
-      },
-      "empty": {
-        "title": "还没有知识",
-        "description": "在这里记录架构决策、约定、坑点和领域规则。参与此项目的每个智能体都能在提示词中看到标题，并可按需获取任意条目的正文。",
-        "searchTitle": "无匹配",
-        "searchDescription": "换个查询试试：搜索同时使用语义相似度和关键词。"
-      },
-      "dialog": {
-        "createTitle": "添加项目知识",
-        "editTitle": "编辑项目知识",
-        "description": "对参与此项目的每个智能体可见。每个条目的标题都会进入智能体的提示词；markdown 正文仅在置顶时注入。",
-        "titleLabel": "标题",
-        "titlePlaceholder": "一句简短、自解释的标题（例如「用 Drizzle ORM，不用 Prisma」）",
-        "titleHint": "这是每个智能体默认在提示词中看到的内容。一行话讲清楚整件事。",
-        "contentLabel": "内容（Markdown）",
-        "contentPlaceholder": "## 背景\n为什么重要…\n\n## 详情\n代码示例、链接、理由…",
-        "contentHint": "自由格式的 markdown，长度不限。仅在置顶时内联到智能体提示词；否则按需获取。",
-        "categoryLabel": "类别（可选）",
-        "categoryPlaceholder": "例如：arch、decision、gotcha、convention",
-        "pinnedLabel": "置顶到系统提示词",
-        "pinnedOnHint": "置顶：完整的 markdown 内容会注入此项目上每个智能体的系统提示词。智能体无需工具调用即可立即使用。上限：每个项目 10 条置顶。",
-        "pinnedOffHint": "未置顶：智能体的提示词中只出现标题。当标题看起来相关时，智能体会通过 get_project_knowledge 工具获取内容。"
-      },
-      "metadata": {
-        "created": "创建于 {{time}}",
-        "updated": "更新于 {{time}}",
-        "createdAt": "创建于 {{date}}",
-        "updatedAt": "更新于 {{date}}",
-        "chars_one": "{{count}} 个字符",
-        "chars_other": "{{count}} 个字符",
-        "copyId": "复制 id",
-        "idCopied": "ID 已复制到剪贴板。"
-      },
-      "toast": {
-        "created": "知识条目已添加。",
-        "updated": "知识条目已更新。",
-        "deleted": "知识条目已删除。"
-      }
-    },
-    "taskStatus": {
-      "queued": "排队中",
-      "pending": "等待中",
-      "in_progress": "运行中",
-      "paused": "已暂停",
-      "awaiting_human_input": "等待你的输入",
-      "awaiting_agent_response": "等待智能体",
-      "awaiting_subtask": "等待子任务",
-      "completed": "已完成",
-      "failed": "失败",
-      "cancelled": "已取消"
-    },
-    "create": {
-      "title": "创建新项目",
-      "description": "默认标签集（bug、feature、chore、doc）会自动添加。之后可以自定义。",
-      "titleField": "项目标题",
-      "titlePlaceholder": "例如：后端重构",
-      "descriptionField": "描述",
-      "descriptionPlaceholder": "背景、目标、链接、约束：任何对参与此项目的智能体有用的信息。",
-      "descriptionHint": "支持 Markdown。此描述会注入到任何激活了此项目的智能体的系统提示词中。"
-    },
-    "ticket": {
-      "create": {
-        "title": "新建工单",
-        "description": "向此项目添加新工单。状态默认为待规划。准备开工时把它拖到其他列。",
-        "titleField": "工单标题",
-        "titlePlaceholder": "例如：修复登录重定向循环",
-        "descriptionField": "描述",
-        "descriptionPlaceholder": "需要做什么？任何对接手者有用的背景信息。",
-        "tagsField": "标签"
-      },
-      "panel": {
-        "heading": "工单",
-        "description": "描述",
-        "descriptionExpand": "显示更多",
-        "descriptionCollapse": "收起",
-        "noDescription": "没有描述。",
-        "tasksHistory": "任务（{{count}}）",
-        "taskKind": {
-          "execute": "任务",
-          "enrich": "充实"
-        },
-        "startTask": "发起任务",
-        "noTasks": "此工单上还没有派生过任务。",
-        "noTasksTitle": "还没有任务",
-        "noTasksDescription": "派生一个智能体来处理此工单，并在这里跟踪运行情况。",
-        "notFound": "未找到此工单，可能已被删除。",
-        "back": "返回{{type}}",
-        "ticketRef": "工单 {{ref}}",
-        "editAction": "编辑工单",
-        "status": "状态",
-        "tags": "标签",
-        "delete": "删除工单",
-        "deleteConfirm": {
-          "title": "删除此工单？",
-          "description": "「{{title}}」将被永久删除。关联的任务历史会保留。",
-          "confirm": "删除工单"
-        }
-      },
-      "edit": {
-        "title": "编辑工单",
-        "description": "更新标题、描述、状态或标签。看板会实时刷新。"
-      },
-      "comments": {
-        "title": "评论",
-        "empty": "还没有评论，来发表第一条吧。",
-        "placeholder": "写一条评论，支持 Markdown。",
-        "submit": "发表评论",
-        "submitting": "发表中...",
-        "edit": "编辑",
-        "save": "保存",
-        "cancel": "取消",
-        "delete": "删除",
-        "auto": "自动",
-        "autoTooltip": "由任务结果自动发表。",
-        "agentTag": "智能体",
-        "edited": "已编辑",
-        "loading": "正在加载评论...",
-        "showAll": "再显示 {{count}} 条",
-        "showLess": "收起",
-        "deleteConfirm": {
-          "title": "删除此评论？",
-          "description": "该评论将被永久移除。此操作无法撤销。",
-          "confirm": "删除评论"
-        }
-      },
-      "attachments": {
-        "title": "附件",
-        "empty": "还没有附件。",
-        "dropHint": "将文件拖放到这里，或",
-        "addFile": "添加文件",
-        "preview": "预览",
-        "download": "下载",
-        "rename": "重命名",
-        "delete": "删除",
-        "noPreview": "无法预览。请下载文件后打开。",
-        "renameTitle": "重命名附件",
-        "renameDescription": "选择新文件名。文件内容不会被修改。",
-        "renamePlaceholder": "新文件名",
-        "deleteConfirm": {
-          "title": "删除此附件？",
-          "description": "「{{name}}」将从磁盘和此工单中永久移除。",
-          "confirm": "删除附件"
-        }
-      }
-    },
-    "startTask": {
-      "title": "发起任务",
-      "description": "派生一个子智能体来处理此工单。预选的是激活了此项目的智能体。任务以等待模式运行：完成时会在智能体的对话中产生一轮回复。",
-      "agentField": "由哪个智能体运行此任务？",
-      "agentPlaceholder": "选择智能体",
-      "activeOnProject": "已在此项目激活",
-      "runPromptField": "本次运行说明（可选）",
-      "runPromptPlaceholder": "例如：只关注后端，UI 留给下一个智能体",
-      "runPromptHelp": "可选。在工单之上限定本次运行的范围。适合并行分派多个智能体，或在特定阶段停止。最多 500 字符。",
-      "runPromptCounter": "{{count}} / 500",
-      "toolboxesField": "工具箱",
-      "toolboxesHelp": "此任务可以使用哪些工具集。任务始终保留必备核心集；所选工具箱在此基础上叠加。默认为代码工具箱。",
-      "modelField": "模型（可选）",
-      "modelInherit": "继承（项目 / 智能体）",
-      "modelHelp": "仅为本次运行覆盖模型。保持继承则先用项目默认，再用智能体自己的模型。",
-      "thinkingField": "推理强度（可选）",
-      "thinkingInherit": "继承（项目 / 智能体）",
-      "thinkingHelp": "仅为本次运行覆盖推理强度。保持继承则先用项目默认，再用智能体自己的设置。",
-      "start": "启动"
-    },
-    "enrich": {
-      "action": "充实工单",
-      "alreadyRunning": "此工单上已有一个充实任务在进行。",
-      "title": "充实此工单",
-      "description": "派生一个专门的智能体来阅读仓库、相关工单和历史，然后重写标题、描述和标签，让工单可直接执行。",
-      "focusField": "特定关注点（可选）",
-      "focusPlaceholder": "例如：深入研究测试策略，或提出数据库迁移方案",
-      "focusHelp": "可选。传递给智能体的简短指引。",
-      "start": "充实",
-      "started": "充实已开始。智能体提交修改后，工单会实时更新。"
-    },
-    "chip": {
-      "tooltip": "活跃项目：{{title}}。点击查看看板。"
-    },
-    "activeAgents": {
-      "tooltip": "{{name}} 已激活此项目",
-      "openThread": "打开 {{name}} 的对话"
-    },
-    "ticketCard": {
-      "running_one": "{{count}} 个运行中",
-      "running_other": "{{count}} 个运行中",
-      "awaitingInput_one": "{{count}} 个需要你",
-      "awaitingInput_other": "{{count}} 个需要你",
-      "taskCount_one": "{{count}} 个任务",
-      "taskCount_other": "{{count}} 个任务",
-      "attachments_one": "{{count}} 个文件",
-      "attachments_other": "{{count}} 个文件",
-      "attachmentsTooltip_one": "此工单有 {{count}} 个附件",
-      "attachmentsTooltip_other": "此工单有 {{count}} 个附件",
-      "agentRunning": "{{name}} 正在处理",
-      "runningSince": "自 {{date}} 起运行",
-      "createdAt": "创建于 {{date}}",
-      "updatedAt": "更新于 {{date}}"
-    },
-    "reporter": {
-      "label": "报告人",
-      "byUser": "由 {{name}} 报告",
-      "byAgent": "由智能体 {{name}} 报告",
-      "tooltip": "{{name}}",
-      "unknown": "未知"
-    },
-    "edit": {
-      "title": "编辑项目",
-      "description": "修改项目详情、管理标签，或删除整个项目。",
-      "openEdit": "编辑项目",
-      "tagsSection": "标签",
-      "modelField": "默认模型",
-      "modelPlaceholder": "使用各智能体自己的模型",
-      "modelHint": "用于在此项目工单上运行的子智能体任务：覆盖各智能体自己的模型。派生任务时显式选择的模型仍然优先。留空则回退到智能体的模型。",
-      "scoutModelField": "默认侦察模型",
-      "scoutModelPlaceholder": "继承（全局 / 智能体模型）",
-      "scoutModelHint": "`scout` 工具在本项目工作时使用的快速廉价模型：优先于每个 Agent 的 scout 设置和全局默认值。留空则回退到 Agent 的 scout，再到全局默认值，最后是 Agent 自身的模型。",
-      "thinkingField": "默认推理强度",
-      "thinkingInherit": "使用各智能体自己的设置",
-      "thinkingHint": "应用于在此项目工单上运行的子智能体任务：覆盖各智能体自己的思考配置。派生任务时显式选择的值仍然优先。",
-      "toolboxesField": "任务的默认工具箱",
-      "toolboxesHint": "默认授予在此项目工单上发起的任务的工具箱。发起任务时显式选择的工具箱仍然优先。留空则回退到内置默认。",
-      "delete": "删除项目",
-      "deleteConfirm": {
-        "title": "删除此项目？",
-        "description": "「{{title}}」及其所有工单、标签和工单历史将被永久删除。任务历史会保留（其工单关联会被解除）。",
-        "confirm": "删除项目"
-      },
-      "scoutThinkingField": "默认 Scout 推理",
-      "scoutThinkingHint": "本项目中派出的 scout 的推理强度：优先于每个 Agent 的 scout 设置和全局默认。继承 = 回退到 Agent 的 scout 设置，再到全局默认。",
-      "scoutThinkingInherit": "继承（Agent 的 scout，再全局）"
-    },
-    "tags": {
-      "empty": "还没有标签，在下方添加。",
-      "newLabel": "新标签名称"
-    },
-    "github": {
-      "sectionTitle": "GitHub 集成",
-      "sectionHint": "选择 GitHub 令牌和要克隆的仓库。子任务工作树会从此克隆创建，让多个任务可以并行运行而互不干扰。",
-      "patField": "GitHub 令牌",
-      "patPlaceholder": "从你的保险库选择令牌",
-      "patSearchPlaceholder": "搜索保险库条目…",
-      "patNoneFound": "你的保险库中还没有凭据。请在设置 → 保险库中添加（条目类型为「凭据」或「文本」）。",
-      "patClear": "不使用令牌",
-      "patSectionTitle": "建议（GitHub 相关）",
-      "patOtherSection": "其他凭据",
-      "repoField": "仓库",
-      "repoPlaceholder": "选择仓库",
-      "repoSearchPlaceholder": "搜索 GitHub 仓库…",
-      "repoNoResults": "没有仓库匹配「{{query}}」。",
-      "repoNoneAccessible": "此令牌无法访问任何仓库。请检查令牌的权限范围。",
-      "repoSearchResults": "搜索结果",
-      "repoAccessible": "可访问的仓库",
-      "repoNeedsPat": "请先选择令牌，才能启用仓库选择器。",
-      "repoReadOnly": "只读",
-      "defaultBranchField": "默认分支",
-      "defaultBranchHint": "子任务工作树从此分支创建。默认为仓库的默认分支。",
-      "statusNone": "无克隆",
-      "statusCloning": "克隆中",
-      "statusReady": "就绪",
-      "statusError": "克隆失败",
-      "statusBlock": {
-        "none": "尚未配置克隆。",
-        "cloning": "正在后台克隆仓库：完成之前子任务将被阻塞。",
-        "ready": "本地克隆已就绪。可以在此项目上派生子任务。",
-        "error": "克隆失败。请查看下方信息，修复问题后点击重试。"
-      },
-      "retry": "重试克隆"
-    }
-  },
   "updateChannel": {
     "stable": "稳定（正式发布）",
     "edge": "Edge（main 分支）"
@@ -3821,7 +3424,6 @@
     "openError": "无法打开此文件",
     "sources": {
       "agents": "智能体",
-      "projects": "项目",
       "folders": "文件夹",
       "addFolder": "添加文件夹…",
       "all": "全部",
@@ -3838,10 +3440,6 @@
       "labelPlaceholder": "我的项目",
       "pathField": "绝对路径",
       "pathHint": "服务器上现有目录的绝对路径。"
-    },
-    "worktree": {
-      "base": "基础克隆",
-      "ticket": "#{{number}} · {{branch}}"
     },
     "git": {
       "dirty": "{{count}} 处未提交的更改",

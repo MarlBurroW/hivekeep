@@ -961,11 +961,6 @@
       "noResults": "Nessun risultato",
       "files": "File"
     },
-    "ticketMention": {
-      "loading": "Ricerca dei ticket...",
-      "noResults": "Nessun ticket corrispondente",
-      "scope": "Progetto: {{slug}}"
-    },
     "emptyState": {
       "greeting": "Chatta con {{name}}",
       "defaultRole": "Il tuo assistente IA, pronto ad aiutarti.",
@@ -1098,7 +1093,6 @@
       "callCount_other": "{{count}} chiamate LLM"
     },
     "description": "Descrizione",
-    "ticketTooltip": "Apri il ticket padre",
     "mode": "Modalità",
     "modeAwait": "Await",
     "modeAsync": "Async",
@@ -1115,8 +1109,6 @@
     "close": "Chiudi",
     "viewPrompt": "Prompt",
     "viewPromptTooltip": "Vedi il prompt completo dell'attività",
-    "runPrompt": "Istruzioni di esecuzione",
-    "runPromptTooltip": "Istruzioni specifiche dell'esecuzione passate al momento dell'avvio",
     "prompt": "Prompt dell'attività",
     "promptDescription": "Contenuto completo del prompt dell'attività",
     "forceStart": "Forza l'avvio",
@@ -2641,8 +2633,7 @@
       "users": "Utenti",
       "database": "Database",
       "mini-apps": "Mini-app",
-      "plugins": "Plugin",
-      "projects": "Progetti"
+      "plugins": "Plugin"
     },
     "names": {
       "web_search": "Ricerca web",
@@ -2874,36 +2865,9 @@
       "list_mini_app_files": "Elenca file dell'app",
       "get_task_messages": "Messaggi dell'attività",
       "transfer_channel": "Trasferisci canale",
-      "list_projects": "Elenca progetti",
-      "get_project": "Leggi progetto",
-      "create_project": "Crea progetto",
-      "update_project": "Aggiorna progetto",
-      "delete_project": "Elimina progetto",
-      "update_project_description": "Aggiorna descrizione progetto",
-      "append_project_description": "Aggiungi alla descrizione progetto",
-      "patch_project_description": "Correggi descrizione progetto",
-      "set_active_project": "Imposta progetto attivo",
-      "list_project_tags": "Elenca tag del progetto",
       "create_tag": "Crea tag",
       "update_tag": "Aggiorna tag",
       "delete_tag": "Elimina tag",
-      "list_tickets": "Elenca ticket",
-      "get_ticket": "Leggi ticket",
-      "create_ticket": "Crea ticket",
-      "update_ticket": "Aggiorna ticket",
-      "add_ticket_tag": "Aggiungi tag al ticket",
-      "remove_ticket_tag": "Rimuovi tag dal ticket",
-      "delete_ticket": "Elimina ticket",
-      "start_ticket_task": "Avvia attività del ticket",
-      "enrich_ticket": "Arricchisci ticket",
-      "add_ticket_comment": "Aggiungi commento al ticket",
-      "list_ticket_comments": "Elenca commenti del ticket",
-      "delete_ticket_comment": "Elimina commento del ticket",
-      "list_ticket_attachments": "Elenca allegati del ticket",
-      "read_ticket_attachment": "Leggi allegato del ticket",
-      "add_ticket_attachment": "Aggiungi allegato al ticket",
-      "update_ticket_attachment": "Aggiorna allegato del ticket",
-      "delete_ticket_attachment": "Elimina allegato del ticket",
       "describe_image_model": "Descrivi modello di immagini",
       "list_endpoints": "Elenca endpoint dei canali",
       "send_to_contact": "Invia a un contatto",
@@ -2916,13 +2880,6 @@
       "transcribe_audio": "Trascrivi audio",
       "reload_mini_app": "Ricarica mini-app",
       "set_mini_app_maintainer": "Imposta manutentore mini-app",
-      "add_project_knowledge": "Aggiungi conoscenza al progetto",
-      "search_project_knowledge": "Cerca nella conoscenza del progetto",
-      "list_project_knowledge": "Elenca conoscenza del progetto",
-      "get_project_knowledge": "Leggi conoscenza del progetto",
-      "update_project_knowledge": "Aggiorna conoscenza del progetto",
-      "delete_project_knowledge": "Elimina conoscenza del progetto",
-      "pin_project_knowledge": "Fissa conoscenza del progetto",
       "get_mini_app_backend_status": "Stato del backend della Mini-App"
     },
     "renderers": {
@@ -3336,7 +3293,6 @@
   },
   "activityBar": {
     "agents": "Agenti",
-    "projects": "Progetti",
     "tasks": "Attività",
     "crons": "Attività pianificate",
     "apps": "Mini-app",
@@ -3436,359 +3392,6 @@
     "start": "Avvia attività",
     "started": "Attività avviata su {{name}}. Il risultato apparirà in questo thread al termine."
   },
-  "projects": {
-    "page": {
-      "title": "Progetti",
-      "comingSoon": "La vista Kanban è in arrivo: il backend è pronto, il frontend è in lavorazione."
-    },
-    "sidebar": {
-      "title": "Progetti",
-      "create": "Nuovo progetto",
-      "empty": "Ancora nessun progetto. Crea il tuo primo progetto per iniziare.",
-      "emptyTitle": "Ancora nessun progetto",
-      "emptyDescription": "Raggruppa i ticket, esegui attività e segui il lavoro dei tuoi Agenti.",
-      "search": "Cerca progetti..."
-    },
-    "empty": {
-      "title": "Nessun progetto",
-      "description": "Crea un progetto dalla barra laterale per iniziare a tracciare il lavoro."
-    },
-    "kanban": {
-      "newTicket": "Nuovo ticket",
-      "searchPlaceholder": "Filtra i ticket per titolo o tag…",
-      "searchClear": "Cancella la ricerca",
-      "searchResults_one": "{{count}} corrispondenza",
-      "searchResults_other": "{{count}} corrispondenze",
-      "progress": "{{done}} di {{total}} completati",
-      "progressEmpty": "Ancora nessun ticket",
-      "columnRunning_one": "{{count}} ticket con un'attività in corso",
-      "columnRunning_other": "{{count}} ticket con attività in corso",
-      "empty": {
-        "backlog": "Le idee atterrano qui. Annotale ora, pianificale dopo.",
-        "todo": "Pronto a iniziare? Trascina qui i ticket quando ti impegni a farli.",
-        "in_progress": "Il lavoro attivo compare qui.",
-        "blocked": "Bloccato? Lascia qui i ticket bloccati così restano visibili.",
-        "done": "I ticket completati si accumulano qui."
-      },
-      "emptySearchInColumn": "Nessuna corrispondenza in questa colonna.",
-      "quickAdd": {
-        "label": "Aggiungi ticket",
-        "inputPlaceholder": "Titolo del ticket (Invio per aggiungere, Esc per annullare)"
-      }
-    },
-    "status": {
-      "backlog": "Backlog",
-      "todo": "Da fare",
-      "in_progress": "In corso",
-      "blocked": "Bloccato",
-      "done": "Fatto"
-    },
-    "view": {
-      "kanban": "Kanban",
-      "knowledge": "Conoscenza"
-    },
-    "knowledge": {
-      "add": "Aggiungi conoscenza",
-      "searchPlaceholder": "Cerca nella conoscenza del progetto…",
-      "clearSearch": "Cancella la ricerca",
-      "summary": "{{pinned}} fissate · {{total}} totali",
-      "totalCount_one": "{{count}} voce",
-      "totalCount_other": "{{count}} voci",
-      "pinnedCount_one": "{{count}} fissata",
-      "pinnedCount_other": "{{count}} fissate",
-      "searchResults": "{{count}} corrispondenze ({{total}} totali)",
-      "pagination": "{{from}}–{{to}} di {{total}}",
-      "pinnedBadge": "Fissata",
-      "byUser": "da te",
-      "byAgent": "da {{name}}",
-      "pin": "Fissa",
-      "unpin": "Sblocca",
-      "edit": "Modifica",
-      "delete": "Elimina",
-      "confirmDelete": "Eliminare questa voce di conoscenza? L'operazione non può essere annullata.",
-      "filter": {
-        "all": "Tutte",
-        "pinned": "Fissate",
-        "unpinned": "Non fissate"
-      },
-      "help": {
-        "title": "Come funziona la conoscenza di progetto",
-        "show": "Come funziona",
-        "pinnedLead": "Le voci fissate",
-        "pinned": "hanno il contenuto completo iniettato automaticamente nel prompt di ogni Agente (nessuna chiamata a strumenti). Usale con parsimonia (max 10 per progetto).",
-        "unpinnedLead": "Le altre voci",
-        "unpinned": "mostrano solo il titolo nell'indice del prompt. Gli Agenti recuperano il corpo su richiesta con get_project_knowledge, o cercano per argomento con search_project_knowledge.",
-        "scope": "Tutte le voci sono condivise tra ogni Agente e attività di ticket su questo progetto: trattala come un wiki collettivo."
-      },
-      "empty": {
-        "title": "Ancora nessuna conoscenza",
-        "description": "Annota qui decisioni architetturali, convenzioni, insidie e regole di dominio. Ogni Agente che lavora su questo progetto vedrà i titoli nel suo prompt e potrà recuperare il corpo di ogni voce su richiesta.",
-        "searchTitle": "Nessuna corrispondenza",
-        "searchDescription": "Prova una query diversa: la ricerca usa sia la somiglianza semantica sia le parole chiave."
-      },
-      "dialog": {
-        "createTitle": "Aggiungi conoscenza al progetto",
-        "editTitle": "Modifica conoscenza del progetto",
-        "description": "Visibile a ogni Agente che lavora su questo progetto. Il titolo di ogni voce finisce nel prompt dell'Agente; il corpo markdown viene iniettato solo se fissata.",
-        "titleLabel": "Titolo",
-        "titlePlaceholder": "Un titolo breve e autoesplicativo (es. 'Usa Drizzle ORM, non Prisma')",
-        "titleHint": "È ciò che ogni Agente vedrà di default nel suo prompt. Fagli raccontare tutta la storia in una riga.",
-        "contentLabel": "Contenuto (Markdown)",
-        "contentPlaceholder": "## Contesto\nPerché è importante…\n\n## Dettagli\nEsempi di codice, link, ragionamenti…",
-        "contentHint": "Markdown libero, lungo quanto serve. Inserito nei prompt degli Agenti solo se fissata; altrimenti recuperato su richiesta.",
-        "categoryLabel": "Categoria (facoltativa)",
-        "categoryPlaceholder": "es. arch, decisione, insidia, convenzione",
-        "pinnedLabel": "Fissa nel prompt di sistema",
-        "pinnedOnHint": "Fissata: il contenuto markdown completo sarà iniettato nel prompt di sistema di ogni Agente per questo progetto. L'Agente può usarlo all'istante senza chiamate a strumenti. Limite: 10 voci fissate per progetto.",
-        "pinnedOffHint": "Non fissata: solo il titolo appare nel prompt dell'Agente. L'Agente recupererà il contenuto tramite lo strumento get_project_knowledge quando il titolo sembra rilevante."
-      },
-      "metadata": {
-        "created": "Creata {{time}}",
-        "updated": "Aggiornata {{time}}",
-        "createdAt": "Creata il {{date}}",
-        "updatedAt": "Aggiornata il {{date}}",
-        "chars_one": "{{count}} carattere",
-        "chars_other": "{{count}} caratteri",
-        "copyId": "Copia id",
-        "idCopied": "ID copiato negli appunti."
-      },
-      "toast": {
-        "created": "Voce di conoscenza aggiunta.",
-        "updated": "Voce di conoscenza aggiornata.",
-        "deleted": "Voce di conoscenza eliminata."
-      }
-    },
-    "taskStatus": {
-      "queued": "In coda",
-      "pending": "In attesa",
-      "in_progress": "In corso",
-      "paused": "In pausa",
-      "awaiting_human_input": "In attesa di te",
-      "awaiting_agent_response": "In attesa dell'Agente",
-      "awaiting_subtask": "In attesa dello scout",
-      "completed": "Completata",
-      "failed": "Non riuscita",
-      "cancelled": "Annullata"
-    },
-    "create": {
-      "title": "Crea un nuovo progetto",
-      "description": "Una palette di tag predefinita (bug, feature, chore, doc) verrà aggiunta automaticamente. Potrai personalizzarla in seguito.",
-      "titleField": "Titolo del progetto",
-      "titlePlaceholder": "es. Refactoring del backend",
-      "descriptionField": "Descrizione",
-      "descriptionPlaceholder": "Contesto, obiettivi, link, vincoli: tutto ciò che è utile a un Agente che lavora su questo progetto.",
-      "descriptionHint": "Markdown supportato. Questa descrizione viene iniettata nel prompt di sistema di ogni Agente che ha questo progetto attivo."
-    },
-    "ticket": {
-      "create": {
-        "title": "Nuovo ticket",
-        "description": "Aggiungi un nuovo ticket a questo progetto. Lo stato predefinito è Backlog. Trascinalo in un'altra colonna quando sei pronto a lavorarci.",
-        "titleField": "Titolo del ticket",
-        "titlePlaceholder": "es. Correggi il loop di redirect al login",
-        "descriptionField": "Descrizione",
-        "descriptionPlaceholder": "Cosa va fatto? Qualsiasi contesto utile per chi se ne occuperà.",
-        "tagsField": "Tag"
-      },
-      "panel": {
-        "heading": "Ticket",
-        "description": "Descrizione",
-        "descriptionExpand": "Mostra di più",
-        "descriptionCollapse": "Mostra meno",
-        "noDescription": "Nessuna descrizione.",
-        "tasksHistory": "Attività ({{count}})",
-        "taskKind": {
-          "execute": "Attività",
-          "enrich": "Arricchimento"
-        },
-        "startTask": "Avvia un'attività",
-        "noTasks": "Nessuna attività è ancora stata avviata su questo ticket.",
-        "noTasksTitle": "Ancora nessuna attività",
-        "noTasksDescription": "Avvia un Agente per lavorare su questo ticket e segui l'esecuzione qui.",
-        "notFound": "Ticket non trovato. Potrebbe essere stato eliminato.",
-        "back": "Torna a {{type}}",
-        "ticketRef": "Ticket {{ref}}",
-        "editAction": "Modifica ticket",
-        "status": "Stato",
-        "tags": "Tag",
-        "delete": "Elimina ticket",
-        "deleteConfirm": {
-          "title": "Eliminare questo ticket?",
-          "description": "\"{{title}}\" sarà eliminato definitivamente. La cronologia delle attività collegate è conservata.",
-          "confirm": "Elimina ticket"
-        }
-      },
-      "edit": {
-        "title": "Modifica ticket",
-        "description": "Aggiorna titolo, descrizione, stato o tag. Il kanban si aggiornerà in tempo reale."
-      },
-      "comments": {
-        "title": "Commenti",
-        "empty": "Ancora nessun commento. Sii il primo ad aggiungerne uno.",
-        "placeholder": "Scrivi un commento. Markdown supportato.",
-        "submit": "Pubblica commento",
-        "submitting": "Pubblicazione...",
-        "edit": "Modifica",
-        "save": "Salva",
-        "cancel": "Annulla",
-        "delete": "Elimina",
-        "auto": "auto",
-        "autoTooltip": "Pubblicato automaticamente dal risultato di un'attività.",
-        "agentTag": "Agente",
-        "edited": "modificato",
-        "loading": "Caricamento dei commenti...",
-        "showAll": "Mostra altri {{count}}",
-        "showLess": "Mostra meno",
-        "deleteConfirm": {
-          "title": "Eliminare questo commento?",
-          "description": "Il commento sarà rimosso definitivamente. L'operazione non può essere annullata.",
-          "confirm": "Elimina commento"
-        }
-      },
-      "attachments": {
-        "title": "Allegati",
-        "empty": "Ancora nessun file allegato.",
-        "dropHint": "Trascina i file qui, oppure",
-        "addFile": "Aggiungi file",
-        "preview": "Anteprima",
-        "download": "Scarica",
-        "rename": "Rinomina",
-        "delete": "Elimina",
-        "noPreview": "Nessuna anteprima disponibile. Scarica il file per aprirlo.",
-        "renameTitle": "Rinomina allegato",
-        "renameDescription": "Scegli un nuovo nome file. Il contenuto del file non viene modificato.",
-        "renamePlaceholder": "Nuovo nome file",
-        "deleteConfirm": {
-          "title": "Eliminare questo allegato?",
-          "description": "\"{{name}}\" sarà rimosso definitivamente dal disco e da questo ticket.",
-          "confirm": "Elimina allegato"
-        }
-      }
-    },
-    "startTask": {
-      "title": "Avvia un'attività",
-      "description": "Avvia un sotto-Agente per lavorare su questo ticket. L'Agente preselezionato è quello con questo progetto attivo. L'attività gira in modalità await: riceverai un turno sul thread dell'Agente al termine.",
-      "agentField": "Quale Agente deve eseguire questa attività?",
-      "agentPlaceholder": "Seleziona un Agente",
-      "activeOnProject": "attivo qui",
-      "runPromptField": "Istruzioni specifiche dell'esecuzione (facoltative)",
-      "runPromptPlaceholder": "es. concentrati solo sul backend, lascia l'interfaccia al prossimo Agente",
-      "runPromptHelp": "Facoltativo. Delimita questa specifica esecuzione in aggiunta al ticket. Utile quando lanci più agenti in parallelo, o per fermarti a una fase precisa. Max 500 caratteri.",
-      "runPromptCounter": "{{count}} / 500",
-      "toolboxesField": "Toolbox",
-      "toolboxesHelp": "Quali set di strumenti può usare questa attività. L'attività mantiene sempre un set core obbligatorio; i toolbox selezionati vi si aggiungono. Default: il toolbox Codice.",
-      "modelField": "Modello (facoltativo)",
-      "modelInherit": "Eredita (progetto / Agente)",
-      "modelHelp": "Sovrascrivi il modello solo per questa esecuzione. Lascia su eredita per usare il default del progetto, poi il modello dell'Agente.",
-      "thinkingField": "Sforzo di ragionamento (facoltativo)",
-      "thinkingInherit": "Eredita (progetto / Agente)",
-      "thinkingHelp": "Sovrascrivi lo sforzo di ragionamento solo per questa esecuzione. Lascia su eredita per usare il default del progetto, poi l'impostazione dell'Agente.",
-      "start": "Avvia"
-    },
-    "enrich": {
-      "action": "Arricchisci ticket",
-      "alreadyRunning": "Un arricchimento è già in corso su questo ticket.",
-      "title": "Arricchisci questo ticket",
-      "description": "Avvia un agente dedicato che legge il repo, i ticket correlati e la cronologia, poi riscrive titolo, descrizione e tag così il ticket diventa azionabile.",
-      "focusField": "Focus specifico (facoltativo)",
-      "focusPlaceholder": "es. approfondisci la strategia di test, o proponi un approccio di migrazione del DB",
-      "focusHelp": "Facoltativo. Un breve orientamento passato all'agente.",
-      "start": "Arricchisci",
-      "started": "Arricchimento avviato. Il ticket si aggiornerà in tempo reale quando l'agente registrerà le sue modifiche."
-    },
-    "chip": {
-      "tooltip": "Progetto attivo: {{title}}. Clicca per vedere il kanban."
-    },
-    "activeAgents": {
-      "tooltip": "{{name}} ha questo progetto attivo",
-      "openThread": "Apri il thread di {{name}}"
-    },
-    "ticketCard": {
-      "running_one": "{{count}} in corso",
-      "running_other": "{{count}} in corso",
-      "awaitingInput_one": "{{count}} ti aspetta",
-      "awaitingInput_other": "{{count}} ti aspettano",
-      "taskCount_one": "{{count}} attività",
-      "taskCount_other": "{{count}} attività",
-      "attachments_one": "{{count}} file",
-      "attachments_other": "{{count}} file",
-      "attachmentsTooltip_one": "{{count}} allegato su questo ticket",
-      "attachmentsTooltip_other": "{{count}} allegati su questo ticket",
-      "agentRunning": "{{name}} ci sta lavorando",
-      "runningSince": "In corso dal {{date}}",
-      "createdAt": "Creato il {{date}}",
-      "updatedAt": "Aggiornato il {{date}}"
-    },
-    "reporter": {
-      "label": "Segnalato da",
-      "byUser": "Segnalato da {{name}}",
-      "byAgent": "Segnalato dall'Agente {{name}}",
-      "tooltip": "{{name}}",
-      "unknown": "Sconosciuto"
-    },
-    "edit": {
-      "title": "Modifica progetto",
-      "description": "Modifica i dettagli del progetto, gestisci i tag o elimina del tutto il progetto.",
-      "openEdit": "Modifica progetto",
-      "tagsSection": "Tag",
-      "modelField": "Modello predefinito",
-      "modelPlaceholder": "Usa il modello di ciascun Agente",
-      "modelHint": "Usato dalle attività dei sotto-Agenti sui ticket di questo progetto: sovrascrive il modello di ciascun Agente. Un modello scelto esplicitamente all'avvio di un'attività vince comunque. Lascia vuoto per ripiegare sul modello dell'Agente.",
-      "scoutModelField": "Modello scout predefinito",
-      "scoutModelPlaceholder": "Eredita (globale / modello dell'Agente)",
-      "scoutModelHint": "Modello rapido ed economico usato dallo strumento `scout` per il lavoro in questo progetto: ha la priorità sull'impostazione scout di ogni Agente e sul predefinito globale. Lascia vuoto per ricadere sullo scout dell'Agente, poi sul predefinito globale, poi sul modello dell'Agente.",
-      "thinkingField": "Sforzo di ragionamento predefinito",
-      "thinkingInherit": "Usa l'impostazione di ciascun Agente",
-      "thinkingHint": "Applicato alle attività dei sotto-Agenti sui ticket di questo progetto: sovrascrive la configurazione di ragionamento di ciascun Agente. Un valore scelto esplicitamente all'avvio dell'attività vince comunque.",
-      "toolboxesField": "Toolbox predefiniti per le attività",
-      "toolboxesHint": "Toolbox assegnati di default alle attività avviate sui ticket di questo progetto. I toolbox scelti esplicitamente all'avvio di un'attività vincono comunque. Lascia vuoto per ripiegare sul default integrato.",
-      "delete": "Elimina progetto",
-      "deleteConfirm": {
-        "title": "Eliminare questo progetto?",
-        "description": "\"{{title}}\" e tutti i suoi ticket, tag e cronologia dei ticket saranno eliminati definitivamente. La cronologia delle attività è conservata (il loro collegamento al ticket viene rimosso).",
-        "confirm": "Elimina progetto"
-      },
-      "scoutThinkingField": "Ragionamento scout predefinito",
-      "scoutThinkingHint": "Sforzo di ragionamento degli scout inviati in questo progetto: ha la priorità sull'impostazione scout di ogni Agente e sul predefinito globale. Eredita = ricadi sullo scout dell'Agente e poi sul predefinito globale.",
-      "scoutThinkingInherit": "Eredita (scout dell'Agente, poi globale)"
-    },
-    "tags": {
-      "empty": "Ancora nessun tag. Aggiungine qualcuno qui sotto.",
-      "newLabel": "Etichetta del nuovo tag"
-    },
-    "github": {
-      "sectionTitle": "Integrazione GitHub",
-      "sectionHint": "Scegli un token GitHub e il repo da clonare. I worktree delle sotto-attività saranno creati da questo clone così più attività possono girare in parallelo senza pestarsi i piedi.",
-      "patField": "Token GitHub",
-      "patPlaceholder": "Scegli un token dal tuo vault",
-      "patSearchPlaceholder": "Cerca voci del vault…",
-      "patNoneFound": "Ancora nessuna credenziale nel tuo vault. Aggiungine una in Impostazioni → Vault (tipo di voce 'credential' o 'text').",
-      "patClear": "Nessun token",
-      "patSectionTitle": "Suggerite (legate a GitHub)",
-      "patOtherSection": "Altre credenziali",
-      "repoField": "Repository",
-      "repoPlaceholder": "Scegli un repo",
-      "repoSearchPlaceholder": "Cerca repo GitHub…",
-      "repoNoResults": "Nessun repo corrisponde a \"{{query}}\".",
-      "repoNoneAccessible": "Nessun repo accessibile con questo token. Controlla gli scope del token.",
-      "repoSearchResults": "Risultati della ricerca",
-      "repoAccessible": "Repository accessibili",
-      "repoNeedsPat": "Scegli prima un token per abilitare il selettore di repo.",
-      "repoReadOnly": "Sola lettura",
-      "defaultBranchField": "Branch predefinito",
-      "defaultBranchHint": "Branch da cui vengono creati i worktree delle sotto-attività. Default: il branch predefinito del repo.",
-      "statusNone": "Nessun clone",
-      "statusCloning": "Clonazione",
-      "statusReady": "Pronto",
-      "statusError": "Clonazione non riuscita",
-      "statusBlock": {
-        "none": "Ancora nessun clone configurato.",
-        "cloning": "Clonazione del repo in background: le sotto-attività saranno bloccate finché non termina.",
-        "ready": "Il clone locale è pronto. Le sotto-attività possono essere avviate su questo progetto.",
-        "error": "Clonazione non riuscita. Controlla il messaggio qui sotto e clicca Riprova una volta risolto il problema."
-      },
-      "retry": "Riprova la clonazione"
-    }
-  },
   "updateChannel": {
     "stable": "Stable (release)",
     "edge": "Edge (branch main)"
@@ -3821,7 +3424,6 @@
     "openError": "Impossibile aprire questo file",
     "sources": {
       "agents": "Agenti",
-      "projects": "Progetti",
       "folders": "Cartelle",
       "addFolder": "Aggiungi una cartella…",
       "all": "Tutti",
@@ -3838,10 +3440,6 @@
       "labelPlaceholder": "Il mio progetto",
       "pathField": "Percorso assoluto",
       "pathHint": "Un percorso assoluto verso una directory esistente sul server."
-    },
-    "worktree": {
-      "base": "Clone base",
-      "ticket": "#{{number}} · {{branch}}"
     },
     "git": {
       "dirty": "{{count}} modifica/e non committate",

@@ -4,7 +4,7 @@
  * Two visual modes:
  *  - Determinate (`indeterminate: false` or unset with a `value`):
  *    delegates to the shared shadcn Progress component, which fills
- *    the track to value/max using the project's gradient indicator.
+ *    the track to value/max using the app's gradient indicator.
  *  - Indeterminate (`indeterminate: true`): renders our own track and
  *    a small colored chunk that continuously slides left to right.
  *    The shadcn primitive's "active" shimmer was too subtle once the

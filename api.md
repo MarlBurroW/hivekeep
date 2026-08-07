@@ -388,25 +388,6 @@ Useful for debugging and transparency. Accepts optional query params for tasks a
 }
 ```
 
-### `PATCH /api/agents/:id/active-project`
-
-Sets the Agent's active project. The project context will be injected into the volatile block of the system prompt on subsequent turns. See `projects.md` § 4.
-
-```typescript
-// Request
-{ projectId: string | null }
-
-// Response 200
-{ activeProjectId: string | null }
-
-// Errors
-// 404: { error: { code: 'PROJECT_NOT_FOUND', message: '...' } }
-// 404: { error: { code: 'KIN_NOT_FOUND', message: '...' } }
-```
-
-An `agent:active-project` SSE event is emitted to all connected clients (useful for syncing the "Active project" chips in other tabs / views).
-
----
 
 ## Messages / Chat
 
@@ -597,258 +578,6 @@ Injects a message into a running task. If the task is streaming, the stream is i
 // Response 409: injection failed
 { error: { code: 'INJECT_FAILED', message: string } }
 ```
-
----
-
-## Projects
-
-See `projects.md` for the full spec.
-
-### `GET /api/projects`
-
-```typescript
-// Response 200
-{
-  projects: Array<{
-    id: string
-    title: string
-    githubUrl: string | null
-    ticketCount: number
-    openTicketCount: number      // status !== 'done'
-    createdAt: number
-    updatedAt: number
-    // description omitted for the list (can be large)
-  }>
-}
-```
-
-### `GET /api/projects/:id`
-
-```typescript
-// Response 200
-{
-  project: {
-    id: string
-    title: string
-    description: string
-    githubUrl: string | null
-    tags: Array<{ id: string, label: string, color: string }>
-    ticketCounts: { backlog: number, todo: number, in_progress: number, blocked: number, done: number }
-    createdAt: number
-    updatedAt: number
-  }
-}
-```
-
-### `POST /api/projects`
-
-```typescript
-// Request
-{
-  title: string
-  description?: string
-  githubUrl?: string
-}
-
-// Response 201
-{ project: { ...same as GET /api/projects/:id } }
-```
-
-> The `DEFAULT_PROJECT_TAGS` seed (bug / feature / chore / doc) is applied server-side. The user can then freely modify them via the tag routes.
-
-### `PATCH /api/projects/:id`
-
-```typescript
-// Request (all optional)
-{
-  title?: string
-  description?: string     // replaces everything
-  githubUrl?: string | null
-}
-
-// Response 200
-{ project: { ...same shape } }
-```
-
-### `DELETE /api/projects/:id`
-
-Hard delete with cascade: all of the project's tickets and tags are deleted. Linked historical tasks have their `ticketId` set to NULL (history preserved in the Agents' threads). Agents that had this project as `activeProjectId` have their value set to NULL.
-
-```typescript
-// Response 200
-{ success: true }
-```
-
-### `GET /api/projects/:projectId/tags`
-
-```typescript
-// Response 200
-{
-  tags: Array<{
-    id: string
-    label: string
-    color: string
-    createdAt: number
-  }>
-}
-```
-
-### `POST /api/projects/:projectId/tags`
-
-```typescript
-// Request
-{ label: string, color: string }
-
-// Response 201
-{ tag: { id, label, color, createdAt } }
-
-// Errors
-// 409: { error: { code: 'TAG_LABEL_TAKEN', message: 'A tag with this label already exists in this project' } }
-```
-
-### `PATCH /api/tags/:id`
-
-```typescript
-// Request (all optional)
-{ label?: string, color?: string }
-
-// Response 200
-{ tag: { id, label, color } }
-```
-
-### `DELETE /api/tags/:id`
-
-```typescript
-// Response 200
-{ success: true }
-```
-
----
-
-## Tickets
-
-### `GET /api/projects/:projectId/tickets`
-
-```typescript
-// Query params: ?status={...}&tagId={...}&limit={...}&offset={...}
-
-// Response 200
-{
-  tickets: Array<{
-    id: string
-    projectId: string
-    title: string
-    description: string         // truncated to 500 chars for the list
-    status: 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done'
-    position: number
-    tags: Array<{ id: string, label: string, color: string }>
-    taskCount: number           // total number of tasks linked to the ticket
-    runningTaskCount: number    // tasks with status in_progress/pending/queued
-    createdAt: number
-    updatedAt: number
-  }>
-  hasMore: boolean
-}
-```
-
-### `GET /api/tickets/:id`
-
-```typescript
-// Response 200
-{
-  ticket: {
-    id: string
-    projectId: string
-    title: string
-    description: string         // full
-    status: 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done'
-    position: number
-    tags: Array<{ id: string, label: string, color: string }>
-    tasks: Array<{
-      id: string
-      parentAgentId: string
-      parentAgentName: string
-      status: string
-      mode: 'await' | 'async'
-      createdAt: number
-      updatedAt: number
-    }>
-    createdAt: number
-    updatedAt: number
-  }
-}
-```
-
-### `POST /api/projects/:projectId/tickets`
-
-```typescript
-// Request
-{
-  title: string
-  description?: string
-  status?: 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done'
-  tagIds?: string[]
-}
-
-// Response 201
-{ ticket: { ...same shape as GET /api/tickets/:id } }
-```
-
-### `PATCH /api/tickets/:id`
-
-```typescript
-// Request (all optional)
-{
-  title?: string
-  description?: string
-  status?: 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done'
-  position?: number          // if provided: place at this position. Otherwise: max+1024 in the column of the new status.
-  tagIds?: string[]          // replaces the whole set (PUT-like)
-}
-
-// Response 200
-{ ticket: { ...same shape } }
-```
-
-### `DELETE /api/tickets/:id`
-
-```typescript
-// Response 200
-{ success: true }
-```
-
-> Linked historical tasks are not deleted: their `ticketId` is set to NULL to preserve the audit trail in the threads.
-
-### `POST /api/tickets/:id/start-task`
-
-Spawns a sub-Agent to work on the ticket. The parent Agent's `agentId` must be passed explicitly (no implicit default, cf. `projects.md` § 4). **Always in `await` mode**: `async` mode is not allowed for ticket-linked tasks (otherwise the ticket would stay frozen with no closing turn, cf. `projects.md` § 5).
-
-```typescript
-// Request
-{
-  agentId: string              // Agent spawning the task (= parent_agent_id)
-}
-
-// Response 201
-{
-  task: {
-    id: string
-    parentAgentId: string
-    ticketId: string
-    status: string
-    mode: 'await'
-    createdAt: number
-  }
-}
-
-// Errors
-// 404: { error: { code: 'TICKET_NOT_FOUND', message: '...' } }
-// 404: { error: { code: 'KIN_NOT_FOUND', message: '...' } }
-```
-
-Side effects:
-- **No effect on the ticket** (status / position / tags unchanged: it's up to the Agent or the user to manage the status manually)
-- A `task:status` SSE event is emitted for the new task
 
 ---
 
@@ -1322,25 +1051,25 @@ Share: snapshot of a workspace file into file-storage (same semantics as the `st
 ```
 
 > Share is **agent-scoped**: a stored file is owned by an agent, so the Files UI
-> only offers "Share" on agent workspaces (not on project repos or FS folders).
+> only offers "Share" on agent workspaces (not on mini-app dirs or FS folders).
 
 ### Generalized workspace sources
 
-The Files **page** browses three kinds of source: an agent workspace, a project
-repo (optionally a specific git worktree), or a user-added FS folder. They share
+The Files **page** browses three kinds of source: an agent workspace, a mini-app
+source directory, or a user-added FS folder. They share
 one route family, mounted under `/api/workspace/:sourceType/:sourceId`, mirroring
 the agent routes above (`ls`, `file`, `raw`, `PUT file`, `mkdir`, `move`, `copy`,
-`DELETE file`, `upload`, `search`). `:sourceType` is `agent` | `project` | `folder`.
+`DELETE file`, `upload`, `search`). `:sourceType` is `agent` | `miniapp` | `folder`.
 The containment/confinement guarantees are identical for every source.
 
 ```typescript
 // GET /api/workspace/agent/:id/ls?path=docs
 // GET /api/workspace/folder/:id/file?path=notes.md
-// GET /api/workspace/project/:id/ls?path=src&worktree=<worktreeId>   // ?worktree optional
+// GET /api/workspace/miniapp/:id/ls?path=src
 // PUT /api/workspace/folder/:id/file        // body identical to the agent PUT
-// move/copy accept an optional `fromSource: { type, id, worktree? }` for cross-source paste
+// move/copy accept an optional `fromSource: { type, id }` for cross-source paste
 
-// Error 404 SOURCE_NOT_FOUND · 409 SOURCE_NOT_READY (repo not cloned) · 400 SOURCE_INVALID
+// Error 404 SOURCE_NOT_FOUND · 400 SOURCE_INVALID
 //   (plus the same PATH_FORBIDDEN / FILE_NOT_FOUND / CONFLICT / … as the agent routes)
 ```
 
@@ -1349,7 +1078,7 @@ The containment/confinement guarantees are identical for every source.
 Renders an HTML file (`text/html` only) to a PDF and streams it back as a
 download (`Content-Disposition: attachment`). The server loads the file via
 `file://` with Playwright, so relative sibling assets (images/CSS on disk) resolve
-as they would in a real browser. Carries the same `?worktree=` as the browse routes.
+as they would in a real browser.
 
 ```typescript
 // GET /api/workspace/agent/:id/export-pdf?path=reports/q3.html
@@ -1360,26 +1089,10 @@ as they would in a real browser. Carries the same `?worktree=` as the browse rou
 //   · plus the same SOURCE_* / PATH_FORBIDDEN / FILE_NOT_FOUND as the browse routes
 ```
 
-### `GET /api/workspace/project/:projectId/worktrees`
-
-Lists the live worktrees of a project repo (base clone + per-task worktrees) for
-the worktree sub-selector. Worktrees are ephemeral (created/swept with sub-tasks).
-
-```typescript
-// Response 200
-{ worktrees: Array<{
-  id: string,            // worktree dir basename; '' = the base clone
-  branch: string,
-  isMain: boolean,
-  ticketNumber?: number  // parsed from task/<slug>-<num>-<hex> when present
-}> }
-// Non-project sources return { worktrees: [] }.
-```
-
 ### `GET /api/workspace/:sourceType/:sourceId/git-status`
 
-Lightweight git badge for any source whose root is a git repo (project repos and
-git FS folders). Carries the same `?worktree=` as the browse routes.
+Lightweight git badge for any source whose root is a git repo (a git-backed
+workspace, folder or mini-app dir).
 
 ```typescript
 // Response 200
@@ -1390,7 +1103,7 @@ git FS folders). Carries the same `?worktree=` as the browse routes.
 ### `GET /api/workspace/:sourceType/:sourceId/git-changes`
 
 Working-tree change list (porcelain) for the changed-files panel opened from the
-git badge. `core.quotepath=false` keeps UTF-8 paths literal. Carries `?worktree=`.
+git badge. `core.quotepath=false` keeps UTF-8 paths literal.
 
 ```typescript
 // Response 200
@@ -1403,8 +1116,7 @@ git badge. `core.quotepath=false` keeps UTF-8 paths literal. Carries `?worktree=
 
 Unified working-tree diff of a single file vs `HEAD` (or vs empty for an
 untracked file), for the in-editor Diff toggle. The `?path=` is re-confined to
-the source root before reaching git. Carries the same `?worktree=` as the browse
-routes.
+the source root before reaching git.
 
 ```typescript
 // Query: ?path=src/main.ts
@@ -2137,8 +1849,6 @@ Returns `201 { "ok": true }`. Errors: `503 FEEDBACK_DISABLED` (feature off), `50
 // Error on an Agent
 { event: 'agent:error', data: { agentId: string, error: string } }
 
-// Active project of an Agent changed
-{ event: 'agent:active-project', data: { agentId: string, activeProjectId: string | null } }
 
 // Channel interactive pairing (e.g. WhatsApp QR): emitted during a pairing
 // adapter's activation. `status: 'qr'` carries a `qrImage` data-URL (PNG) to
@@ -2161,11 +1871,11 @@ Returns `201 { "ok": true }`. Errors: `503 FEEDBACK_DISABLED` (feature off), `50
 // `changes` array is bounded (≤ 20: beyond that, a single change on the common parent).
 // `modifiedAt` (resulting mtime) lets the emitting device ignore its own echo.
 // Scope: agent sources keep the per-agent scope (sendToAgent) and carry `agentId`;
-// project/folder sources are broadcast and carry only `source`. The client filters
+// folder/mini-app sources are broadcast and carry only `source`. The client filters
 // by the source it is currently viewing (agentId for agents, source otherwise).
 { event: 'workspace:changed', data: {
   agentId?: string,                                  // present for agent sources
-  source: { type: 'agent' | 'project' | 'folder', id: string, worktree?: string },
+  source: { type: 'agent' | 'folder' | 'miniapp', id: string },
   changes: Array<{
     path: string,
     type: 'created' | 'modified' | 'deleted' | 'renamed',
@@ -2174,21 +1884,6 @@ Returns `201 { "ok": true }`. Errors: `503 FEEDBACK_DISABLED` (feature off), `50
     modifiedAt?: number
   }>
 } }
-
-// Project created / updated / deleted
-{ event: 'project:created', data: { project: ProjectSummary } }
-{ event: 'project:updated', data: { project: ProjectSummary } }
-{ event: 'project:deleted', data: { projectId: string } }
-
-// Ticket created / updated / deleted
-{ event: 'ticket:created', data: { ticket: TicketSummary } }
-{ event: 'ticket:updated', data: { ticket: TicketSummary } }      // includes status / position change
-{ event: 'ticket:deleted', data: { ticketId: string, projectId: string } }
-
-// Tag CRUD within a project
-{ event: 'project-tag:created', data: { tag: { id: string, label: string, color: string }, projectId: string } }
-{ event: 'project-tag:updated', data: { tag: { id: string, label: string, color: string }, projectId: string } }
-{ event: 'project-tag:deleted', data: { tagId: string, projectId: string } }
 
 // Admin terminal sessions changed (creation / attach / detach / rename /
 // death): user scope (sendToUser): only the owner receives it. The payload carries
@@ -2220,8 +1915,6 @@ Returns `201 { "ok": true }`. Errors: `503 FEEDBACK_DISABLED` (feature off), `50
 > Mini-app backends can subscribe IN-PROCESS to this catalog via `ctx.on(eventType, handler)` (guarded by the `events:<prefix>` permission, e.g. `events:task`). High-frequency/internal types (`chat:token`, `queue:update`, `*-token-usage`…) are not subscribable. See `docs-site` > mini-apps > backend.
 
 > The SSE is **global** (not per Agent). The client filters on the frontend side by `agentId` to display only the relevant events. This makes it possible to update the sidebar (badges, statuses) for all Agents simultaneously.
-
-> The existing `task:*` events remain unchanged. Clients interested in ticket-linked tasks filter on the frontend side on `task.ticketId !== null` (the field is now present in the tasks payload).
 
 ---
 

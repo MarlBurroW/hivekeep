@@ -82,7 +82,6 @@ export default defineConfig({
 						{ label: 'Toolboxes', slug: 'features/toolboxes' },
 						{ label: 'Scout', slug: 'features/scout' },
 						{ label: 'Connected Accounts', slug: 'features/connected-accounts' },
-						{ label: 'Projects and Tickets', slug: 'features/projects' },
 						{ label: 'Files (Workspace Browser)', slug: 'features/files' },
 						{ label: 'Terminal', slug: 'features/terminal' },
 						{ label: 'Automation, Crons and Webhooks', slug: 'features/automation' },

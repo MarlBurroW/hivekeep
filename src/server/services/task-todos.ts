@@ -5,7 +5,7 @@
  * call each time the plan changes (creating items, marking one as
  * in_progress, completing one, cancelling a stale one). The list lives in
  * memory for the duration of the task and is broadcast over SSE so the
- * ticket panel can render live progress.
+ * task panel can render live progress.
  *
  * Discipline (enforced softly via prompt + tool description):
  *   - At most one in_progress item at a time.
@@ -38,7 +38,7 @@ const byTask = new Map<string, TodoItem[]>()
 export function setTodosForTask(
   taskId: string,
   todos: TodoItem[],
-  meta: { parentAgentId: string; ticketId: string | null },
+  meta: { parentAgentId: string },
 ): TodoItem[] {
   if (todos.length > 30) {
     throw new Error('A task may have at most 30 todos. Break large work into a sub-task with its own list.')
@@ -68,7 +68,6 @@ export function setTodosForTask(
     agentId: meta.parentAgentId,
     data: {
       taskId,
-      ticketId: meta.ticketId,
       todos: stored,
     },
   })

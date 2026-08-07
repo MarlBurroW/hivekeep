@@ -961,11 +961,6 @@
       "noResults": "結果なし",
       "files": "ファイル"
     },
-    "ticketMention": {
-      "loading": "チケットを検索中...",
-      "noResults": "一致するチケットがありません",
-      "scope": "プロジェクト:{{slug}}"
-    },
     "emptyState": {
       "greeting": "{{name}}とチャット",
       "defaultRole": "あなたのAIアシスタントが待機しています。",
@@ -1098,7 +1093,6 @@
       "callCount_other": "{{count}}回のLLM呼び出し"
     },
     "description": "説明",
-    "ticketTooltip": "親チケットを開く",
     "mode": "モード",
     "modeAwait": "Await",
     "modeAsync": "Async",
@@ -1115,8 +1109,6 @@
     "close": "閉じる",
     "viewPrompt": "プロンプト",
     "viewPromptTooltip": "タスクプロンプト全文を表示",
-    "runPrompt": "実行時の指示",
-    "runPromptTooltip": "起動時に渡された実行固有の指示",
     "prompt": "タスクプロンプト",
     "promptDescription": "タスクプロンプトの全文",
     "forceStart": "強制開始",
@@ -2641,8 +2633,7 @@
       "users": "ユーザー",
       "database": "データベース",
       "mini-apps": "ミニアプリ",
-      "plugins": "プラグイン",
-      "projects": "プロジェクト"
+      "plugins": "プラグイン"
     },
     "names": {
       "web_search": "Web検索",
@@ -2874,36 +2865,9 @@
       "list_mini_app_files": "アプリファイル一覧",
       "get_task_messages": "タスクメッセージ",
       "transfer_channel": "チャンネルを移管",
-      "list_projects": "プロジェクト一覧",
-      "get_project": "プロジェクトを取得",
-      "create_project": "プロジェクトを作成",
-      "update_project": "プロジェクトを更新",
-      "delete_project": "プロジェクトを削除",
-      "update_project_description": "プロジェクト説明を更新",
-      "append_project_description": "プロジェクト説明に追記",
-      "patch_project_description": "プロジェクト説明をパッチ",
-      "set_active_project": "アクティブプロジェクトを設定",
-      "list_project_tags": "プロジェクトタグ一覧",
       "create_tag": "タグを作成",
       "update_tag": "タグを更新",
       "delete_tag": "タグを削除",
-      "list_tickets": "チケット一覧",
-      "get_ticket": "チケットを取得",
-      "create_ticket": "チケットを作成",
-      "update_ticket": "チケットを更新",
-      "add_ticket_tag": "チケットタグを追加",
-      "remove_ticket_tag": "チケットタグを削除",
-      "delete_ticket": "チケットを削除",
-      "start_ticket_task": "チケットタスクを開始",
-      "enrich_ticket": "チケットを補強",
-      "add_ticket_comment": "チケットコメントを追加",
-      "list_ticket_comments": "チケットコメント一覧",
-      "delete_ticket_comment": "チケットコメントを削除",
-      "list_ticket_attachments": "チケット添付ファイル一覧",
-      "read_ticket_attachment": "チケット添付ファイルを読む",
-      "add_ticket_attachment": "チケット添付ファイルを追加",
-      "update_ticket_attachment": "チケット添付ファイルを更新",
-      "delete_ticket_attachment": "チケット添付ファイルを削除",
       "describe_image_model": "画像モデルの説明",
       "list_endpoints": "チャンネルエンドポイント一覧",
       "send_to_contact": "連絡先に送信",
@@ -2916,13 +2880,6 @@
       "transcribe_audio": "音声を文字起こし",
       "reload_mini_app": "ミニアプリを再読み込み",
       "set_mini_app_maintainer": "ミニアプリのメンテナーを設定",
-      "add_project_knowledge": "プロジェクトナレッジを追加",
-      "search_project_knowledge": "プロジェクトナレッジを検索",
-      "list_project_knowledge": "プロジェクトナレッジ一覧",
-      "get_project_knowledge": "プロジェクトナレッジを取得",
-      "update_project_knowledge": "プロジェクトナレッジを更新",
-      "delete_project_knowledge": "プロジェクトナレッジを削除",
-      "pin_project_knowledge": "プロジェクトナレッジをピン留め",
       "get_mini_app_backend_status": "ミニアプリバックエンドの状態"
     },
     "renderers": {
@@ -3336,7 +3293,6 @@
   },
   "activityBar": {
     "agents": "エージェント",
-    "projects": "プロジェクト",
     "tasks": "タスク",
     "crons": "スケジュールタスク",
     "apps": "ミニアプリ",
@@ -3436,359 +3392,6 @@
     "start": "タスクを開始",
     "started": "{{name}}でタスクを開始しました。完了すると結果がこのスレッドに表示されます。"
   },
-  "projects": {
-    "page": {
-      "title": "プロジェクト",
-      "comingSoon": "カンバンビューは近日公開:バックエンドは実装済み、フロントエンドは開発中です。"
-    },
-    "sidebar": {
-      "title": "プロジェクト",
-      "create": "新規プロジェクト",
-      "empty": "プロジェクトはまだありません。最初のプロジェクトを作成して始めましょう。",
-      "emptyTitle": "プロジェクトはまだありません",
-      "emptyDescription": "チケットをまとめ、タスクを実行し、エージェント全体の作業を追跡しましょう。",
-      "search": "プロジェクトを検索..."
-    },
-    "empty": {
-      "title": "プロジェクトなし",
-      "description": "サイドバーからプロジェクトを作成して、作業の追跡を始めましょう。"
-    },
-    "kanban": {
-      "newTicket": "新規チケット",
-      "searchPlaceholder": "タイトルまたはタグでチケットを絞り込み…",
-      "searchClear": "検索をクリア",
-      "searchResults_one": "{{count}}件の一致",
-      "searchResults_other": "{{count}}件の一致",
-      "progress": "{{total}}件中{{done}}件完了",
-      "progressEmpty": "チケットはまだありません",
-      "columnRunning_one": "アクティブなタスクを持つチケットが{{count}}件",
-      "columnRunning_other": "アクティブなタスクを持つチケットが{{count}}件",
-      "empty": {
-        "backlog": "アイデアはここに集まります。今は記録して、計画は後で。",
-        "todo": "始める準備はできましたか?着手を決めたチケットをここにドラッグしてください。",
-        "in_progress": "進行中の作業がここに表示されます。",
-        "blocked": "行き詰まりましたか?ブロックされたチケットをここに置いて見えるようにしましょう。",
-        "done": "完了したチケットがここに積み上がります。"
-      },
-      "emptySearchInColumn": "この列に一致はありません。",
-      "quickAdd": {
-        "label": "チケットを追加",
-        "inputPlaceholder": "チケットのタイトル(Enterで追加、Escでキャンセル)"
-      }
-    },
-    "status": {
-      "backlog": "バックログ",
-      "todo": "未着手",
-      "in_progress": "進行中",
-      "blocked": "ブロック中",
-      "done": "完了"
-    },
-    "view": {
-      "kanban": "カンバン",
-      "knowledge": "ナレッジ"
-    },
-    "knowledge": {
-      "add": "ナレッジを追加",
-      "searchPlaceholder": "プロジェクトナレッジを検索…",
-      "clearSearch": "検索をクリア",
-      "summary": "ピン留め{{pinned}}件 · 合計{{total}}件",
-      "totalCount_one": "{{count}}件のエントリ",
-      "totalCount_other": "{{count}}件のエントリ",
-      "pinnedCount_one": "{{count}}件ピン留め",
-      "pinnedCount_other": "{{count}}件ピン留め",
-      "searchResults": "{{count}}件の一致(合計{{total}}件)",
-      "pagination": "{{total}}件中{{from}}–{{to}}件",
-      "pinnedBadge": "ピン留め",
-      "byUser": "あなたによる",
-      "byAgent": "{{name}}による",
-      "pin": "ピン留め",
-      "unpin": "ピン留めを解除",
-      "edit": "編集",
-      "delete": "削除",
-      "confirmDelete": "このナレッジエントリを削除しますか?この操作は元に戻せません。",
-      "filter": {
-        "all": "すべて",
-        "pinned": "ピン留め",
-        "unpinned": "ピン留めなし"
-      },
-      "help": {
-        "title": "プロジェクトナレッジの仕組み",
-        "show": "仕組み",
-        "pinnedLead": "ピン留めされた",
-        "pinned": "エントリは、その全文がすべてのエージェントのプロンプトに自動的に挿入されます(ツール呼び出し不要)。控えめに使ってください(プロジェクトあたり最大10件)。",
-        "unpinnedLead": "その他のエントリ",
-        "unpinned": "はプロンプトのインデックスにタイトルのみが表示されます。エージェントはget_project_knowledgeで本文を必要に応じて取得するか、search_project_knowledgeでトピック検索します。",
-        "scope": "すべてのエントリは、このプロジェクトのすべてのエージェントとチケットタスクで共有されます:共同のWikiとして扱ってください。"
-      },
-      "empty": {
-        "title": "ナレッジはまだありません",
-        "description": "アーキテクチャの決定、規約、落とし穴、ドメインルールをここに記録しましょう。このプロジェクトで働くすべてのエージェントは、プロンプトにタイトルが表示され、必要に応じて任意のエントリの本文を取得できます。",
-        "searchTitle": "一致なし",
-        "searchDescription": "別のクエリを試してください:検索は意味的類似度とキーワードの両方を使用します。"
-      },
-      "dialog": {
-        "createTitle": "プロジェクトナレッジを追加",
-        "editTitle": "プロジェクトナレッジを編集",
-        "description": "このプロジェクトで働くすべてのエージェントに表示されます。すべてのエントリのタイトルはエージェントのプロンプトに入り、Markdown本文はピン留め時のみ挿入されます。",
-        "titleLabel": "タイトル",
-        "titlePlaceholder": "短く自明な見出し(例:「Prismaではなく Drizzle ORMを使う」)",
-        "titleHint": "すべてのエージェントがデフォルトでプロンプトに見る内容です。1行で全体が伝わるようにしてください。",
-        "contentLabel": "内容(Markdown)",
-        "contentPlaceholder": "## 背景\nなぜ重要か…\n\n## 詳細\nコードサンプル、リンク、理由…",
-        "contentHint": "必要なだけ自由なMarkdownで書けます。ピン留め時のみエージェントのプロンプトにインライン挿入され、それ以外は必要に応じて取得されます。",
-        "categoryLabel": "カテゴリ(任意)",
-        "categoryPlaceholder": "例:arch、decision、gotcha、convention",
-        "pinnedLabel": "システムプロンプトにピン留め",
-        "pinnedOnHint": "ピン留め:Markdownの全文が、このプロジェクトのすべてのエージェントのシステムプロンプトに挿入されます。エージェントはツール呼び出しなしで即座に使えます。上限:プロジェクトあたりピン留め10件。",
-        "pinnedOffHint": "ピン留めなし:エージェントのプロンプトにはタイトルのみが表示されます。タイトルが関連しそうな場合、エージェントはget_project_knowledgeツールで内容を取得します。"
-      },
-      "metadata": {
-        "created": "{{time}}に作成",
-        "updated": "{{time}}に更新",
-        "createdAt": "{{date}}に作成",
-        "updatedAt": "{{date}}に更新",
-        "chars_one": "{{count}}文字",
-        "chars_other": "{{count}}文字",
-        "copyId": "IDをコピー",
-        "idCopied": "IDをクリップボードにコピーしました。"
-      },
-      "toast": {
-        "created": "ナレッジエントリを追加しました。",
-        "updated": "ナレッジエントリを更新しました。",
-        "deleted": "ナレッジエントリを削除しました。"
-      }
-    },
-    "taskStatus": {
-      "queued": "キュー待ち",
-      "pending": "保留中",
-      "in_progress": "実行中",
-      "paused": "一時停止",
-      "awaiting_human_input": "あなたの対応待ち",
-      "awaiting_agent_response": "エージェントの応答待ち",
-      "awaiting_subtask": "スカウト待ち",
-      "completed": "完了",
-      "failed": "失敗",
-      "cancelled": "キャンセル済み"
-    },
-    "create": {
-      "title": "新しいプロジェクトを作成",
-      "description": "デフォルトのタグパレット(bug、feature、chore、doc)が自動的に追加されます。後からカスタマイズできます。",
-      "titleField": "プロジェクトのタイトル",
-      "titlePlaceholder": "例:バックエンドのリファクタリング",
-      "descriptionField": "説明",
-      "descriptionPlaceholder": "背景、目標、リンク、制約:このプロジェクトで働くエージェントに役立つことすべて。",
-      "descriptionHint": "Markdown対応。この説明は、このプロジェクトをアクティブにしているすべてのエージェントのシステムプロンプトに挿入されます。"
-    },
-    "ticket": {
-      "create": {
-        "title": "新規チケット",
-        "description": "このプロジェクトに新しいチケットを追加します。ステータスはデフォルトでバックログです。着手の準備ができたら別の列にドラッグしてください。",
-        "titleField": "チケットのタイトル",
-        "titlePlaceholder": "例:ログインのリダイレクトループを修正",
-        "descriptionField": "説明",
-        "descriptionPlaceholder": "何をする必要がありますか?担当者に役立つ背景情報など。",
-        "tagsField": "タグ"
-      },
-      "panel": {
-        "heading": "チケット",
-        "description": "説明",
-        "descriptionExpand": "さらに表示",
-        "descriptionCollapse": "折りたたむ",
-        "noDescription": "説明はありません。",
-        "tasksHistory": "タスク({{count}})",
-        "taskKind": {
-          "execute": "タスク",
-          "enrich": "補強"
-        },
-        "startTask": "タスクを開始",
-        "noTasks": "このチケットからまだタスクは起動されていません。",
-        "noTasksTitle": "タスクはまだありません",
-        "noTasksDescription": "エージェントを起動してこのチケットに取り組ませ、実行をここで追跡しましょう。",
-        "notFound": "このチケットが見つかりません。削除された可能性があります。",
-        "back": "{{type}}に戻る",
-        "ticketRef": "チケット {{ref}}",
-        "editAction": "チケットを編集",
-        "status": "ステータス",
-        "tags": "タグ",
-        "delete": "チケットを削除",
-        "deleteConfirm": {
-          "title": "このチケットを削除しますか?",
-          "description": "「{{title}}」が完全に削除されます。関連するタスク履歴は保持されます。",
-          "confirm": "チケットを削除"
-        }
-      },
-      "edit": {
-        "title": "チケットを編集",
-        "description": "タイトル、説明、ステータス、タグを更新します。カンバンはリアルタイムで更新されます。"
-      },
-      "comments": {
-        "title": "コメント",
-        "empty": "コメントはまだありません。最初のコメントを追加しましょう。",
-        "placeholder": "コメントを書く。Markdown対応。",
-        "submit": "コメントを投稿",
-        "submitting": "投稿中...",
-        "edit": "編集",
-        "save": "保存",
-        "cancel": "キャンセル",
-        "delete": "削除",
-        "auto": "自動",
-        "autoTooltip": "タスク結果から自動的に投稿されました。",
-        "agentTag": "エージェント",
-        "edited": "編集済み",
-        "loading": "コメントを読み込み中...",
-        "showAll": "さらに{{count}}件表示",
-        "showLess": "表示を減らす",
-        "deleteConfirm": {
-          "title": "このコメントを削除しますか?",
-          "description": "コメントは完全に削除されます。この操作は元に戻せません。",
-          "confirm": "コメントを削除"
-        }
-      },
-      "attachments": {
-        "title": "添付ファイル",
-        "empty": "添付ファイルはまだありません。",
-        "dropHint": "ここにファイルをドラッグ&ドロップ、または",
-        "addFile": "ファイルを追加",
-        "preview": "プレビュー",
-        "download": "ダウンロード",
-        "rename": "名前を変更",
-        "delete": "削除",
-        "noPreview": "プレビューはありません。ファイルをダウンロードして開いてください。",
-        "renameTitle": "添付ファイルの名前を変更",
-        "renameDescription": "新しいファイル名を選んでください。ファイルの内容は変更されません。",
-        "renamePlaceholder": "新しいファイル名",
-        "deleteConfirm": {
-          "title": "この添付ファイルを削除しますか?",
-          "description": "「{{name}}」がディスクとこのチケットから完全に削除されます。",
-          "confirm": "添付ファイルを削除"
-        }
-      }
-    },
-    "startTask": {
-      "title": "タスクを開始",
-      "description": "このチケットに取り組むサブエージェントを起動します。事前選択されているのは、このプロジェクトをアクティブにしているエージェントです。タスクはawaitモードで実行され、完了時にエージェントのスレッドでターンが発生します。",
-      "agentField": "どのエージェントがこのタスクを実行しますか?",
-      "agentPlaceholder": "エージェントを選択",
-      "activeOnProject": "ここでアクティブ",
-      "runPromptField": "実行固有の指示(任意)",
-      "runPromptPlaceholder": "例:バックエンドのみに集中し、UIは次のエージェントに残す",
-      "runPromptHelp": "任意。チケットに加えて、この実行だけの範囲を指定します。複数のエージェントを並列に展開するときや、特定のフェーズで止めるときに便利です。最大500文字。",
-      "runPromptCounter": "{{count}} / 500",
-      "toolboxesField": "ツールボックス",
-      "toolboxesHelp": "このタスクが使えるツールセットです。タスクは常に必須のコアセットを保持し、選択したツールボックスがそれに追加されます。デフォルトはコードツールボックスです。",
-      "modelField": "モデル(任意)",
-      "modelInherit": "継承(プロジェクト / エージェント)",
-      "modelHelp": "この実行に限りモデルを上書きします。「継承」のままにすると、プロジェクトのデフォルト、次にエージェント自身のモデルを使用します。",
-      "thinkingField": "推論の強度(任意)",
-      "thinkingInherit": "継承(プロジェクト / エージェント)",
-      "thinkingHelp": "この実行に限り推論の強度を上書きします。「継承」のままにすると、プロジェクトのデフォルト、次にエージェント自身の設定を使用します。",
-      "start": "開始"
-    },
-    "enrich": {
-      "action": "チケットを補強",
-      "alreadyRunning": "このチケットではすでに補強が進行中です。",
-      "title": "このチケットを補強",
-      "description": "リポジトリ、関連チケット、履歴を読み取る専用エージェントを起動し、チケットが実行可能になるようにタイトル、説明、タグを書き直します。",
-      "focusField": "特に注目する点(任意)",
-      "focusPlaceholder": "例:テスト戦略を深掘りする、DBマイグレーション方針を提案する",
-      "focusHelp": "任意。エージェントに渡す短い方向付けです。",
-      "start": "補強",
-      "started": "補強を開始しました。エージェントが変更を確定すると、チケットはリアルタイムで更新されます。"
-    },
-    "chip": {
-      "tooltip": "アクティブなプロジェクト:{{title}}。クリックでカンバンを表示。"
-    },
-    "activeAgents": {
-      "tooltip": "{{name}}はこのプロジェクトをアクティブにしています",
-      "openThread": "{{name}}のスレッドを開く"
-    },
-    "ticketCard": {
-      "running_one": "{{count}}件実行中",
-      "running_other": "{{count}}件実行中",
-      "awaitingInput_one": "{{count}}件があなたの対応待ち",
-      "awaitingInput_other": "{{count}}件があなたの対応待ち",
-      "taskCount_one": "{{count}}件のタスク",
-      "taskCount_other": "{{count}}件のタスク",
-      "attachments_one": "{{count}}個のファイル",
-      "attachments_other": "{{count}}個のファイル",
-      "attachmentsTooltip_one": "このチケットに{{count}}件の添付ファイル",
-      "attachmentsTooltip_other": "このチケットに{{count}}件の添付ファイル",
-      "agentRunning": "{{name}}が作業中です",
-      "runningSince": "{{date}}から実行中",
-      "createdAt": "{{date}}に作成",
-      "updatedAt": "{{date}}に更新"
-    },
-    "reporter": {
-      "label": "報告者",
-      "byUser": "{{name}}が報告",
-      "byAgent": "エージェント{{name}}が報告",
-      "tooltip": "{{name}}",
-      "unknown": "不明"
-    },
-    "edit": {
-      "title": "プロジェクトを編集",
-      "description": "プロジェクトの詳細を変更したり、タグを管理したり、プロジェクト全体を削除したりできます。",
-      "openEdit": "プロジェクトを編集",
-      "tagsSection": "タグ",
-      "modelField": "デフォルトモデル",
-      "modelPlaceholder": "各エージェント自身のモデルを使用",
-      "modelHint": "このプロジェクトのチケットで実行されるサブエージェントタスクで使用され、各エージェント自身のモデルを上書きします。タスク起動時に明示的に選択されたモデルが優先されます。空欄にするとエージェントのモデルにフォールバックします。",
-      "scoutModelField": "デフォルトスカウトモデル",
-      "scoutModelPlaceholder": "継承(グローバル / エージェントのモデル)",
-      "scoutModelHint": "このプロジェクトでの作業時に `scout` ツールが使う高速で安価なモデル。各エージェントの scout 設定とグローバルデフォルトより優先されます。空のままにすると、エージェントの scout、グローバルデフォルト、エージェント自身のモデルの順にフォールバックします。",
-      "thinkingField": "デフォルトの推論の強度",
-      "thinkingInherit": "各エージェント自身の設定を使用",
-      "thinkingHint": "このプロジェクトのチケットで実行されるサブエージェントタスクに適用され、各エージェント自身の思考設定を上書きします。タスク起動時に明示的に選択された値が優先されます。",
-      "toolboxesField": "タスクのデフォルトツールボックス",
-      "toolboxesHint": "このプロジェクトのチケットで開始されるタスクにデフォルトで付与されるツールボックスです。タスク開始時に明示的に選択されたツールボックスが優先されます。空欄にすると組み込みのデフォルトにフォールバックします。",
-      "delete": "プロジェクトを削除",
-      "deleteConfirm": {
-        "title": "このプロジェクトを削除しますか?",
-        "description": "「{{title}}」と、そのすべてのチケット、タグ、チケット履歴が完全に削除されます。タスク履歴は保持されます(チケットへのリンクは解除されます)。",
-        "confirm": "プロジェクトを削除"
-      },
-      "scoutThinkingField": "デフォルトのスカウト推論",
-      "scoutThinkingHint": "このプロジェクトで送り出されるスカウトの推論強度。各エージェントのスカウト設定とグローバルデフォルトより優先されます。継承 = エージェントのスカウト設定、次にグローバルデフォルトにフォールバックします。",
-      "scoutThinkingInherit": "継承（エージェントのスカウト、次にグローバル）"
-    },
-    "tags": {
-      "empty": "タグはまだありません。下から追加してください。",
-      "newLabel": "新しいタグのラベル"
-    },
-    "github": {
-      "sectionTitle": "GitHub連携",
-      "sectionHint": "GitHubトークンとクローンするリポジトリを選択してください。サブタスクのworktreeはこのクローンから作成されるため、複数のタスクが互いに干渉せず並列実行できます。",
-      "patField": "GitHubトークン",
-      "patPlaceholder": "Vaultからトークンを選択",
-      "patSearchPlaceholder": "Vaultエントリを検索…",
-      "patNoneFound": "Vaultに認証情報がまだありません。設定 → Vaultで追加してください(エントリ種類は「credential」または「text」)。",
-      "patClear": "トークンなし",
-      "patSectionTitle": "推奨(GitHub関連)",
-      "patOtherSection": "その他の認証情報",
-      "repoField": "リポジトリ",
-      "repoPlaceholder": "リポジトリを選択",
-      "repoSearchPlaceholder": "GitHubリポジトリを検索…",
-      "repoNoResults": "「{{query}}」に一致するリポジトリがありません。",
-      "repoNoneAccessible": "このトークンでアクセスできるリポジトリがありません。トークンのスコープを確認してください。",
-      "repoSearchResults": "検索結果",
-      "repoAccessible": "アクセス可能なリポジトリ",
-      "repoNeedsPat": "リポジトリ選択を有効にするには、まずトークンを選択してください。",
-      "repoReadOnly": "読み取り専用",
-      "defaultBranchField": "デフォルトブランチ",
-      "defaultBranchHint": "サブタスクのworktreeが作成されるブランチです。デフォルトはリポジトリのデフォルトブランチです。",
-      "statusNone": "クローンなし",
-      "statusCloning": "クローン中",
-      "statusReady": "準備完了",
-      "statusError": "クローン失敗",
-      "statusBlock": {
-        "none": "クローンはまだ設定されていません。",
-        "cloning": "バックグラウンドでリポジトリをクローン中:完了するまでサブタスクはブロックされます。",
-        "ready": "ローカルクローンの準備ができました。このプロジェクトでサブタスクを起動できます。",
-        "error": "クローンに失敗しました。下のメッセージを確認し、問題を解決したら「再試行」をクリックしてください。"
-      },
-      "retry": "クローンを再試行"
-    }
-  },
   "updateChannel": {
     "stable": "Stable(リリース)",
     "edge": "Edge(mainブランチ)"
@@ -3821,7 +3424,6 @@
     "openError": "このファイルを開けませんでした",
     "sources": {
       "agents": "エージェント",
-      "projects": "プロジェクト",
       "folders": "フォルダ",
       "addFolder": "フォルダを追加…",
       "all": "すべて",
@@ -3838,10 +3440,6 @@
       "labelPlaceholder": "マイプロジェクト",
       "pathField": "絶対パス",
       "pathHint": "サーバー上の既存ディレクトリへの絶対パス。"
-    },
-    "worktree": {
-      "base": "ベースクローン",
-      "ticket": "#{{number}} · {{branch}}"
     },
     "git": {
       "dirty": "未コミットの変更 {{count}} 件",

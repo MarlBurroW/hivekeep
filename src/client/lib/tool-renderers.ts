@@ -61,8 +61,6 @@ registerRenderer('task_todos', TaskTodosRenderer)
 // Memory / knowledge lookups — list-of-hits shaped results
 registerRenderer('recall', KnowledgeResultRenderer)
 registerRenderer('search_knowledge', KnowledgeResultRenderer)
-registerRenderer('search_project_knowledge', KnowledgeResultRenderer)
-registerRenderer('list_project_knowledge', KnowledgeResultRenderer)
 registerRenderer('browse_url', BrowseUrlRenderer)
 
 // Contacts — single-contact / contact-list shaped results

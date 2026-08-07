@@ -262,7 +262,7 @@ export interface Hivekeep {
   storage: HivekeepStorage;
   /** Call backend API routes (_server.js). */
   api: HivekeepApi;
-  /** Call Hivekeep's own REST API (manage contacts, crons, projects…), gated by platform:<resource>:<read|write> permissions. */
+  /** Call Hivekeep's own REST API (manage contacts, crons, memories…), gated by platform:<resource>:<read|write> permissions. */
   platform: HivekeepPlatform;
   /** Fetch external URLs through server proxy (bypasses CORS). */
   http: HivekeepHttp;

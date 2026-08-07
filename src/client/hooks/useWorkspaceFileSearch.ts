@@ -16,7 +16,6 @@ export function buildWorkspaceSearchUrl(params: { source: WorkspaceSourceRef | n
   const qs = new URLSearchParams()
   if (params.query) qs.set('q', params.query)
   qs.set('limit', String(Math.max(1, Math.min(params.limit, 50))))
-  if (params.source.worktree) qs.set('worktree', params.source.worktree)
   return `${sourceApiBase(params.source)}/search?${qs.toString()}`
 }
 
@@ -31,7 +30,7 @@ interface UseWorkspaceFileSearchOptions {
 /**
  * Server-side workspace filename search for the `@` palette and the quick-open
  * dialog (files.md § 5.1) — same debounce + request-sequencing pattern as
- * useTicketSearch so slow responses never land out of order.
+ * the request sequence so slow responses never land out of order.
  */
 export function useWorkspaceFileSearch({
   query,

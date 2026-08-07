@@ -22,7 +22,6 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { lazyWithRetry as lazy } from '@/client/lib/lazy-with-retry'
 import { api, getErrorMessage } from '@/client/lib/api'
 const TaskPanelContent = lazy(() => import('@/client/components/sidebar/TaskPanelContent').then(m => ({ default: m.TaskPanelContent })))
-const TicketPanelContent = lazy(() => import('@/client/components/sidebar/TicketPanelContent').then(m => ({ default: m.TicketPanelContent })))
 import { toast } from 'sonner'
 import { useAuth } from '@/client/hooks/useAuth'
 import type { MiniAppSummary } from '@/shared/types'
@@ -793,11 +792,10 @@ export function MiniAppViewer() {
     )
   }
 
-  const { activeTab, activeTask, activeTicket, switchTab, closeTask } = useSidePanel()
+  const { activeTab, activeTask, switchTab, closeTask } = useSidePanel()
   const hasBothTabs = activeAppId !== null && activeTask !== null
   const showMiniApp = activeTab === 'mini-app'
   const showTask = activeTab === 'task'
-  const showTicket = activeTab === 'ticket'
 
   // Side panel mode (default). The inner content is identical between desktop
   // (inline fixed-width column) and mobile (fullscreen Sheet overlay). On
@@ -979,20 +977,12 @@ export function MiniAppViewer() {
             </Suspense>
           </>
         )}
-
-        {/* Ticket content (Phase 26.7) — full panel takeover, no tab bar yet.
-            Header + close handled internally by TicketPanelContent. */}
-        {showTicket && activeTicket && (
-          <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="size-4 animate-spin text-muted-foreground" /></div>}>
-            <TicketPanelContent ticketId={activeTicket.ticketId} />
-          </Suspense>
-        )}
       </div>
   )
 
   // Mobile: render the panel as a fullscreen Sheet overlay instead of an inline
   // column. This frees the whole width for the conversation and hosts mini-apps,
-  // task detail and ticket detail without forcing page-wide horizontal scroll.
+  // task detail without forcing page-wide horizontal scroll.
   // Closing the Sheet routes through closePanel() so the underlying tab/app
   // state is reset consistently with the desktop close controls.
   if (isMobile) {

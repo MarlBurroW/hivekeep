@@ -8,7 +8,6 @@ import { api } from '@/client/lib/api'
 import { SidePanelProvider } from '@/client/contexts/SidePanelContext'
 import { TasksProvider } from '@/client/contexts/TasksContext'
 import { CronsProvider } from '@/client/contexts/CronsContext'
-import { TicketMentionShell } from '@/client/contexts/TicketMentionShell'
 import { UpdateProvider } from '@/client/contexts/UpdateContext'
 import { FeedbackProvider } from '@/client/contexts/FeedbackContext'
 import { UpdateOverlay } from '@/client/components/common/UpdateOverlay'
@@ -19,7 +18,6 @@ import { TooltipProvider } from '@/client/components/ui/tooltip'
 
 // Lazy-loaded pages for code splitting
 const ChatPage = lazy(() => import('@/client/pages/chat/ChatPage').then(m => ({ default: m.ChatPage })))
-const ProjectsPage = lazy(() => import('@/client/pages/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })))
 const TasksPage = lazy(() => import('@/client/pages/tasks/TasksPage').then(m => ({ default: m.TasksPage })))
 const CronsPage = lazy(() => import('@/client/pages/crons/CronsPage').then(m => ({ default: m.CronsPage })))
 const FilesPage = lazy(() => import('@/client/pages/files/FilesPage').then(m => ({ default: m.FilesPage })))
@@ -31,7 +29,7 @@ const OnboardingPage = lazy(() => import('@/client/pages/onboarding/OnboardingPa
 const DesignSystemPage = lazy(() => import('@/client/pages/design-system/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })))
 const InvitePage = lazy(() => import('@/client/pages/invite/InvitePage').then(m => ({ default: m.InvitePage })))
 
-// Global modals rendered at App root so they survive navigation between Agents / Projets.
+// Global modals rendered at App root so they survive navigation between Agents.
 const SettingsModal = lazy(() => import('@/client/pages/settings/SettingsPage').then(m => ({ default: m.SettingsModal })))
 const AccountDialog = lazy(() => import('@/client/pages/account/AccountPage').then(m => ({ default: m.AccountDialog })))
 
@@ -168,7 +166,7 @@ function AppRoot() {
 // that fixed sidebar to the content area lives on ChatPage's own wrapper, NOT
 // here on the global routed-content div. Applying it globally would also turn
 // this div into the containing block for @dnd-kit's DragOverlay (also
-// position: fixed), offsetting the drag ghost on the Projects kanban.
+// position: fixed), offsetting drag ghosts.
 function AuthenticatedShell() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialSection, setSettingsInitialSection] = useState<string | undefined>()
@@ -208,7 +206,6 @@ function AuthenticatedShell() {
     <CronsProvider>
     <UpdateProvider>
     <FeedbackProvider>
-    <TicketMentionShell>
       <div className="flex h-dvh w-screen flex-col overflow-hidden">
         <AppTopBar
           onOpenSettings={handleOpenSettings}
@@ -219,14 +216,6 @@ function AuthenticatedShell() {
           <div className="min-w-0 flex-1">
             <Suspense fallback={<PageFallback />}>
               <Routes>
-                <Route
-                  path="/projects"
-                  element={<ProjectsPage />}
-                />
-                <Route
-                  path="/projects/:projectId"
-                  element={<ProjectsPage />}
-                />
                 <Route path="/tasks" element={<TasksPage />} />
                 <Route path="/crons" element={<CronsPage />} />
                 <Route path="/files" element={<FilesPage />} />
@@ -269,7 +258,6 @@ function AuthenticatedShell() {
         <GlobalUpdateDialog />
         <UpdateOverlay />
       </div>
-    </TicketMentionShell>
     </FeedbackProvider>
     </UpdateProvider>
     </CronsProvider>

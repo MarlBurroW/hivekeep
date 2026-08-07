@@ -14,7 +14,6 @@ interface AgentSummary {
   avatarUrl: string | null
   model: string
   providerId: string | null
-  activeProjectId: string | null
   createdAt: string
   thinkingEnabled: boolean
   thinkingEffort: AgentThinkingEffort | null
@@ -24,7 +23,7 @@ interface AgentDetail extends AgentSummary {
   character: string
   expertise: string
   /** Optional cheap scout model for the `scout` tool. Coupled with
-   *  `scoutProviderId`; null → inherit (project → global → main model). */
+   *  `scoutProviderId`; null → inherit (global default → main model). */
   scoutModel: string | null
   scoutProviderId: string | null
   workspacePath: string
@@ -170,7 +169,6 @@ export function useAgents() {
         kind: (data.kind as AgentKind | undefined) ?? 'regular',
         model: data.model as string,
         providerId: (data.providerId as string | null) ?? null,
-        activeProjectId: (data.activeProjectId as string | null) ?? null,
         avatarUrl: (data.avatarUrl as string | null) ?? null,
         createdAt: data.createdAt as string,
         thinkingEnabled: (data.thinkingEnabled as boolean) ?? false,
@@ -246,11 +244,6 @@ export function useAgents() {
         })
         return next
       })
-    },
-    'agent:active-project': (data) => {
-      const agentId = data.agentId as string
-      const activeProjectId = (data.activeProjectId as string | null) ?? null
-      setAgents((prev) => prev.map((k) => (k.id === agentId ? { ...k, activeProjectId } : k)))
     },
     'profile:updated': (data) => {
       // Sync agentOrder when another tab/device reorders — avoid clobbering if

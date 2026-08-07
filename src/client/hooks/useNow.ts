@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 /**
  * Returns a live-ticking `Date.now()` value, re-rendering the calling component
  * at a fixed interval. Used to drive live duration counters (running tasks,
- * in-progress tickets) without each row owning its own timer.
+ * running tasks) without each row owning its own timer.
  *
  * Pass `active = false` to freeze the clock (e.g. once every visible item is in
  * a terminal state) so we don't keep re-rendering for nothing. When inactive,
