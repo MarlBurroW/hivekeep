@@ -37,7 +37,7 @@ export const createAgentTool: ToolRegistration = {
           .array(z.string())
           .optional()
           .describe(
-            'Names of toolboxes granting this Agent its tools. An Agent with NO toolbox can only use the core floor (read/write files, shell, basic) — so give it the toolboxes it needs (don\'t be stingy). Built-ins: "all" (everything), "research" (web + memory), "ops" (memory + vault + http), "code" (projects/tickets), "scout", "email", "calendar", "address-book". Omit to default to "all". Use list_toolboxes to discover more.',
+            'Names of toolboxes granting this Agent its tools. An Agent with NO toolbox can only use the core floor (read/write files, shell, basic) — so give it the toolboxes it needs (don\'t be stingy). Built-ins: "all" (everything), "research" (web + memory), "ops" (memory + vault + http), "code" (task introspection + web docs + read-only memory), "scout", "email", "calendar", "address-book". Omit to default to "all". Use list_toolboxes to discover more.',
           ),
         generate_avatar: z
           .boolean()

@@ -20,7 +20,7 @@
 
 1. **L'utilisateur touche le disque, pas l'agent.** Aucune opération de cette feature ne déclenche de tour LLM. C'est une UI directe sur `data/workspaces/<agentId>/`.
 2. **Une seule implémentation, plusieurs portes d'entrée.** Une page routée `/files` unique ; la fiche agent, le chat et les liens profonds y mènent pré-scopés. Pas de second browser embarqué ailleurs.
-3. **Nommage : la section s'appelle `Files`** (icône folder). « Workspace » reste le terme pour la racine par agent *à l'intérieur* de la page (sélecteur). Raisons : « workspace » est un concept interne agent (prompts, tools) ; « Files » est extensible si on unifie d'autres racines plus tard (file-storage) ; cohérent avec le registre de la nav (Projects, Tasks, Crons…).
+3. **Nommage : la section s'appelle `Files`** (icône folder). « Workspace » reste le terme pour la racine par agent *à l'intérieur* de la page (sélecteur). Raisons : « workspace » est un concept interne agent (prompts, tools) ; « Files » est extensible si on unifie d'autres racines plus tard (file-storage) ; cohérent avec le registre de la nav (Tasks, Crons…).
 4. **Ouvert à tous les utilisateurs authentifiés** (pas de gate admin — décision fondateur : le rôle admin ne servira à terme qu'à inviter des utilisateurs).
 5. **Réutilisation maximale** : CodeMirror existant (extension de `code-editor.tsx`, thème `codemirror-theme.ts`), `createFileFromWorkspace` pour le partage (via un nouveau mode de `FileStorageFormDialog`), le pattern popover du composer pour la palette `@`, le pattern `remarkTicketMentions`/`TicketMentionContext` pour les chemins cliquables, `UnsavedChangesDialog`, `useDraftMessage`.
 6. **Mobile first-class** (règle CLAUDE.md n°8) : tree en drawer (`Sheet side="left"`), onglets scrollables, nav ajoutée à `AppTopBar`, menus « ⋯ » toujours visibles sur tactile, utilisable à 360 px.
@@ -84,7 +84,7 @@ Mobile (< `md`) :
 ### 3.2 Sélecteur de workspace & deep-links
 
 - Dropdown (pattern de sélecteur d'agent existant, avatars inclus) listant tous les agents, l'agent actif en tête.
-- Le workspace affiché est **toujours** `config.workspace.baseDir/<agentId>` (le mécanisme `workspaceOverride` des sous-tâches est hors périmètre : ce sont des worktrees éphémères).
+- Le workspace affiché est **toujours** `config.workspace.baseDir/<agentId>`. (Depuis, la page a été généralisée en sources multiples : agent / mini-app / dossier arbitraire, voir `workspace-sources.ts`.)
 - Dernier workspace consulté mémorisé en `localStorage` (`files.lastAgentId`). Deep-link : `/files/:agentId?path=<relPath>` prime sur le localStorage.
 - **Deep-link mort** (fichier supprimé entre temps — un chip d'un vieux message peut pointer vers un chemin disparu) : toast `files.notFound` + ouverture du workspace avec le tree déplié jusqu'au parent existant le plus profond. **Deep-link vers un dossier** : expansion + sélection dans le tree, pas d'onglet.
 - Si le dossier workspace n'existe pas encore (agent n'a jamais écrit) : `EmptyState` « Ce workspace est vide » + actions « nouveau fichier » / « upload » (création disque lazy, comme dans les tools).
@@ -168,7 +168,7 @@ Racine (en-tête du tree) : Nouveau fichier · Nouveau dossier · Upload · Coll
 Deux usages distincts, deux mécanismes :
 
 1. **Upload depuis l'OS** : dropzone native (HTML5 `dragover`/`drop`, pas dnd-kit) sur le tree entier ; le dossier survolé se surligne et devient la destination (racine par défaut). Multi-fichiers OK. Upload immédiat avec indicateur de progression par fichier (statuts `uploading`/`done`/`error`, pattern `useFileUpload`).
-2. **Déplacement intra-workspace** : `@dnd-kit/core` (déjà utilisé par le Kanban, sensors `PointerSensor` distance 5) : glisser un fichier/dossier sur un dossier = `move`. Mise à jour optimiste du tree, rollback si l'API échoue. **Activé uniquement sur pointeurs fins** (`matchMedia('(pointer: fine)')`) : sur tactile, rendre chaque rangée draggable détournerait le scroll vertical du tree (fatal dans le `Sheet` mobile) — le déplacement tactile passe par couper/coller (§ 4.3). Pas de `TouchSensor` en v1. Pas de drag inter-workspace (un seul tree affiché — le presse-papier couvre ce cas).
+2. **Déplacement intra-workspace** : `@dnd-kit/core` (sensors `PointerSensor` distance 5) : glisser un fichier/dossier sur un dossier = `move`. Mise à jour optimiste du tree, rollback si l'API échoue. **Activé uniquement sur pointeurs fins** (`matchMedia('(pointer: fine)')`) : sur tactile, rendre chaque rangée draggable détournerait le scroll vertical du tree (fatal dans le `Sheet` mobile) — le déplacement tactile passe par couper/coller (§ 4.3). Pas de `TouchSensor` en v1. Pas de drag inter-workspace (un seul tree affiché — le presse-papier couvre ce cas).
 
 ### 4.3 Presse-papier applicatif (copier/coller, y compris inter-workspace)
 
@@ -218,7 +218,7 @@ Calqué sur le pipeline `remarkTicketMentions` → `TicketMention` → `TicketMe
   - Résolution **vérifiée côté serveur** via un provider batché **`WorkspacePathContext`** placé dans **`src/client/contexts/`** (comme son modèle `TicketMentionContext` — seul le composant chip vit dans `components/chat/`) : POST batché ≤ 50 chemins, debounce 50 ms, cache par `(agentId, path)` → `POST /api/agents/:agentId/workspace/resolve-paths`.
   - Existe → chip cliquable (icône fichier + chemin, style proche des chips `MessageFiles`) → `navigate('/files/' + agentId + '?path=' + encodeURIComponent(path))`.
   - N'existe pas / en attente → rendu du texte original tel quel (aucune fausse affordance, règle n°10). **Le faux positif de la regex est donc inoffensif.**
-- **Portée du provider** : posé dans `ChatPanel` **et** `QuickChatPanel` (tous deux connaissent leur agent). Les autres rendus de `MarkdownContent` (TaskResultCard, panels projet, crons…) restent sans provider en v1 : les chemins y restent du texte simple — dégradation propre, actée.
+- **Portée du provider** : posé dans `ChatPanel` **et** `QuickChatPanel` (tous deux connaissent leur agent). Les autres rendus de `MarkdownContent` (TaskResultCard, crons…) restent sans provider en v1 : les chemins y restent du texte simple — dégradation propre, actée.
 - Invalidation du cache : sur `workspace:changed` (matching **par préfixe** quand `isDirectory`, § 8.2) **et** purge via `useSSEResync` (sans ça, un téléphone déverrouillé garde des chips mortes indéfiniment — piège CATCHUP_GAP).
 
 ### 5.3 Browser → conversation
@@ -429,7 +429,7 @@ Le confinement est la pierre angulaire — c'est une API d'écriture disque expo
 4. **Auth** : middleware global existant ; tous les utilisateurs authentifiés (décision § 1.4). Les routes mutantes loggent `userId` + chemin (logStore existant) pour l'audit.
 5. **Validation des noms saisis** (rename inline, création, filename d'upload) : non vide, pas de `/` ni `\` ni caractère de contrôle, ≠ `.`/`..`, ≤ 255 octets — appliquée client (feedback inline) **et** serveur (`400 INVALID_NAME`).
 6. **Limite résiduelle connue — hardlinks** : `realpath` ne résout pas les hardlinks (autre nom du même inode, créable par un agent via shell sur le même filesystem). Risque accepté et documenté en v1 ; mitigation possible plus tard : monter `data/workspaces` sur un filesystem séparé (un hardlink ne traverse pas les FS). C'est pourquoi le § 1.7 ne promet plus un « JAMAIS » absolu.
-7. **Helpers à extraire** (aujourd'hui privés/dupliqués — l'implémenteur ne peut pas les importer en l'état) : `isBinary` (privé dans `filesystem-tools.ts`) et `guessMimeType` (5 copies privées dans le repo ; seule celle de `ticket-attachments.ts` est exportée) → extraction vers un util serveur partagé, ex. `src/server/services/file-kind.ts`, plutôt qu'une sixième copie.
+7. **Helpers à extraire** (aujourd'hui privés/dupliqués — l'implémenteur ne peut pas les importer en l'état) : `isBinary` (privé dans `filesystem-tools.ts`) et `guessMimeType` (plusieurs copies privées dans le repo) → extraction vers un util serveur partagé, ex. `src/server/services/file-kind.ts`, plutôt qu'une sixième copie.
 8. **Tests obligatoires** (`workspace-files.test.ts`, bloquants P1) : traversal (`../`, absolu, encodages `%2e%2e`, NUL), symlink-feuille et symlink-parent (lecture ET écriture), `ls` racine (cas d'égalité), conflit 409, `createOnly` 409, collision copy/upload, validation inter-workspace (from/to contre leurs racines respectives), noms invalides.
 
 ---
@@ -457,7 +457,7 @@ Checklist `sse.md` appliquée : type ajouté à `SSEEventType`, portée `sendToA
 - **Sémantique dossier** : une opération récursive (delete/move/copy/upload de dossier) émet **UN seul change** sur le chemin du dossier (`isDirectory: true`) — jamais une entrée par descendant (supprimer un dossier contenant un `node_modules` cloné = des milliers d'entrées sinon). `changes` est borné (≤ 20 par event ; au-delà, un seul change grossier sur le parent commun).
 - **Émetteurs** :
   - toutes les routes mutantes du § 6 (write/mkdir/move/copy/delete/upload) — inter-workspace : un event par agent concerné ;
-  - **tous les tools natifs qui écrivent dans le workspace statique** — la liste exhaustive vérifiée : `write_file`, `edit_file` (`filesystem-tools.ts`), `multi_edit` (`multi-edit-tools.ts` — c'est l'outil que la description de `write_file` recommande aux agents !), `download_stored_file` (`file-storage-tools.ts`, copie storage → workspace ; `store_file` lui ne mute pas le workspace), `download_email_attachment` (`email-tools.ts`). Implémentation : **un helper unique** `emitWorkspaceChanged(ctx, changes)` exporté par `workspace-files.ts` (skip si `ctx.workspaceOverride` — worktrees éphémères ; calcul du chemin relatif), appelé par les 5 sites + les routes. Les tools importent déjà `sseManager` directement ailleurs (précédents : `mini-app-tools.ts`, `config-tools.ts`).
+  - **tous les tools natifs qui écrivent dans le workspace statique** — la liste exhaustive vérifiée : `write_file`, `edit_file` (`filesystem-tools.ts`), `multi_edit` (`multi-edit-tools.ts` — c'est l'outil que la description de `write_file` recommande aux agents !), `download_stored_file` (`file-storage-tools.ts`, copie storage → workspace ; `store_file` lui ne mute pas le workspace), `download_email_attachment` (`email-tools.ts`). Implémentation : **un helper unique** `emitWorkspaceChangedForTool(ctx, absPath, type, opts)` exporté par `workspace-files.ts` (skip si le chemin sort du workspace statique ; calcul du chemin relatif), appelé par les 5 sites + les routes. Les tools importent déjà `sseManager` directement ailleurs (précédents : `mini-app-tools.ts`, `config-tools.ts`).
 - **Gap assumé (v1)** : `run_shell` et les process enfants ne sont pas captés. Mitigations : re-fetch du dossier à l'expansion, bouton refresh, `useSSEResync`. v2 : `fs.watch` par workspace abonné, noté § 13.
 
 ### 8.2 Handlers client
@@ -583,7 +583,7 @@ Chaque phase est commitable indépendamment (conventional commits), `typecheck` 
 - Onglets « preview » (simple clic remplaçable, italique) — pas d'équivalent tactile du double-clic d'épinglage.
 - Multi-sélection dans le tree ; split view ; auto-save ; auto-révélation du fichier actif au changement d'onglet (bouton manuel livré, auto jugé intrusif).
 - Recherche **dans le contenu** des fichiers (grep UI) — seul le nom/chemin est cherché en v1.
-- Chips de chemins hors conversations (TaskResultCard, panels projet…) — nécessite un provider par surface.
+- Chips de chemins hors conversations (TaskResultCard…) : nécessite un provider par surface.
 - Tool agent `notify_file` — probablement couvert par la convention prompt.
 - Corbeille / undo de suppression (suppression définitive en v1, assumée via AlertDialog explicite).
 - Édition collaborative temps réel (CRDT) — le conflit 409 + bannières suffisent à l'échelle d'un foyer/petit groupe.

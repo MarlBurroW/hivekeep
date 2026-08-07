@@ -409,9 +409,9 @@
       "roleTip": "Una sintesi in una riga di cosa fa questo Agente. Mostrata sotto il nome nella barra laterale.",
       "modelTip": "Il modello IA che alimenta questo Agente. Ogni modello ha punti di forza diversi: i modelli più grandi sono più intelligenti ma più lenti e costosi.",
       "scoutModel": "Modello scout",
-      "scoutModelTip": "Un modello rapido ed economico usato dallo strumento `scout` quando questo Agente (o i suoi task) delega un'esplorazione pesante in sola lettura. Lo scout predefinito di un progetto ha la priorità su questa impostazione. Lascia su eredita per ricadere sul predefinito globale e poi sul modello dell'Agente.",
-      "scoutModelHint": "Usato dallo strumento `scout` per delegare grandi esplorazioni in sola lettura (individuare codice, mappare un sottosistema) a un modello più economico. Priorità: override per chiamata → scout del progetto → questa impostazione → predefinito globale → modello di questo Agente.",
-      "scoutModelInherit": "Eredita (progetto / globale / modello dell'Agente)",
+      "scoutModelTip": "Un modello rapido ed economico usato dallo strumento `scout` quando questo Agente (o i suoi task) delega un'esplorazione pesante in sola lettura. Lascia su eredita per ricadere sul predefinito globale e poi sul modello dell'Agente.",
+      "scoutModelHint": "Usato dallo strumento `scout` per delegare grandi esplorazioni in sola lettura (individuare codice, mappare un sottosistema) a un modello più economico. Priorità: override per chiamata → questa impostazione → predefinito globale → modello di questo Agente.",
+      "scoutModelInherit": "Eredita (globale / modello dell'Agente)",
       "characterTip": "Definisce la personalità dell'Agente: come parla, il suo tono, le sue particolarità e il suo stile di comunicazione. Pensalo come l'\"anima\" dell'Agente.",
       "expertiseTip": "Descrive cosa sa l'Agente e su cosa deve concentrarsi. Guida le sue risposte, priorità e aree di competenza.",
       "slugPlaceholder": "slug-del-mio-agente",
@@ -1513,7 +1513,7 @@
       "defaultCompactingPlaceholder": "Usa il modello di ciascun Agente (default)",
       "defaultScout": "Modello scout predefinito",
       "defaultScoutTip": "Un modello economico e veloce che lo strumento `scout` usa per delegare esplorazioni pesanti in sola lettura. Qui un modello piccolo e veloce è l'ideale.",
-      "defaultScoutHint": "Usato dallo strumento `scout` quando un Agente o un'attività delega grandi esplorazioni in sola lettura (trovare codice, mappare un sottosistema) invece di macinarle sul modello costoso. Un Agente o un progetto può sovrascriverlo. Senza, lo scout ripiega sul modello dell'Agente chiamante.",
+      "defaultScoutHint": "Usato dallo strumento `scout` quando un Agente o un'attività delega grandi esplorazioni in sola lettura (trovare codice, mappare un sottosistema) invece di macinarle sul modello costoso. Un Agente può sovrascriverlo. Senza, lo scout ripiega sul modello dell'Agente chiamante.",
       "defaultScoutPlaceholder": "Usa il modello dell'Agente chiamante (default)",
       "defaultImage": "Modello di immagini predefinito",
       "defaultImageTip": "Modello di generazione di immagini usato da `generate_image` e dalla generazione di avatar IA.",
@@ -1546,7 +1546,7 @@
         "bullet3": "Cambiare il modello di embedding richiede di rigenerare gli embedding di tutti i ricordi esistenti"
       },
       "defaultScoutThinking": "Ragionamento degli scout",
-      "defaultScoutThinkingTip": "Sforzo di ragionamento predefinito degli scout. La catena segue quella del modello scout: override per chiamata, poi progetto, poi Agente, poi questa impostazione. Non impostato = gli scout seguono la configurazione dell'Agente chiamante.",
+      "defaultScoutThinkingTip": "Sforzo di ragionamento predefinito degli scout. La catena segue quella del modello scout: override per chiamata, poi Agente, poi questa impostazione. Non impostato = gli scout seguono la configurazione dell'Agente chiamante.",
       "defaultScoutThinkingInherit": "Nessun predefinito (segui l'Agente)"
     },
     "mcp": {
@@ -3371,8 +3371,8 @@
   "orphanTask": {
     "menuAction": "Avvia un'attività",
     "title": "Avvia un'attività",
-    "description": "Lancia un'attività autonoma su {{name}}, senza bisogno di progetto o ticket. Il risultato viene pubblicato in questo thread al termine.",
-    "descriptionGeneric": "Lancia un'attività autonoma, senza bisogno di progetto o ticket. Scegli l'Agente che deve eseguirla; il risultato viene pubblicato nel suo thread al termine.",
+    "description": "Lancia un'attività autonoma su {{name}}. Il risultato viene pubblicato in questo thread al termine.",
+    "descriptionGeneric": "Lancia un'attività autonoma. Scegli l'Agente che deve eseguirla; il risultato viene pubblicato nel suo thread al termine.",
     "agentField": "Agente",
     "agentPlaceholder": "Scegli un Agente per eseguire questa attività",
     "promptField": "Cosa deve fare questa attività?",

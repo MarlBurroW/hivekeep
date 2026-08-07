@@ -409,9 +409,9 @@
       "roleTip": "Eine Einzeiler-Zusammenfassung, was dieser Agent tut. Wird in der Seitenleiste unter dem Namen angezeigt.",
       "modelTip": "Das KI-Modell hinter diesem Agenten. Modelle haben unterschiedliche Stärken: größere sind klüger, aber langsamer und teurer.",
       "scoutModel": "Scout-Modell",
-      "scoutModelTip": "Ein schnelles, günstiges Modell, das das `scout`-Tool nutzt, wenn dieser Agent (oder seine Tasks) schwere Nur-Lese-Erkundung delegiert. Der Scout-Standard eines Projekts hat Vorrang vor dieser Einstellung. Auf Erben lassen, um auf den globalen Standard und dann das Modell des Agents zurückzufallen.",
-      "scoutModelHint": "Vom `scout`-Tool genutzt, um große Nur-Lese-Erkundungen (Code finden, ein Subsystem kartieren) an ein günstigeres Modell zu delegieren. Priorität: Override pro Aufruf → Projekt-Scout → diese Einstellung → globaler Standard → Modell dieses Agents.",
-      "scoutModelInherit": "Erben (Projekt / global / Modell des Agenten)",
+      "scoutModelTip": "Ein schnelles, günstiges Modell, das das `scout`-Tool nutzt, wenn dieser Agent (oder seine Tasks) schwere Nur-Lese-Erkundung delegiert. Auf Erben lassen, um auf den globalen Standard und dann das Modell des Agents zurückzufallen.",
+      "scoutModelHint": "Vom `scout`-Tool genutzt, um große Nur-Lese-Erkundungen (Code finden, ein Subsystem kartieren) an ein günstigeres Modell zu delegieren. Priorität: Override pro Aufruf → diese Einstellung → globaler Standard → Modell dieses Agents.",
+      "scoutModelInherit": "Erben (global / Modell des Agenten)",
       "characterTip": "Definiert die Persönlichkeit des Agenten: wie er spricht, sein Tonfall, seine Eigenheiten und sein Kommunikationsstil. Quasi die \"Seele\" des Agenten.",
       "expertiseTip": "Beschreibt, was der Agent weiß und worauf er sich konzentrieren soll. Das lenkt seine Antworten, Prioritäten und Kompetenzbereiche.",
       "slugPlaceholder": "mein-agent-slug",
@@ -1513,7 +1513,7 @@
       "defaultCompactingPlaceholder": "Eigenes Modell jedes Agenten verwenden (Standard)",
       "defaultScout": "Standard-Scout-Modell",
       "defaultScoutTip": "Ein günstiges, schnelles Modell, das das `scout`-Tool nutzt, um umfangreiche Nur-Lese-Erkundungen zu delegieren. Ein kleines, schnelles Modell ist hier ideal.",
-      "defaultScoutHint": "Wird vom `scout`-Tool genutzt, wenn ein Agent oder eine Aufgabe große Nur-Lese-Erkundungen delegiert (Code finden, ein Subsystem kartieren), statt sie auf dem teuren Modell durchzuackern. Ein Agent oder Projekt kann das überschreiben. Ohne ihn fällt der Scout auf das eigene Modell des aufrufenden Agenten zurück.",
+      "defaultScoutHint": "Wird vom `scout`-Tool genutzt, wenn ein Agent oder eine Aufgabe große Nur-Lese-Erkundungen delegiert (Code finden, ein Subsystem kartieren), statt sie auf dem teuren Modell durchzuackern. Ein Agent kann das überschreiben. Ohne ihn fällt der Scout auf das eigene Modell des aufrufenden Agenten zurück.",
       "defaultScoutPlaceholder": "Eigenes Modell des aufrufenden Agenten verwenden (Standard)",
       "defaultImage": "Standard-Bildmodell",
       "defaultImageTip": "Bildgenerierungsmodell für `generate_image` und die KI-Avatar-Generierung.",
@@ -1546,7 +1546,7 @@
         "bullet3": "Ein Wechsel des Embedding-Modells erfordert das Neu-Einbetten aller bestehenden Erinnerungen"
       },
       "defaultScoutThinking": "Scout-Reasoning",
-      "defaultScoutThinkingTip": "Standard-Reasoning-Aufwand für Scouts. Die Kette folgt der des Scout-Modells: Override pro Aufruf, dann Projekt, dann Agent, dann diese Einstellung. Nicht gesetzt = Scouts folgen der Reasoning-Konfiguration des aufrufenden Agents.",
+      "defaultScoutThinkingTip": "Standard-Reasoning-Aufwand für Scouts. Die Kette folgt der des Scout-Modells: Override pro Aufruf, dann Agent, dann diese Einstellung. Nicht gesetzt = Scouts folgen der Reasoning-Konfiguration des aufrufenden Agents.",
       "defaultScoutThinkingInherit": "Kein Standard (dem Agent folgen)"
     },
     "mcp": {
@@ -3371,8 +3371,8 @@
   "orphanTask": {
     "menuAction": "Aufgabe starten",
     "title": "Aufgabe starten",
-    "description": "Starte eine eigenständige Aufgabe bei {{name}}, ohne Projekt oder Ticket. Das Ergebnis wird nach Abschluss in diesen Thread gepostet.",
-    "descriptionGeneric": "Starte eine eigenständige Aufgabe, ohne Projekt oder Ticket. Wähle den Agenten, der sie ausführen soll; das Ergebnis wird nach Abschluss in seinen Thread gepostet.",
+    "description": "Starte eine eigenständige Aufgabe bei {{name}}. Das Ergebnis wird nach Abschluss in diesen Thread gepostet.",
+    "descriptionGeneric": "Starte eine eigenständige Aufgabe. Wähle den Agenten, der sie ausführen soll; das Ergebnis wird nach Abschluss in seinen Thread gepostet.",
     "agentField": "Agent",
     "agentPlaceholder": "Wähle einen Agenten für diese Aufgabe",
     "promptField": "Was soll diese Aufgabe tun?",

@@ -264,7 +264,7 @@ The user approves from the banner in the app panel. Until granted, these throw:
 - \`ctx.agent.inform(text)\` — drop a message into the maintainer Agent's queue (needs \`agent:inform\`, 10/hour)
 - \`ctx.agent.task(description, {title?})\` — spawn an async sub-task on the maintainer Agent (needs \`agent:task\`, 5/hour)
 - \`ctx.on(eventType, handler)\` — subscribe to platform events (needs \`events:<prefix>\`, e.g. events:task): see the context list above. Lets an app react ("when a task finishes, SMS me"; "when a contact is created, sync it").
-- \`ctx.platform.get/post/put/patch/delete(path)\` — manage platform RESOURCES from the backend (needs \`platform:<resource>:<read|write>\`). Background equivalent of the frontend Hivekeep.platform, but service-backed: available resources are contacts, projects, tickets, crons (e.g. \`ctx.platform.get("/contacts")\`, \`ctx.platform.post("/tickets", {projectId, title})\`, \`ctx.platform.get("/tickets?projectId=...")\`). Use this to react to an event by mutating a resource ("on inbound email → create a ticket").
+- \`ctx.platform.get/post/put/patch/delete(path)\` — manage platform RESOURCES from the backend (needs \`platform:<resource>:<read|write>\`). Background equivalent of the frontend Hivekeep.platform, but service-backed: available resources are contacts and crons (e.g. \`ctx.platform.get("/contacts")\`, \`ctx.platform.post("/crons", {...})\`). Use this to react to an event by mutating a resource ("on inbound email → create a contact").
 - \`ctx.channels\` — send through the platform's EXISTING messaging channels (needs \`channels:send\`, 20/hour):
   - \`ctx.channels.list()\` — channels with id/name/platform/status
   - \`ctx.channels.send(channelId, chatId, text)\` — send to a known platform chat id

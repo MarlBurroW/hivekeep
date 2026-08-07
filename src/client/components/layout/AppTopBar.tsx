@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, FolderKanban, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, ChevronDown } from 'lucide-react'
+import { Home, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, ChevronDown } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -29,7 +29,7 @@ interface AppTopBarProps {
 }
 
 /**
- * Persistent top bar shown across all authenticated pages (Agents, Projets, etc.).
+ * Persistent top bar shown across all authenticated pages.
  *
  * Hosts global actions: brand, SSE indicator, palette/theme toggles, notifications,
  * user menu. Lives at the App.tsx layout level so it doesn't disappear when the

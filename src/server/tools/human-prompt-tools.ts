@@ -28,7 +28,7 @@ export const promptHumanTool: ToolRegistration = {
     let promptCalledThisTurn = false
     return tool({
       description:
-        'Prompt the user with a question and wait for their reply. Choose the prompt_type that fits: `confirm` (yes/no), `select` (one of N), `multi_select` (any of N), or `text` (free-form answer). On a ticket task this is the canonical way to ask the user something — the task is suspended with a yellow "awaiting input" badge on the ticket until they answer. Not available in cron tasks.',
+        'Prompt the user with a question and wait for their reply. Choose the prompt_type that fits: `confirm` (yes/no), `select` (one of N), `multi_select` (any of N), or `text` (free-form answer). When called from a task, the task is suspended until they answer. Not available in cron tasks.',
       inputSchema: z.object({
         prompt_type: z
           .enum(['confirm', 'select', 'multi_select', 'text']),

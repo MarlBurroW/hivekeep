@@ -409,9 +409,9 @@
       "roleTip": "Un résumé en une ligne de ce que fait cet Agent. Affiché sous le nom dans la barre latérale.",
       "modelTip": "Le modèle IA qui anime cet Agent. Les modèles plus grands sont plus intelligents mais plus lents et coûteux.",
       "scoutModel": "Modèle d'exploration",
-      "scoutModelTip": "Un modèle rapide et économique utilisé par l'outil `scout` quand cet Agent (ou ses tâches) délègue une exploration lourde en lecture seule. Le scout par défaut d'un projet est prioritaire sur ce réglage. Laissez sur hériter pour retomber sur le défaut global, puis le modèle de l'Agent.",
-      "scoutModelHint": "Utilisé par l'outil `scout` pour déléguer les grosses explorations en lecture seule (localiser du code, cartographier un sous-système) à un modèle moins cher. Priorité : override par appel → scout du projet → ce réglage → défaut global → modèle de cet Agent.",
-      "scoutModelInherit": "Héritage (projet / global / modèle de l'Agent)",
+      "scoutModelTip": "Un modèle rapide et économique utilisé par l'outil `scout` quand cet Agent (ou ses tâches) délègue une exploration lourde en lecture seule.Laissez sur hériter pour retomber sur le défaut global, puis le modèle de l'Agent.",
+      "scoutModelHint": "Utilisé par l'outil `scout` pour déléguer les grosses explorations en lecture seule (localiser du code, cartographier un sous-système) à un modèle moins cher. Priorité : override par appel → ce réglage → défaut global → modèle de cet Agent.",
+      "scoutModelInherit": "Héritage (global / modèle de l'Agent)",
       "characterTip": "Définit la personnalité de l'Agent : comment il parle, son ton, ses particularités. C'est en quelque sorte l'\"âme\" de l'Agent.",
       "expertiseTip": "Décrit ce que l'Agent sait et sur quoi il doit se concentrer. Guide ses réponses et domaines de compétence.",
       "slugPlaceholder": "mon-agent-slug",
@@ -1513,7 +1513,7 @@
       "defaultCompactingPlaceholder": "Utiliser le modèle de chaque Agent (par défaut)",
       "defaultScout": "Modèle d'exploration par défaut",
       "defaultScoutTip": "Un modèle rapide et économique que l'outil `scout` utilise pour déléguer une exploration lourde en lecture seule. Un petit modèle rapide est idéal ici.",
-      "defaultScoutHint": "Utilisé par l'outil `scout` quand un Agent ou une tâche délègue une grosse exploration en lecture seule (localiser du code, cartographier un sous-système) au lieu de la faire sur le modèle coûteux. Un Agent ou un projet peut le remplacer. Sans cela, le scout retombe sur le modèle de l'Agent appelant.",
+      "defaultScoutHint": "Utilisé par l'outil `scout` quand un Agent ou une tâche délègue une grosse exploration en lecture seule (localiser du code, cartographier un sous-système) au lieu de la faire sur le modèle coûteux. Un Agent peut le remplacer. Sans cela, le scout retombe sur le modèle de l'Agent appelant.",
       "defaultScoutPlaceholder": "Utiliser le modèle de l'Agent appelant (par défaut)",
       "defaultImage": "Modèle d'image par défaut",
       "defaultImageTip": "Modèle de génération d'image utilisé par `generate_image` et la génération d'avatars IA.",
@@ -1546,7 +1546,7 @@
         "bullet3": "Changer le modèle d'embedding nécessite de re-indexer tous les souvenirs existants"
       },
       "defaultScoutThinking": "Raisonnement des scouts",
-      "defaultScoutThinkingTip": "Effort de raisonnement par défaut des scouts. La chaîne suit celle du modèle scout : override par appel, puis projet, puis Agent, puis ce réglage. Non défini = les scouts suivent la config de raisonnement de l'Agent appelant.",
+      "defaultScoutThinkingTip": "Effort de raisonnement par défaut des scouts. La chaîne suit celle du modèle scout : override par appel, puis Agent, puis ce réglage. Non défini = les scouts suivent la config de raisonnement de l'Agent appelant.",
       "defaultScoutThinkingInherit": "Aucun défaut (suivre l'Agent appelant)"
     },
     "mcp": {
@@ -3371,8 +3371,8 @@
   "orphanTask": {
     "menuAction": "Lancer une tâche",
     "title": "Lancer une tâche",
-    "description": "Lance une tâche autonome sur {{name}}, sans projet ni ticket. Le résultat est déposé dans ce fil quand elle se termine.",
-    "descriptionGeneric": "Lance une tâche autonome, sans projet ni ticket. Choisis l'Agent qui doit l'exécuter ; le résultat est déposé dans son fil quand elle se termine.",
+    "description": "Lance une tâche autonome sur {{name}}. Le résultat est déposé dans ce fil quand elle se termine.",
+    "descriptionGeneric": "Lance une tâche autonome. Choisis l'Agent qui doit l'exécuter ; le résultat est déposé dans son fil quand elle se termine.",
     "agentField": "Agent",
     "agentPlaceholder": "Choisir un Agent pour exécuter cette tâche",
     "promptField": "Que doit faire cette tâche ?",

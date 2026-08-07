@@ -411,9 +411,9 @@
       "roleTip": "Jednolinijkowe podsumowanie tego, co robi ten Agent. Wyświetlane pod nazwą na pasku bocznym.",
       "modelTip": "Model AI napędzający tego Agenta. Modele różnią się mocnymi stronami: większe są mądrzejsze, ale wolniejsze i droższe.",
       "scoutModel": "Model zwiadowczy",
-      "scoutModelTip": "Szybki i tani model używany przez narzędzie `scout`, gdy ten Agent (lub jego zadania) deleguje ciężką eksplorację tylko do odczytu. Domyślny scout projektu ma pierwszeństwo przed tym ustawieniem. Pozostaw dziedziczenie, aby wrócić do globalnego domyślnego, a następnie do modelu Agenta.",
-      "scoutModelHint": "Używane przez narzędzie `scout` do delegowania dużych eksploracji tylko do odczytu (lokalizowanie kodu, mapowanie podsystemu) tańszemu modelowi. Priorytet: nadpisanie per wywołanie → scout projektu → to ustawienie → globalny domyślny → model tego Agenta.",
-      "scoutModelInherit": "Dziedzicz (projekt / globalny / model Agenta)",
+      "scoutModelTip": "Szybki i tani model używany przez narzędzie `scout`, gdy ten Agent (lub jego zadania) deleguje ciężką eksplorację tylko do odczytu. Pozostaw dziedziczenie, aby wrócić do globalnego domyślnego, a następnie do modelu Agenta.",
+      "scoutModelHint": "Używane przez narzędzie `scout` do delegowania dużych eksploracji tylko do odczytu (lokalizowanie kodu, mapowanie podsystemu) tańszemu modelowi. Priorytet: nadpisanie per wywołanie → to ustawienie → globalny domyślny → model tego Agenta.",
+      "scoutModelInherit": "Dziedzicz (globalny / model Agenta)",
       "characterTip": "Definiuje osobowość Agenta: sposób mówienia, ton, dziwactwa i styl komunikacji. Traktuj to jak \"duszę\" Agenta.",
       "expertiseTip": "Opisuje, co Agent wie i na czym powinien się skupiać. To wyznacza jego odpowiedzi, priorytety i obszary kompetencji.",
       "slugPlaceholder": "my-agent-slug",
@@ -1529,7 +1529,7 @@
       "defaultCompactingPlaceholder": "Użyj własnego modelu każdego Agenta (domyślnie)",
       "defaultScout": "Domyślny model zwiadowcy",
       "defaultScoutTip": "Tani, szybki model używany przez narzędzie `scout` do delegowania ciężkiej eksploracji tylko do odczytu. Mały, szybki model sprawdzi się tu idealnie.",
-      "defaultScoutHint": "Używany przez narzędzie `scout`, gdy Agent lub zadanie deleguje obszerną eksplorację tylko do odczytu (lokalizowanie kodu, mapowanie podsystemu), zamiast przerabiać ją na drogim modelu. Agent lub projekt może to nadpisać. Bez niego zwiadowca korzysta z własnego modelu wywołującego Agenta.",
+      "defaultScoutHint": "Używany przez narzędzie `scout`, gdy Agent lub zadanie deleguje obszerną eksplorację tylko do odczytu (lokalizowanie kodu, mapowanie podsystemu), zamiast przerabiać ją na drogim modelu. Agent może to nadpisać. Bez niego zwiadowca korzysta z własnego modelu wywołującego Agenta.",
       "defaultScoutPlaceholder": "Użyj własnego modelu wywołującego Agenta (domyślnie)",
       "defaultImage": "Domyślny model obrazów",
       "defaultImageTip": "Model generowania obrazów używany przez `generate_image` i do generowania awatarów AI.",
@@ -1562,7 +1562,7 @@
         "bullet3": "Zmiana modelu embeddingów wymaga ponownego przeliczenia embeddingów wszystkich istniejących wspomnień"
       },
       "defaultScoutThinking": "Rozumowanie scoutów",
-      "defaultScoutThinkingTip": "Domyślny wysiłek rozumowania scoutów. Łańcuch odpowiada łańcuchowi modelu scout: nadpisanie per wywołanie, potem projekt, potem Agent, potem to ustawienie. Nieustawione = scouty podążają za konfiguracją wywołującego Agenta.",
+      "defaultScoutThinkingTip": "Domyślny wysiłek rozumowania scoutów. Łańcuch odpowiada łańcuchowi modelu scout: nadpisanie per wywołanie, potem Agent, potem to ustawienie. Nieustawione = scouty podążają za konfiguracją wywołującego Agenta.",
       "defaultScoutThinkingInherit": "Brak domyślnego (podążaj za Agentem)"
     },
     "mcp": {
@@ -3389,8 +3389,8 @@
   "orphanTask": {
     "menuAction": "Uruchom zadanie",
     "title": "Uruchom zadanie",
-    "description": "Uruchom samodzielne zadanie na {{name}}, bez projektu ani zgłoszenia. Wynik pojawi się w tym wątku po zakończeniu.",
-    "descriptionGeneric": "Uruchom samodzielne zadanie, bez projektu ani zgłoszenia. Wybierz Agenta, który ma je wykonać; wynik pojawi się w jego wątku po zakończeniu.",
+    "description": "Uruchom samodzielne zadanie na {{name}}. Wynik pojawi się w tym wątku po zakończeniu.",
+    "descriptionGeneric": "Uruchom samodzielne zadanie. Wybierz Agenta, który ma je wykonać; wynik pojawi się w jego wątku po zakończeniu.",
     "agentField": "Agent",
     "agentPlaceholder": "Wybierz Agenta do tego zadania",
     "promptField": "Co ma robić to zadanie?",

@@ -32,7 +32,7 @@ const todoItemSchema = z.object({
  * Available to sub-Agents only. The model passes the FULL list each time it
  * changes (creating items, advancing one to in_progress, marking one as
  * completed, cancelling stale ones). The list is held in memory for the
- * task lifetime and broadcast over SSE so the ticket UI can render
+ * task lifetime and broadcast over SSE so the task UI can render
  * progress. It is NOT persisted to disk — a server restart loses it,
  * which matches the same model as `awaiting_agent_response` recovery.
  */

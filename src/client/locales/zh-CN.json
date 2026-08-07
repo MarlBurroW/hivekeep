@@ -409,9 +409,9 @@
       "roleTip": "一句话概括这个智能体的职责。显示在侧边栏名称下方。",
       "modelTip": "驱动这个智能体的 AI 模型。不同模型各有所长：更大的模型更聪明，但更慢也更贵。",
       "scoutModel": "侦察模型",
-      "scoutModelTip": "当此 Agent（或其任务）通过 `scout` 工具委派繁重的只读探索时所用的快速廉价模型。项目级 scout 默认值优先于此设置。保持继承则回退到全局默认值，再到 Agent 自身的模型。",
-      "scoutModelHint": "`scout` 工具用它把大规模只读探索（定位代码、梳理子系统）委派给更便宜的模型。优先级：单次调用覆盖 → 项目 scout 默认值 → 此设置 → 全局默认值 → 此 Agent 的模型。",
-      "scoutModelInherit": "继承（项目 / 全局 / 智能体模型）",
+      "scoutModelTip": "当此 Agent（或其任务）通过 `scout` 工具委派繁重的只读探索时所用的快速廉价模型。保持继承则回退到全局默认值，再到 Agent 自身的模型。",
+      "scoutModelHint": "`scout` 工具用它把大规模只读探索（定位代码、梳理子系统）委派给更便宜的模型。优先级：单次调用覆盖 → 此设置 → 全局默认值 → 此 Agent 的模型。",
+      "scoutModelInherit": "继承（全局 / 智能体模型）",
       "characterTip": "定义智能体的个性：说话方式、语气、小习惯和沟通风格。可以把它看作智能体的「灵魂」。",
       "expertiseTip": "描述智能体掌握什么、应该专注什么。这会引导它的回答、优先级和能力范围。",
       "slugPlaceholder": "my-agent-slug",
@@ -1513,7 +1513,7 @@
       "defaultCompactingPlaceholder": "使用各智能体自己的模型（默认）",
       "defaultScout": "默认侦察模型",
       "defaultScoutTip": "`scout` 工具用于委派大量只读探索的廉价快速模型。小而快的模型最合适。",
-      "defaultScoutHint": "当智能体或任务把大规模只读探索（定位代码、梳理子系统）委派出去而不是用昂贵模型硬啃时，由 `scout` 工具使用。智能体或项目可以覆盖此设置。没有它，侦察会回退到调用方智能体自己的模型。",
+      "defaultScoutHint": "当智能体或任务把大规模只读探索（定位代码、梳理子系统）委派出去而不是用昂贵模型硬啃时，由 `scout` 工具使用。智能体可以覆盖此设置。没有它，侦察会回退到调用方智能体自己的模型。",
       "defaultScoutPlaceholder": "使用调用方智能体自己的模型（默认）",
       "defaultImage": "默认图像模型",
       "defaultImageTip": "`generate_image` 和 AI 头像生成使用的图像生成模型。",
@@ -1546,7 +1546,7 @@
         "bullet3": "更换嵌入模型需要重新嵌入所有现有记忆"
       },
       "defaultScoutThinking": "Scout 推理",
-      "defaultScoutThinkingTip": "Scout 的默认推理强度。链条与 scout 模型一致：单次调用覆盖、然后项目、然后 Agent、最后此设置。未设置 = scout 跟随调用方 Agent 的推理配置。",
+      "defaultScoutThinkingTip": "Scout 的默认推理强度。链条与 scout 模型一致：单次调用覆盖、然后 Agent、最后此设置。未设置 = scout 跟随调用方 Agent 的推理配置。",
       "defaultScoutThinkingInherit": "无默认（跟随调用方 Agent）"
     },
     "mcp": {
@@ -3371,8 +3371,8 @@
   "orphanTask": {
     "menuAction": "发起任务",
     "title": "发起任务",
-    "description": "在 {{name}} 上启动一个独立任务，无需项目或工单。任务完成后，结果会发回这个对话。",
-    "descriptionGeneric": "启动一个独立任务，无需项目或工单。选择执行它的智能体；任务完成后，结果会发回该智能体的对话。",
+    "description": "在 {{name}} 上启动一个独立任务。任务完成后，结果会发回这个对话。",
+    "descriptionGeneric": "启动一个独立任务。选择执行它的智能体；任务完成后，结果会发回该智能体的对话。",
     "agentField": "智能体",
     "agentPlaceholder": "选择运行此任务的智能体",
     "promptField": "这个任务要做什么？",

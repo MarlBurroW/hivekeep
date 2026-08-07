@@ -236,7 +236,7 @@ Emitted when an Agent queues an outbound email that needs human approval.
 
 ### Other resource events
 
-Most CRUD resources also broadcast `created` / `updated` / `deleted` events so any open tab stays in sync. Beyond the families above, these include: `agent` (plus `agent:active-project`, `agent:read`), `provider`, `mcp-server`, `contact`, `cron`, `webhook`, `memory`, `custom-tool`, `toolbox`, `tool-domain`, `email-account`, and `connected-account`. The canonical, exhaustive list of event names lives in `src/server/sse/types.ts`.
+Most CRUD resources also broadcast `created` / `updated` / `deleted` events so any open tab stays in sync. Beyond the families above, these include: `agent` (plus `agent:read`), `provider`, `mcp-server`, `contact`, `cron`, `webhook`, `memory`, `custom-tool`, `toolbox`, `tool-domain`, `email-account`, and `connected-account`. The canonical, exhaustive list of event names lives in `src/server/sse/types.ts`.
 
 ## Delivery Scope
 

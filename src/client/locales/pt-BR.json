@@ -409,9 +409,9 @@
       "roleTip": "Um resumo de uma linha do que este Agente faz. Exibido sob o nome na barra lateral.",
       "modelTip": "O modelo de IA que alimenta este Agente. Modelos diferentes têm pontos fortes diferentes: modelos maiores são mais inteligentes, mas mais lentos e mais caros.",
       "scoutModel": "Modelo de batedor",
-      "scoutModelTip": "Um modelo rápido e barato usado pela ferramenta `scout` quando este Agente (ou suas tarefas) delega uma exploração pesada somente leitura. O scout padrão de um projeto tem prioridade sobre esta configuração. Deixe em herdar para recorrer ao padrão global e depois ao modelo do Agente.",
-      "scoutModelHint": "Usado pela ferramenta `scout` para delegar grandes explorações somente leitura (localizar código, mapear um subsistema) a um modelo mais barato. Prioridade: override por chamada → scout do projeto → esta configuração → padrão global → modelo deste Agente.",
-      "scoutModelInherit": "Herdar (projeto / global / modelo do Agente)",
+      "scoutModelTip": "Um modelo rápido e barato usado pela ferramenta `scout` quando este Agente (ou suas tarefas) delega uma exploração pesada somente leitura. Deixe em herdar para recorrer ao padrão global e depois ao modelo do Agente.",
+      "scoutModelHint": "Usado pela ferramenta `scout` para delegar grandes explorações somente leitura (localizar código, mapear um subsistema) a um modelo mais barato. Prioridade: override por chamada → esta configuração → padrão global → modelo deste Agente.",
+      "scoutModelInherit": "Herdar (global / modelo do Agente)",
       "characterTip": "Define a personalidade do Agente: como ele fala, seu tom, manias e estilo de comunicação. Pense nisso como a \"alma\" do Agente.",
       "expertiseTip": "Descreve o que o Agente sabe e em que deve focar. Isso orienta suas respostas, prioridades e áreas de competência.",
       "slugPlaceholder": "slug-do-meu-agente",
@@ -1513,7 +1513,7 @@
       "defaultCompactingPlaceholder": "Usar o modelo de cada Agente (padrão)",
       "defaultScout": "Modelo de batedor padrão",
       "defaultScoutTip": "Um modelo barato e rápido que a ferramenta `scout` usa para delegar exploração pesada somente leitura. Um modelo pequeno e rápido é ideal aqui.",
-      "defaultScoutHint": "Usado pela ferramenta `scout` quando um Agente ou tarefa delega grandes explorações somente leitura (localizar código, mapear um subsistema) em vez de fazê-las no modelo caro. Um Agente ou projeto pode sobrescrever isso. Sem ele, o batedor usa o modelo do próprio Agente que chamou.",
+      "defaultScoutHint": "Usado pela ferramenta `scout` quando um Agente ou tarefa delega grandes explorações somente leitura (localizar código, mapear um subsistema) em vez de fazê-las no modelo caro. Um Agente pode sobrescrever isso. Sem ele, o batedor usa o modelo do próprio Agente que chamou.",
       "defaultScoutPlaceholder": "Usar o modelo do Agente que chamou (padrão)",
       "defaultImage": "Modelo de imagem padrão",
       "defaultImageTip": "Modelo de geração de imagens usado por `generate_image` e pela geração de avatares por IA.",
@@ -1546,7 +1546,7 @@
         "bullet3": "Trocar o modelo de embedding exige reprocessar os embeddings de todas as memórias existentes"
       },
       "defaultScoutThinking": "Raciocínio dos scouts",
-      "defaultScoutThinkingTip": "Esforço de raciocínio padrão dos scouts. A cadeia segue a do modelo scout: override por chamada, depois projeto, depois Agente, depois esta configuração. Não definido = os scouts seguem a configuração do Agente chamador.",
+      "defaultScoutThinkingTip": "Esforço de raciocínio padrão dos scouts. A cadeia segue a do modelo scout: override por chamada, depois Agente, depois esta configuração. Não definido = os scouts seguem a configuração do Agente chamador.",
       "defaultScoutThinkingInherit": "Sem padrão (seguir o Agente)"
     },
     "mcp": {
@@ -3371,8 +3371,8 @@
   "orphanTask": {
     "menuAction": "Iniciar uma tarefa",
     "title": "Iniciar uma tarefa",
-    "description": "Inicie uma tarefa avulsa em {{name}}, sem precisar de projeto ou ticket. O resultado é publicado de volta nesta conversa quando terminar.",
-    "descriptionGeneric": "Inicie uma tarefa avulsa, sem precisar de projeto ou ticket. Escolha o Agente que deve executá-la; o resultado é publicado de volta na conversa dele quando terminar.",
+    "description": "Inicie uma tarefa avulsa em {{name}}. O resultado é publicado de volta nesta conversa quando terminar.",
+    "descriptionGeneric": "Inicie uma tarefa avulsa. Escolha o Agente que deve executá-la; o resultado é publicado de volta na conversa dele quando terminar.",
     "agentField": "Agente",
     "agentPlaceholder": "Escolha um Agente para executar esta tarefa",
     "promptField": "O que esta tarefa deve fazer?",

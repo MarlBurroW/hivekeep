@@ -409,9 +409,9 @@
       "roleTip": "A one-line summary of what this Agent does. Shown under the name in the sidebar.",
       "modelTip": "The AI model powering this Agent. Different models have different strengths - larger models are smarter but slower and more expensive.",
       "scoutModel": "Scout model",
-      "scoutModelTip": "A cheap, fast model used by the `scout` tool when this Agent (or its tasks) delegates heavy read-only exploration. A project's scout default takes precedence over this setting. Leave on inherit to fall back to the global scout default, then the Agent's own model.",
-      "scoutModelHint": "Used by the `scout` tool to delegate large read-only exploration (locating code, mapping a subsystem) to a cheaper model. Priority: per-call override → project scout default → this setting → global default → this Agent's model.",
-      "scoutModelInherit": "Inherit (project / global / Agent's model)",
+      "scoutModelTip": "A cheap, fast model used by the `scout` tool when this Agent (or its tasks) delegates heavy read-only exploration. Leave on inherit to fall back to the global scout default, then the Agent's own model.",
+      "scoutModelHint": "Used by the `scout` tool to delegate large read-only exploration (locating code, mapping a subsystem) to a cheaper model. Priority: per-call override → this setting → global default → this Agent's model.",
+      "scoutModelInherit": "Inherit (global / Agent's model)",
       "characterTip": "Defines the Agent's personality: how it talks, its tone, quirks, and communication style. Think of it as the Agent's \"soul\".",
       "expertiseTip": "Describes what the Agent knows and should focus on. This guides its answers, priorities, and areas of competence.",
       "slugPlaceholder": "my-agent-slug",
@@ -1513,7 +1513,7 @@
       "defaultCompactingPlaceholder": "Use each Agent's own model (default)",
       "defaultScout": "Default Scout Model",
       "defaultScoutTip": "A cheap, fast model the `scout` tool uses to delegate heavy read-only exploration. A small, fast model is ideal here.",
-      "defaultScoutHint": "Used by the `scout` tool when an Agent or task delegates large read-only exploration (locating code, mapping a subsystem) instead of grinding through it on the expensive model. An Agent or project can override this. Without it, the scout falls back to the calling Agent's own model.",
+      "defaultScoutHint": "Used by the `scout` tool when an Agent or task delegates large read-only exploration (locating code, mapping a subsystem) instead of grinding through it on the expensive model. An Agent can override this. Without it, the scout falls back to the calling Agent's own model.",
       "defaultScoutPlaceholder": "Use the calling Agent's own model (default)",
       "defaultImage": "Default Image Model",
       "defaultImageTip": "Image-generation model used by `generate_image` and AI avatar generation.",
@@ -1546,7 +1546,7 @@
         "bullet3": "Changing the embedding model requires re-embedding all existing memories"
       },
       "defaultScoutThinking": "Scout reasoning",
-      "defaultScoutThinkingTip": "Default reasoning effort for scouts. The chain mirrors the scout model: per-call override, then project, then Agent, then this. Unset = scouts follow the calling Agent's own reasoning config.",
+      "defaultScoutThinkingTip": "Default reasoning effort for scouts. The chain mirrors the scout model: per-call override, then Agent, then this. Unset = scouts follow the calling Agent's own reasoning config.",
       "defaultScoutThinkingInherit": "No default (follow the calling Agent)"
     },
     "mcp": {
@@ -3371,8 +3371,8 @@
   "orphanTask": {
     "menuAction": "Start a task",
     "title": "Start a task",
-    "description": "Launch a standalone task on {{name}}, no project or ticket needed. The result is posted back into this thread when it finishes.",
-    "descriptionGeneric": "Launch a standalone task, no project or ticket needed. Pick the Agent that should run it; the result is posted back into its thread when it finishes.",
+    "description": "Launch a standalone task on {{name}}. The result is posted back into this thread when it finishes.",
+    "descriptionGeneric": "Launch a standalone task. Pick the Agent that should run it; the result is posted back into its thread when it finishes.",
     "agentField": "Agent",
     "agentPlaceholder": "Choose an Agent to run this task",
     "promptField": "What should this task do?",

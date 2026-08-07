@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home, FolderKanban, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, MessageSquarePlus } from 'lucide-react'
+import { Home, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, MessageSquarePlus } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { useTasksContext } from '@/client/contexts/TasksContext'
 import { useCronsContext } from '@/client/contexts/CronsContext'

@@ -54,7 +54,7 @@ Agents interact with the world through **tools**: functions they can call during
 | `update_secret` | Update an existing secret |
 | `delete_secret` | Remove a secret |
 | `search_secrets` | Search secrets by query |
-| `redact_message` | Redact sensitive content from a chat message |
+| `redact_secret_leak` | Redact a leaked secret value from past chat messages |
 | `get_vault_entry` | Retrieve a structured vault entry |
 | `create_vault_entry` | Create a structured vault entry |
 | `create_vault_type` | Define a custom vault type (e.g. "WiFi Network") |

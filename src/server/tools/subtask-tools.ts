@@ -75,8 +75,8 @@ export const updateTaskStatusTool: ToolRegistration = {
 }
 
 /**
- * request_input — ask the parent Agent (non-ticket task) or the human user
- * (ticket task) for clarification or a decision. Available to sub-Agents only,
+ * request_input — ask the parent Agent for clarification or a decision.
+ * Available to sub-Agents only,
  * capped at `config.tasks.maxRequestInput` invocations per task.
  *
  * The tool **pauses the task**: the runner stops the multi-step loop and
@@ -90,7 +90,7 @@ export const requestInputTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Ask the parent Agent or the human user (when the task is linked to a ticket) for clarification or a decision. The task is suspended until the response arrives — DO NOT emit any further tool calls in this turn. Limited calls per task.',
+        'Ask the parent Agent for clarification or a decision. The task is suspended until the response arrives. DO NOT emit any further tool calls in this turn. Limited calls per task.',
       inputSchema: z.object({
         question: z.string(),
       }),

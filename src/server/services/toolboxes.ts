@@ -100,7 +100,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'list_memories',
       'get_secret',
       'search_secrets',
-      'redact_message',
+      'redact_secret_leak',
       'http_request',
       'get_system_info',
       // Delegation — offload heavy read-only exploration to a cheap scout model.

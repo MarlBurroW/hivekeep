@@ -91,9 +91,9 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 21 | `Current message from: **{platform}**` hint | volatile | `currentMessageSource{}` | one-line origin + per-platform formatting reminder |
 | 22 | `## Channel origin context` | volatile | `pendingChannelContext{}` | reply auto-delivered back to the originating channel |
 | 23 | `## Workspace` (+ file tree) | volatile | `workspacePath` → `generateWorkspaceTree()` | depth-limited tree |
-| 25 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | rare on main; primary on sub-Agents |
-| 26 | `## Context` | volatile | `buildContextBlock()` | date/time/tz/version/install/RAM/uptime (see §6 [8]) |
-| 27 | `## Final reminder (most important rule of this turn)` | volatile | hardcoded | recency-positioned tool-discipline tie-breaker |
+| 24 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | rare on main; primary on sub-Agents |
+| 25 | `## Context` | volatile | `buildContextBlock()` | date/time/tz/version/install/RAM/uptime (see §6 [8]) |
+| 26 | `## Final reminder (most important rule of this turn)` | volatile | hardcoded | recency-positioned tool-discipline tie-breaker |
 
 ### B. Sub-Agent (task) prompt (prompt-builder.ts:974–1087 + shared tail)
 
@@ -101,18 +101,18 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 |---|---|---|---|---|
 | 1 | `You are {name}, a specialized AI agent on Hivekeep, executing a delegated task.` | stable | `agent.name` | + one line on what Hivekeep is |
 | 2 | `## Your mission` | stable | `taskDescription` | |
-| 4 | `## Environment` | stable | `systemContext{}` | platform/arch/available CLIs + workspace cwd; saves probe calls |
-| 5 | `## Constraints` + `## Tool calling discipline` + `## Execution discipline` + `## CRITICAL - Task resolution` | stable | hardcoded | cron-journal addendum when it's a cron task |
-| 6 | `## Previous runs` | stable | `previousCronRuns[]` | cron continuity (newest first) |
-| 7 | `## Learnings from previous runs` | stable | `cronLearnings[]` | accumulated lessons |
-| 8 | `## Platform directives` | stable | `globalPrompt` | global prompt applies to sub-Agents too |
-| 9 | `## Known contacts` | volatile | `contacts[]` | **injected**: sub-Agents DO see contacts |
-| 10 | `## Agent directory` + Inter-Agent comms + Escalation | stable | `agentDirectory[]` | sub-Agent variant; references `send_message`/`list_kins` |
-| 11 | `## Memories` | volatile | `relevantMemories[]` | same renderer as main |
-| 12 | speaker / participants / state / summaries / language / message-hint / channel / workspace | mixed | shared tail | same blocks as main (only those with data render) |
-| 14 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | primary use case: the live plan, re-shown every turn |
-| 15 | `## Context` | volatile | `buildContextBlock()` | |
-| 16 | `## Final reminder (this turn)` | volatile | hardcoded | execution-efficiency variant (don't re-read, fan out, no shell wrappers, no safety bypass) |
+| 3 | `## Environment` | stable | `systemContext{}` | platform/arch/available CLIs + workspace cwd; saves probe calls |
+| 4 | `## Constraints` + `## Tool calling discipline` + `## Execution discipline` + `## CRITICAL - Task resolution` | stable | hardcoded | cron-journal addendum when it's a cron task |
+| 5 | `## Previous runs` | stable | `previousCronRuns[]` | cron continuity (newest first) |
+| 6 | `## Learnings from previous runs` | stable | `cronLearnings[]` | accumulated lessons |
+| 7 | `## Platform directives` | stable | `globalPrompt` | global prompt applies to sub-Agents too |
+| 8 | `## Known contacts` | volatile | `contacts[]` | **injected**: sub-Agents DO see contacts |
+| 9 | `## Agent directory` + Inter-Agent comms + Escalation | stable | `agentDirectory[]` | sub-Agent variant; references `send_message`/`list_kins` |
+| 10 | `## Memories` | volatile | `relevantMemories[]` | same renderer as main |
+| 11 | speaker / participants / state / summaries / language / message-hint / channel / workspace | mixed | shared tail | same blocks as main (only those with data render) |
+| 12 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | primary use case: the live plan, re-shown every turn |
+| 13 | `## Context` | volatile | `buildContextBlock()` | |
+| 14 | `## Final reminder (this turn)` | volatile | hardcoded | execution-efficiency variant (don't re-read, fan out, no shell wrappers, no safety bypass) |
 
 > The sub-Agent shape skips: `## Platform context`, `## Core principles`, `## Personality`, `## Expertise`, the main-agent `## Internal instructions` mega-block, and the `## MCP Tools` / `## External channels` summaries. Its discipline blocks are inlined into the `## Constraints` group instead.
 
@@ -178,7 +178,7 @@ The volatile `<system-reminder>` (per §1) is prepended to the **last user messa
 
 ---
 
-## 8. The `PromptParams` shape
+## 7. The `PromptParams` shape
 
 The builder takes a single `~30`-field params object. Rather than restating it (it drifts), read `PromptParams` in `prompt-builder.ts` (lines 91–184). The fields, grouped:
 
@@ -196,7 +196,7 @@ function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt
 
 ---
 
-## 9. Tools
+## 8. Tools
 
 Tools are not part of the textual prompt. The Agent's available tools are resolved from its **toolboxes** (the DB-backed toolbox system), converted to the provider's native tool-schema shape, and passed in the LLM call's `tools` parameter. The prompt only references tools by name inside instruction blocks (e.g. "use `memorize()`", "delegate with `scout`").
 
@@ -211,7 +211,7 @@ The **authoritative native-tool inventory is `src/server/tools/register.ts`**. D
 | `calendar` | list/get/create/update/delete events across slug-resolved accounts |
 | `voice` | TTS + STT discovery and actions (`text_to_speech`, `transcribe_audio`, list providers/voices/models) |
 | `memory` | `recall`/`memorize`/`update_memory`/`forget`/`list_memories`/`review_memories`, history (`search_history`, `browse_history`, `read_message`, `list_summaries`, `read_summary`), knowledge base (`search_knowledge`, `list_knowledge_sources`) |
-| `vault` | secrets (`get/create/update/delete/search_secret(s)`, `redact_message`) + vault entries/types/attachments |
+| `vault` | secrets (`get/create/update/delete/search_secret(s)`, `redact_secret_leak`) + vault entries/types/attachments |
 | `tasks` | delegation & control (`spawn_self`, `spawn_agent`, `scout`, `respond_to_task`, `cancel_task`, `list_tasks`, `list_active_queues`, `get_task_detail`, `get_task_messages`), sub-Agent side (`report_to_parent`, `update_task_status`, `request_input`), cron learnings (`save/delete_run_learning`), human-in-the-loop (`prompt_human`, `notify`), reasoning (`think`), planning (`task_todos`) |
 | `inter-agent` | `send_message`, `reply`, `list_kins` (registers `listAgentsTool`; the `list_kins` name is the registered identifier the prompt correctly matches) |
 | `crons` | cron CRUD + journal/trigger + wake-up scheduler (`wake_me_in`, `wake_me_every`, `cancel_wakeup`, `list_wakeups`) |
@@ -235,7 +235,7 @@ The **authoritative native-tool inventory is `src/server/tools/register.ts`**. D
 
 ### Sub-Agent tool scope
 
-Sub-Agent tool availability is governed by the **toolbox system** (and scout-toolbox resolution), not by a fixed table in the prompt builder. There is no hardcoded "sub-Agents only get tools X, Y, Z" list here. Two things the builder *does* do for sub-Agents:
+Sub-Agent tool availability is governed by the **toolbox system** (and scout-toolbox resolution), not by a fixed table in the prompt builder. There is no hardcoded "sub-Agents only get tools X, Y, Z" list here. One thing the builder *does* do for sub-Agents:
 
 - It injects `## Known contacts` and a sub-Agent `## Agent directory` with inter-Agent communication instructions, so a delegated task can read contacts and message other Agents when its toolbox grants those tools.
 
@@ -243,7 +243,7 @@ For the exact tools a given sub-Agent can call, consult its toolbox configuratio
 
 ---
 
-## 10. Token budget
+## 9. Token budget
 
 The system prompt competes with the message history and the response for the context window.
 
@@ -254,7 +254,7 @@ The compacting service triggers a new summary when the history exceeds its thres
 
 ---
 
-## 11. Cross-references
+## 10. Cross-references
 
 - `src/server/services/prompt-builder.ts`: the assembly (source of truth for block content and order).
 - `src/server/services/llm-cache-hints.ts`: `buildSegmentedMessages`, how `stable`/`volatile` reach the provider and where cache breakpoints land.

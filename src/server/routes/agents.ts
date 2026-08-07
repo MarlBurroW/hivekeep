@@ -788,8 +788,8 @@ agentRoutes.delete('/:id', async (c) => {
 
 const ORPHAN_TASK_VALID_EFFORTS: readonly AgentThinkingEffort[] = THINKING_EFFORTS
 
-// POST /api/agents/:id/tasks — start a standalone (orphan) task on this Agent with
-// NO project/ticket binding. Body: { prompt, title?, model?, providerId?,
+// POST /api/agents/:id/tasks — start a standalone (orphan) task on this Agent.
+// Body: { prompt, title?, model?, providerId?,
 // thinkingConfig?, toolboxIds? }. model + providerId are coupled (both or
 // neither). Result is deposited back into the Agent's main session (async mode).
 agentRoutes.post('/:id/tasks', async (c) => {
@@ -824,7 +824,7 @@ agentRoutes.post('/:id/tasks', async (c) => {
     thinkingConfig = { enabled, ...(effort !== null ? { effort } : {}) }
   }
 
-  // Optional toolbox selection. Absent → runtime default ('all' for non-ticket).
+  // Optional toolbox selection. Absent → runtime default ('all').
   let toolboxIds: string[] | undefined
   if (body.toolboxIds !== undefined) {
     if (!Array.isArray(body.toolboxIds) || body.toolboxIds.some((id: unknown) => typeof id !== 'string')) {
