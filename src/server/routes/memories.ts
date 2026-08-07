@@ -75,7 +75,7 @@ memoryRoutes.post('/backfill-importance', async (c) => {
 // POST /api/memories/consolidate — trigger memory consolidation manually
 memoryRoutes.post('/consolidate', async (c) => {
   const { agentId } = await c.req.json<{ agentId: string }>()
-  if (!agentId) return c.json({ error: 'agentId is required' }, 400)
+  if (!agentId) return c.json({ error: { code: 'INVALID_INPUT', message: 'agentId is required' } }, 400)
   const { consolidateMemories } = await import('@/server/services/consolidation')
   const removed = await consolidateMemories(agentId)
   return c.json({ removed })

@@ -704,7 +704,7 @@ async function captureTaskPromptContextSnapshot(params: {
     ? params.sourceAgentId
     : params.parentAgentId
   const identityAgent = await db.select().from(agents).where(eq(agents.id, identityAgentId)).get()
-  if (!identityAgent) throw new Error('IDENTITY_KIN_NOT_FOUND')
+  if (!identityAgent) throw new Error('IDENTITY_AGENT_NOT_FOUND')
 
   const [globalPrompt, agentDirectory] = await Promise.all([
     getGlobalPrompt(),
@@ -936,7 +936,7 @@ export interface StartOrphanTaskResult {
  *   - toolboxes: explicit selection → runtime default 'all' via
  *     resolveTaskToolboxIds when left null.
  *
- * Throws 'KIN_NOT_FOUND' / 'MODEL_AND_PROVIDER_MUST_BOTH_BE_SET' / 'EMPTY_PROMPT'.
+ * Throws 'AGENT_NOT_FOUND' / 'MODEL_AND_PROVIDER_MUST_BOTH_BE_SET' / 'EMPTY_PROMPT'.
  */
 export async function startOrphanTask(
   parentAgentId: string,
@@ -950,7 +950,7 @@ export async function startOrphanTask(
   },
 ): Promise<StartOrphanTaskResult> {
   const agent = db.select({ id: agents.id }).from(agents).where(eq(agents.id, parentAgentId)).get()
-  if (!agent) throw new Error('KIN_NOT_FOUND')
+  if (!agent) throw new Error('AGENT_NOT_FOUND')
 
   const prompt = input.prompt?.trim() ?? ''
   if (!prompt) throw new Error('EMPTY_PROMPT')

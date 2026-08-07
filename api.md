@@ -815,9 +815,9 @@ Multipart/form-data upload.
 
 ## Workspace files (Files section)
 
-Routes of the **Files** section (workspace browser/editor, see `files.md`). Mounted under `/api/agents/:agentId/workspace`; `:agentId` accepts an id or a slug. Agent not found → `404 KIN_NOT_FOUND`. All `path` values are **relative to the workspace root** and strictly confined (no absolute path, no `..`, no symlink escape, leaf included).
+Routes of the **Files** section (workspace browser/editor, see `files.md`). Mounted under `/api/agents/:agentId/workspace`; `:agentId` accepts an id or a slug. Agent not found → `404 AGENT_NOT_FOUND`. All `path` values are **relative to the workspace root** and strictly confined (no absolute path, no `..`, no symlink escape, leaf included).
 
-Common error codes: `KIN_NOT_FOUND` (404), `PATH_FORBIDDEN` (400), `FILE_NOT_FOUND` (404), `IS_DIRECTORY` (400), `NOT_A_DIRECTORY` (400), `FILE_TOO_LARGE` (413), `INVALID_NAME` (400), `DEST_EXISTS` (409), `CONFLICT` (409), `COPY_TOO_LARGE` (413).
+Common error codes: `AGENT_NOT_FOUND` (404), `PATH_FORBIDDEN` (400), `FILE_NOT_FOUND` (404), `IS_DIRECTORY` (400), `NOT_A_DIRECTORY` (400), `FILE_TOO_LARGE` (413), `INVALID_NAME` (400), `DEST_EXISTS` (409), `CONFLICT` (409), `COPY_TOO_LARGE` (413).
 
 ### `GET /api/agents/:agentId/workspace/ls`
 
@@ -1046,7 +1046,7 @@ Share: snapshot of a workspace file into file-storage (same semantics as the `st
   }
 }
 
-// Error 404 KIN_NOT_FOUND · 404 FILE_NOT_FOUND · 400 PATH_FORBIDDEN
+// Error 404 AGENT_NOT_FOUND · 404 FILE_NOT_FOUND · 400 PATH_FORBIDDEN
 // Error 413 FILE_TOO_LARGE (file-storage limit FILE_STORAGE_MAX_SIZE)
 ```
 

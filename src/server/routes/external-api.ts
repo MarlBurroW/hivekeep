@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, and, asc, lt } from 'drizzle-orm'
-import { db } from '@/server/db/index'
+import { eq, and, desc, sql } from 'drizzle-orm'
+import { db, sqlite } from '@/server/db/index'
 import { agents, messages } from '@/server/db/schema'
 import { enqueueMessage } from '@/server/services/queue'
 import { resolveAgentId } from '@/server/services/agent-resolver'
@@ -110,13 +110,17 @@ externalApiRoutes.post('/agents/:agentId/messages', async (c) => {
   const requestId = uuid()
 
   // Attribute the message to the declared client so the Agent knows who is
-  // speaking, mirroring the channel sender prefix.
+  // speaking, mirroring the channel sender prefix. User priority, like
+  // inbound channel messages: sourceType 'api' would otherwise fall to the
+  // automated priority tier and a mode:'wait' caller could starve behind
+  // task results and inter-agent traffic until its timeout.
   const { id: queueItemId } = await enqueueMessage({
     agentId,
     messageType: 'user',
     content: `[${client.name}] ${content}`,
     sourceType: 'api',
     sourceId: client.id,
+    priority: config.queue.userPriority,
     requestId,
     sessionId,
   })
@@ -193,16 +197,39 @@ externalApiRoutes.get('/conversations/:conversationId/messages', (c) => {
     return c.json({ error: { code: 'CONVERSATION_NOT_FOUND', message: 'Conversation not found' } }, 404)
   }
   const before = c.req.query('before')
-  const limit = Math.min(Number(c.req.query('limit') ?? 50), 100)
+  // Clamp on both ends: `?limit=-1` reached SQLite as LIMIT -1 (unlimited),
+  // dumping the whole transcript in one response.
+  const limit = Math.min(Math.max(Number(c.req.query('limit')) || 50, 1), 100)
+
+  // Cursor semantics: `before` pages BACKWARD from the given message.
+  // The old `id < before` compare on random UUIDs, combined with ascending
+  // order, always returned the oldest page regardless of the cursor.
+  let cursor: { createdAt: number; rowid: number } | null = null
+  if (before) {
+    const row = sqlite
+      .query<{ created_at: number; rowid: number }, [string]>('SELECT created_at, rowid FROM messages WHERE id = ?')
+      .get(before)
+    if (!row) {
+      return c.json({ error: { code: 'INVALID_CURSOR', message: 'Unknown `before` message id' } }, 400)
+    }
+    cursor = { createdAt: row.created_at, rowid: row.rowid }
+  }
+
+  const conditions = [eq(messages.sessionId, sessionId)]
+  if (cursor) {
+    conditions.push(
+      sql`(${messages.createdAt} < ${cursor.createdAt} OR (${messages.createdAt} = ${cursor.createdAt} AND rowid < ${cursor.rowid}))`,
+    )
+  }
   const rows = db
     .select({ id: messages.id, role: messages.role, content: messages.content, sourceType: messages.sourceType, createdAt: messages.createdAt })
     .from(messages)
-    .where(before
-      ? and(eq(messages.sessionId, sessionId), lt(messages.id, before))
-      : eq(messages.sessionId, sessionId))
-    .orderBy(asc(messages.createdAt))
+    .where(and(...conditions))
+    .orderBy(desc(messages.createdAt), desc(sql`rowid`))
     .limit(limit)
     .all()
+  // Chronological order within the page, newest page first.
+  rows.reverse()
   return c.json({ messages: rows })
 })
 

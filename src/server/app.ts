@@ -105,6 +105,12 @@ app.use('*', async (c, next) => {
 
 // Global error handler — ensures all unhandled exceptions return JSON, not plain text
 app.onError((err, c) => {
+  // A malformed request body is the CALLER's error, not a server fault: most
+  // handlers call c.req.json() unguarded, and the SyntaxError it throws used
+  // to surface as 500 INTERNAL_ERROR (and pollute the error logs).
+  if (err instanceof SyntaxError && err.message.toLowerCase().includes('json')) {
+    return c.json({ error: { code: 'INVALID_JSON', message: 'Request body is not valid JSON' } }, 400)
+  }
   log.error({ err }, 'Unhandled error')
   return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500)
 })

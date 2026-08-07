@@ -188,7 +188,7 @@ describe('channelRoutes', () => {
   })
 
   describe('PATCH /:id', () => {
-    itMocked('rejects a agentId mutation with 400 KINID_NOT_PATCHABLE', async () => {
+    itMocked('rejects a agentId mutation with 400 AGENT_ID_NOT_PATCHABLE', async () => {
       mockGetChannel.mockResolvedValue({ id: 'ch-1', name: 'Test', agentId: 'agent-source' })
 
       const resp = await app.fetch(
@@ -201,7 +201,7 @@ describe('channelRoutes', () => {
 
       expect(resp.status).toBe(400)
       const body = await resp.json()
-      expect(body.error.code).toBe('KINID_NOT_PATCHABLE')
+      expect(body.error.code).toBe('AGENT_ID_NOT_PATCHABLE')
       expect(body.error.message).toContain('/transfer')
       expect(mockUpdateChannel).not.toHaveBeenCalled()
       expect(mockTransferChannel).not.toHaveBeenCalled()

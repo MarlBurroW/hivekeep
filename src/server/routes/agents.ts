@@ -408,7 +408,7 @@ agentRoutes.get('/avatar-base/image', async (c) => {
 agentRoutes.get('/:id/context-usage', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Compute compacting proximity (always fresh)
@@ -507,7 +507,7 @@ agentRoutes.get('/:id/context-usage', async (c) => {
 agentRoutes.get('/:id/context-preview', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const taskId = c.req.query('taskId')
@@ -554,7 +554,7 @@ agentRoutes.get('/:id/context-preview', async (c) => {
 agentRoutes.get('/:id/tools', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const user = c.get('user') as { id: string }
   const quick = c.req.query('quick') === '1' || c.req.query('quick') === 'true'
@@ -584,12 +584,12 @@ agentRoutes.get('/:id/tools', async (c) => {
 agentRoutes.get('/:id', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const details = await getAgentDetails(agent.id)
   if (!details) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Get queue info
@@ -716,7 +716,7 @@ agentRoutes.post('/', async (c) => {
 agentRoutes.patch('/:id', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const body = await c.req.json()
@@ -791,12 +791,12 @@ agentRoutes.patch('/:id', async (c) => {
 agentRoutes.delete('/:id', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const deleted = await deleteAgent(existing.id)
   if (!deleted) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   return c.json({ success: true })
@@ -811,7 +811,7 @@ const ORPHAN_TASK_VALID_EFFORTS: readonly AgentThinkingEffort[] = THINKING_EFFOR
 agentRoutes.post('/:id/tasks', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const body = await c.req.json().catch(() => ({}))
 
@@ -855,8 +855,8 @@ agentRoutes.post('/:id/tasks', async (c) => {
     return c.json({ task }, 201)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (msg === 'KIN_NOT_FOUND') {
-      return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    if (msg === 'AGENT_NOT_FOUND') {
+      return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
     }
     if (msg === 'EMPTY_PROMPT') {
       return c.json({ error: { code: 'INVALID_INPUT', message: 'prompt is required' } }, 400)
@@ -874,7 +874,7 @@ agentRoutes.post('/:id/mark-read', async (c) => {
   const sessionUser = c.get('user') as { id: string }
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   await markAgentAsRead(sessionUser.id, existing.id)
   return c.json({ success: true })
@@ -884,7 +884,7 @@ agentRoutes.post('/:id/mark-read', async (c) => {
 agentRoutes.post('/:id/avatar', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const id = existing.id
 
@@ -936,7 +936,7 @@ agentRoutes.post('/:id/avatar', async (c) => {
 agentRoutes.post('/:id/avatar/generate', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const id = existing.id
 
@@ -1038,7 +1038,7 @@ agentRoutes.post('/:id/avatar/generate', async (c) => {
 agentRoutes.post('/:id/force-reset', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const { forceResetAgent } = await import('@/server/services/agent-engine')
   const result = await forceResetAgent(existing.id)
@@ -1051,7 +1051,7 @@ agentRoutes.post('/:id/force-reset', async (c) => {
 agentRoutes.post('/:id/compacting/run', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Refuse if compacting is already running for this Agent. Without this guard,
@@ -1133,7 +1133,7 @@ agentRoutes.post('/:id/compacting/run', async (c) => {
 agentRoutes.post('/:id/compacting/purge', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
 
@@ -1149,7 +1149,7 @@ agentRoutes.post('/:id/compacting/purge', async (c) => {
 agentRoutes.get('/:id/compacting/summaries', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
 
@@ -1178,7 +1178,7 @@ agentRoutes.get('/:id/compacting/snapshots', async (c) => {
   // Redirect internally to the new summaries route
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
 
@@ -1204,7 +1204,7 @@ agentRoutes.get('/:id/compacting/snapshots', async (c) => {
 agentRoutes.post('/:id/compacting/rollback', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!resolvedAgent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = resolvedAgent.id
   const body = (await c.req.json()) as { summaryId?: string; snapshotId?: string }
@@ -1260,7 +1260,7 @@ agentRoutes.post('/:id/compacting/rollback', async (c) => {
 agentRoutes.get('/:id/memories', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
   const category = c.req.query('category')
@@ -1315,7 +1315,7 @@ agentRoutes.get('/:id/memories', async (c) => {
 agentRoutes.delete('/:id/memories/:memoryId', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!resolvedAgent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = resolvedAgent.id
   const memoryId = c.req.param('memoryId')
@@ -1332,7 +1332,7 @@ agentRoutes.delete('/:id/memories/:memoryId', async (c) => {
 agentRoutes.post('/:id/memories', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
   const { content, category, subject, scope } = (await c.req.json()) as {
@@ -1377,7 +1377,7 @@ agentRoutes.post('/:id/memories', async (c) => {
 agentRoutes.patch('/:id/memories/:memoryId', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!resolvedAgent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = resolvedAgent.id
   const memoryId = c.req.param('memoryId')
@@ -1419,12 +1419,12 @@ agentRoutes.patch('/:id/memories/:memoryId', async (c) => {
 agentRoutes.get('/:id/export', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const details = await getAgentDetails(agent.id)
   if (!details) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Get MCP server details for this agent

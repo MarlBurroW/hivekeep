@@ -290,7 +290,7 @@ channelRoutes.patch('/:id', async (c) => {
     return c.json(
       {
         error: {
-          code: 'KINID_NOT_PATCHABLE',
+          code: 'AGENT_ID_NOT_PATCHABLE',
           message: 'To change the bound Agent, use POST /api/channels/:id/transfer or the transfer_channel tool.',
         },
       },

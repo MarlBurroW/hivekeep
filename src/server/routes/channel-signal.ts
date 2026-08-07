@@ -30,18 +30,18 @@ channelSignalRoutes.post('/:channelId', async (c) => {
   try {
     payload = await c.req.json()
   } catch {
-    return c.json({ error: 'Invalid JSON' }, 400)
+    return c.json({ error: { code: 'INVALID_JSON', message: 'Invalid JSON' } }, 400)
   }
 
   try {
     const adapter = channelAdapters.get('signal') as SignalAdapter | undefined
     if (!adapter) {
-      return c.json({ error: 'Signal adapter not registered' }, 500)
+      return c.json({ error: { code: 'ADAPTER_NOT_REGISTERED', message: 'Signal adapter not registered' } }, 500)
     }
     await adapter.handleWebhook(channelId, payload)
     return c.json({ ok: true })
   } catch (err) {
     log.error({ channelId, err }, 'Error handling Signal webhook')
-    return c.json({ error: 'Internal error' }, 500)
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error' } }, 500)
   }
 })

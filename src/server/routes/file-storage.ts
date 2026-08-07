@@ -41,7 +41,7 @@ fileStorageRoutes.post('/from-workspace', async (c) => {
     return c.json({ error: { code: 'VALIDATION_ERROR', message: 'agentId and path are required' } }, 400)
   }
   const agent = resolveAgentByIdOrSlug(body.agentId)
-  if (!agent) return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+  if (!agent) return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
 
   try {
     // Hardened containment first: createFileFromWorkspace's own check predates

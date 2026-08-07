@@ -52,7 +52,7 @@ function requireAgent(c: Context) {
 }
 
 const agentNotFound = (c: Context) =>
-  c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+  c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
 
 // GET /api/agents/:agentId/workspace/ls?path=docs — list one directory
 workspaceFilesRoutes.get('/ls', async (c) => {

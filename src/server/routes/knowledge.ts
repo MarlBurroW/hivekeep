@@ -57,7 +57,10 @@ knowledgeRoutes.post('/', async (c) => {
 knowledgeRoutes.get('/search', async (c) => {
   const agentId = c.req.param('agentId') as string
   const query = c.req.query('q')
-  const limit = c.req.query('limit') ? Number(c.req.query('limit')) : undefined
+  // Clamp: an unbounded limit runs an unbounded vector search.
+  const limit = c.req.query('limit')
+    ? Math.min(Math.max(Number(c.req.query('limit')) || 10, 1), 100)
+    : undefined
 
   if (!query) {
     return c.json({ error: { code: 'INVALID_INPUT', message: 'q query parameter is required' } }, 400)

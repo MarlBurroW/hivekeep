@@ -13,7 +13,7 @@ channelSlackRoutes.post('/:channelId', async (c) => {
 
   const channel = await getChannel(channelId)
   if (!channel || channel.platform !== 'slack' || channel.status !== 'active') {
-    return c.json({ error: 'Channel not found' }, 404)
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Channel not found' } }, 404)
   }
 
   // Read raw body for signature verification
@@ -30,6 +30,6 @@ channelSlackRoutes.post('/:channelId', async (c) => {
     return c.json(result.body, result.status as 200)
   } catch (err) {
     log.error({ channelId, err }, 'Error handling Slack webhook')
-    return c.json({ error: 'Internal error' }, 500)
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error' } }, 500)
   }
 })
