@@ -25,6 +25,7 @@ import { AvatarPickerModal, type AvatarPickerResult } from '@/client/components/
 import { AgentToolsTab } from '@/client/components/agent/AgentToolsTab'
 import { CompactingAnimation } from '@/client/components/agent/CompactingAnimation'
 import { MemoryList } from '@/client/components/memory/MemoryList'
+import { AgentProfileEditor } from '@/client/components/memory/AgentProfileEditor'
 import { Switch } from '@/client/components/ui/switch'
 import {
   Select,
@@ -1268,7 +1269,17 @@ export function AgentFormModal({
 
                       {activeTab === 'memory' && isEdit && (
                         <div className="space-y-6">
-                          <MemoryList agentId={agent.id} compact />
+                          <AgentProfileEditor agentId={agent.id} />
+                          <div className="space-y-2">
+                            <Label className="inline-flex items-center gap-1.5 text-sm font-medium">
+                              <Archive className="size-4" />
+                              {t('agent.memoryArchive.title')}
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              {t('agent.memoryArchive.description')}
+                            </p>
+                            <MemoryList agentId={agent.id} compact />
+                          </div>
                         </div>
                       )}
 

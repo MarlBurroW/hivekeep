@@ -530,6 +530,19 @@
       "animContinuing": "Conversation continues. {{summaries}} summary(ies) preserved, new messages keep flowing.",
       "animExplanation": "When the context window fills up, the oldest messages are compressed into dated summaries. These summaries accumulate chronologically. When too many summaries pile up, the oldest ones are merged together, keeping recent summaries detailed and older ones compressed."
     },
+    "memoryProfile": {
+      "title": "Memory profile",
+      "description": "The curated document injected into every prompt: current state, standing preferences, active work. Episodic details live in the archive below and are searched on demand.",
+      "tokenCount": "{{tokens}} / {{budget}} tokens",
+      "regenerate": "Regenerate",
+      "regenerateConfirmTitle": "Regenerate the profile from the archive?",
+      "regenerateConfirmDescription": "The current profile is replaced by one recompiled from the memory archive. Pinned entries are kept. This cannot be undone.",
+      "regenerating": "Recompiling from the archive. The profile updates when it completes."
+    },
+    "memoryArchive": {
+      "title": "Memory archive",
+      "description": "Episodic memories, searched on demand by the Agent. Never injected automatically."
+    },
     "thinking": {
       "title": "Thinking / Reasoning",
       "description": "When enabled, compatible models will reason step-by-step before responding. This can improve quality for complex tasks but uses more tokens. Not all models support this feature.",
@@ -860,8 +873,6 @@
     "removeFile": "Remove file",
     "downloadFile": "Download",
     "viewImage": "View full size",
-    "memoriesUsed": "{{count}} memories",
-    "memoriesUsedSingular": "1 memory",
     "thinking": "Thinking...",
     "thinkingPicker": {
       "title": "Reasoning effort",

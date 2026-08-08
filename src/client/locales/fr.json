@@ -530,6 +530,19 @@
       "modeCustom": "Modèle personnalisé",
       "selectCustomModel": "Sélectionner un modèle"
     },
+    "memoryProfile": {
+      "title": "Profil mémoire",
+      "description": "Le document organisé injecté dans chaque prompt : état actuel, préférences durables, travaux en cours. Les détails épisodiques vivent dans l'archive ci-dessous et sont cherchés à la demande.",
+      "tokenCount": "{{tokens}} / {{budget}} jetons",
+      "regenerate": "Régénérer",
+      "regenerateConfirmTitle": "Régénérer le profil depuis l'archive ?",
+      "regenerateConfirmDescription": "Le profil actuel est remplacé par une recompilation de l'archive mémoire. Les entrées épinglées sont conservées. Action irréversible.",
+      "regenerating": "Recompilation depuis l'archive. Le profil se mettra à jour à la fin."
+    },
+    "memoryArchive": {
+      "title": "Archive mémoire",
+      "description": "Souvenirs épisodiques, cherchés à la demande par l'Agent. Jamais injectés automatiquement."
+    },
     "thinking": {
       "title": "Réflexion / Raisonnement",
       "description": "Lorsqu'elle est activée, les modèles compatibles raisonnent étape par étape avant de répondre. Cela peut améliorer la qualité pour les tâches complexes mais consomme plus de tokens. Tous les modèles ne supportent pas cette fonctionnalité.",
@@ -860,8 +873,6 @@
     "removeFile": "Retirer le fichier",
     "downloadFile": "Télécharger",
     "viewImage": "Voir en taille réelle",
-    "memoriesUsed": "{{count}} souvenirs",
-    "memoriesUsedSingular": "1 souvenir",
     "thinking": "Réflexion...",
     "thinkingPicker": {
       "title": "Niveau de réflexion",

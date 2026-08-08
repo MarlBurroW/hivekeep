@@ -530,6 +530,19 @@
       "animContinuing": "对话继续。已保留 {{summaries}} 条摘要，新消息持续流入。",
       "animExplanation": "当上下文窗口被填满时，最旧的消息会被压缩成带日期的摘要。这些摘要按时间顺序累积。当摘要堆积过多时，最旧的会被合并，保持较新的摘要详细、较旧的摘要精简。"
     },
+    "memoryProfile": {
+      "title": "记忆档案",
+      "description": "注入每次提示的精选文档：当前状态、长期偏好、进行中的工作。情节性细节存放在下方归档中，按需检索。",
+      "tokenCount": "{{tokens}} / {{budget}} 个 token",
+      "regenerate": "重新生成",
+      "regenerateConfirmTitle": "从归档重新生成档案？",
+      "regenerateConfirmDescription": "当前档案将被从记忆归档重新编译的版本替换。置顶条目会保留。此操作无法撤销。",
+      "regenerating": "正在从归档重新编译，完成后档案会自动更新。"
+    },
+    "memoryArchive": {
+      "title": "记忆归档",
+      "description": "情节性记忆，由智能体按需检索，绝不自动注入。"
+    },
     "thinking": {
       "title": "思考 / 推理",
       "description": "启用后，兼容的模型会在回答前逐步推理。这可以提升复杂任务的质量，但会消耗更多 token。并非所有模型都支持此功能。",
@@ -860,8 +873,6 @@
     "removeFile": "移除文件",
     "downloadFile": "下载",
     "viewImage": "查看原图",
-    "memoriesUsed": "{{count}} 条记忆",
-    "memoriesUsedSingular": "1 条记忆",
     "thinking": "思考中...",
     "thinkingPicker": {
       "title": "推理强度",

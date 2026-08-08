@@ -530,6 +530,19 @@
       "animContinuing": "Die Unterhaltung geht weiter. {{summaries}} Zusammenfassung(en) erhalten, neue Nachrichten fließen weiter.",
       "animExplanation": "Wenn sich das Kontextfenster füllt, werden die ältesten Nachrichten zu datierten Zusammenfassungen komprimiert. Diese Zusammenfassungen sammeln sich chronologisch an. Häufen sich zu viele an, werden die ältesten zusammengeführt: aktuelle Zusammenfassungen bleiben detailliert, ältere werden komprimiert."
     },
+    "memoryProfile": {
+      "title": "Gedächtnisprofil",
+      "description": "Das kuratierte Dokument, das in jeden Prompt eingefügt wird: aktueller Stand, dauerhafte Vorlieben, laufende Arbeit. Episodische Details liegen im Archiv unten und werden bei Bedarf durchsucht.",
+      "tokenCount": "{{tokens}} / {{budget}} Tokens",
+      "regenerate": "Neu erzeugen",
+      "regenerateConfirmTitle": "Profil aus dem Archiv neu erzeugen?",
+      "regenerateConfirmDescription": "Das aktuelle Profil wird durch eines ersetzt, das aus dem Gedächtnisarchiv neu erstellt wird. Angeheftete Einträge bleiben erhalten. Nicht umkehrbar.",
+      "regenerating": "Neuerstellung aus dem Archiv. Das Profil wird nach Abschluss aktualisiert."
+    },
+    "memoryArchive": {
+      "title": "Gedächtnisarchiv",
+      "description": "Episodische Erinnerungen, vom Agenten bei Bedarf durchsucht. Werden nie automatisch eingefügt."
+    },
     "thinking": {
       "title": "Thinking / Reasoning",
       "description": "Wenn aktiviert, denken kompatible Modelle vor der Antwort Schritt für Schritt nach. Das kann die Qualität bei komplexen Aufgaben verbessern, verbraucht aber mehr Tokens. Nicht alle Modelle unterstützen diese Funktion.",
@@ -860,8 +873,6 @@
     "removeFile": "Datei entfernen",
     "downloadFile": "Herunterladen",
     "viewImage": "In voller Größe ansehen",
-    "memoriesUsed": "{{count}} Erinnerungen",
-    "memoriesUsedSingular": "1 Erinnerung",
     "thinking": "Denkt nach...",
     "thinkingPicker": {
       "title": "Reasoning-Aufwand",

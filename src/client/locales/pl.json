@@ -532,6 +532,19 @@
       "animContinuing": "Rozmowa trwa dalej. Zachowano podsumowania: {{summaries}}, nowe wiadomości wciąż napływają.",
       "animExplanation": "Gdy okno kontekstu się zapełnia, najstarsze wiadomości są kompresowane do datowanych podsumowań. Podsumowania gromadzą się chronologicznie. Gdy jest ich zbyt wiele, najstarsze są ze sobą scalane, dzięki czemu nowsze pozostają szczegółowe, a starsze skompresowane."
     },
+    "memoryProfile": {
+      "title": "Profil pamięci",
+      "description": "Wyselekcjonowany dokument dołączany do każdego promptu: bieżący stan, trwałe preferencje, aktywna praca. Szczegóły epizodyczne są w archiwum poniżej i wyszukiwane na żądanie.",
+      "tokenCount": "{{tokens}} / {{budget}} tokenów",
+      "regenerate": "Wygeneruj ponownie",
+      "regenerateConfirmTitle": "Wygenerować profil ponownie z archiwum?",
+      "regenerateConfirmDescription": "Bieżący profil zostanie zastąpiony skompilowanym z archiwum pamięci. Przypięte wpisy zostaną zachowane. Nie można cofnąć.",
+      "regenerating": "Kompilowanie z archiwum. Profil zaktualizuje się po zakończeniu."
+    },
+    "memoryArchive": {
+      "title": "Archiwum pamięci",
+      "description": "Wspomnienia epizodyczne, wyszukiwane przez Agenta na żądanie. Nigdy nie są dołączane automatycznie."
+    },
     "thinking": {
       "title": "Myślenie / Rozumowanie",
       "description": "Po włączeniu zgodne modele będą rozumować krok po kroku przed udzieleniem odpowiedzi. Może to poprawić jakość przy złożonych zadaniach, ale zużywa więcej tokenów. Nie wszystkie modele obsługują tę funkcję.",
@@ -864,8 +877,6 @@
     "removeFile": "Usuń plik",
     "downloadFile": "Pobierz",
     "viewImage": "Zobacz w pełnym rozmiarze",
-    "memoriesUsed": "{{count}} wspomnień",
-    "memoriesUsedSingular": "1 wspomnienie",
     "thinking": "Myślę...",
     "thinkingPicker": {
       "title": "Poziom rozumowania",

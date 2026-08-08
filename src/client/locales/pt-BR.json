@@ -530,6 +530,19 @@
       "animContinuing": "A conversa continua. {{summaries}} resumo(s) preservado(s), novas mensagens continuam chegando.",
       "animExplanation": "Quando a janela de contexto enche, as mensagens mais antigas são comprimidas em resumos datados. Esses resumos se acumulam cronologicamente. Quando há resumos demais, os mais antigos são mesclados, mantendo os recentes detalhados e os antigos comprimidos."
     },
+    "memoryProfile": {
+      "title": "Perfil de memória",
+      "description": "O documento curado injetado em cada prompt: estado atual, preferências duradouras, trabalho em andamento. Detalhes episódicos ficam no arquivo abaixo e são buscados sob demanda.",
+      "tokenCount": "{{tokens}} / {{budget}} tokens",
+      "regenerate": "Regenerar",
+      "regenerateConfirmTitle": "Regenerar o perfil a partir do arquivo?",
+      "regenerateConfirmDescription": "O perfil atual é substituído por um recompilado do arquivo de memória. Entradas fixadas são mantidas. Não pode ser desfeito.",
+      "regenerating": "Recompilando a partir do arquivo. O perfil será atualizado ao concluir."
+    },
+    "memoryArchive": {
+      "title": "Arquivo de memória",
+      "description": "Memórias episódicas, buscadas sob demanda pelo Agente. Nunca injetadas automaticamente."
+    },
     "thinking": {
       "title": "Raciocínio",
       "description": "Quando habilitado, modelos compatíveis raciocinam passo a passo antes de responder. Isso pode melhorar a qualidade em tarefas complexas, mas usa mais tokens. Nem todos os modelos suportam este recurso.",
@@ -860,8 +873,6 @@
     "removeFile": "Remover arquivo",
     "downloadFile": "Baixar",
     "viewImage": "Ver em tamanho real",
-    "memoriesUsed": "{{count}} memórias",
-    "memoriesUsedSingular": "1 memória",
     "thinking": "Pensando...",
     "thinkingPicker": {
       "title": "Esforço de raciocínio",

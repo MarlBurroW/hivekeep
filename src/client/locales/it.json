@@ -530,6 +530,19 @@
       "animContinuing": "La conversazione continua. {{summaries}} riepilogo(hi) conservato(i), i nuovi messaggi continuano ad arrivare.",
       "animExplanation": "Quando la finestra di contesto si riempie, i messaggi più vecchi vengono compressi in riepiloghi datati. Questi riepiloghi si accumulano in ordine cronologico. Quando se ne accumulano troppi, i più vecchi vengono fusi insieme, mantenendo dettagliati i riepiloghi recenti e compressi quelli più vecchi."
     },
+    "memoryProfile": {
+      "title": "Profilo di memoria",
+      "description": "Il documento curato inserito in ogni prompt: stato attuale, preferenze durature, lavoro in corso. I dettagli episodici stanno nell’archivio qui sotto e si cercano su richiesta.",
+      "tokenCount": "{{tokens}} / {{budget}} token",
+      "regenerate": "Rigenera",
+      "regenerateConfirmTitle": "Rigenerare il profilo dall’archivio?",
+      "regenerateConfirmDescription": "Il profilo attuale viene sostituito da uno ricompilato dall’archivio di memoria. Le voci fissate vengono mantenute. Non reversibile.",
+      "regenerating": "Ricompilazione dall’archivio. Il profilo si aggiornerà al termine."
+    },
+    "memoryArchive": {
+      "title": "Archivio di memoria",
+      "description": "Ricordi episodici, cercati su richiesta dall’Agente. Mai inseriti automaticamente."
+    },
     "thinking": {
       "title": "Ragionamento",
       "description": "Se abilitato, i modelli compatibili ragioneranno passo dopo passo prima di rispondere. Può migliorare la qualità nei compiti complessi ma consuma più token. Non tutti i modelli supportano questa funzione.",
@@ -860,8 +873,6 @@
     "removeFile": "Rimuovi file",
     "downloadFile": "Scarica",
     "viewImage": "Vedi a grandezza intera",
-    "memoriesUsed": "{{count}} ricordi",
-    "memoriesUsedSingular": "1 ricordo",
     "thinking": "Sto pensando...",
     "thinkingPicker": {
       "title": "Sforzo di ragionamento",
