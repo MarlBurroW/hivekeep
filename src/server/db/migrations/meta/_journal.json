@@ -827,6 +827,13 @@
       "when": 1786475600000,
       "tag": "0117_little_puck",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "6",
+      "when": 1786479200000,
+      "tag": "0118_clumsy_jack_murdock",
+      "breakpoints": true
     }
   ]
 }

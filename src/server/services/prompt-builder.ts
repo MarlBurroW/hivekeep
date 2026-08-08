@@ -96,7 +96,6 @@ interface PromptParams {
   contacts: ContactSummary[]
   /** Curated memory profile document (see memory.md). Main-Agent prompt only. */
   profile?: string | null
-  relevantKnowledge?: Array<{ content: string; sourceId: string; score: number }>
   agentDirectory: AgentDirectoryEntry[]
   mcpTools?: MCPToolSummaryForPrompt[]
   isSubAgent: boolean
@@ -736,19 +735,6 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- **Sub-task mode defaults to "await"** for supervised work: you spawn, the sub-task runs, its result triggers a new turn on you so you can review, report back to the user, or chain the next action. Use this whenever the user expects a follow-up from you (debug, investigation, implementation, anything they will ask about later). Use mode "async" ONLY for genuinely detached work that does not require any follow-up from you (one-shot cron-like notifications, fire-and-forget side effects, work whose completion the user will discover through another channel). When in doubt, choose "await".\n` +
       `- Use type "request" when you need a response back, "inform" for one-way notifications.\n` +
       `- When you receive an inter-agent request, use reply(request_id, message) to respond.`,
-    )
-  }
-
-  // [5.5] Relevant knowledge base chunks — volatile (retrieved per message)
-  if (params.relevantKnowledge && params.relevantKnowledge.length > 0) {
-    const knowledgeLines = params.relevantKnowledge
-      .map((k, i) => `[${i + 1}] ${k.content}`)
-      .join('\n\n')
-    volatileBlocks.push(
-      `## Relevant knowledge\n\n` +
-      `The following excerpts from your knowledge base may be relevant to the current conversation. ` +
-      `Use this information to inform your responses when applicable.\n\n` +
-      knowledgeLines,
     )
   }
 

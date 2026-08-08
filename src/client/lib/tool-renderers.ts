@@ -29,7 +29,7 @@ import { BrowserPageStateRenderer } from '@/client/components/chat/renderers/Bro
 import { SqlResultRenderer } from '@/client/components/chat/renderers/SqlResultRenderer'
 import { WebSearchRenderer } from '@/client/components/chat/renderers/WebSearchRenderer'
 import { GeneratedImageRenderer } from '@/client/components/chat/renderers/GeneratedImageRenderer'
-import { KnowledgeResultRenderer } from '@/client/components/chat/renderers/KnowledgeResultRenderer'
+import { MemoryResultRenderer } from '@/client/components/chat/renderers/MemoryResultRenderer'
 import { BrowseUrlRenderer } from '@/client/components/chat/renderers/BrowseUrlRenderer'
 import { ContactResultRenderer } from '@/client/components/chat/renderers/ContactResultRenderer'
 import { EmailResultRenderer } from '@/client/components/chat/renderers/EmailResultRenderer'
@@ -58,9 +58,8 @@ registerRenderer('generate_image', GeneratedImageRenderer)
 registerRenderer('think', ThinkRenderer)
 registerRenderer('task_todos', TaskTodosRenderer)
 
-// Memory / knowledge lookups — list-of-hits shaped results
-registerRenderer('recall', KnowledgeResultRenderer)
-registerRenderer('search_knowledge', KnowledgeResultRenderer)
+// Memory lookups — list-of-hits shaped results
+registerRenderer('recall', MemoryResultRenderer)
 registerRenderer('browse_url', BrowseUrlRenderer)
 
 // Contacts — single-contact / contact-list shaped results

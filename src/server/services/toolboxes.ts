@@ -70,7 +70,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
   },
   {
     name: 'research',
-    description: 'Web research and knowledge capture: browsing, history, summaries, and full memory read/write.',
+    description: 'Web research and memory capture: browsing, history, summaries, and full memory read/write.',
     toolNames: [
       'web_search',
       'browse_url',

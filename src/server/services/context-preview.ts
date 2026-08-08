@@ -311,22 +311,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     role: k.role,
   }))
 
-  // Knowledge
-  let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-  try {
-    const { searchKnowledge } = await import('@/server/services/knowledge')
-    const lastUserMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.agentId, agentId), eq(messages.role, 'user'), isNull(messages.taskId), isNull(messages.sessionId)))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    relevantKnowledge = await searchKnowledge(agentId, lastUserMsg?.content ?? agent.name, 5)
-  } catch {
-    // Non-fatal
-  }
-
   // MCP tools summary for prompt
   const mcpToolsSummary = await getMCPToolsSummary(agentId)
 
@@ -443,7 +427,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: contactsWithSlug,
-    relevantKnowledge,
     agentDirectory,
     mcpTools: mcpToolsSummary,
     isSubAgent: false,
@@ -887,28 +870,11 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
   const firstProfile = db.select({ language: userProfiles.language, agentLanguage: userProfiles.agentLanguage }).from(userProfiles).limit(1).get()
   if (firstProfile) userLanguage = firstProfile.agentLanguage ?? firstProfile.language
 
-  // Knowledge
-  let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-  try {
-    const { searchKnowledge } = await import('@/server/services/knowledge')
-    const lastMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    if (lastMsg?.content) relevantKnowledge = await searchKnowledge(agentId, lastMsg.content, 5)
-  } catch {
-    // Non-fatal
-  }
-
   const globalPrompt = await getGlobalPrompt()
 
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: [],
-    relevantKnowledge,
     agentDirectory: [],
     isSubAgent: false,
     isQuickSession: true,

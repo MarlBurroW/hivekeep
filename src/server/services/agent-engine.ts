@@ -1380,14 +1380,6 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     }))
 
 
-    // Retrieve relevant knowledge base chunks
-    let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-    try {
-      const { searchKnowledge } = await import('@/server/services/knowledge')
-      relevantKnowledge = await searchKnowledge(agentId, queueItem.content, 5)
-    } catch {
-      // Knowledge retrieval failure is non-fatal
-    }
 
     // Resolve MCP tool summaries for system prompt injection
     const mcpToolsSummary = await getMCPToolsSummary(agentId)
@@ -1484,7 +1476,6 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: contactsWithSlug,
       profile: memoryProfile.content,
-      relevantKnowledge,
       agentDirectory,
       mcpTools: mcpToolsSummary,
       isSubAgent: false,
@@ -2442,14 +2433,6 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     }
 
 
-    // Retrieve relevant knowledge base chunks
-    let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-    try {
-      const { searchKnowledge } = await import('@/server/services/knowledge')
-      relevantKnowledge = await searchKnowledge(agentId, queueItem.content, 5)
-    } catch {
-      // Non-fatal
-    }
 
     // Build quick session system prompt (minimal — no contacts, no agent directory, no hidden instructions)
     const globalPrompt = await getGlobalPrompt()
@@ -2513,7 +2496,6 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: apiContacts,
       profile: (await getProfile(agentId)).content,
-      relevantKnowledge,
       agentDirectory: apiAgentDirectory,
       mcpTools: apiMcpToolsSummary,
       activeChannels: apiActiveChannels,

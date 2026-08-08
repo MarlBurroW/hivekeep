@@ -216,10 +216,6 @@ import {
   deactivateChannelTool,
   transferChannelTool,
 } from '@/server/tools/channel-tools'
-import {
-  searchKnowledgeTool,
-  listKnowledgeSourcesTool,
-} from '@/server/tools/knowledge-tools'
 import { getPlatformLogsTool, getPlatformConfigTool, listPlatformConfigOptionsTool, updatePlatformConfigTool, restartPlatformTool } from '@/server/tools/platform-tools'
 import { getSystemInfoTool } from '@/server/tools/system-info-tools'
 import { getSetupHealthTool } from '@/server/tools/health-tools'
@@ -607,10 +603,6 @@ export function registerAllTools(): void {
 
   // Sub-Agent structured planning (TodoWrite-equivalent).
   toolRegistry.register('task_todos', taskTodosTool, 'tasks')
-
-  // Knowledge base tools (main only)
-  toolRegistry.register('search_knowledge', searchKnowledgeTool, 'memory')
-  toolRegistry.register('list_knowledge_sources', listKnowledgeSourcesTool, 'memory')
 
   log.info({ count: toolRegistry.registeredCount }, 'Native tools registered')
 }

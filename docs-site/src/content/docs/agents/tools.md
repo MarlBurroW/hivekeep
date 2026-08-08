@@ -7,7 +7,7 @@ Agents interact with the world through **tools**: functions they can call during
 
 ## Built-in tools
 
-### Memory & Knowledge
+### Memory
 
 | Tool | Description |
 |---|---|
@@ -22,8 +22,6 @@ Agents interact with the world through **tools**: functions they can call during
 | `browse_history` | Browse messages by date range with pagination |
 | `list_summaries` | List all compacting summaries (active and archived) with metadata |
 | `read_summary` | Read the full text of a specific compacting summary by ID |
-| `search_knowledge` | Search the knowledge base (uploaded documents) |
-| `list_knowledge_sources` | List available knowledge sources |
 
 ### Web & Browsing
 

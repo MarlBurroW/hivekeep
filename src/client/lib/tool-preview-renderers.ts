@@ -242,12 +242,6 @@ registerPreviewRenderer('browser_delete_state', ({ args }) => {
   return args.name ? `delete "${args.name}"` : null
 })
 
-// --- Knowledge ---
-
-registerPreviewRenderer('search_knowledge', ({ args }) => {
-  return (args.query as string) ? `"${truncate(args.query as string, 40)}"` : null
-})
-
 // --- Notify ---
 
 registerPreviewRenderer('notify', ({ args }) => {

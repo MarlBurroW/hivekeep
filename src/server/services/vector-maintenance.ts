@@ -4,7 +4,7 @@ import { createLogger } from '@/server/logger'
 const log = createLogger('vector-maintenance')
 
 /**
- * The sqlite-vec virtual tables (memories_vec, knowledge_chunks_vec) have no
+ * The sqlite-vec virtual tables (memories_vec) have no
  * FK or trigger sync with their base tables — every deletion path must remove
  * the vector rows explicitly, and any path that forgets leaves orphans that
  * occupy KNN slots forever (blinding duplicate detection and starving search
@@ -35,7 +35,6 @@ export function deleteVectorRows(table: string, column: string, ids: string[]): 
 export function reconcileVectorTables(): void {
   const sweeps: Array<{ table: string; column: string; base: string }> = [
     { table: 'memories_vec', column: 'memory_id', base: 'memories' },
-    { table: 'knowledge_chunks_vec', column: 'chunk_id', base: 'knowledge_chunks' },
   ]
   for (const { table, column, base } of sweeps) {
     if (!hasTable(table) || !hasTable(base)) continue

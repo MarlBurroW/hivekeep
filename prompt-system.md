@@ -79,7 +79,6 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 9 | `## Known contacts` | volatile | `contacts[]` | shared registry (capped at 25, overflow points to `search_contacts`), with aka/system-user/identifier summary |
 | 10 | `## Agent directory` + Collaboration & delegation | stable | `agentDirectory[]` | main-agent variant |
 | 11 | `## Your memory` (`[3.7]`, emitted right after the persona blocks) | **stable** | `profile` | the curated memory profile document + the profile-vs-archive rule (see §6 [5]) |
-| 12 | `## Relevant knowledge` | volatile | `relevantKnowledge[]` | knowledge-base chunks |
 | 13 | `## Internal instructions (do not share…)` | stable | hardcoded, gated on `!isSubAgent && toolsEnabled` | large block; custom-tool authoring and mini-app SDK detail live behind `get_custom_tool_docs` / `get_mini_app_docs` (progressive disclosure), the prompt keeps short pointers |
 | 14 | `## MCP Tools (external servers)` | stable | `mcpTools[]`, gated on `toolsEnabled` | one summary line per server (counts only) |
 | 15 | `## External channels` | stable | `activeChannels[]` | channel list + attach_file/cross-channel notes; per-platform formatting comes from the per-turn `Current message from` hint, not a static guide |
@@ -208,7 +207,7 @@ The **authoritative native-tool inventory is `src/server/tools/register.ts`**. D
 | `contacts` | Hivekeep CRM contacts (`get/search/create/update/delete_contact`, `set_contact_note`, `find_contact_by_identifier`) + read-only external address books (`*_address_book*`) |
 | `calendar` | list/get/create/update/delete events across slug-resolved accounts |
 | `voice` | TTS + STT discovery and actions (`text_to_speech`, `transcribe_audio`, list providers/voices/models) |
-| `memory` | `recall`/`memorize`/`edit_profile`/`update_memory`/`forget`/`list_memories`/`review_memories`, history (`search_history`, `browse_history`, `read_message`, `list_summaries`, `read_summary`), knowledge base (`search_knowledge`, `list_knowledge_sources`) |
+| `memory` | `recall`/`memorize`/`edit_profile`/`update_memory`/`forget`/`list_memories`/`review_memories`, history (`search_history`, `browse_history`, `read_message`, `list_summaries`, `read_summary`) |
 | `vault` | secrets (`get/create/update/delete/search_secret(s)`, `redact_secret_leak`) + vault entries/types/attachments |
 | `tasks` | delegation & control (`spawn_self`, `spawn_agent`, `scout`, `respond_to_task`, `cancel_task`, `list_tasks`, `list_active_queues`, `get_task_detail`, `get_task_messages`), sub-Agent side (`report_to_parent`, `update_task_status`, `request_input`), cron learnings (`save/delete_run_learning`), human-in-the-loop (`prompt_human`, `notify`), reasoning (`think`), planning (`task_todos`) |
 | `inter-agent` | `send_message`, `reply`, `list_kins` (registers `listAgentsTool`; the `list_kins` name is the registered identifier the prompt correctly matches) |

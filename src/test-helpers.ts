@@ -253,8 +253,6 @@ export const fullMockSchema = {
   miniAppStorage: {},
   miniAppSnapshots: {},
   fileStorage: {},
-  knowledgeSources: {},
-  knowledgeChunks: {},
   pluginStates: {},
   pluginStorage: {},
   cronLearnings: {},
