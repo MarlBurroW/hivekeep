@@ -245,6 +245,25 @@ export async function processSource(sourceId: string) {
 
 // ─── Hybrid Search ──────────────────────────────────────────────────────────
 
+/**
+ * Whether the Agent has at least one indexed knowledge chunk.
+ * Indexed on `agent_id`, so this is a cheap existence check.
+ */
+function hasIndexedChunks(agentId: string): boolean {
+  try {
+    const row = sqlite
+      .query<{ one: number }, [string]>(
+        'SELECT 1 AS one FROM knowledge_chunks WHERE agent_id = ? LIMIT 1',
+      )
+      .get(agentId)
+    return !!row
+  } catch {
+    // Table missing on a partially-migrated database: treat as empty rather
+    // than falling through to a search that cannot succeed either.
+    return false
+  }
+}
+
 export async function searchKnowledge(
   agentId: string,
   query: string,
@@ -253,6 +272,12 @@ export async function searchKnowledge(
   const maxResults = limit ?? 5
   const K = config.memory.rrfK
   const scoreMap = new Map<string, { score: number; content: string; sourceId: string; position: number }>()
+
+  // Bail out before embedding the query when the Agent has no indexed chunk.
+  // This runs on every user message, and the embedding call below is a paid
+  // round-trip that would return nothing on an Agent with no knowledge base
+  // (the common case: there is no UI to add sources yet).
+  if (!hasIndexedChunks(agentId)) return []
 
   // Vector search
   try {
