@@ -3,6 +3,7 @@ import { agents, messages, userProfiles, compactingSummaries, tasks } from '@/se
 import { eq, and, isNull, desc, ne, asc, sql } from 'drizzle-orm'
 import { getFilesForMessages } from '@/server/services/files'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
+import { getProfile } from '@/server/services/agent-profile'
 import { listActiveTriggerSummariesForAgent } from '@/server/services/account-triggers'
 import { listContactsForPrompt } from '@/server/services/contacts'
 import { listAvailableAgents } from '@/server/services/inter-agent'
@@ -424,9 +425,11 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
   const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agentId)
 
   // Build system prompt
+  const memoryProfile = await getProfile(agentId)
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: contactsWithSlug,
+    profile: memoryProfile.content,
     agentDirectory,
     mcpTools: mcpToolsSummary,
     isSubAgent: false,
@@ -740,6 +743,7 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agentIdentity.name, slug: agentIdentity.slug, role: agentIdentity.role, character: agentIdentity.character, expertise: agentIdentity.expertise },
     contacts: [],
+    profile: null,
     agentDirectory,
     isSubAgent: true,
     taskDescription: task.description,
@@ -872,9 +876,11 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
 
   const globalPrompt = await getGlobalPrompt()
 
+  const quickProfile = await getProfile(agentId)
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: [],
+    profile: quickProfile.content,
     agentDirectory: [],
     isSubAgent: false,
     isQuickSession: true,

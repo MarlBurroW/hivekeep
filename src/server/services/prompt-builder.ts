@@ -94,8 +94,10 @@ interface PromptParams {
     kind?: AgentKind
   }
   contacts: ContactSummary[]
-  /** Curated memory profile document (see memory.md). Main-Agent prompt only. */
-  profile?: string | null
+  /** Curated memory profile document (see memory.md). Required so a new caller
+   *  cannot silently build a prompt without it — pass null for sub-Agents,
+   *  which have no profile of their own. */
+  profile: string | null
   agentDirectory: AgentDirectoryEntry[]
   mcpTools?: MCPToolSummaryForPrompt[]
   isSubAgent: boolean

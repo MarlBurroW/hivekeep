@@ -22,6 +22,7 @@ function makeParams(overrides: Record<string, unknown> = {}) {
       expertise: 'General knowledge.',
     },
     contacts: [],
+    profile: null,
     agentDirectory: [],
     isSubAgent: false,
     userLanguage: 'en' as const,
