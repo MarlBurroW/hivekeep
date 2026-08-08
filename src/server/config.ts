@@ -340,65 +340,31 @@ export const config = {
   memory: (() => {
     const extraction = parseModelEnv(process.env.MEMORY_EXTRACTION_MODEL)
     const embedding = parseModelEnv(process.env.MEMORY_EMBEDDING_MODEL || 'text-embedding-3-small')
-    const consolidation = parseModelEnv(process.env.MEMORY_CONSOLIDATION_MODEL)
-    const multiQuery = parseModelEnv(process.env.MEMORY_MULTI_QUERY_MODEL)
-    const hyde = parseModelEnv(process.env.MEMORY_HYDE_MODEL)
-    const rerank = parseModelEnv(process.env.MEMORY_RERANK_MODEL)
-    const contextualRewrite = parseModelEnv(process.env.MEMORY_CONTEXTUAL_REWRITE_MODEL)
     return {
+      // Model for the compaction-time maintenance call (archive extraction +
+      // profile rewrite). App-setting `extraction_model` overrides this.
       extractionModel: extraction.model,
       extractionProviderId: extraction.providerId,
+      /** Default number of results returned by a `recall` search. */
       maxRelevantMemories: Number(process.env.MEMORY_MAX_RELEVANT ?? 10),
-      // Cosine similarity floor for vector search candidates.
-      // Lowered from 0.7 → 0.5: at 0.7, only memories near-identical to the
-      // query made it past the filter, so the vector arm of hybrid search
-      // returned almost nothing and the FTS5 arm (lexical) had to carry the
-      // whole load. The downstream adaptive-K + reranker already prune
-      // weak matches; the threshold only needs to be a spam filter, not a
-      // relevance gate.
+      // Cosine similarity floor for vector search candidates. This is a spam
+      // filter, not a relevance gate: at 0.7, only memories near-identical to
+      // the query survived and the FTS5 arm had to carry the whole search.
       similarityThreshold: Number(process.env.MEMORY_SIMILARITY_THRESHOLD ?? 0.5),
       embeddingModel: embedding.model ?? 'text-embedding-3-small',
       embeddingProviderId: embedding.providerId,
       // Embedding calls run under the compacting lock; unbounded, a silent
       // endpoint pins the Agent with no recovery path. 0 disables.
       embeddingTimeoutMs: Number(process.env.MEMORY_EMBEDDING_TIMEOUT ?? 60_000),
-      // Ceiling for the retrieval-side LLM calls (multi-query, HyDE, rerank,
-      // contextual rewrite). They sit on the prompt-building path of a turn,
-      // so they must never be the reason a turn hangs. These are optional
-      // enhancements: on timeout the caller falls back to plain retrieval.
-      retrievalLlmTimeoutMs: Number(process.env.MEMORY_RETRIEVAL_LLM_TIMEOUT ?? 45_000),
       embeddingDimension: Number(process.env.MEMORY_EMBEDDING_DIMENSION ?? 1536),
-      temporalDecayLambda: Number(process.env.MEMORY_TEMPORAL_DECAY_LAMBDA ?? 0.01),
-      temporalDecayFloor: Number(process.env.MEMORY_TEMPORAL_DECAY_FLOOR ?? 0.7),
-      consolidationSimilarityThreshold: Number(process.env.MEMORY_CONSOLIDATION_SIMILARITY ?? 0.85),
-      consolidationMaxGeneration: Number(process.env.MEMORY_CONSOLIDATION_MAX_GEN ?? 5),
-      consolidationModel: consolidation.model,
-      consolidationProviderId: consolidation.providerId,
-      multiQueryModel: multiQuery.model,
-      multiQueryProviderId: multiQuery.providerId,
-      hydeModel: hyde.model,
-      hydeProviderId: hyde.providerId,
-      rerankModel: rerank.model,
-      rerankProviderId: rerank.providerId,
-      adaptiveK: process.env.MEMORY_ADAPTIVE_K !== 'false',
-      // Lowered from 0.3 → 0.15: with the previous threshold, a single memory
-      // boosted by importance × retrieval feedback could be 3x its peers,
-      // putting them all under the cutoff and producing a winner-take-all
-      // effect (one memory recalled forever, rest invisible).
-      adaptiveKMinScoreRatio: Number(process.env.MEMORY_ADAPTIVE_K_MIN_SCORE_RATIO ?? 0.15),
-      // Largest-gap heuristic: only truncate when a single drop accounts for
-      // more than this fraction of the top-to-current range. Raised from the
-      // hardcoded 0.4 to be less eager to truncate after the first result.
-      adaptiveKLargestGapRatio: Number(process.env.MEMORY_ADAPTIVE_K_LARGEST_GAP_RATIO ?? 0.6),
+      // Reciprocal rank fusion constant, and the weight given to the FTS arm
+      // relative to the vector arm at the same rank.
       rrfK: Number(process.env.MEMORY_RRF_K ?? 60),
       ftsBoost: Number(process.env.MEMORY_FTS_BOOST ?? 0.5),
-      subjectBoost: Number(process.env.MEMORY_SUBJECT_BOOST ?? 1.3),
-      categoryBoost: Number(process.env.MEMORY_CATEGORY_BOOST ?? 1.25),
-      contextualRewriteModel: contextualRewrite.model,
-      contextualRewriteProviderId: contextualRewrite.providerId,
-      contextualRewriteThreshold: Number(process.env.MEMORY_CONTEXTUAL_REWRITE_THRESHOLD ?? 80),
-      tokenBudget: Number(process.env.MEMORY_TOKEN_BUDGET || 0), // 0 = unlimited (no budget enforcement)
-      recencyBoostEnabled: process.env.MEMORY_RECENCY_BOOST !== 'false', // Boost very recent memories (default: true)
+      // Budget for the always-injected profile document (see memory.md).
+      // It sits in the cached stable prompt segment, so every line costs on
+      // every turn — the maintenance rewrite is told to stay under this.
+      profileMaxTokens: Number(process.env.MEMORY_PROFILE_MAX_TOKENS ?? 1500),
     }
   })(),
 

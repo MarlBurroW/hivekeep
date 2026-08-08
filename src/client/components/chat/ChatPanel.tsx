@@ -971,7 +971,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
                       userInitials={isFromUser ? userInitials : undefined}
                       timestamp={msg.createdAt}
                       toolCalls={toolCallsByMessage.get(msg.id)}
-                      injectedMemories={msg.injectedMemories}
                       stepLimitReached={msg.stepLimitReached}
                     emptyTurn={msg.emptyTurn}
                     finishReason={msg.finishReason}

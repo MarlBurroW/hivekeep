@@ -15,14 +15,14 @@ It describes what the **code actually does**, not an idealized design. The sourc
 ```ts
 interface BuiltSystemPrompt {
   stable: string    // rarely-changing prefix (identity, principles, instructions, directory, MCP/channels)
-  volatile: string  // per-turn content (memories, contacts, speaker, summaries, language, workspace, date)
+  volatile: string  // per-turn content (contacts, speaker, summaries, language, workspace, date)
 }
 ```
 
 The split exists for **Anthropic prompt caching**. The two segments are placed differently when the request is built (`buildSegmentedMessages` in `llm-cache-hints.ts`):
 
 - `stable` becomes the actual `system` text block, marked with a cache breakpoint (`cacheControl: { type: 'ephemeral' }`). It is the long-lived cached prefix.
-- `volatile` is **not** appended to the system prompt. It is wrapped in a `<system-reminder>…</system-reminder>` block and prepended to the **last user message's** content. Putting the per-turn content after the cached prefix (rather than inside it) keeps the cache from being invalidated every turn by date/time, memories, and other volatile blocks.
+- `volatile` is **not** appended to the system prompt. It is wrapped in a `<system-reminder>…</system-reminder>` block and prepended to the **last user message's** content. Putting the per-turn content after the cached prefix (rather than inside it) keeps the cache from being invalidated every turn by date/time and the other volatile blocks.
 
 `joinSystemPrompt(p)` concatenates `${stable}\n\n${volatile}` back into a single string. It is used only by callers that don't care about caching (token estimation, the context-preview UI). The real LLM path (`agent-engine.ts`, `tasks.ts`) goes through `buildSegmentedMessages`, never `joinSystemPrompt`.
 
@@ -78,8 +78,7 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 8 | `## Configurator mission` + `## Hivekeep knowledge` (`[3.6]`) | stable | `agent.kind === 'configurator'` | Queenie only (see §5) |
 | 9 | `## Known contacts` | volatile | `contacts[]` | shared registry (capped at 25, overflow points to `search_contacts`), with aka/system-user/identifier summary |
 | 10 | `## Agent directory` + Collaboration & delegation | stable | `agentDirectory[]` | main-agent variant |
-| 11 | `## Memories` (full code heading: `Memories · what you actually know`) | volatile | `relevantMemories[]` | scored, grouped, relevance/importance legend (see §6 [5]) |
-| 12 | `## Relevant knowledge` | volatile | `relevantKnowledge[]` | knowledge-base chunks |
+| 11 | `## Your memory` (`[3.7]`, emitted right after the persona blocks) | **stable** | `profile` | the curated memory profile document + the profile-vs-archive rule (see §6 [5]) |
 | 13 | `## Internal instructions (do not share…)` | stable | hardcoded, gated on `!isSubAgent && toolsEnabled` | large block; custom-tool authoring and mini-app SDK detail live behind `get_custom_tool_docs` / `get_mini_app_docs` (progressive disclosure), the prompt keeps short pointers |
 | 14 | `## MCP Tools (external servers)` | stable | `mcpTools[]`, gated on `toolsEnabled` | one summary line per server (counts only) |
 | 15 | `## External channels` | stable | `activeChannels[]` | channel list + attach_file/cross-channel notes; per-platform formatting comes from the per-turn `Current message from` hint, not a static guide |
@@ -108,7 +107,6 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 | 7 | `## Platform directives` | stable | `globalPrompt` | global prompt applies to sub-Agents too |
 | 8 | `## Known contacts` | volatile | `contacts[]` | **injected**: sub-Agents DO see contacts |
 | 9 | `## Agent directory` + Inter-Agent comms + Escalation | stable | `agentDirectory[]` | sub-Agent variant; references `send_message`/`list_kins` |
-| 10 | `## Memories` | volatile | `relevantMemories[]` | same renderer as main |
 | 11 | speaker / participants / state / summaries / language / message-hint / channel / workspace | mixed | shared tail | same blocks as main (only those with data render) |
 | 12 | `## Current plan` (task_todos) | volatile | `taskTodos[]` | primary use case: the live plan, re-shown every turn |
 | 13 | `## Context` | volatile | `buildContextBlock()` | |
@@ -118,7 +116,7 @@ Each block below is tagged `[stable]` or `[volatile]` exactly as the code segmen
 
 ### C. Quick session prompt (prompt-builder.ts:1166–1200)
 
-Returns early. Quick sessions first flow through the main branch's [0]-[3.6] blocks, with a shortened `## Platform context` variant (no "continuous and permanent session" facts, which would contradict the Quick session notice) and Platform directives injected once by [3.5]. Then: `## Memories` (if any, volatile) → `## Quick session` notice (stable) → `## Language` (volatile) → `## Context` (volatile). Skips contacts, agent directory, internal instructions, and MCP. Quick sessions are stateless one-offs with no main conversation history, no inter-Agent comms, and no admin tools.
+Returns early. Quick sessions first flow through the main branch's [0]-[3.6] blocks, with a shortened `## Platform context` variant (no "continuous and permanent session" facts, which would contradict the Quick session notice) and Platform directives injected once by [3.5]. Then: `## Your memory` (stable, read-only variant without the `edit_profile` guidance) → `## Quick session` notice (stable) → `## Language` (volatile) → `## Context` (volatile). Skips contacts, agent directory, internal instructions, and MCP. Quick sessions are stateless one-offs with no main conversation history, no inter-Agent comms, and no admin tools.
 
 ---
 
@@ -145,14 +143,13 @@ The configurator-only tools (`describe_provider_config`, `request_provider_setup
 
 Result-discipline rule modeled on Claude Code's `IMPORTANT:` pattern. One short sentence of intent before a tool call is allowed (a total preamble ban is documented by Anthropic as counterproductive: it pushes models to write tool calls into plain text). What is forbidden: stating a tool's RESULTS before its output is visible (even values remembered from earlier in the conversation), simulated interleaving (a single narrated message with all the tool calls stacked at the end, the observed Opus 4.7 pathology), and ending a turn on a tool call with no follow-up text. Ships concrete BAD/GOOD anti-patterns. Necessary because personality blocks often push warm/conversational tones that fight terse tool discipline. Includes an **Embedding images** sub-block: tools that return an image URL should be embedded with `![alt](url)` markdown so the chat renderer shows them inline with click-to-zoom.
 
-### [5] Memories: `buildMemoriesBlock` (volatile)
+### [5] Memory: `buildProfileBlock` (stable)
 
-Long-term memories retrieved by hybrid search for the incoming message. Rendering adapts:
-- ≤3 memories → flat list.
-- ≥60% have a subject → grouped by subject (most natural for the LLM).
-- Otherwise → grouped by category (Facts/Preferences/Decisions/Knowledge).
+The Agent's curated **profile** document, injected verbatim. It is what the Agent *knows*: current state, standing preferences, active work. The episodic archive (`memories`) is **not** injected — the Agent reaches it through `recall`.
 
-Each line carries indicators: `★` (importance ≥7), relevance tags `⬤`/`◉`/`○` (from the retrieval score, normalized against the top score), `[category]`, `*[shared by {agent}]*` for shared memories, subject, source context, and a relative timestamp. A `config.memory.tokenBudget` (when set) trims the lowest-relevance memories first. The header tells the Agent to weight `⬤`/`★` highest, prefer recent on conflict, and weave them in naturally.
+The block sits in the stable segment because it only changes on a compaction-time maintenance rewrite or an explicit edit, so it rides the prompt cache instead of invalidating it every turn (memory v1 injected per-message search results into the volatile segment; see `memory.md` for why that was dropped). When the profile is empty the block still renders, stating so, so the Agent knows the archive exists.
+
+The trailing guidance states the profile-vs-archive test verbatim: *should this influence behavior in most future conversations, without anyone mentioning it?* Yes → the profile (`edit_profile`), no → the archive (`memorize`), and nothing is ever lost by going to the archive. The same wording appears in the maintenance prompt and the two tool descriptions so every decision point agrees. Quick sessions get a read-only variant (no `edit_profile` mention), since they are told not to offer saving memories.
 
 ### [8] Context: `buildContextBlock` (volatile)
 
@@ -183,7 +180,7 @@ The volatile `<system-reminder>` (per §1) is prepended to the **last user messa
 The builder takes a single `~30`-field params object. Rather than restating it (it drifts), read `PromptParams` in `prompt-builder.ts` (lines 91–184). The fields, grouped:
 
 - **Identity / mode**: `agent { name, slug, role, character, expertise, kind }`, `isSubAgent`, `isQuickSession`, `taskDescription`, `toolsEnabled`.
-- **Knowledge & people**: `contacts`, `relevantMemories`, `relevantKnowledge`, `agentDirectory`, `currentSpeaker`, `participants`.
+- **Knowledge & people**: `contacts`, `profile`, `relevantKnowledge`, `agentDirectory`, `currentSpeaker`, `participants`.
 - **Conversation**: `compactingSummaries`, `conversationState`, `currentMessageSource`, `pendingChannelContext`, `userLanguage`.
 - **Platform**: `globalPrompt`, `mcpTools`, `activeChannels`, `workspacePath`.
 - **Tasks**: `taskTodos`.
@@ -210,7 +207,7 @@ The **authoritative native-tool inventory is `src/server/tools/register.ts`**. D
 | `contacts` | Hivekeep CRM contacts (`get/search/create/update/delete_contact`, `set_contact_note`, `find_contact_by_identifier`) + read-only external address books (`*_address_book*`) |
 | `calendar` | list/get/create/update/delete events across slug-resolved accounts |
 | `voice` | TTS + STT discovery and actions (`text_to_speech`, `transcribe_audio`, list providers/voices/models) |
-| `memory` | `recall`/`memorize`/`update_memory`/`forget`/`list_memories`/`review_memories`, history (`search_history`, `browse_history`, `read_message`, `list_summaries`, `read_summary`), knowledge base (`search_knowledge`, `list_knowledge_sources`) |
+| `memory` | `recall`/`memorize`/`edit_profile`/`update_memory`/`forget`/`list_memories`/`review_memories`, history (`search_history`, `browse_history`, `read_message`, `list_summaries`, `read_summary`) |
 | `vault` | secrets (`get/create/update/delete/search_secret(s)`, `redact_secret_leak`) + vault entries/types/attachments |
 | `tasks` | delegation & control (`spawn_self`, `spawn_agent`, `scout`, `respond_to_task`, `cancel_task`, `list_tasks`, `list_active_queues`, `get_task_detail`, `get_task_messages`), sub-Agent side (`report_to_parent`, `update_task_status`, `request_input`), cron learnings (`save/delete_run_learning`), human-in-the-loop (`prompt_human`, `notify`), reasoning (`think`), planning (`task_todos`) |
 | `inter-agent` | `send_message`, `reply`, `list_kins` (registers `listAgentsTool`; the `list_kins` name is the registered identifier the prompt correctly matches) |
@@ -247,8 +244,8 @@ For the exact tools a given sub-Agent can call, consult its toolbox configuratio
 
 The system prompt competes with the message history and the response for the context window.
 
-- Base main-Agent prompt: roughly ~1500–3000 tokens depending on memories, contacts, and the instruction blocks.
-- Memories are bounded by `config.memory.tokenBudget` when set; the workspace tree targets ~200–500 tokens.
+- Base main-Agent prompt: roughly ~1500–3000 tokens depending on the profile, contacts, and the instruction blocks.
+- The memory profile is bounded by `config.memory.profileMaxTokens` (default 1500) and sits in the cached prefix; the workspace tree targets ~200–500 tokens.
 
 The compacting service triggers a new summary when the history exceeds its thresholds (see `compacting.md`), keeping the messages segment within budget while older context survives as `## Conversation history summaries`.
 
@@ -260,5 +257,6 @@ The compacting service triggers a new summary when the history exceeds its thres
 - `src/server/services/llm-cache-hints.ts`: `buildSegmentedMessages`, how `stable`/`volatile` reach the provider and where cache breakpoints land.
 - `src/server/tools/register.ts`: the live native-tool inventory (source of truth for tool names and families).
 - `queenie.md`: the configurator Agent spec (mission, secure-input, avatars, onboarding flow).
-- `compacting.md`: how compacting summaries (block [9]) are produced and the memory-extraction pipeline.
+- `compacting.md`: how compacting summaries (block [9]) are produced and when memory maintenance runs.
+- `memory.md`: the profile + archive design behind block [5].
 - `sse.md`: real-time/SSE rules (orthogonal to prompt assembly, but relevant when touching shared state).

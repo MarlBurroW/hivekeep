@@ -70,7 +70,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
   },
   {
     name: 'research',
-    description: 'Web research and knowledge capture: browsing, history, summaries, and full memory read/write.',
+    description: 'Web research and memory capture: browsing, history, summaries, and full memory read/write.',
     toolNames: [
       'web_search',
       'browse_url',
@@ -83,6 +83,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'read_summary',
       'recall',
       'memorize',
+      'edit_profile',
       'update_memory',
       'forget',
       'list_memories',
@@ -97,6 +98,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
     toolNames: [
       'recall',
       'memorize',
+      'edit_profile',
       'list_memories',
       'get_secret',
       'search_secrets',
@@ -216,6 +218,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'search_contacts',
       // Memory.
       'memorize',
+      'edit_profile',
       'recall',
       'list_memories',
       // Secure secret entry.

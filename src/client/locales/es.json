@@ -530,6 +530,19 @@
       "animContinuing": "La conversación continúa. {{summaries}} resumen(es) conservado(s), los nuevos mensajes siguen fluyendo.",
       "animExplanation": "Cuando la ventana de contexto se llena, los mensajes más antiguos se comprimen en resúmenes fechados. Estos resúmenes se acumulan cronológicamente. Cuando se amontonan demasiados, los más antiguos se fusionan, manteniendo detallados los recientes y comprimidos los antiguos."
     },
+    "memoryProfile": {
+      "title": "Perfil de memoria",
+      "description": "El documento curado inyectado en cada prompt: estado actual, preferencias duraderas, trabajo en curso. Los detalles episódicos viven en el archivo de abajo y se buscan bajo demanda.",
+      "tokenCount": "{{tokens}} / {{budget}} tokens",
+      "regenerate": "Regenerar",
+      "regenerateConfirmTitle": "¿Regenerar el perfil desde el archivo?",
+      "regenerateConfirmDescription": "El perfil actual se sustituye por uno recompilado desde el archivo de memoria. Las entradas fijadas se conservan. No se puede deshacer.",
+      "regenerating": "Recompilando desde el archivo. El perfil se actualizará al terminar."
+    },
+    "memoryArchive": {
+      "title": "Archivo de memoria",
+      "description": "Recuerdos episódicos, buscados bajo demanda por el Agente. Nunca se inyectan automáticamente."
+    },
     "thinking": {
       "title": "Razonamiento",
       "description": "Cuando está activado, los modelos compatibles razonan paso a paso antes de responder. Puede mejorar la calidad en tareas complejas, pero usa más tokens. No todos los modelos lo admiten.",
@@ -860,8 +873,6 @@
     "removeFile": "Quitar archivo",
     "downloadFile": "Descargar",
     "viewImage": "Ver a tamaño completo",
-    "memoriesUsed": "{{count}} recuerdos",
-    "memoriesUsedSingular": "1 recuerdo",
     "thinking": "Pensando...",
     "thinkingPicker": {
       "title": "Esfuerzo de razonamiento",
@@ -2700,9 +2711,8 @@
       "read_message": "Leer mensaje",
       "list_summaries": "Listar resúmenes",
       "read_summary": "Leer resumen",
+      "edit_profile": "Editar perfil de memoria",
       "review_memories": "Revisar recuerdos",
-      "search_knowledge": "Buscar conocimiento",
-      "list_knowledge_sources": "Listar fuentes de conocimiento",
       "list_active_queues": "Listar colas activas",
       "get_task_detail": "Detalles de tarea",
       "save_run_learning": "Guardar aprendizaje de ejecución",
@@ -2946,10 +2956,10 @@
       "searchAnswer": "Respuesta",
       "searchNoResults": "Sin resultados",
       "searchUntitled": "Resultado sin título",
-      "knowledgeResults": "{{count}} entrada",
-      "knowledgeResults_plural": "{{count}} entradas",
-      "knowledgeNoResults": "No se encontró nada",
-      "knowledgeMatch": "{{score}}%",
+      "memoryResults": "{{count}} entrada",
+      "memoryResults_plural": "{{count}} entradas",
+      "memoryNoResults": "No se encontró nada",
+      "memoryMatch": "{{score}}%",
       "browseContentLength": "{{count}} carácter",
       "browseContentLength_plural": "{{count}} caracteres",
       "browseFetchTime": "{{ms}} ms",

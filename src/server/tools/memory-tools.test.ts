@@ -12,11 +12,7 @@ const mockMemory = {
   listMemories: mock(() => Promise.resolve([] as any[])),
   isDuplicateMemory: mock(() => Promise.resolve(false)),
   getMemory: mock(() => Promise.resolve(null as any)),
-  rewriteQueryWithContext: mock(() => Promise.resolve('')),
-  getRelevantMemories: mock(() => Promise.resolve([] as any[])),
   reembedAllMemories: mock(() => Promise.resolve(0)),
-  recalibrateImportance: mock(() => Promise.resolve(0)),
-  pruneStaleMemories: mock(() => Promise.resolve(0)),
 }
 
 mock.module('@/server/services/memory', () => mockMemory)
@@ -101,7 +97,11 @@ describe('memory-tools', () => {
 
       const result = await execute(recallTool, { query: 'typescript' })
 
-      expect(mockMemory.searchMemories).toHaveBeenCalledWith('agent-abc', 'typescript', undefined)
+      expect(mockMemory.searchMemories).toHaveBeenCalledWith('agent-abc', 'typescript', undefined, {
+        subject: undefined,
+        category: undefined,
+        since: undefined,
+      })
       expect(result.memories).toHaveLength(2)
       expect(result.memories[0]).toMatchObject({
         id: 'mem-1',
@@ -118,7 +118,42 @@ describe('memory-tools', () => {
 
       await execute(recallTool, { query: 'test', limit: 5 })
 
-      expect(mockMemory.searchMemories).toHaveBeenCalledWith('agent-abc', 'test', 5)
+      expect(mockMemory.searchMemories).toHaveBeenCalledWith('agent-abc', 'test', 5, {
+        subject: undefined,
+        category: undefined,
+        since: undefined,
+      })
+    })
+
+    itMocked('forwards the subject and category filters', async () => {
+      mockMemory.searchMemories.mockResolvedValueOnce([])
+
+      await execute(recallTool, { query: 'deploy', subject: 'kinbot', category: 'decision' })
+
+      expect(mockMemory.searchMemories).toHaveBeenCalledWith('agent-abc', 'deploy', undefined, {
+        subject: 'kinbot',
+        category: 'decision',
+        since: undefined,
+      })
+    })
+
+    itMocked('parses the since filter into a Date', async () => {
+      mockMemory.searchMemories.mockResolvedValueOnce([])
+
+      await execute(recallTool, { query: 'deploy', since: '2026-07-01' })
+
+      expect(mockMemory.searchMemories).toHaveBeenCalledWith('agent-abc', 'deploy', undefined, {
+        subject: undefined,
+        category: undefined,
+        since: new Date('2026-07-01'),
+      })
+    })
+
+    itMocked('rejects an unparseable since date instead of searching', async () => {
+      const result = await execute(recallTool, { query: 'deploy', since: 'last tuesday' })
+
+      expect(result.error).toBe('Invalid "since" date: "last tuesday". Use an ISO date such as 2026-07-01.')
+      expect(mockMemory.searchMemories).not.toHaveBeenCalled()
     })
 
     itMocked('returns empty array when no memories match', async () => {

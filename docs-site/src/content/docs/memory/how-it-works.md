@@ -1,30 +1,53 @@
 ---
 title: How Memory Works
-description: "Understanding Hivekeep's memory system: extraction, retrieval, and the advanced search pipeline."
+description: "Understanding Hivekeep's memory system: the always-injected profile, the searchable archive, and how both are maintained."
 ---
 
-Hivekeep gives each Agent persistent memory across conversations. The system uses two complementary channels: **automatic extraction** and **explicit remembering**, backed by a sophisticated hybrid search pipeline. Memories can be **private** (default, only the owning Agent can access them) or **shared** (visible and searchable by all Agents).
+Hivekeep gives each Agent persistent memory across conversations, split into two layers: an always-present **profile** and a searchable **archive**. Memories can be **private** (default, only the owning Agent can access them) or **shared** (visible and searchable by all Agents).
 
 :::note
-For Agent-specific memory features (importance, categories, retrieval), see [Agent Memory](/docs/agents/memory/).
+For the user-facing tour of both layers, see [Agent Memory](/docs/agents/memory/).
 :::
 
-## Dual-Channel Architecture
+## Two Layers
 
-### Automatic Extraction
+| Layer | Contents | Injection |
+|---|---|---|
+| **Profile** (`agent_profiles`) | What the Agent *knows*: current state, standing preferences, active work | Always, in the cached system-prompt prefix |
+| **Archive** (`memories`) | What *happened*: dated events, past details, one-off facts | Never automatic; searched with `recall` |
 
-After every LLM turn, Hivekeep runs a memory extraction pipeline that identifies facts, preferences, decisions, and knowledge from the conversation. These are stored automatically without any user action.
+The profile is bounded (default 1500 tokens) because it costs context on every turn. The archive is unbounded because it costs nothing until queried.
 
-The extraction uses a dedicated model (configurable via `MEMORY_EXTRACTION_MODEL`) to analyze the conversation and produce structured memory entries with:
+### Why the archive is not injected
 
-- **Category**: `fact`, `preference`, `decision`, or `knowledge`
-- **Subject**: Who or what the memory is about (e.g. a contact name)
-- **Source context**: A brief 1 to 2 sentence description of the conversational context in which the fact was mentioned (e.g. *"While discussing weekend plans, user mentioned..."*). This gives memories episodic flavor without a separate memory system.
-- **Importance**: Score from 1 (mundane) to 10 (critical)
+Earlier versions searched the archive on every user message and injected the top results. Measured on a real instance, that produced a winner-take-all corpus: half the memories were never retrieved once, while a handful were injected hundreds of times. The cause was structural. The relevance score was multiplied by temporal decay, importance, retrieval count, and subject/category boosts, and `retrieval_count` measures *injection* rather than usefulness, so surfacing a memory made it more likely to surface again. On top of that, the search query was the raw chat message, which is a poor embedding query against stored fact sentences.
 
-### Explicit Remembering
+Memory v2 removes those heuristics. The profile carries the context that must always be present, and the Agent formulates its own query when it needs the archive.
 
-Agents have a `memorize` tool that lets them (or users) explicitly store information. This is useful for direct instructions like "Remember that I prefer dark mode" or important context the extraction pipeline might miss.
+## Maintenance
+
+Both layers are updated by a single LLM call that runs during compacting:
+
+- **Archive extraction**: new episodic memories are added or existing ones updated, deduplicated at insert time by cosine distance.
+- **Profile rewrite**: the whole document is regenerated, folding in what is new and durable, dropping what is resolved.
+
+Fusing them keeps the cost identical to the old extraction-only call and makes the two outputs consistent. The model is configurable via `MEMORY_EXTRACTION_MODEL` (or the `extraction_model` app setting).
+
+Between compactions, two tools cover immediacy: `memorize` writes to the archive right away, and `edit_profile` patches the profile without an LLM call.
+
+### Guards
+
+- The `## Pinned` section is reinstated verbatim after every automatic rewrite, so pinned instructions cannot be edited away.
+- A rewrite far over budget drops whole trailing sections, never `## Pinned`.
+- A missing or malformed profile block leaves the previous document in place: a stale profile beats one lost to a bad generation.
+
+### Routing rule
+
+Every decision point (the prompt block, the maintenance call, and the `memorize` / `edit_profile` tool descriptions) states the same test:
+
+> Should this influence the Agent's behavior in most future conversations, without anyone mentioning it?
+
+Yes routes to the profile, no routes to the archive. Demotion out of the profile is filing, not deletion.
 
 ## Shared Memories
 
@@ -44,12 +67,13 @@ Shared memories are for information that genuinely helps other Agents: cross-dom
 
 ## Memory Tools
 
-Agents have six memory tools available (main agent only):
+Memory tools are available to main agents only:
 
 | Tool | Description |
 |------|-------------|
-| `recall` | Semantic + keyword search across private + shared memories |
-| `memorize` | Save a new memory (private or shared) |
+| `recall` | Semantic + keyword search across private + shared archive memories, with optional `subject` / `category` / `since` filters |
+| `memorize` | Save an episodic memory to the archive (private or shared) |
+| `edit_profile` | Patch the profile: `append`, `replace_section` or `remove_line`, optionally into `## Pinned` |
 | `update_memory` | Update content, category, subject, or scope |
 | `forget` | Delete an outdated or incorrect memory |
 | `list_memories` | List memories, filtered by subject, category, or scope |
@@ -64,98 +88,40 @@ Memories are stored as vector embeddings using an embedding provider (OpenAI, Vo
 - **sqlite-vec**: KNN vector index for semantic similarity
 - **FTS5**: Full-text search index for keyword matching
 
-## Retrieval Pipeline
+## Search Pipeline
 
-When an Agent needs relevant memories (either via the `recall` tool or automatic injection at conversation start), Hivekeep runs a multi-stage pipeline:
+`recall` runs a two-arm hybrid search and fuses the results. There is no automatic injection path, and no LLM call on the search path.
 
-### 1. Contextual Query Rewriting
+### 1. Hybrid search (vector + FTS)
 
-Short or ambiguous messages (e.g. "yes", "what about that?") are rewritten into standalone queries using recent conversation context. This prevents poor retrieval on follow-up messages that only make sense in context.
+Two searches run in parallel:
 
-Controlled by `MEMORY_CONTEXTUAL_REWRITE_MODEL`, disabled by default.
+- **Vector similarity**: KNN via sqlite-vec, filtered by a cosine similarity floor (`MEMORY_SIMILARITY_THRESHOLD`, default 0.5). The floor is a spam filter, not a relevance gate.
+- **Full-text search**: FTS5 with prefix matching, AND-first with an OR fallback.
 
-### 2. Multi-Query Expansion
+Optional `subject`, `category` and `since` filters are applied in SQL in **both** arms, so a filter can never silently apply to only one. When a filter is present the vector arm widens its candidate pool, otherwise the filter would starve it.
 
-If enabled, the query is expanded into 3 alternative formulations using an LLM. Each variation targets a different aspect, entity, or sub-topic to maximize recall. The system provides known memory subjects to help generate targeted, entity-specific queries.
-
-Controlled by `MEMORY_MULTI_QUERY_MODEL`, disabled by default.
-
-### 3. Hybrid Search (Vector + FTS)
-
-For each query (original + variations), two searches run in parallel:
-
-- **Vector similarity**: KNN search via sqlite-vec, filtered by a cosine similarity threshold
-- **Full-text search**: FTS5 with prefix matching, AND-first with OR fallback
-
-### 4. Reciprocal Rank Fusion (RRF)
-
-Results from both search methods (across all query variations) are merged using RRF scoring:
+### 2. Reciprocal rank fusion
 
 ```
-score = Σ (boost / (K + rank + 1))
+score = Σ (weight / (K + rank + 1))
 ```
 
-Where `K` is a smoothing constant (default 60) and FTS results get an optional boost factor (default 1.2×).
+`K` is a smoothing constant (`MEMORY_RRF_K`, default 60). The FTS arm carries its own weight (`MEMORY_FTS_BOOST`, default 0.5), since a keyword hit and a vector neighbour at the same rank are not equally trustworthy.
 
-### 5. Score Weighting
+### 3. Ranking
 
-Fused scores are weighted by multiple factors:
+Relevance to the query is the only ranking signal. Recency breaks ties. `importance` and `retrieval_count` are still recorded and shown in the UI, but they no longer affect ranking.
 
-- **Temporal decay**: Older memories decay based on category. Facts/knowledge decay very slowly; decisions decay faster. Controlled by `MEMORY_TEMPORAL_DECAY_LAMBDA`.
-- **Importance**: Higher importance memories get proportionally higher scores
-- **Retrieval frequency**: Memories retrieved more often get a mild logarithmic boost (the system finds them useful)
-- **Subject matching**: If the query mentions a known memory subject, those memories get a boost (default 1.3×)
-- **Recency boost**: Very recent memories get an extra multiplier: ×1.5 for today, ×1.25 for this week, ×1.1 for this month. Enabled by default, disable with `MEMORY_RECENCY_BOOST=false`
-- **Category boost**: Memories matching a detected category in the query get a configurable multiplier (default 1.2×, set via `MEMORY_CATEGORY_BOOST`)
+## Storage Metadata
 
-### 6. Re-ranking (Optional)
+Each archive memory carries a category, an optional subject, an importance score, and a **source context** describing where it was learned. `recall` and `list_memories` return the source context when present, and shared results are attributed to their author Agent.
 
-If enabled via `MEMORY_RERANK_MODEL`, top candidates are re-ranked for relevance. Hivekeep supports two re-ranking strategies:
+## Bootstrap and Regeneration
 
-1. **Cross-encoder rerank (preferred)**: If a provider with `rerank` capability is configured (Cohere or Jina), Hivekeep calls their dedicated rerank API. Cross-encoders are ~20× faster and ~10× cheaper than LLM rerankers with comparable accuracy.
-2. **LLM-based rerank (fallback)**: If no rerank provider is available, an LLM scores each memory's relevance on a 0-10 scale. The LLM score becomes the primary ranking signal, with the hybrid score as tiebreaker.
+Upgrading an existing instance does not start with empty profiles. A deferred, idempotent boot job compiles each Agent's existing archive into an initial profile, using the same routing rule as the maintenance call. The archive is left untouched. The done flag is only set once every Agent succeeded or had nothing to compile, so a provider outage at boot retries on the next start.
 
-The system tries cross-encoder first and falls back to LLM automatically. Controlled by `MEMORY_RERANK_MODEL`, disabled by default.
-
-### 7. Adaptive K
-
-Instead of returning a fixed number of results, Adaptive K trims the result list based on score distribution:
-
-- Results below a minimum score ratio of the top result are dropped
-- If there's a steep score drop between consecutive results (a "cliff"), the list is truncated there
-
-This ensures only genuinely relevant memories are injected, avoiding noise. Enabled by default.
-
-## Retrieval Tracking
-
-Every time memories are injected into an Agent's context, their retrieval count and timestamp are updated. This data feeds into:
-
-- **Retrieval frequency boost** during search scoring
-- **Importance recalibration**: a periodic process that nudges importance scores based on retrieval patterns (frequently retrieved = bump up, never retrieved after 30+ days = slight decrease)
-
-## Memory Consolidation
-
-When enabled, Hivekeep periodically consolidates similar memories to reduce redundancy:
-
-1. **Pair detection**: memories with cosine similarity above the threshold (default `0.85`) are flagged as candidates
-2. **Clustering**: overlapping pairs are grouped into clusters, capped at **3 memories per cluster** to avoid information loss in large merges (larger clusters are split and handled across multiple runs)
-3. **LLM merge**: each cluster is sent to an LLM that either merges them into a single richer memory or **aborts** if the memories are about genuinely different topics (preventing false merges)
-4. **Quality guardrails**: the LLM preserves all unique details, picks the most appropriate category/subject, and keeps the highest importance rating from the sources
-
-Consolidation is disabled by default. Enable it by setting `MEMORY_CONSOLIDATION_MODEL` to a model identifier. See [configuration](/docs/memory/configuration/#memory-consolidation) for all settings.
-
-## Stale Memory Pruning
-
-After importance recalibration runs during compacting, Hivekeep automatically prunes memories that have decayed to very low importance and are never retrieved. This completes the importance lifecycle: extraction → recalibration → pruning.
-
-The pruning is purely heuristic-based, no LLM calls needed:
-
-| Condition | Threshold |
-|-----------|-----------|
-| Importance ≤ 1, never retrieved | Older than **60 days** |
-| Importance ≤ 2, never retrieved | Older than **90 days** |
-
-Pruned memories are permanently deleted. The number of pruned memories is recorded in the compacting system message metadata alongside extraction and consolidation counts.
+The same compile is available per-Agent from the **Memory** tab ("Regenerate"), which preserves pinned entries.
 
 ## Session Compacting
 
@@ -177,23 +143,17 @@ Users can **force compact** from the UI at any time. All compaction results and 
 
 ```
 User message
-  → Contextual rewrite (if short/ambiguous)
-  → Multi-query expansion (if enabled)
-  → Hybrid search (vector + FTS) per query
-  → RRF fusion → score weighting → re-rank → adaptive K
-  → Relevant memories injected into Agent context with prioritization guidance
+  → Profile is already in the cached system prompt (no search, no LLM call)
   → LLM processes and responds
-  → Extraction pipeline analyzes the turn
-  → New memories stored as embeddings
-  → Retrieval counts updated
+  → If it needs something episodic: recall(query[, filters])
+        → hybrid search (vector + FTS) → RRF fusion → results
 
 Compacting cycle (after each LLM turn):
   → Progressive context pipeline (tool masking + observation compaction)
   → Token-percentage check → keep-window summarization if threshold exceeded
   → New summary added (accumulates chronologically)
-  → Extract new memories from compacted batch
-  → Consolidate similar memories
-  → Recalibrate importance scores
-  → Prune stale memories (low importance, never retrieved, old)
+  → Memory maintenance call:
+        → archive extraction (add / update, deduplicated)
+        → profile rewrite (Pinned preserved, budget enforced)
   → Telescopic merge if summaries exceed budget or count
 ```

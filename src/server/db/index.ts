@@ -40,6 +40,18 @@ export { sqlite }
  * Called once at startup after Drizzle migrations have run.
  */
 export function initVirtualTables() {
+  // Leftovers from the removed knowledge base. Migration 0118 drops the real
+  // tables, but Drizzle does not know about virtual ones, and dropping the vec
+  // table needs the sqlite-vec module loaded — which is true here and not in
+  // the standalone migrate script. Safe to delete once every install has
+  // booted past 0118.
+  try {
+    sqlite.run('DROP TABLE IF EXISTS knowledge_chunks_fts')
+    sqlite.run('DROP TABLE IF EXISTS knowledge_chunks_vec')
+  } catch (e) {
+    log.warn('knowledge base virtual-table cleanup failed (harmless leftovers remain): %s', e)
+  }
+
   // FTS5: full-text search on memories
   sqlite.run(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
@@ -139,52 +151,6 @@ export function initVirtualTables() {
     `)
   } catch {
     log.warn('sqlite-vec: virtual table creation failed — vector search disabled')
-  }
-
-  // FTS5 + triggers + vec for knowledge chunks
-  // Wrapped in try-catch: knowledge_chunks table must exist (created by migrations)
-  try {
-    sqlite.run(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_fts USING fts5(
-        content,
-        content_rowid='rowid',
-        tokenize='unicode61'
-      )
-    `)
-
-    sqlite.run(`
-      CREATE TRIGGER IF NOT EXISTS knowledge_chunks_fts_insert AFTER INSERT ON knowledge_chunks
-      WHEN new.content IS NOT NULL
-      BEGIN
-        INSERT INTO knowledge_chunks_fts(rowid, content) VALUES (new.rowid, new.content);
-      END
-    `)
-    sqlite.run(`
-      CREATE TRIGGER IF NOT EXISTS knowledge_chunks_fts_update AFTER UPDATE OF content ON knowledge_chunks
-      WHEN new.content IS NOT NULL
-      BEGIN
-        UPDATE knowledge_chunks_fts SET content = new.content WHERE rowid = old.rowid;
-      END
-    `)
-    sqlite.run(`
-      CREATE TRIGGER IF NOT EXISTS knowledge_chunks_fts_delete AFTER DELETE ON knowledge_chunks
-      BEGIN
-        DELETE FROM knowledge_chunks_fts WHERE rowid = old.rowid;
-      END
-    `)
-  } catch (e) {
-    log.warn('knowledge_chunks FTS5 setup failed — knowledge full-text search disabled: %s', e)
-  }
-
-  try {
-    sqlite.run(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_vec USING vec0(
-        chunk_id text PRIMARY KEY,
-        embedding float[${config.memory.embeddingDimension}]
-      )
-    `)
-  } catch {
-    log.warn('sqlite-vec: knowledge_chunks_vec creation failed - vector search disabled for knowledge')
   }
 
   // Backfill slugs for existing agents that don't have one

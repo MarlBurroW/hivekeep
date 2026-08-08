@@ -27,7 +27,6 @@ import {
   secretPrompts,
   pendingEmailSends,
   accountTriggers,
-  knowledgeChunks,
 } from '@/server/db/schema'
 import { config } from '@/server/config'
 import { deleteVectorRows } from '@/server/services/vector-maintenance'
@@ -330,7 +329,6 @@ export async function deleteAgent(agentId: string): Promise<boolean> {
   const affectedCronIds = db.select({ id: crons.id, cronAgentId: crons.agentId }).from(crons).where(eq(crons.targetAgentId, agentId)).all()
   const affectedMcpServerIds = db.select({ id: mcpServers.id }).from(mcpServers).where(eq(mcpServers.createdByAgentId, agentId)).all().map((m) => m.id)
 
-  const agentKnowledgeChunkIds = db.select({ id: knowledgeChunks.id }).from(knowledgeChunks).where(eq(knowledgeChunks.agentId, agentId)).all().map((k) => k.id)
   const agentQuickSessionIds = db.select({ id: quickSessions.id }).from(quickSessions).where(eq(quickSessions.agentId, agentId)).all().map((s) => s.id)
 
   // In-memory / external cleanup that must precede row deletion.
@@ -409,7 +407,6 @@ export async function deleteAgent(agentId: string): Promise<boolean> {
     // The vec virtual tables have no FK/trigger sync (unlike FTS): rows must
     // be removed explicitly or they poison KNN search and dedup forever.
     deleteVectorRows('memories_vec', 'memory_id', agentMemoryIds)
-    deleteVectorRows('knowledge_chunks_vec', 'chunk_id', agentKnowledgeChunkIds)
 
     // Delete the agent (remaining child tables cascade or SET NULL via FKs)
     db.delete(agents).where(eq(agents.id, agentId)).run()

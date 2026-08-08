@@ -264,6 +264,22 @@ export const memories = sqliteTable('memories', {
   index('idx_memories_scope_category').on(table.scope, table.category),
 ])
 
+/**
+ * Curated long-term memory document, one per Agent. Always injected into the
+ * stable (cached) system-prompt segment — unlike `memories`, which is the
+ * episodic archive reached on demand via the `recall` tool.
+ */
+export const agentProfiles = sqliteTable('agent_profiles', {
+  id: text('id').primaryKey(),
+  agentId: text('agent_id').notNull().unique().references(() => agents.id, { onDelete: 'cascade' }),
+  content: text('content').notNull().default(''),
+  tokenEstimate: integer('token_estimate').notNull().default(0),
+  lastRewriteAt: integer('last_rewrite_at', { mode: 'timestamp_ms' }),
+  manuallyEditedAt: integer('manually_edited_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
 export const contacts = sqliteTable('contacts', {
   id: text('id').primaryKey(),
   firstName: text('first_name'),
@@ -1106,42 +1122,6 @@ export const fileStorage = sqliteTable('file_storage', {
 ])
 
 // ─── Knowledge Base ─────────────────────────────────────────────────────────
-
-export const knowledgeSources = sqliteTable('knowledge_sources', {
-  id: text('id').primaryKey(),
-  agentId: text('agent_id').notNull().references(() => agents.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  type: text('type').notNull(), // 'file' | 'text' | 'url'
-  status: text('status').notNull().default('pending'), // 'pending' | 'processing' | 'ready' | 'error'
-  errorMessage: text('error_message'),
-  originalFilename: text('original_filename'),
-  mimeType: text('mime_type'),
-  storedPath: text('stored_path'),
-  sourceUrl: text('source_url'),
-  rawContent: text('raw_content'),
-  chunkCount: integer('chunk_count').notNull().default(0),
-  tokenCount: integer('token_count').notNull().default(0),
-  metadata: text('metadata'), // JSON
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  index('idx_knowledge_sources_agent_id').on(table.agentId),
-])
-
-export const knowledgeChunks = sqliteTable('knowledge_chunks', {
-  id: text('id').primaryKey(),
-  sourceId: text('source_id').notNull().references(() => knowledgeSources.id, { onDelete: 'cascade' }),
-  agentId: text('agent_id').notNull().references(() => agents.id, { onDelete: 'cascade' }),
-  content: text('content').notNull(),
-  embedding: blob('embedding'),
-  position: integer('position').notNull(),
-  tokenCount: integer('token_count').notNull(),
-  metadata: text('metadata'), // JSON
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-}, (table) => [
-  index('idx_knowledge_chunks_agent_id').on(table.agentId),
-  index('idx_knowledge_chunks_source_id').on(table.sourceId),
-])
 
 // ─── Plugin System ───────────────────────────────────────────────────────────
 

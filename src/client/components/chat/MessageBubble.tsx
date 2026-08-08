@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCopyToClipboard } from '@/client/hooks/useCopyToClipboard'
-import { Badge } from '@/client/components/ui/badge'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/client/components/ui/collapsible'
 import { MarkdownContent } from '@/client/components/chat/MarkdownContent'
 import { InlineToolCall } from '@/client/components/chat/InlineToolCall'
@@ -35,13 +34,6 @@ import { PluginCardRenderer } from '@/client/components/chat/plugin-card/PluginC
 import { PRESET_EMOJIS } from '@/client/hooks/useReactions'
 import { ArrowRightFromLine, ArrowRightToLine } from 'lucide-react'
 
-interface InjectedMemory {
-  id: string
-  category: string
-  content: string
-  subject: string | null
-}
-
 interface MessageBubbleProps {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -52,7 +44,6 @@ interface MessageBubbleProps {
   userInitials?: string
   timestamp?: string
   toolCalls?: ToolCallViewItem[]
-  injectedMemories?: InjectedMemory[] | null
   stepLimitReached?: boolean
   /** Turn ended with no content and no tool calls — show a localized notice instead of the sentinel text. */
   emptyTurn?: boolean
@@ -272,59 +263,6 @@ function MessageFiles({ files, isUser }: { files: MessageFile[]; isUser: boolean
   )
 }
 
-// ─── Injected memories indicator ──────────────────────────────────────────────
-
-function estimateMemoryTokens(mem: InjectedMemory): number {
-  const text = `${mem.content}${mem.subject ?? ''}${mem.category}`
-  return Math.ceil(text.length / 3.5)
-}
-
-function formatMemoryTokens(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
-  return String(n)
-}
-
-function InjectedMemoriesIndicator({ memories }: { memories: InjectedMemory[] }) {
-  const { t } = useTranslation()
-  const count = memories.length
-  const totalTokens = memories.reduce((sum, m) => sum + estimateMemoryTokens(m), 0)
-
-  return (
-    <Collapsible>
-      <CollapsibleTrigger className="group mt-1.5 flex items-center gap-1.5 text-xs text-chart-2 hover:text-chart-2/80 transition-colors">
-        <Brain className="size-3.5" />
-        <span>
-          {count === 1 ? t('chat.memoriesUsedSingular') : t('chat.memoriesUsed', { count })}
-        </span>
-        <span className="font-mono text-[10px] text-muted-foreground/70">~{formatMemoryTokens(totalTokens)}t</span>
-        <ChevronDown className="size-3 transition-transform group-data-[state=open]:rotate-180" />
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-1.5 space-y-1 rounded-lg border border-chart-2/20 bg-chart-2/5 px-3 py-2">
-          {memories.map((mem) => {
-            const memTokens = estimateMemoryTokens(mem)
-            return (
-              <div key={mem.id} className="flex items-start gap-2 text-xs">
-                <Badge variant="secondary" size="xs" className="mt-0.5 shrink-0">
-                  {t(`settings.memories.category.${mem.category}`)}
-                </Badge>
-                <span className="text-muted-foreground whitespace-pre-wrap min-w-0 flex-1">
-                  {mem.content}
-                  {mem.subject && (
-                    <span className="ml-1 text-muted-foreground/60">({mem.subject})</span>
-                  )}
-                </span>
-                <span className="shrink-0 self-start mt-0.5 font-mono text-[10px] text-muted-foreground/60 tabular-nums">
-                  {formatMemoryTokens(memTokens)}t
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  )
-}
 
 // ─── Reasoning/thinking block ────────────────────────────────────────────────
 
@@ -979,7 +917,6 @@ export const MessageBubble = memo(function MessageBubble({
   userInitials,
   timestamp,
   toolCalls,
-  injectedMemories,
   stepLimitReached = false,
   emptyTurn = false,
   finishReason = null,
@@ -1047,7 +984,6 @@ export const MessageBubble = memo(function MessageBubble({
   }, [toolCalls])
   const hasToolCalls = dedupedToolCalls && dedupedToolCalls.length > 0
   const hasFiles = files && files.length > 0
-  const hasMemories = injectedMemories && injectedMemories.length > 0
 
   // Normalize reasoning prop: string (streaming) → single segment at offset 0, array → as-is
   const reasoningSegments = useMemo(() => {
@@ -1178,8 +1114,6 @@ export const MessageBubble = memo(function MessageBubble({
           )}
 
           {/* Injected memories indicator */}
-          {hasMemories && <InjectedMemoriesIndicator memories={injectedMemories} />}
-
           {/* Empty-turn / silent-stop notice (replaces the sentinel text) */}
           {(emptyTurn || silentStop) && (
             <div className="flex items-center gap-1.5 mt-1 text-[11px] text-warning">
@@ -1280,9 +1214,6 @@ export const MessageBubble = memo(function MessageBubble({
         {!isRedacted && channelContextLine && (
           <ChannelContextLine platform={channelPlatform} text={channelContextLine} />
         )}
-
-        {/* Injected memories indicator */}
-        {!isRedacted && hasMemories && <InjectedMemoriesIndicator memories={injectedMemories} />}
 
         {/* Step limit indicator */}
         {!isRedacted && stepLimitReached && (

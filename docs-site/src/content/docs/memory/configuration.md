@@ -1,62 +1,38 @@
 ---
 title: Memory Configuration
-description: Configure memory extraction, retrieval, search pipeline, and compacting behavior.
+description: Configure the memory profile, archive search, maintenance, and compacting behavior.
 ---
 
-Memory behavior is controlled through environment variables. All settings have sensible defaults. The advanced search features (multi-query, re-ranking, contextual rewrite) are disabled by default and can be enabled by setting their respective model variables.
+Memory behavior is controlled through environment variables. All settings have sensible defaults.
+
+Memory has two layers (see [How Memory Works](/docs/memory/how-it-works/)): a curated **profile** always injected into the prompt, and an episodic **archive** searched on demand with `recall`.
 
 ## Core Settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MEMORY_EXTRACTION_MODEL` | Provider default | Model used for automatic memory extraction after each turn |
-| `MEMORY_MAX_RELEVANT` | `10` | Maximum relevant memories injected into context per turn |
-| `MEMORY_SIMILARITY_THRESHOLD` | `0.7` | Minimum cosine similarity for vector search results (0-1) |
+| `MEMORY_PROFILE_MAX_TOKENS` | `1500` | Token budget for the profile document. It sits in the cached prompt prefix, so every line costs on every turn. The maintenance rewrite is told to stay under it; a rewrite far over drops whole trailing sections, never `## Pinned` |
+| `MEMORY_EXTRACTION_MODEL` | Agent's model | Model for the compaction-time maintenance call (archive extraction + profile rewrite). Overridden by the `extraction_model` app setting |
+| `MEMORY_MAX_RELEVANT` | `10` | Default number of results returned by a `recall` search |
+| `MEMORY_SIMILARITY_THRESHOLD` | `0.5` | Minimum cosine similarity for vector search candidates. A spam filter, not a relevance gate |
 | `MEMORY_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for memory vectors |
 | `MEMORY_EMBEDDING_DIMENSION` | `1536` | Vector dimension for embeddings |
+| `MEMORY_EMBEDDING_TIMEOUT` | `60000` | Ceiling for one embedding call, in ms |
 
-## Search Pipeline Settings
+## Search Settings
 
-These control the hybrid search, scoring, and result selection pipeline.
+`recall` fuses a vector arm and an FTS arm with reciprocal rank fusion. Relevance to the query is the only ranking signal; recency breaks ties.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MEMORY_RRF_K` | `60` | Reciprocal Rank Fusion smoothing constant. Higher values give more weight to lower-ranked results |
-| `MEMORY_FTS_BOOST` | `1.2` | Multiplier for FTS results in RRF scoring. Values > 1 favor keyword matches |
-| `MEMORY_SUBJECT_BOOST` | `1.3` | Score multiplier when a memory's subject matches an entity in the query |
-| `MEMORY_CATEGORY_BOOST` | `1.25` | Score multiplier for category-matching memories |
-| `MEMORY_TEMPORAL_DECAY_LAMBDA` | `0.01` | Temporal decay rate. Higher = faster decay. Set to `0` to disable. Category-adjusted: facts decay 10× slower than decisions |
-| `MEMORY_TEMPORAL_DECAY_FLOOR` | `0.7` | Minimum score multiplier from temporal decay. Prevents old memories from being completely suppressed |
-| `MEMORY_TOKEN_BUDGET` | `0` | Max tokens for the memory block in prompt. `0` = unlimited (no budget enforcement) |
-| `MEMORY_RECENCY_BOOST` | `true` | Enable recency-based score boost (×1.5 today, ×1.25 this week, ×1.1 this month). Set to `false` to disable |
-| `MEMORY_ADAPTIVE_K` | `true` | Enable adaptive result trimming based on score distribution |
-| `MEMORY_ADAPTIVE_K_MIN_SCORE_RATIO` | `0.3` | Minimum score as a ratio of the top result. Results below this are dropped |
+| `MEMORY_FTS_BOOST` | `0.5` | Weight of the FTS arm relative to the vector arm at the same rank |
 
-## Optional LLM Enhancements
+## Removed in memory v2
 
-These features use additional LLM calls to improve retrieval quality. Each is disabled by default (no model set). Set a model name to enable.
+The scoring heuristics below no longer exist, and setting their variables is a no-op. They tuned a per-message injection pipeline that produced a winner-take-all archive (half the corpus never retrieved, a handful injected hundreds of times); the profile layer replaced the need for it.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MEMORY_MULTI_QUERY_MODEL` | *(disabled)* | Model for generating query variations. Expands each query into 3 alternatives targeting different aspects |
-| `MEMORY_HYDE_MODEL` | *(disabled)* | Model for HyDE (Hypothetical Document Embedding). Generates a hypothetical answer to use as an additional search query for better semantic matching |
-| `MEMORY_RERANK_MODEL` | *(disabled)* | Model for re-ranking. If a rerank provider (Cohere/Jina) is configured, uses their cross-encoder API (~20× faster). Otherwise falls back to LLM-based scoring (0-10 scale) |
-| `MEMORY_CONTEXTUAL_REWRITE_MODEL` | *(disabled)* | Model for rewriting short/ambiguous messages into standalone queries using conversation context |
-| `MEMORY_CONTEXTUAL_REWRITE_THRESHOLD` | `80` | Character length threshold. Messages shorter than this are candidates for contextual rewriting |
-
-:::tip
-For LLM enhancement models, use a fast/cheap model (e.g. `gpt-4.1-mini`) since they run on every retrieval. The quality gain comes from the technique, not the model size.
-:::
-
-## Memory Consolidation
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MEMORY_CONSOLIDATION_MODEL` | *(disabled)* | Model for memory consolidation (merging similar memories) |
-| `MEMORY_CONSOLIDATION_SIMILARITY` | `0.85` | Cosine similarity threshold for considering two memories as candidates for consolidation |
-| `MEMORY_CONSOLIDATION_MAX_GEN` | `5` | Maximum number of consolidated memories generated per run |
-
-Consolidation clusters are capped at 3 memories to preserve detail. Larger groups are split and merged incrementally across runs. The LLM can also abort a merge if it determines the memories are about different topics.
+`MEMORY_TEMPORAL_DECAY_LAMBDA`, `MEMORY_TEMPORAL_DECAY_FLOOR`, `MEMORY_ADAPTIVE_K`, `MEMORY_ADAPTIVE_K_MIN_SCORE_RATIO`, `MEMORY_ADAPTIVE_K_LARGEST_GAP_RATIO`, `MEMORY_SUBJECT_BOOST`, `MEMORY_CATEGORY_BOOST`, `MEMORY_RECENCY_BOOST`, `MEMORY_TOKEN_BUDGET`, `MEMORY_RETRIEVAL_LLM_TIMEOUT`, `MEMORY_MULTI_QUERY_MODEL`, `MEMORY_HYDE_MODEL`, `MEMORY_RERANK_MODEL`, `MEMORY_CONTEXTUAL_REWRITE_MODEL`, `MEMORY_CONTEXTUAL_REWRITE_THRESHOLD`, `MEMORY_CONSOLIDATION_MODEL`, `MEMORY_CONSOLIDATION_SIMILARITY`, `MEMORY_CONSOLIDATION_MAX_GEN`.
 
 ## Compacting Settings
 
@@ -117,19 +93,18 @@ Without an embedding provider, memory storage and retrieval will not work. The A
 
 ## Tuning Tips
 
-### Basic Tuning
-- **Lower `MEMORY_SIMILARITY_THRESHOLD`** (e.g., 0.5) to retrieve more memories at the cost of relevance
-- **Raise `MEMORY_MAX_RELEVANT`** if your Agent needs broader context awareness
-- **Lower `COMPACTING_THRESHOLD_PERCENT`** (e.g., 60) for earlier compaction triggers
-- **Raise `COMPACTING_KEEP_PERCENT`** (e.g., 50) to keep more raw context visible to the LLM
+### Profile
+- **Raise `MEMORY_PROFILE_MAX_TOKENS`** if Agents track a lot of parallel work and their profiles keep getting truncated. It is a per-turn cost on every conversation, so raise it deliberately.
+- If a profile drifts or bloats, edit it directly in the Agent's **Memory** tab, or use **Regenerate** to recompile it from the archive.
 
-### Search Quality
-- **Enable multi-query** (`MEMORY_MULTI_QUERY_MODEL=gpt-4.1-mini`) for better recall on complex queries
-- **Enable re-ranking** (`MEMORY_RERANK_MODEL=gpt-4.1-mini`) for better precision when you have many memories
-- **Enable contextual rewrite** (`MEMORY_CONTEXTUAL_REWRITE_MODEL=gpt-4.1-mini`) if your users send lots of short follow-up messages
-- **Increase `MEMORY_FTS_BOOST`** (e.g., 1.5) if keyword matching should matter more than semantic similarity
+### Search
+- **Lower `MEMORY_SIMILARITY_THRESHOLD`** to let more vector candidates through when `recall` comes back empty on valid queries.
+- **Raise `MEMORY_FTS_BOOST`** if keyword matching should matter more than semantic similarity in your corpus.
+- **Raise `MEMORY_MAX_RELEVANT`** if `recall` results are consistently too narrow.
+
+### Compacting
+- **Lower `COMPACTING_THRESHOLD_PERCENT`** (e.g. 60) for earlier compaction triggers.
+- **Raise `COMPACTING_KEEP_PERCENT`** (e.g. 50) to keep more raw context visible to the LLM.
 
 ### Performance
-- Use a **faster/cheaper model** for `MEMORY_EXTRACTION_MODEL` since it runs on every turn
-- LLM enhancements (multi-query, re-rank, rewrite) each add one LLM call per retrieval. Enable selectively based on your needs
-- **Disable temporal decay** (`MEMORY_TEMPORAL_DECAY_LAMBDA=0`) if all memories should be treated equally regardless of age
+- Use a **fast, tool-reliable model** for `MEMORY_EXTRACTION_MODEL`: it runs once per compaction and writes both memory layers.

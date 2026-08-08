@@ -1172,6 +1172,54 @@ authenticated user (same access as agent workspaces). The path is canonicalized
 
 ---
 
+## Memory profile
+
+The curated document injected into every prompt for an Agent, as opposed to the
+episodic archive above, which is only reached through the `recall` tool. Design
+in `memory.md`.
+
+### `GET /api/agents/:id/profile`
+
+```typescript
+// Response 200
+{
+  profile: {
+    content: string            // markdown; '' when the Agent has no profile yet
+    tokenEstimate: number
+    budget: number             // MEMORY_PROFILE_MAX_TOKENS
+    lastRewriteAt: number | null   // last maintenance/regenerate rewrite
+    manuallyEditedAt: number | null
+    updatedAt: number | null
+  }
+}
+```
+
+### `PUT /api/agents/:id/profile`
+
+```typescript
+// Body
+{ content: string }
+
+// Response 200 — same shape as GET
+// 400 PROFILE_TOO_LARGE when the document exceeds the token budget
+```
+
+Sets `manuallyEditedAt`. Emits `agent-profile:updated` with `source: 'user'`.
+
+### `POST /api/agents/:id/profile/regenerate`
+
+```typescript
+// Response 202
+{ started: true }
+```
+
+Recompiles the profile from the Agent's memory archive with one LLM call
+(pinned entries preserved). Async: the result arrives via
+`agent-profile:updated` with `source: 'regenerate'`. A failed compile leaves
+the existing profile untouched.
+
+---
+
 ## Contacts (management via UI)
 
 ### `GET /api/contacts`

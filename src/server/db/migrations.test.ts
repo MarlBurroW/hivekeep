@@ -112,6 +112,36 @@ describe('database migrations', () => {
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true })
   })
 
+  // Drizzle's migrator applies only migrations whose journal `when` is greater
+  // than the newest `created_at` already in __drizzle_migrations. A migration
+  // whose timestamp lands below an earlier one is therefore SKIPPED on any
+  // database that already applied that earlier migration in a previous
+  // release — silently, with the migrator still reporting "Migrations
+  // complete". Several entries carry hand-set timestamps ahead of real time,
+  // so a freshly generated migration can land behind them.
+  //
+  // Older entries violate this too (a few hand-set timestamps sit far ahead of
+  // the migrations that follow them), but those shipped in the same release as
+  // the entry they sit behind, so the filter never excluded them and every
+  // install has them. Raising them now would re-run applied migrations on
+  // installs whose cursor sits between the old and new value. What must hold is
+  // the rule for the migration being ADDED: it has to clear every predecessor,
+  // or it silently never runs on an existing install.
+  it('gives the newest migration a timestamp above every earlier one', () => {
+    const journal = JSON.parse(
+      readFileSync(join(migrationsFolder, 'meta', '_journal.json'), 'utf8'),
+    ) as { entries: Array<{ idx: number; tag: string; when: number }> }
+
+    const newest = journal.entries[journal.entries.length - 1]!
+    const earlier = journal.entries.slice(0, -1)
+    const highest = earlier.reduce((max, e) => (e.when > max.when ? e : max), earlier[0]!)
+
+    expect({ tag: newest.tag, clearsPredecessors: newest.when > highest.when }).toEqual({
+      tag: newest.tag,
+      clearsPredecessors: true,
+    })
+  })
+
   it.skipIf(!schemaIsReal)(
     'derives a non-trivial set of table names from the schema',
     () => {

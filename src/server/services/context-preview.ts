@@ -3,8 +3,8 @@ import { agents, messages, userProfiles, compactingSummaries, tasks } from '@/se
 import { eq, and, isNull, desc, ne, asc, sql } from 'drizzle-orm'
 import { getFilesForMessages } from '@/server/services/files'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
+import { getProfile } from '@/server/services/agent-profile'
 import { listActiveTriggerSummariesForAgent } from '@/server/services/account-triggers'
-import { getRelevantMemories } from '@/server/services/memory'
 import { listContactsForPrompt } from '@/server/services/contacts'
 import { listAvailableAgents } from '@/server/services/inter-agent'
 import { getMCPToolsSummary } from '@/server/services/mcp'
@@ -312,38 +312,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     role: k.role,
   }))
 
-  // Relevant memories — use the last user message as query, or fallback
-  let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-  try {
-    const lastUserMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.agentId, agentId), eq(messages.role, 'user'), isNull(messages.taskId), isNull(messages.sessionId)))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    const query = lastUserMsg?.content ?? agent.name
-    relevantMemories = await getRelevantMemories(agentId, query)
-  } catch {
-    // Non-fatal
-  }
-
-  // Knowledge
-  let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-  try {
-    const { searchKnowledge } = await import('@/server/services/knowledge')
-    const lastUserMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.agentId, agentId), eq(messages.role, 'user'), isNull(messages.taskId), isNull(messages.sessionId)))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    relevantKnowledge = await searchKnowledge(agentId, lastUserMsg?.content ?? agent.name, 5)
-  } catch {
-    // Non-fatal
-  }
-
   // MCP tools summary for prompt
   const mcpToolsSummary = await getMCPToolsSummary(agentId)
 
@@ -457,11 +425,11 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
   const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agentId)
 
   // Build system prompt
+  const memoryProfile = await getProfile(agentId)
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: contactsWithSlug,
-    relevantMemories,
-    relevantKnowledge,
+    profile: memoryProfile.content,
     agentDirectory,
     mcpTools: mcpToolsSummary,
     isSubAgent: false,
@@ -775,7 +743,7 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agentIdentity.name, slug: agentIdentity.slug, role: agentIdentity.role, character: agentIdentity.character, expertise: agentIdentity.expertise },
     contacts: [],
-    relevantMemories: [],
+    profile: null,
     agentDirectory,
     isSubAgent: true,
     taskDescription: task.description,
@@ -906,44 +874,13 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
   const firstProfile = db.select({ language: userProfiles.language, agentLanguage: userProfiles.agentLanguage }).from(userProfiles).limit(1).get()
   if (firstProfile) userLanguage = firstProfile.agentLanguage ?? firstProfile.language
 
-  // Memories (use last session message as query)
-  let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-  try {
-    const lastMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    if (lastMsg?.content) relevantMemories = await getRelevantMemories(agentId, lastMsg.content)
-  } catch {
-    // Non-fatal
-  }
-
-  // Knowledge
-  let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-  try {
-    const { searchKnowledge } = await import('@/server/services/knowledge')
-    const lastMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    if (lastMsg?.content) relevantKnowledge = await searchKnowledge(agentId, lastMsg.content, 5)
-  } catch {
-    // Non-fatal
-  }
-
   const globalPrompt = await getGlobalPrompt()
 
+  const quickProfile = await getProfile(agentId)
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: [],
-    relevantMemories,
-    relevantKnowledge,
+    profile: quickProfile.content,
     agentDirectory: [],
     isSubAgent: false,
     isQuickSession: true,

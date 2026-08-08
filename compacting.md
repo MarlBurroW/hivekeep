@@ -152,9 +152,9 @@ await db.insert(compactingSummaries).values({
 })
 ```
 
-#### Step 4 — Extract memories
+#### Step 4 — Memory maintenance
 
-The memory extraction pipeline runs on the messages that were just summarized (see Memory Extraction section below).
+One LLM call extracts episodic memories into the archive AND rewrites the Agent's memory profile, on the messages that were just summarized (see Memory maintenance below).
 
 #### Step 5 — Check for telescopic merge
 
@@ -211,7 +211,7 @@ Merged summaries carry a `[compressed]` marker and their depth is incremented. T
 
 ### No re-extraction
 
-Memory extraction does **not** run during merges — memories were already extracted when each source summary was created at depth 0.
+Memory maintenance does **not** run during merges — it already ran when each source summary was created at depth 0.
 
 ---
 
@@ -233,35 +233,34 @@ Compacting errors (LLM failures, nothing to compact, etc.) are **persisted as sy
 
 ---
 
-## Memory extraction
+## Memory maintenance
 
-Compacting triggers the **memory extraction pipeline** on the messages that were just summarized.
+Compacting triggers one **memory maintenance** LLM call on the messages that were just summarized. It updates both memory layers at once (design in `memory.md`):
 
-### Extraction prompt
+- the **archive** (`memories`): episodic items, added or updated, deduplicated at insert time;
+- the **profile** (`agent_profiles`): the curated document injected into every prompt, rewritten in full.
 
-```
-System: You are an assistant specialized in information extraction.
-Analyze the exchanges below and extract information worth remembering long-term.
+Fusing them into a single call keeps the cost identical to the previous extraction-only call and makes the two outputs consistent by construction.
 
-For each piece of information, decide:
-- "add": New information not present in existing memories
-- "update": Information that contradicts, supersedes, or enriches an existing memory
+### Response format
 
-Return a JSON array with: action, content, category, subject, importance (1-10), sourceContext, updateIndex
+The model returns two delimited blocks: `<archive>` holding a JSON array, and `<profile>` holding the complete new markdown document. The profile is deliberately **not** carried inside the JSON payload — a multi-line markdown document embedded in a JSON string is a reliable source of broken escaping, and a parse failure there would take the archive items down with it. Each half degrades independently: broken archive JSON still lets the profile rewrite land, and a missing profile block still applies the archive items.
 
-Rules:
-- Only extract **durable** information (not ephemeral details)
-- Durability test: Will this still be true/relevant in 3 months?
-- Categories: fact, preference, decision, knowledge
-```
+### Guards
 
-### Post-extraction pipeline
+Enforced in code, not trusted to instruction-following:
 
-After extraction, three additional processes run:
+- the previous `## Pinned` section is reinstated verbatim after every rewrite;
+- a rewrite far over `MEMORY_PROFILE_MAX_TOKENS` drops whole trailing sections, never `## Pinned`;
+- a missing or empty profile block keeps the previous document, since losing a curated profile to one bad generation is worse than a stale one.
 
-1. **Memory consolidation** — merges near-duplicate memories using semantic similarity
-2. **Importance recalibration** — adjusts importance scores based on retrieval patterns
-3. **Stale memory pruning** — removes low-importance, never-retrieved, old memories
+### Routing rule
+
+The prompt states the same profile-vs-archive test used by the prompt block and the memory tools: *should this influence the Agent's behavior in most future conversations, without anyone mentioning it?* Yes goes to the profile, no goes to the archive. Demoting a resolved item out of the profile is filing, not deletion — its trace stays in the archive and in these summaries.
+
+### Model
+
+`extraction_model` (app setting) → `MEMORY_EXTRACTION_MODEL` → the Agent's own model. Hard 3-minute timeout: the call is awaited inside `runCompacting`, which holds the per-Agent compacting lock.
 
 ---
 
@@ -366,10 +365,9 @@ Message processed by the Agent
               overwrites)
                     │
                     ▼
-              Memory extraction
-              + consolidation
-              + recalibration
-              + pruning
+              Memory maintenance
+              (archive extraction
+              + profile rewrite)
                     │
                     ▼
               Telescopic merge

@@ -530,6 +530,19 @@
       "animContinuing": "会話は継続中。{{summaries}}件のサマリーを保持したまま、新しいメッセージが流れ続けます。",
       "animExplanation": "コンテキストウィンドウが埋まると、最も古いメッセージが日付付きのサマリーに圧縮されます。サマリーは時系列に蓄積されます。サマリーが増えすぎると古いものから統合され、新しいサマリーは詳細に、古いものは圧縮された状態で保たれます。"
     },
+    "memoryProfile": {
+      "title": "メモリープロファイル",
+      "description": "毎回のプロンプトに挿入される整理済みドキュメント。現在の状況、恒常的な好み、進行中の作業を記述します。エピソード的な詳細は下のアーカイブにあり、必要に応じて検索されます。",
+      "tokenCount": "{{tokens}} / {{budget}} トークン",
+      "regenerate": "再生成",
+      "regenerateConfirmTitle": "アーカイブからプロファイルを再生成しますか？",
+      "regenerateConfirmDescription": "現在のプロファイルは、メモリーアーカイブから再構成したものに置き換わります。ピン留めした項目は保持されます。元に戻せません。",
+      "regenerating": "アーカイブから再構成しています。完了するとプロファイルが更新されます。"
+    },
+    "memoryArchive": {
+      "title": "メモリーアーカイブ",
+      "description": "エピソード的な記憶。エージェントが必要に応じて検索します。自動的に挿入されることはありません。"
+    },
     "thinking": {
       "title": "思考 / 推論",
       "description": "有効にすると、対応モデルは応答前にステップごとに推論します。複雑なタスクの品質が向上しますが、トークン消費が増えます。すべてのモデルが対応しているわけではありません。",
@@ -860,8 +873,6 @@
     "removeFile": "ファイルを削除",
     "downloadFile": "ダウンロード",
     "viewImage": "フルサイズで表示",
-    "memoriesUsed": "{{count}}件のメモリー",
-    "memoriesUsedSingular": "1件のメモリー",
     "thinking": "思考中...",
     "thinkingPicker": {
       "title": "推論の強度",
@@ -2700,9 +2711,8 @@
       "read_message": "メッセージを読む",
       "list_summaries": "サマリー一覧",
       "read_summary": "サマリーを読む",
+      "edit_profile": "メモリープロファイルを編集",
       "review_memories": "メモリーをレビュー",
-      "search_knowledge": "ナレッジを検索",
-      "list_knowledge_sources": "ナレッジソース一覧",
       "list_active_queues": "アクティブキュー一覧",
       "get_task_detail": "タスク詳細",
       "save_run_learning": "実行の学習事項を保存",
@@ -2946,10 +2956,10 @@
       "searchAnswer": "回答",
       "searchNoResults": "結果が見つかりません",
       "searchUntitled": "無題の結果",
-      "knowledgeResults": "{{count}}件のエントリ",
-      "knowledgeResults_plural": "{{count}}件のエントリ",
-      "knowledgeNoResults": "何も見つかりません",
-      "knowledgeMatch": "{{score}}%",
+      "memoryResults": "{{count}}件のエントリ",
+      "memoryResults_plural": "{{count}}件のエントリ",
+      "memoryNoResults": "何も見つかりません",
+      "memoryMatch": "{{score}}%",
       "browseContentLength": "{{count}}文字",
       "browseContentLength_plural": "{{count}}文字",
       "browseFetchTime": "{{ms}}ミリ秒",

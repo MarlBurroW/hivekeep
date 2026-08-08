@@ -35,7 +35,7 @@ import { sseManager } from '@/server/sse/index'
 import { eventBus } from '@/server/services/events'
 import { hookRegistry } from '@/server/hooks/index'
 import { config } from '@/server/config'
-import { getRelevantMemories, rewriteQueryWithContext } from '@/server/services/memory'
+import { getProfile } from '@/server/services/agent-profile'
 import { maybeCompact, resolveCompactionBoundary, isAfterCompactionBoundary } from '@/server/services/compacting'
 import { getMCPToolsSummary } from '@/server/services/mcp'
 import { resolveToolset } from '@/server/services/toolset-resolver'
@@ -1379,41 +1379,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       role: k.role,
     }))
 
-    // Retrieve relevant memories via hybrid search (semantic + FTS5)
-    // If contextual rewriting is enabled, enrich short/ambiguous queries with conversation context
-    let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-    try {
-      let memoryQuery = queueItem.content
-      if (config.memory.contextualRewriteModel) {
-        // Fetch last few messages for context (lightweight — only content + role, limit 6)
-        const recentMsgs = await db
-          .select({ role: messages.role, content: messages.content })
-          .from(messages)
-          .where(and(eq(messages.agentId, agentId), isNull(messages.taskId), isNull(messages.sessionId)))
-          .orderBy(desc(messages.createdAt))
-          .limit(6)
-          .all()
-        // Reverse to chronological, exclude the current message (already inserted above), filter nulls
-        const contextMsgs = recentMsgs
-          .reverse()
-          .slice(0, -1) // drop last (= current user message)
-          .filter((m) => m.content)
-          .map((m) => ({ role: m.role, content: m.content! }))
-        memoryQuery = await rewriteQueryWithContext(queueItem.content, contextMsgs, agentId)
-      }
-      relevantMemories = await getRelevantMemories(agentId, memoryQuery)
-    } catch {
-      // Memory retrieval failure is non-fatal — proceed without memories
-    }
 
-    // Retrieve relevant knowledge base chunks
-    let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-    try {
-      const { searchKnowledge } = await import('@/server/services/knowledge')
-      relevantKnowledge = await searchKnowledge(agentId, queueItem.content, 5)
-    } catch {
-      // Knowledge retrieval failure is non-fatal
-    }
 
     // Resolve MCP tool summaries for system prompt injection
     const mcpToolsSummary = await getMCPToolsSummary(agentId)
@@ -1505,11 +1471,11 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     }
 
     const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agent.id)
+    const memoryProfile = await getProfile(agentId)
     const systemSegments = buildSystemPrompt({
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: contactsWithSlug,
-      relevantMemories,
-      relevantKnowledge,
+      profile: memoryProfile.content,
       agentDirectory,
       mcpTools: mcpToolsSummary,
       isSubAgent: false,
@@ -2076,7 +2042,6 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         reasoning: reasoningSegments.length > 0 ? JSON.stringify(reasoningSegments) : null,
         metadata: (() => {
           const meta: Record<string, unknown> = {}
-          if (relevantMemories.length > 0) meta.injectedMemories = relevantMemories
           if (stepLimitReached) {
             meta.stepLimitReached = true
             meta.maxSteps = config.tools.maxSteps
@@ -2467,22 +2432,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       if (profile) userLanguage = profile.agentLanguage ?? profile.language
     }
 
-    // Retrieve relevant memories (read-only) via hybrid search
-    let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-    try {
-      relevantMemories = await getRelevantMemories(agentId, queueItem.content)
-    } catch {
-      // Non-fatal
-    }
 
-    // Retrieve relevant knowledge base chunks
-    let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-    try {
-      const { searchKnowledge } = await import('@/server/services/knowledge')
-      relevantKnowledge = await searchKnowledge(agentId, queueItem.content, 5)
-    } catch {
-      // Non-fatal
-    }
 
     // Build quick session system prompt (minimal — no contacts, no agent directory, no hidden instructions)
     const globalPrompt = await getGlobalPrompt()
@@ -2545,8 +2495,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     const systemSegments = buildSystemPrompt({
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: apiContacts,
-      relevantMemories,
-      relevantKnowledge,
+      profile: (await getProfile(agentId)).content,
       agentDirectory: apiAgentDirectory,
       mcpTools: apiMcpToolsSummary,
       activeChannels: apiActiveChannels,
@@ -2918,7 +2867,6 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
         reasoning: reasoningSegments.length > 0 ? JSON.stringify(reasoningSegments) : null,
         metadata: (() => {
           const meta: Record<string, unknown> = {}
-          if (relevantMemories.length > 0) meta.injectedMemories = relevantMemories
           if (stepLimitReached) {
             meta.stepLimitReached = true
             meta.maxSteps = config.tools.maxSteps

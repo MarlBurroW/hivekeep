@@ -5,7 +5,7 @@ import { cn } from '@/client/lib/utils'
 import { JsonViewer } from '@/client/components/common/JsonViewer'
 import type { ToolResultRendererProps } from '@/client/lib/tool-renderers'
 
-interface KnowledgeItem {
+interface MemoryResultItem {
   id?: string
   content?: string
   title?: string
@@ -17,19 +17,16 @@ interface KnowledgeItem {
   age?: string
   score?: number
   pinned?: boolean
-  sourceId?: string
-  position?: number
   updatedAt?: number
 }
 
 /**
- * Generic renderer for memory / knowledge lookup results — recall and
- * search_knowledge. They both return a list of
- * "hits" under different keys (memories / chunks / results / entries); each hit is
- * rendered as a compact card with title/snippet and metadata badges. Falls back to
- * JsonViewer for unexpected shapes.
+ * Renderer for memory lookup results (recall). Hits arrive under one of
+ * several keys (memories / results / entries); each is rendered as a compact
+ * card with title/snippet and metadata badges. Falls back to JsonViewer for
+ * unexpected shapes.
  */
-export function KnowledgeResultRenderer({ args, result, status }: ToolResultRendererProps) {
+export function MemoryResultRenderer({ args, result, status }: ToolResultRendererProps) {
   const { t } = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
 
@@ -37,11 +34,11 @@ export function KnowledgeResultRenderer({ args, result, status }: ToolResultRend
   const error = typeof res?.error === 'string' ? res.error : null
 
   // The four tools each use a different array key.
-  const items: KnowledgeItem[] | null =
-    (Array.isArray(res?.memories) ? (res!.memories as KnowledgeItem[]) : null) ??
-    (Array.isArray(res?.results) ? (res!.results as KnowledgeItem[]) : null) ??
-    (Array.isArray(res?.chunks) ? (res!.chunks as KnowledgeItem[]) : null) ??
-    (Array.isArray(res?.entries) ? (res!.entries as KnowledgeItem[]) : null)
+  const items: MemoryResultItem[] | null =
+    (Array.isArray(res?.memories) ? (res!.memories as MemoryResultItem[]) : null) ??
+    (Array.isArray(res?.results) ? (res!.results as MemoryResultItem[]) : null) ??
+    (Array.isArray(res?.chunks) ? (res!.chunks as MemoryResultItem[]) : null) ??
+    (Array.isArray(res?.entries) ? (res!.entries as MemoryResultItem[]) : null)
 
   const query = typeof args.query === 'string' ? args.query : null
 
@@ -64,7 +61,7 @@ export function KnowledgeResultRenderer({ args, result, status }: ToolResultRend
           {query && <span className="min-w-0 text-foreground truncate font-medium">{query}</span>}
           {items && (
             <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground shrink-0">
-              {t('tools.renderers.knowledgeResults', { count: items.length })}
+              {t('tools.renderers.memoryResults', { count: items.length })}
             </span>
           )}
         </div>
@@ -100,7 +97,7 @@ export function KnowledgeResultRenderer({ args, result, status }: ToolResultRend
                     </div>
                     {scorePct !== null && (
                       <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary tabular-nums">
-                        {t('tools.renderers.knowledgeMatch', { score: scorePct })}
+                        {t('tools.renderers.memoryMatch', { score: scorePct })}
                       </span>
                     )}
                   </div>
@@ -124,7 +121,7 @@ export function KnowledgeResultRenderer({ args, result, status }: ToolResultRend
         )}
 
         {items && items.length === 0 && !error && (
-          <div className="px-3 py-2 text-[11px] text-muted-foreground">{t('tools.renderers.knowledgeNoResults')}</div>
+          <div className="px-3 py-2 text-[11px] text-muted-foreground">{t('tools.renderers.memoryNoResults')}</div>
         )}
       </div>
 

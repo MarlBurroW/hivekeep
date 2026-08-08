@@ -65,18 +65,6 @@ interface ContactSummary {
   identifierSummary?: string
 }
 
-interface Memory {
-  category: string
-  content: string
-  subject: string | null
-  sourceContext?: string | null
-  importance?: number | null
-  scope?: string
-  authorAgentName?: string | null
-  updatedAt?: Date | null
-  score?: number | null
-}
-
 interface AgentDirectoryEntry {
   slug: string | null
   name: string
@@ -106,8 +94,10 @@ interface PromptParams {
     kind?: AgentKind
   }
   contacts: ContactSummary[]
-  relevantMemories: Memory[]
-  relevantKnowledge?: Array<{ content: string; sourceId: string; score: number }>
+  /** Curated memory profile document (see memory.md). Required so a new caller
+   *  cannot silently build a prompt without it — pass null for sub-Agents,
+   *  which have no profile of their own. */
+  profile: string | null
   agentDirectory: AgentDirectoryEntry[]
   mcpTools?: MCPToolSummaryForPrompt[]
   isSubAgent: boolean
@@ -203,47 +193,6 @@ function formatRelativeTime(date: Date | null | undefined): string | null {
   if (diffMonths < 12) return `${diffMonths}mo ago`
   const diffYears = Math.round(diffDays / 365)
   return `${diffYears}y ago`
-}
-
-/**
- * Convert a retrieval score ratio (0–1, relative to top score) into a relevance tag.
- */
-function formatRelevanceTag(ratio: number): string {
-  if (ratio >= 0.7) return '⬤'   // highly relevant
-  if (ratio >= 0.4) return '◉'   // relevant
-  return '○'                      // loosely related
-}
-
-/**
- * Format a single memory line with optional metadata (importance, recency).
- */
-function formatMemoryLine(m: Memory): string {
-  const parts: string[] = []
-  // Importance indicator: ★ for high (7-10), · for normal
-  if (m.importance != null && m.importance >= 7) {
-    parts.push('★')
-  }
-  // Relevance indicator from retrieval score
-  if (m.score != null) {
-    parts.push(formatRelevanceTag(m.score))
-  }
-  parts.push(`[${m.category}]`)
-  // Shared memory attribution
-  if (m.scope === 'shared' && m.authorAgentName) {
-    parts.push(`*[shared by ${m.authorAgentName}]*`)
-  }
-  parts.push(m.content)
-  if (m.subject) {
-    parts.push(`(subject: ${m.subject})`)
-  }
-  if (m.sourceContext) {
-    parts.push(`[context: ${m.sourceContext}]`)
-  }
-  const relTime = formatRelativeTime(m.updatedAt)
-  if (relTime) {
-    parts.push(`— ${relTime}`)
-  }
-  return `- ${parts.join(' ')}`
 }
 
 /**
@@ -350,162 +299,47 @@ function buildConversationStateBlock(state: PromptParams['conversationState']): 
 }
 
 /**
- * Category display order and labels for grouped memory rendering.
- */
-const MEMORY_CATEGORY_META: Record<string, { order: number; label: string }> = {
-  fact: { order: 1, label: 'Facts' },
-  preference: { order: 2, label: 'Preferences' },
-  decision: { order: 3, label: 'Decisions' },
-  knowledge: { order: 4, label: 'Knowledge' },
-}
-
-/**
- * Format a memory line for subject-grouped display (category as inline tag).
- */
-function formatMemoryLineCompact(m: Memory): string {
-  const parts: string[] = []
-  if (m.importance != null && m.importance >= 7) {
-    parts.push('★')
-  }
-  if (m.score != null) {
-    parts.push(formatRelevanceTag(m.score))
-  }
-  parts.push(`[${m.category}]`)
-  if (m.scope === 'shared' && m.authorAgentName) {
-    parts.push(`*[shared by ${m.authorAgentName}]*`)
-  }
-  parts.push(m.content)
-  const relTime = formatRelativeTime(m.updatedAt)
-  if (relTime) {
-    parts.push(`— ${relTime}`)
-  }
-  return `- ${parts.join(' ')}`
-}
-
-/**
- * Build the memories block using the most effective grouping strategy:
- * - If most memories have subjects, group by subject (more natural for the LLM)
- * - Otherwise, fall back to category-based grouping
- * - For ≤3 memories, use a flat list
+ * Build the always-injected memory profile block (stable segment).
  *
- * Subject grouping mirrors how humans organize knowledge: "what do I know
- * about X?" is more natural than "what facts vs preferences do I have?"
+ * The profile is the Agent's curated semantic memory: current state, standing
+ * preferences, active work. The episodic archive (`memories`) is NOT injected —
+ * the Agent reaches it through `recall`. The boundary test stated here is the
+ * same one used by the maintenance rewrite and by the memory tool descriptions,
+ * so all three decision points agree (see memory.md §3).
  */
-/**
- * Rough token estimation: ~3.5 chars per token for English/French mixed content.
- * Conservative to avoid over-trimming.
- */
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3.5)
-}
+function buildProfileBlock(profile: string, opts: { canEdit: boolean }): string {
+  const lines = [`## Your memory\n`]
 
-function buildMemoriesBlock(memories: Memory[]): string {
-  const header = `## Memories — what you actually know\n\nThese are facts and context you've learned across past interactions. **Use them.** When the user references something past, don't ask them to remind you if it's here. When you're choosing how to phrase or scope a response, let these inform you — they're why you're not a stranger.\n\nGuidelines:\n- Weight ⬤ (highly relevant) and ★ (important) memories most. Treat ○ (loosely related) as background.\n- When memories conflict, prefer the most recent one.\n- Don't quote them mechanically — weave them into your reply naturally, as something you remember.\n- If a memory is clearly outdated or wrong relative to what the user just said, trust the user and the new info will eventually update the memory.\n\nLegend: ★ = high importance · ⬤ = highly relevant · ◉ = relevant · ○ = loosely related`
-
-  // Normalize scores relative to top score so relevance tags are scale-independent
-  const topScore = memories.reduce((max, m) => Math.max(max, m.score ?? 0), 0)
-  if (topScore > 0) {
-    for (const m of memories) {
-      if (m.score != null) m.score = m.score / topScore
-    }
+  const content = profile.trim()
+  if (content) {
+    lines.push(`This is your curated long-term memory. It is always current; trust it.\n`)
+    lines.push(`${content}\n`)
+  } else {
+    lines.push(
+      `Your profile is still empty — it fills itself as you have conversations.\n`,
+    )
   }
 
-  // Token budget enforcement: trim lowest-relevance memories if budget is set
-  const budget = config.memory?.tokenBudget ?? 0
-  if (budget > 0 && memories.length > 1) {
-    // Sort by normalized score descending (preserve order for display later)
-    const scored = memories.map((m, i) => ({ m, i, score: m.score ?? 0 }))
-    scored.sort((a, b) => b.score - a.score)
+  const editGuidance = opts.canEdit
+    ? ` Rule of thumb: if it should shape your behavior in most future conversations unprompted, it belongs here (use edit_profile); if it is something you might need to look up when a topic comes back, memorize() it.`
+    : ''
 
-    let totalTokens = estimateTokens(header)
-    const kept: typeof scored = []
+  lines.push(
+    `This document is what you *know*: current state, standing preferences, active work. ` +
+    `Your archive is what *happened*: dated events, past details, one-off facts, searchable with recall(query).${editGuidance} ` +
+    `Nothing is ever lost by going to the archive: search it with recall() BEFORE saying you don't remember.`,
+  )
 
-    for (const entry of scored) {
-      const lineTokens = estimateTokens(formatMemoryLine(entry.m)) + 1 // +1 for newline
-      if (totalTokens + lineTokens > budget && kept.length >= 1) {
-        break // Budget exceeded, stop adding memories
-      }
-      totalTokens += lineTokens
-      kept.push(entry)
-    }
+  // Without this, the document silently changing between two turns reads as
+  // unexplained, and models compensate by hoarding into it.
+  lines.push(
+    `\nThis document is also revised for you automatically whenever your conversation is compacted: entries get merged, ` +
+    `rephrased, and dropped once they no longer apply. Only the "## Pinned" section survives that untouched, so put ` +
+    `anything you were explicitly told to always follow there${opts.canEdit ? ' (edit_profile with pin: true)' : ''}. ` +
+    `You do not need to restate things here to keep them: what belongs in the archive is safe in the archive.`,
+  )
 
-    // Restore original order for display
-    kept.sort((a, b) => a.i - b.i)
-    memories = kept.map((k) => k.m)
-  }
-
-  if (memories.length <= 3) {
-    const memoryLines = memories.map(formatMemoryLine).join('\n')
-    return `${header}\n\n${memoryLines}`
-  }
-
-  // Decide grouping strategy: subject-first if ≥60% of memories have subjects
-  const withSubject = memories.filter((m) => m.subject)
-  const useSubjectGrouping = withSubject.length >= memories.length * 0.6
-
-  if (useSubjectGrouping) {
-    return buildSubjectGroupedMemories(header, memories)
-  }
-  return buildCategoryGroupedMemories(header, memories)
-}
-
-/**
- * Group memories by subject, with unsubject memories in a "General" group.
- * Within each subject group, memories are ordered by importance (desc).
- */
-function buildSubjectGroupedMemories(header: string, memories: Memory[]): string {
-  const groups = new Map<string, Memory[]>()
-  for (const m of memories) {
-    const key = m.subject ?? '_general'
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(m)
-  }
-
-  // Sort groups: largest first (most relevant subjects bubble up), _general last
-  const sortedKeys = [...groups.keys()].sort((a, b) => {
-    if (a === '_general') return 1
-    if (b === '_general') return -1
-    return groups.get(b)!.length - groups.get(a)!.length
-  })
-
-  const sections: string[] = []
-  for (const key of sortedKeys) {
-    const label = key === '_general' ? 'General' : key
-    const mems = groups.get(key)!
-    // Sort by importance descending within group
-    mems.sort((a, b) => (b.importance ?? 5) - (a.importance ?? 5))
-    const lines = mems.map(formatMemoryLineCompact).join('\n')
-    sections.push(`### ${label}\n${lines}`)
-  }
-
-  return `${header}\n\n${sections.join('\n\n')}`
-}
-
-/**
- * Group memories by category (original approach).
- */
-function buildCategoryGroupedMemories(header: string, memories: Memory[]): string {
-  const groups = new Map<string, Memory[]>()
-  for (const m of memories) {
-    const key = m.category
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(m)
-  }
-
-  const sortedCategories = [...groups.keys()].sort((a, b) => {
-    const orderA = MEMORY_CATEGORY_META[a]?.order ?? 99
-    const orderB = MEMORY_CATEGORY_META[b]?.order ?? 99
-    return orderA - orderB
-  })
-
-  const sections: string[] = []
-  for (const cat of sortedCategories) {
-    const label = MEMORY_CATEGORY_META[cat]?.label ?? cat
-    const lines = groups.get(cat)!.map(formatMemoryLine).join('\n')
-    sections.push(`### ${label}\n${lines}`)
-  }
-
-  return `${header}\n\n${sections.join('\n\n')}`
+  return lines.join('\n')
 }
 
 // code → English name for the Language prompt block. Sourced from the shared
@@ -793,16 +627,21 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     if (params.agent.kind === 'configurator') {
       stableBlocks.push(buildConfiguratorBlock())
     }
+
+    // [3.7] Memory profile — stable. Unlike the v1 per-message memory
+    // injection, this changes only on a maintenance rewrite or an explicit
+    // edit, so it can live in the cached prefix.
+    if (toolsEnabled || params.profile?.trim()) {
+      // Quick sessions are told not to offer saving memories, so the block
+      // there stays read-only guidance (recall) without the edit affordances.
+      stableBlocks.push(
+        buildProfileBlock(params.profile ?? '', { canEdit: toolsEnabled && !params.isQuickSession }),
+      )
+    }
   }
 
   // Quick session: skip contacts, agent directory, hidden instructions, and MCP blocks
   if (params.isQuickSession) {
-    // [5] Relevant memories (read-only) — volatile (depends on the incoming message)
-    // (Platform directives were already injected by the [3.5] block above.)
-    if (params.relevantMemories.length > 0) {
-      volatileBlocks.push(buildMemoriesBlock(params.relevantMemories))
-    }
-
     stableBlocks.push(
       `## Quick session\n\n` +
       `This is a quick session. You do not have access to the main conversation history, ` +
@@ -901,24 +740,6 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     )
   }
 
-  // [5] Relevant memories — volatile (retrieved per incoming message)
-  if (params.relevantMemories.length > 0) {
-    volatileBlocks.push(buildMemoriesBlock(params.relevantMemories))
-  }
-
-  // [5.5] Relevant knowledge base chunks — volatile (retrieved per message)
-  if (params.relevantKnowledge && params.relevantKnowledge.length > 0) {
-    const knowledgeLines = params.relevantKnowledge
-      .map((k, i) => `[${i + 1}] ${k.content}`)
-      .join('\n\n')
-    volatileBlocks.push(
-      `## Relevant knowledge\n\n` +
-      `The following excerpts from your knowledge base may be relevant to the current conversation. ` +
-      `Use this information to inform your responses when applicable.\n\n` +
-      knowledgeLines,
-    )
-  }
-
   // [6] Hidden system instructions (main agent only) — stable, large block.
   // Skipped when the model can't tool-call: every section in here
   // references a specific tool (memorize/recall/find_contact_by_identifier/
@@ -935,6 +756,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- Use set_contact_note(contact_id, scope, content) to record observations:\n` +
       `  - "private" notes are only visible to you.\n` +
       `  - "global" notes are visible to all Agents.\n` +
+      `- Contact notes and your memory profile are not interchangeable: a note describes a PERSON and follows them across every Agent, while your profile describes YOUR OWN work and is yours alone. "Prefers short answers" is a contact note; "the migration we are shipping this week" is the profile. When something fits both, write it once, as a contact note.\n` +
       `- The platform user may also write their own notes on contacts (shown to you as "Notes from the platform user"). These are read-only: you cannot modify or delete them, and there is no tool to do so. Treat them as authoritative context from the user.\n` +
       `- Use delete_contact() only when explicitly asked by the user.\n\n` +
       `### Channel contact resolution\n` +
@@ -947,8 +769,10 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `  4. If truly new, use create_contact() with all available identifiers.\n` +
       `- This prevents duplicate contacts when the same person talks from different channels.\n\n` +
       `### Memory management\n` +
-      `- When you identify important information worth remembering long-term (fact, preference, decision), use memorize() to save it immediately.\n` +
-      `- If you're unsure about past information, use recall() to check your memory rather than guessing.\n` +
+      `- Facts about a PERSON (how they like to be answered, their role, their context) are contact notes, not profile entries: notes follow that person across every Agent, your profile does not leave you. Your profile is about your own work.\n` +
+      `- Your memory has two halves, and the "## Your memory" section above holds the first one. Route new information with this test: should it influence your behavior in most future conversations, without anyone mentioning it? If yes, it belongs in the profile — use edit_profile(). If it is episodic (a dated event, an outcome, a detail you might look up when the topic returns), memorize() it into the archive.\n` +
+      `- Keep the profile lean: it costs context on every single turn. Prefer memorize() when in doubt, and use edit_profile() to remove entries that no longer apply.\n` +
+      `- If you're unsure about past information, use recall() to search the archive rather than guessing. Narrow it with the subject, category, or since filters when you know roughly what you're after.\n` +
       `- When memorizing, default to \`private\` scope. Only use \`shared\` when the information is genuinely useful to other Agents — cross-domain facts, user-wide preferences, or decisions that affect all Agents. Your domain-specific knowledge and task context should stay private.\n\n` +
       `### Secrets\n` +
       `- Secrets are referenced by PLACEHOLDER, never by value. get_secret(key) returns a placeholder like {{secret:GITHUB_TOKEN}} — insert it verbatim in any tool argument and the real value is substituted at execution time. You never see, and never need, the raw value.\n` +

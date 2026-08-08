@@ -56,7 +56,6 @@ import { feedbackRoutes } from '@/server/routes/feedback'
 import { miniAppRoutes, miniAppSdkRoutes } from '@/server/routes/mini-apps'
 import { pluginRoutes } from '@/server/routes/plugins'
 import { pluginCardRoutes } from '@/server/routes/plugin-cards'
-import { knowledgeRoutes } from '@/server/routes/knowledge'
 import { workspaceFilesRoutes } from '@/server/routes/workspace-files'
 import { workspaceSourceRoutes } from '@/server/routes/workspace-sources'
 import { workspaceFolderRoutes } from '@/server/routes/workspace-folders'
@@ -234,7 +233,6 @@ app.route('/api/channels/slack/webhook', channelSlackRoutes)
 app.route('/api/channels/whatsapp/webhook', channelWhatsAppRoutes)
 app.route('/api/channels/signal/webhook', channelSignalRoutes)
 app.route('/api/channels', channelRoutes)
-app.route('/api/agents/:agentId/knowledge', knowledgeRoutes)
 app.route('/api/agents/:agentId/workspace', workspaceFilesRoutes)
 app.route('/api/workspace/:sourceType/:sourceId', workspaceSourceRoutes)
 app.route('/api/workspace-folders', workspaceFolderRoutes)
