@@ -112,6 +112,27 @@ describe('buildSystemPrompt', () => {
     expect(result).not.toContain('It is always current; trust it.')
   })
 
+  it('warns that the profile is rewritten automatically and that Pinned is the exception', () => {
+    const result = buildSystemPrompt(makeParams({ profile: '## Pinned\n\n- Keep me.' }))
+    expect(result).toContain('automatically whenever your conversation is compacted')
+    expect(result).toContain('Only the "## Pinned" section survives that untouched')
+    expect(result).toContain('pin: true')
+  })
+
+  it('tells a tool-less agent about the rewrite without naming edit_profile', () => {
+    const result = buildSystemPrompt(makeParams({ profile: '## Pinned\n\n- Keep me.', toolsEnabled: false }))
+    expect(result).toContain('Only the "## Pinned" section survives that untouched')
+    expect(result).not.toContain('pin: true')
+  })
+
+  it('separates contact notes from the profile in both directions', () => {
+    const result = buildSystemPrompt(makeParams({ profile: '## Pinned\n\n- Keep me.' }))
+    // Stated where contacts are explained...
+    expect(result).toContain('a note describes a PERSON and follows them across every Agent')
+    // ...and again where memory is explained.
+    expect(result).toContain('are contact notes, not profile entries')
+  })
+
   it('points at recall for anything episodic', () => {
     const result = buildSystemPrompt(makeParams({ profile: '## Pinned\n\n- Keep me.' }))
     expect(result).toContain('searchable with recall(query)')

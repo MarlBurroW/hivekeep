@@ -329,6 +329,15 @@ function buildProfileBlock(profile: string, opts: { canEdit: boolean }): string 
     `Nothing is ever lost by going to the archive: search it with recall() BEFORE saying you don't remember.`,
   )
 
+  // Without this, the document silently changing between two turns reads as
+  // unexplained, and models compensate by hoarding into it.
+  lines.push(
+    `\nThis document is also revised for you automatically whenever your conversation is compacted: entries get merged, ` +
+    `rephrased, and dropped once they no longer apply. Only the "## Pinned" section survives that untouched, so put ` +
+    `anything you were explicitly told to always follow there${opts.canEdit ? ' (edit_profile with pin: true)' : ''}. ` +
+    `You do not need to restate things here to keep them: what belongs in the archive is safe in the archive.`,
+  )
+
   return lines.join('\n')
 }
 
@@ -759,6 +768,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- Use set_contact_note(contact_id, scope, content) to record observations:\n` +
       `  - "private" notes are only visible to you.\n` +
       `  - "global" notes are visible to all Agents.\n` +
+      `- Contact notes and your memory profile are not interchangeable: a note describes a PERSON and follows them across every Agent, while your profile describes YOUR OWN work and is yours alone. "Prefers short answers" is a contact note; "the migration we are shipping this week" is the profile. When something fits both, write it once, as a contact note.\n` +
       `- The platform user may also write their own notes on contacts (shown to you as "Notes from the platform user"). These are read-only: you cannot modify or delete them, and there is no tool to do so. Treat them as authoritative context from the user.\n` +
       `- Use delete_contact() only when explicitly asked by the user.\n\n` +
       `### Channel contact resolution\n` +
@@ -771,6 +781,7 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `  4. If truly new, use create_contact() with all available identifiers.\n` +
       `- This prevents duplicate contacts when the same person talks from different channels.\n\n` +
       `### Memory management\n` +
+      `- Facts about a PERSON (how they like to be answered, their role, their context) are contact notes, not profile entries: notes follow that person across every Agent, your profile does not leave you. Your profile is about your own work.\n` +
       `- Your memory has two halves, and the "## Your memory" section above holds the first one. Route new information with this test: should it influence your behavior in most future conversations, without anyone mentioning it? If yes, it belongs in the profile — use edit_profile(). If it is episodic (a dated event, an outcome, a detail you might look up when the topic returns), memorize() it into the archive.\n` +
       `- Keep the profile lean: it costs context on every single turn. Prefer memorize() when in doubt, and use edit_profile() to remove entries that no longer apply.\n` +
       `- If you're unsure about past information, use recall() to search the archive rather than guessing. Narrow it with the subject, category, or since filters when you know roughly what you're after.\n` +
