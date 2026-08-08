@@ -537,7 +537,8 @@
       "regenerate": "Regenerate",
       "regenerateConfirmTitle": "Regenerate the profile from the archive?",
       "regenerateConfirmDescription": "The current profile is replaced by one recompiled from the memory archive. Pinned entries are kept. This cannot be undone.",
-      "regenerating": "Recompiling from the archive. The profile updates when it completes."
+      "regenerating": "Recompiling from the archive. The profile updates when it completes.",
+      "regenerateTimeout": "The rebuild did not finish. Check the server logs, then try again."
     },
     "memoryArchive": {
       "title": "Memory archive",

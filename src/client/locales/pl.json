@@ -539,7 +539,8 @@
       "regenerate": "Wygeneruj ponownie",
       "regenerateConfirmTitle": "Wygenerować profil ponownie z archiwum?",
       "regenerateConfirmDescription": "Bieżący profil zostanie zastąpiony skompilowanym z archiwum pamięci. Przypięte wpisy zostaną zachowane. Nie można cofnąć.",
-      "regenerating": "Kompilowanie z archiwum. Profil zaktualizuje się po zakończeniu."
+      "regenerating": "Kompilowanie z archiwum. Profil zaktualizuje się po zakończeniu.",
+      "regenerateTimeout": "Odbudowa nie zakończyła się. Sprawdź logi serwera i spróbuj ponownie."
     },
     "memoryArchive": {
       "title": "Archiwum pamięci",

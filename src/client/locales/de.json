@@ -537,7 +537,8 @@
       "regenerate": "Neu erzeugen",
       "regenerateConfirmTitle": "Profil aus dem Archiv neu erzeugen?",
       "regenerateConfirmDescription": "Das aktuelle Profil wird durch eines ersetzt, das aus dem Gedächtnisarchiv neu erstellt wird. Angeheftete Einträge bleiben erhalten. Nicht umkehrbar.",
-      "regenerating": "Neuerstellung aus dem Archiv. Das Profil wird nach Abschluss aktualisiert."
+      "regenerating": "Neuerstellung aus dem Archiv. Das Profil wird nach Abschluss aktualisiert.",
+      "regenerateTimeout": "Die Neuerstellung wurde nicht abgeschlossen. Prüfe die Server-Logs und versuche es erneut."
     },
     "memoryArchive": {
       "title": "Gedächtnisarchiv",

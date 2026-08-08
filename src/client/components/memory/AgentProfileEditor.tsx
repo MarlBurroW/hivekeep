@@ -19,6 +19,9 @@ import { useAgentProfile } from '@/client/hooks/useAgentProfile'
 import { getErrorMessage } from '@/client/lib/api'
 import { cn } from '@/client/lib/utils'
 
+/** Matches the server-side compile timeout, plus room for the round trip. */
+const REGENERATE_TIMEOUT_MS = 3 * 60 * 1000 + 15_000
+
 /**
  * Editor for an Agent's curated memory profile — the document injected into
  * every prompt. The episodic archive lives in the sibling MemoryList.
@@ -44,6 +47,17 @@ export function AgentProfileEditor({ agentId }: { agentId: string }) {
     if (!regenerating || !profile) return
     if (profile.lastRewriteAt !== rewriteAtBeforeRegen.current) setRegenerating(false)
   }, [profile, regenerating])
+
+  // A compile that fails server-side emits no event, so waiting on one alone
+  // spins forever. Give up after the server's own ceiling and say so.
+  useEffect(() => {
+    if (!regenerating) return
+    const timer = setTimeout(() => {
+      setRegenerating(false)
+      setSaveError(t('agent.memoryProfile.regenerateTimeout'))
+    }, REGENERATE_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [regenerating, t])
 
   const handleSave = async () => {
     setSaving(true)

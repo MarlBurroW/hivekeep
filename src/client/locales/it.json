@@ -537,7 +537,8 @@
       "regenerate": "Rigenera",
       "regenerateConfirmTitle": "Rigenerare il profilo dall’archivio?",
       "regenerateConfirmDescription": "Il profilo attuale viene sostituito da uno ricompilato dall’archivio di memoria. Le voci fissate vengono mantenute. Non reversibile.",
-      "regenerating": "Ricompilazione dall’archivio. Il profilo si aggiornerà al termine."
+      "regenerating": "Ricompilazione dall’archivio. Il profilo si aggiornerà al termine.",
+      "regenerateTimeout": "La ricostruzione non è andata a buon fine. Controlla i log del server e riprova."
     },
     "memoryArchive": {
       "title": "Archivio di memoria",

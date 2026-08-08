@@ -537,7 +537,8 @@
       "regenerate": "再生成",
       "regenerateConfirmTitle": "アーカイブからプロファイルを再生成しますか？",
       "regenerateConfirmDescription": "現在のプロファイルは、メモリーアーカイブから再構成したものに置き換わります。ピン留めした項目は保持されます。元に戻せません。",
-      "regenerating": "アーカイブから再構成しています。完了するとプロファイルが更新されます。"
+      "regenerating": "アーカイブから再構成しています。完了するとプロファイルが更新されます。",
+      "regenerateTimeout": "再構成が完了しませんでした。サーバーログを確認してから再試行してください。"
     },
     "memoryArchive": {
       "title": "メモリーアーカイブ",

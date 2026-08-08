@@ -537,7 +537,8 @@
       "regenerate": "重新生成",
       "regenerateConfirmTitle": "从归档重新生成档案？",
       "regenerateConfirmDescription": "当前档案将被从记忆归档重新编译的版本替换。置顶条目会保留。此操作无法撤销。",
-      "regenerating": "正在从归档重新编译，完成后档案会自动更新。"
+      "regenerating": "正在从归档重新编译，完成后档案会自动更新。",
+      "regenerateTimeout": "重新生成未能完成。请检查服务器日志后重试。"
     },
     "memoryArchive": {
       "title": "记忆归档",

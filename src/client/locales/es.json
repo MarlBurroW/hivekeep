@@ -537,7 +537,8 @@
       "regenerate": "Regenerar",
       "regenerateConfirmTitle": "¿Regenerar el perfil desde el archivo?",
       "regenerateConfirmDescription": "El perfil actual se sustituye por uno recompilado desde el archivo de memoria. Las entradas fijadas se conservan. No se puede deshacer.",
-      "regenerating": "Recompilando desde el archivo. El perfil se actualizará al terminar."
+      "regenerating": "Recompilando desde el archivo. El perfil se actualizará al terminar.",
+      "regenerateTimeout": "La reconstrucción no finalizó. Revisa los registros del servidor y vuelve a intentarlo."
     },
     "memoryArchive": {
       "title": "Archivo de memoria",

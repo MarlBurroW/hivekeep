@@ -537,7 +537,8 @@
       "regenerate": "Régénérer",
       "regenerateConfirmTitle": "Régénérer le profil depuis l'archive ?",
       "regenerateConfirmDescription": "Le profil actuel est remplacé par une recompilation de l'archive mémoire. Les entrées épinglées sont conservées. Action irréversible.",
-      "regenerating": "Recompilation depuis l'archive. Le profil se mettra à jour à la fin."
+      "regenerating": "Recompilation depuis l'archive. Le profil se mettra à jour à la fin.",
+      "regenerateTimeout": "La reconstruction n'a pas abouti. Vérifie les logs du serveur, puis réessaie."
     },
     "memoryArchive": {
       "title": "Archive mémoire",

@@ -298,6 +298,11 @@ export const STAINLESS_HEADERS: Record<string, string> = {
  * Per-request Stainless headers (`X-Stainless-Retry-Count`, `X-Stainless-Timeout`)
  * are added by the OAuth fetch wrapper rather than baked in here.
  */
+/** The 1M-context beta. Not every model/subscription is entitled to it, and the
+ *  API rejects the request rather than ignoring the header, so the OAuth fetch
+ *  retries without it on that specific 400. */
+export const LONG_CONTEXT_BETA = 'context-1m-2025-08-07'
+
 export const OAUTH_HEADERS = {
   // Beta set aligned with what the real Claude Code CLI sends (captured on the
   // wire). Most are capability-enablers that are NO-OP unless the matching
@@ -309,7 +314,7 @@ export const OAUTH_HEADERS = {
   'anthropic-beta': [
     'claude-code-20250219',
     'oauth-2025-04-20',
-    'context-1m-2025-08-07',
+    LONG_CONTEXT_BETA,
     'interleaved-thinking-2025-05-14',
     'redact-thinking-2026-02-12',
     'thinking-token-count-2026-05-13',
