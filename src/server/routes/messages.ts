@@ -68,6 +68,19 @@ messageRoutes.post('/', async (c) => {
   return c.json({ messageId: id, queuePosition }, 202)
 })
 
+/**
+ * Rows the chat timeline may render: everything except messages flagged hidden
+ * (e.g. the onboarding kickoff trigger, which exists only to drive an LLM turn).
+ *
+ * This belongs in the WHERE clause, never after the limit. Filtering afterwards
+ * made a page of `limit` come back short, down to empty, while `hasMore` still
+ * said true, which left the client with an unmoved cursor and no way to make
+ * progress. json_valid() guards rows whose metadata isn't parseable JSON:
+ * json_extract raises on those, and they must stay visible.
+ */
+export const VISIBLE_MESSAGE_PREDICATE =
+  "(metadata IS NULL OR json_valid(metadata) = 0 OR json_extract(metadata, '$.hidden') IS NOT 1)"
+
 // GET /api/agents/:agentId/messages — get message history (accepts UUID or slug)
 messageRoutes.get('/', async (c) => {
   const agentIdParam = c.req.param('agentId')
@@ -92,7 +105,12 @@ messageRoutes.get('/', async (c) => {
     cursor = { createdAt: row.created_at, rowid: row.rowid }
   }
 
-  const conditions = [eq(messages.agentId, agentId), isNull(messages.taskId), isNull(messages.sessionId)]
+  const conditions = [
+    eq(messages.agentId, agentId),
+    isNull(messages.taskId),
+    isNull(messages.sessionId),
+    sql.raw(VISIBLE_MESSAGE_PREDICATE),
+  ]
   if (cursor) {
     conditions.push(
       sql`(${messages.createdAt} < ${cursor.createdAt} OR (${messages.createdAt} = ${cursor.createdAt} AND rowid < ${cursor.rowid}))`,
@@ -107,17 +125,8 @@ messageRoutes.get('/', async (c) => {
     .limit(limit + 1) // +1 to check hasMore
     .all()
 
-  // hasMore is computed on the RAW window: filtering hidden rows first made
-  // hasMore false whenever a hidden message fell inside the window, stalling
-  // infinite scroll with older history still unreachable.
   const hasMore = rawResult.length > limit
-  const windowRows = hasMore ? rawResult.slice(0, limit) : rawResult
-  // Drop messages flagged hidden (e.g. the onboarding kickoff trigger) — they
-  // exist only to drive an LLM turn and must never render in the chat.
-  const messageList = windowRows.filter((m) => {
-    if (!m.metadata) return true
-    try { return (JSON.parse(m.metadata as string) as { hidden?: boolean }).hidden !== true } catch { return true }
-  })
+  const messageList = hasMore ? rawResult.slice(0, limit) : rawResult
 
   // Reverse for chronological order
   messageList.reverse()

@@ -175,12 +175,26 @@ export function useChat(agentId: string | null) {
   // cancels it, keeping the card continuous during catch-up.
   const compactingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch message history
-  const fetchMessages = useCallback(async () => {
+  // True once the user has pulled at least one page of older history. Only then
+  // does the list extend above the latest window, and only then does a refetch
+  // have anything to preserve.
+  const hasLoadedOlderRef = useRef(false)
+
+  // Fetch message history.
+  //
+  // `preserveOlderPages` keeps the pages the user pulled via infinite scroll:
+  // this endpoint only returns the LATEST window, so a plain replacement wipes
+  // the paginated history from under a user reading old messages. Callers that
+  // repair state after possibly-missed SSE events (mount, resync) must NOT
+  // preserve: their whole job is to re-sync with the server, and stale rows
+  // above the window are exactly what they need to drop.
+  const fetchMessages = useCallback(async (options?: { preserveOlderPages?: boolean }) => {
     if (!agentId) {
       setMessages([])
+      hasLoadedOlderRef.current = false
       return
     }
+    const preserveOlderPages = options?.preserveOlderPages ?? false
 
     setIsLoading(true)
     try {
@@ -200,13 +214,27 @@ export function useChat(agentId: string | null) {
         }
       }
 
+      if (!preserveOlderPages) hasLoadedOlderRef.current = false
+
       // Smart merge: preserve object references for messages that haven't changed.
       // This prevents unnecessary re-renders of MessageBubble components (which are
       // memo'd and compare props by reference).
       setMessages((prev) => {
-        if (prev.length === 0) return data.messages
-        const prevById = new Map(prev.map((m) => [m.id, m]))
-        return data.messages.map((m) => {
+        // Anchor the fresh window on the id of its oldest row: everything before
+        // that index is paginated history contiguous with the window. Comparing
+        // createdAt instead would drop boundary rows, since the server orders by
+        // (createdAt, rowid) and ties at millisecond resolution are real.
+        const anchorId = data.messages[0]?.id
+        const anchorIdx = anchorId ? prev.findIndex((m) => m.id === anchorId) : -1
+        // anchorIdx < 0 means more than one window landed since the last refetch,
+        // so prev and the fresh window no longer overlap. Splicing them would
+        // render a silent, unfillable hole; replace the list instead.
+        const olderPages =
+          preserveOlderPages && hasLoadedOlderRef.current && anchorIdx > 0
+            ? prev.slice(0, anchorIdx)
+            : []
+        const prevById = new Map(prev.slice(anchorIdx < 0 ? 0 : anchorIdx).map((m) => [m.id, m]))
+        const refreshed = data.messages.map((m) => {
           const existing = prevById.get(m.id)
           if (!existing) return m
           // Keep old reference if content and key metadata are unchanged
@@ -221,8 +249,13 @@ export function useChat(agentId: string | null) {
           }
           return m
         })
+        return [...olderPages, ...refreshed]
       })
-      setHasMore(data.hasMore)
+      // hasMore means "more above the OLDEST loaded message". Once pages have
+      // been pulled, the response's hasMore describes the latest window's upper
+      // bound, not ours, so leave the cursor state alone. If the merge above had
+      // to fall back to a replacement, the next fetchOlderMessages corrects it.
+      if (!hasLoadedOlderRef.current) setHasMore(data.hasMore)
 
       // Remove live tasks whose result already appears as a persisted message.
       // Only match by resolvedTaskId (precise) and never remove tasks still active.
@@ -381,7 +414,18 @@ export function useChat(agentId: string | null) {
         }
       }
 
-      setMessages((prev) => [...data.messages, ...prev])
+      // The list now extends above the latest window, so subsequent refetches
+      // must preserve it. True even if every row below is deduped away: that
+      // only happens when they are already loaded.
+      if (data.messages.length > 0) hasLoadedOlderRef.current = true
+
+      setMessages((prev) => {
+        // Guard against a concurrent fetchMessages() that landed while this
+        // page was in flight: never prepend a message already in the list.
+        const existingIds = new Set(prev.map((m) => m.id))
+        const fresh = data.messages.filter((m) => !existingIds.has(m.id))
+        return fresh.length > 0 ? [...fresh, ...prev] : prev
+      })
       setHasMore(data.hasMore)
     } catch {
       toast.error(t('errors.loadMessagesFailed'))
@@ -464,7 +508,7 @@ export function useChat(agentId: string | null) {
       // Refresh to get the final message from DB (with tool calls, memoriesExtracted, etc.)
       // Use a smart merge to preserve object references for unchanged messages,
       // avoiding unnecessary re-renders of the entire message list.
-      fetchMessages()
+      fetchMessages({ preserveOlderPages: true })
     },
 
     'chat:message': (data) => {
@@ -568,7 +612,7 @@ export function useChat(agentId: string | null) {
 
       // Refresh messages after a short delay to pick up the task result message
       // (for await mode it may take longer; fetchMessages on chat:done handles that)
-      setTimeout(() => fetchMessages(), 1000)
+      setTimeout(() => fetchMessages({ preserveOlderPages: true }), 1000)
     },
 
     'compacting:start': (data) => {
@@ -608,7 +652,7 @@ export function useChat(agentId: string | null) {
       if (compactingClearTimerRef.current) clearTimeout(compactingClearTimerRef.current)
       compactingClearTimerRef.current = setTimeout(() => {
         compactingClearTimerRef.current = null
-        fetchMessages().then(() => setLiveCompacting(null))
+        fetchMessages({ preserveOlderPages: true }).then(() => setLiveCompacting(null))
       }, 1200)
     },
 
@@ -631,6 +675,8 @@ export function useChat(agentId: string | null) {
     'chat:cleared': (data) => {
       if (data.agentId !== agentId) return
       setMessages([])
+      setHasMore(false)
+      hasLoadedOlderRef.current = false
       resetStreaming()
     },
 
@@ -647,7 +693,8 @@ export function useChat(agentId: string | null) {
       // A secret value was scrubbed from history (redact_secret_leak) —
       // contents changed in place, so refetch rather than patch: the server
       // is the only source of the cleaned text, and the whole point is to
-      // stop displaying the leaked value.
+      // stop displaying the leaked value. Paginated pages are dropped rather
+      // than preserved for that same reason: they may hold the leaked value.
       if (data.agentId !== agentId) return
       fetchMessages()
     },
@@ -659,7 +706,7 @@ export function useChat(agentId: string | null) {
       // Agent is unrelated to avoid pointless work.
       if (!agentId) return
       if (data.fromAgentId === agentId || data.toAgentId === agentId) {
-        fetchMessages()
+        fetchMessages({ preserveOlderPages: true })
       }
     },
 
@@ -794,6 +841,8 @@ export function useChat(agentId: string | null) {
     try {
       await api.delete(`/agents/${agentId}/messages`)
       setMessages([])
+      setHasMore(false)
+      hasLoadedOlderRef.current = false
       toast.success(t('chat.clear.success'))
     } catch {
       toast.error(t('chat.clear.error'))
