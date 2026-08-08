@@ -212,6 +212,22 @@ export function applyProfileEdit(
 }
 
 /**
+ * Whether an edit may be persisted given the token budget.
+ *
+ * Over-budget results are refused, with one exception: an edit that SHRINKS the
+ * document always passes. A profile can legitimately sit above budget (the
+ * maintenance rewrite tolerates an overshoot, and a single oversized section
+ * cannot be truncated), and refusing the very edits that bring it back down
+ * would leave no way out.
+ */
+export function isEditAllowedByBudget(current: string, next: string, budget: number): boolean {
+  if (budget <= 0) return true
+  const tokens = countTokens(next)
+  if (tokens <= budget) return true
+  return tokens < countTokens(current)
+}
+
+/**
  * Apply an edit and persist it, enforcing the token budget.
  * Throws ProfileBudgetError / ProfileLineNotFoundError so callers can surface
  * an actionable message to the model or the user.
@@ -226,9 +242,7 @@ export async function editProfile(
 
   const budget = getProfileBudget()
   const tokens = countTokens(next)
-  // Removals must always be allowed: refusing them when a profile is already
-  // over budget would leave no way back under it.
-  if (budget > 0 && tokens > budget && edit.operation !== 'remove_line') {
+  if (!isEditAllowedByBudget(current.content, next, budget)) {
     throw new ProfileBudgetError(tokens, budget)
   }
 

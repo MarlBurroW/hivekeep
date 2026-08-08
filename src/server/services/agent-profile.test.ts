@@ -4,7 +4,9 @@ import {
   serializeSections,
   applyProfileEdit,
   ProfileLineNotFoundError,
+  isEditAllowedByBudget,
 } from '@/server/services/agent-profile'
+import { countTokens } from '@/shared/token-estimator'
 
 const SAMPLE = `## Pinned
 
@@ -143,5 +145,32 @@ describe('applyProfileEdit', () => {
       content: '- First project.',
     })
     expect(next).toBe('## Active projects\n\n- First project.')
+  })
+})
+
+describe('isEditAllowedByBudget', () => {
+  const small = '## Active projects\n\n- One short line.'
+  const big = '## Active projects\n\n' + Array.from({ length: 200 }, (_, i) => `- Entry number ${i} with descriptive text.`).join('\n')
+
+  it('allows an edit that stays within budget', () => {
+    expect(isEditAllowedByBudget(small, small + '\n- Another line.', 1500)).toBe(true)
+  })
+
+  it('refuses an edit that pushes an in-budget profile over it', () => {
+    expect(isEditAllowedByBudget(small, big, 100)).toBe(false)
+  })
+
+  it('allows shrinking an over-budget profile even while it stays over', () => {
+    const slightlySmaller = big.split('\n').slice(0, -20).join('\n')
+    expect(countTokens(slightlySmaller)).toBeGreaterThan(100)
+    expect(isEditAllowedByBudget(big, slightlySmaller, 100)).toBe(true)
+  })
+
+  it('refuses growing a profile that is already over budget', () => {
+    expect(isEditAllowedByBudget(big, big + '\n- One more entry.', 100)).toBe(false)
+  })
+
+  it('is a no-op when no budget is configured', () => {
+    expect(isEditAllowedByBudget(small, big, 0)).toBe(true)
   })
 })

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, RefreshCw, Save, Brain } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
@@ -32,12 +32,18 @@ export function AgentProfileEditor({ agentId }: { agentId: string }) {
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const rewriteAtBeforeRegen = useRef<string | null>(null)
 
   // Adopt server content unless the user has unsaved edits, so a maintenance
   // rewrite arriving over SSE doesn't silently discard what they typed.
   useEffect(() => {
     if (profile && !dirty) setDraft(profile.content)
   }, [profile, dirty])
+
+  useEffect(() => {
+    if (!regenerating || !profile) return
+    if (profile.lastRewriteAt !== rewriteAtBeforeRegen.current) setRegenerating(false)
+  }, [profile, regenerating])
 
   const handleSave = async () => {
     setSaving(true)
@@ -52,15 +58,19 @@ export function AgentProfileEditor({ agentId }: { agentId: string }) {
     }
   }
 
+  // The route answers 202 and compiles in the background, so the request
+  // resolving means nothing yet. Stay in the regenerating state until the
+  // rewrite actually lands (lastRewriteAt moves), otherwise the button settles
+  // instantly and the screen looks like nothing happened.
   const handleRegenerate = async () => {
     setRegenerating(true)
     setSaveError(null)
+    rewriteAtBeforeRegen.current = profile?.lastRewriteAt ?? null
     try {
       await regenerate()
       setDirty(false)
     } catch (err) {
       setSaveError(getErrorMessage(err))
-    } finally {
       setRegenerating(false)
     }
   }

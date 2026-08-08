@@ -44,16 +44,23 @@ export function buildCompilePrompt(params: {
 }
 
 /**
- * Compile one Agent's existing archive into an initial profile document.
- * Returns false when nothing was written (no memories, or the LLM call failed).
+ * Outcome of a compile attempt.
+ *
+ * 'failed' and 'nothing-to-compile' must stay distinguishable: the bootstrap
+ * only records itself as done when no Agent failed, and collapsing both into a
+ * boolean would make a provider outage look like an archive with nothing in it,
+ * marking the migration complete with every profile still empty.
  */
-export async function compileProfileFromArchive(agentId: string): Promise<boolean> {
+export type CompileOutcome = 'compiled' | 'nothing-to-compile' | 'failed'
+
+/** Compile one Agent's existing archive into an initial profile document. */
+export async function compileProfileFromArchive(agentId: string): Promise<CompileOutcome> {
   const agent = await db
     .select({ name: agents.name, role: agents.role, model: agents.model, providerId: agents.providerId })
     .from(agents)
     .where(eq(agents.id, agentId))
     .get()
-  if (!agent) return false
+  if (!agent) return 'nothing-to-compile'
 
   const rows = await db
     .select({
@@ -69,7 +76,7 @@ export async function compileProfileFromArchive(agentId: string): Promise<boolea
     .limit(MAX_MEMORIES_PER_COMPILE)
     .all()
 
-  if (rows.length === 0) return false
+  if (rows.length === 0) return 'nothing-to-compile'
 
   const memoriesList = rows
     .map((m) => {
@@ -91,7 +98,7 @@ export async function compileProfileFromArchive(agentId: string): Promise<boolea
     resolved = await resolveLLM({ modelId: effectiveModel ?? agent.model, providerId })
   } catch (err) {
     log.warn({ agentId, err }, 'Cannot resolve a model to compile the profile')
-    return false
+    return 'failed'
   }
 
   const current = await getProfile(agentId)
@@ -116,15 +123,15 @@ export async function compileProfileFromArchive(agentId: string): Promise<boolea
     text = result.text
   } catch (err) {
     log.warn({ agentId, err }, 'Profile compile LLM call failed')
-    return false
+    return 'failed'
   }
 
   const compiled = text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim()
-  if (!compiled) return false
+  if (!compiled) return 'failed'
 
   await setProfile(agentId, enforceBudget(enforcePinned(current.content, compiled), budget), 'regenerate')
   log.info({ agentId, memoriesUsed: rows.length }, 'Profile compiled from archive')
-  return true
+  return 'compiled'
 }
 
 /**
@@ -152,9 +159,10 @@ export async function bootstrapProfiles(): Promise<void> {
       continue
     }
     try {
-      const ok = await compileProfileFromArchive(agent.id)
-      if (ok) compiled++
-      else skipped++ // no memories to compile from
+      const outcome = await compileProfileFromArchive(agent.id)
+      if (outcome === 'compiled') compiled++
+      else if (outcome === 'nothing-to-compile') skipped++
+      else failed++
     } catch (err) {
       failed++
       log.warn({ agentId: agent.id, err }, 'Profile bootstrap failed for this Agent')

@@ -225,8 +225,8 @@ export function buildMaintenancePrompt(params: {
   currentProfile: string
   summary: string
   existingMemoriesSummary: string
-  /** Total archive size, when the listed index is only a slice of it. */
-  archiveTotal?: number
+  /** How many memories the index below lists, when it is only a slice of the archive. */
+  listedCount?: number
   formattedMessages: string
   budget: number
 }): string {
@@ -267,8 +267,8 @@ export function buildMaintenancePrompt(params: {
     `- If nothing durable changed, return the current profile unchanged.\n\n` +
     `## Current profile\n\n${params.currentProfile.trim() || '(empty — build it from what you learn here)'}\n\n` +
     `## Summary of the exchanges just archived\n\n${params.summary}\n\n` +
-    (params.archiveTotal && params.archiveTotal > 0
-      ? `## Existing archive memories (indexed)\n\nThese are the most relevant ${params.archiveTotal} of a larger archive, listed so you can target an "update". Anything absent here is not gone: treat it as unseen rather than missing, and prefer "add" when unsure.\n\n${params.existingMemoriesSummary}\n\n`
+    (params.listedCount && params.listedCount > 0
+      ? `## Existing archive memories (indexed)\n\nThese are the most relevant ${params.listedCount} of a larger archive, listed so you can target an "update". Anything absent here is not gone: treat it as unseen rather than missing, and prefer "add" when unsure.\n\n${params.existingMemoriesSummary}\n\n`
       : `## Existing archive memories (indexed)\n\n${params.existingMemoriesSummary}\n\n`) +
     `## Exchanges to analyze\n\n${params.formattedMessages}`
   )
@@ -368,7 +368,7 @@ export async function runMemoryMaintenance(params: {
         currentProfile: currentProfile.content,
         summary,
         existingMemoriesSummary,
-        archiveTotal: existingMemories.length < allMemories.length ? existingMemories.length : undefined,
+        listedCount: existingMemories.length < allMemories.length ? existingMemories.length : undefined,
         formattedMessages,
         budget,
       }),
