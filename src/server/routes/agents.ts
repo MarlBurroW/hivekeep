@@ -1353,6 +1353,24 @@ agentRoutes.put('/:id/profile', async (c) => {
   return c.json({ profile: { ...profile, budget } })
 })
 
+// POST /api/agents/:id/profile/regenerate — recompile the profile from the archive
+agentRoutes.post('/:id/profile/regenerate', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const agentId = existing.id
+
+  // Fire-and-forget: the compile is an LLM call over the whole archive. The
+  // client learns the outcome from the agent-profile:updated SSE event.
+  const { compileProfileFromArchive } = await import('@/server/services/agent-profile-bootstrap')
+  void compileProfileFromArchive(agentId).catch(() => {
+    // compileProfileFromArchive already logs; a failure leaves the profile as-is.
+  })
+
+  return c.json({ started: true }, 202)
+})
+
 // DELETE /api/agents/:id/memories/:memoryId — delete a memory
 agentRoutes.delete('/:id/memories/:memoryId', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))

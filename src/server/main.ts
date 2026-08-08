@@ -262,6 +262,14 @@ import { getModelPricing, listModelsWithPricing } from '@/server/services/model-
 setUsageCostHooks({ getPricing: getModelPricing, listPricedModels: listModelsWithPricing })
 setTimeout(() => backfillUsageCosts(), 5000)
 
+// One-shot, idempotent migration to memory v2: compile each Agent's existing
+// memory archive into an initial profile document. Deferred and fire-and-forget
+// — it makes LLM calls per Agent and must never hold up boot.
+import { bootstrapProfiles } from '@/server/services/agent-profile-bootstrap'
+setTimeout(() => {
+  bootstrapProfiles().catch((err) => log.error({ err }, 'Memory profile bootstrap failed'))
+}, 10_000)
+
 // Serve uploaded files
 app.use('/api/uploads/*', serveStatic({ root: config.upload.dir, rewriteRequestPath: (path) => path.replace('/api/uploads', '') }))
 
