@@ -83,9 +83,10 @@ Real-time message streaming and conversation events.
 
 | Event | Description | Scope |
 |-------|-------------|-------|
-| `memory:created` | Memory created | Per-Agent |
-| `memory:updated` | Memory updated | Per-Agent |
-| `memory:deleted` | Memory deleted | Per-Agent |
+| `memory:created` | Archive memory created | Per-Agent |
+| `memory:updated` | Archive memory updated | Per-Agent |
+| `memory:deleted` | Archive memory deleted | Per-Agent |
+| `agent-profile:updated` | Memory profile rewritten (`source`: `maintenance`, `tool`, `user` or `regenerate`) | Per-Agent |
 
 ### Compacting
 

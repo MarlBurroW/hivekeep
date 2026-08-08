@@ -11,8 +11,9 @@ Agents interact with the world through **tools**: functions they can call during
 
 | Tool | Description |
 |---|---|
-| `recall` | Semantic search across memories |
-| `memorize` | Store a new memory |
+| `recall` | Search the memory archive (semantic + keyword) |
+| `memorize` | Store an episodic memory in the archive |
+| `edit_profile` | Edit the always-injected memory profile |
 | `update_memory` | Edit an existing memory |
 | `forget` | Delete a memory |
 | `list_memories` | Browse all memories with filters |

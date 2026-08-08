@@ -222,9 +222,33 @@ Résumés de compacting avec accumulation multi-summary et merge télescopique.
 
 ---
 
+### `agent_profiles`
+
+Document de mémoire curé, un par Agent : injecté dans le segment **stable**
+(caché) du prompt système à chaque tour. Complément de `memories`, qui est
+l'archive épisodique atteinte à la demande via l'outil `recall`. Voir
+`memory.md`.
+
+| Colonne | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | text PK | UUID | |
+| `agent_id` | text | FK → agents.id, NOT NULL, UNIQUE, ON DELETE CASCADE | |
+| `content` | text | NOT NULL, DEFAULT '' | Le document markdown |
+| `token_estimate` | integer | NOT NULL, DEFAULT 0 | Recalculé à chaque écriture (jamais désynchronisé de `content`) |
+| `last_rewrite_at` | integer | | Dernière réécriture par l'appel de maintenance ou une régénération |
+| `manually_edited_at` | integer | | Dernière édition utilisateur via l'UI |
+| `created_at` | integer | NOT NULL | |
+| `updated_at` | integer | NOT NULL | |
+
+**Index** :
+- `agent_profiles_agent_id_unique` (UNIQUE) sur `agent_id`
+
+---
+
 ### `memories`
 
-Mémoire long terme des Agents (faits, préférences, décisions, connaissances).
+Archive épisodique des Agents (faits, préférences, décisions, connaissances).
+Jamais injectée automatiquement : cherchée à la demande via `recall`.
 
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|
