@@ -33,6 +33,13 @@ interface UpdateMemoryInput {
   scope?: MemoryScope
 }
 
+/** Optional metadata narrowing for an archive search. */
+export interface MemorySearchFilters {
+  subject?: string
+  category?: string
+  since?: Date
+}
+
 interface MemorySearchResult {
   id: string
   content: string
@@ -538,10 +545,11 @@ async function hybridSearchSingleQuery(
   scoreMap: Map<string, ScoreMapEntry>,
   K: number,
   ftsBoost: number,
+  filters?: MemorySearchFilters,
 ): Promise<void> {
   const [vecResults, ftsResults] = await Promise.all([
-    searchByVector(agentId, query, candidateLimit),
-    searchByFTS(agentId, query, candidateLimit),
+    searchByVector(agentId, query, candidateLimit, filters),
+    searchByFTS(agentId, query, candidateLimit, filters),
   ])
 
   for (let i = 0; i < vecResults.length; i++) {
@@ -576,6 +584,7 @@ export async function searchMemories(
   agentId: string,
   query: string,
   limit?: number,
+  filters?: MemorySearchFilters,
 ): Promise<MemorySearchResult[]> {
   const maxResults = limit ?? config.memory.maxRelevantMemories
   const useRerank = !!config.memory.rerankModel
@@ -603,7 +612,7 @@ export async function searchMemories(
   // Run hybrid search for each query variation in parallel
   const candidateLimit = maxResults * 2
   await Promise.all(
-    queries.map((q) => hybridSearchSingleQuery(agentId, q, candidateLimit, scoreMap, K, ftsBoost)),
+    queries.map((q) => hybridSearchSingleQuery(agentId, q, candidateLimit, scoreMap, K, ftsBoost, filters)),
   )
 
   // Detect subjects mentioned in the query for score boosting
@@ -675,16 +684,49 @@ export async function searchMemories(
 }
 
 /**
+ * Build the SQL fragment + bound values for the optional archive filters.
+ * Shared by both search arms so a filter can never apply to only one of them.
+ */
+function buildFilterClause(
+  filters?: MemorySearchFilters,
+  /** Table alias to qualify columns with, for queries that join two tables. */
+  prefix = '',
+): { sql: string; params: Array<string | number> } {
+  const col = (name: string) => `${prefix}${name}`
+  const clauses: string[] = []
+  const params: Array<string | number> = []
+  if (filters?.subject) {
+    clauses.push(`${col('subject')} = ?`)
+    params.push(filters.subject)
+  }
+  if (filters?.category) {
+    clauses.push(`${col('category')} = ?`)
+    params.push(filters.category)
+  }
+  if (filters?.since) {
+    clauses.push(`${col('updated_at')} >= ?`)
+    params.push(filters.since.getTime())
+  }
+  return { sql: clauses.length > 0 ? ` AND ${clauses.join(' AND ')}` : '', params }
+}
+
+/**
  * Semantic search using sqlite-vec KNN.
  */
 async function searchByVector(
   agentId: string,
   query: string,
   limit: number,
+  filters?: MemorySearchFilters,
 ): Promise<Array<{ id: string; content: string; category: string; subject: string | null; sourceContext: string | null; importance: number | null; retrievalCount: number; distance: number; scope: MemoryScope; agentId: string; updatedAt: Date | null }>> {
   try {
     const queryEmbedding = await generateEmbedding(query)
     const queryBuf = Buffer.from(new Float32Array(queryEmbedding).buffer)
+
+    const filter = buildFilterClause(filters)
+    // KNN runs before the metadata filter, so a filtered search needs a wider
+    // candidate pool or the filter would starve the vector arm.
+    const k = filter.params.length > 0 ? limit * 4 : limit
 
     const rows = sqlite
       .query<{ memory_id: string; distance: number }, [Buffer, number]>(
@@ -693,7 +735,7 @@ async function searchByVector(
          WHERE embedding MATCH ? AND k = ?
          ORDER BY distance`,
       )
-      .all(queryBuf, limit)
+      .all(queryBuf, k)
 
     // Filter by similarity threshold (distance = 1 - cosine_similarity for vec0)
     const threshold = config.memory.similarityThreshold
@@ -708,12 +750,12 @@ async function searchByVector(
     const memRows = sqlite
       .query<
         { id: string; agent_id: string; content: string; category: string; subject: string | null; source_context: string | null; importance: number | null; retrieval_count: number; scope: string; updated_at: string | null },
-        string[]
+        Array<string | number>
       >(
         `SELECT id, agent_id, content, category, subject, source_context, importance, retrieval_count, scope, updated_at FROM memories
-         WHERE id IN (${placeholders}) AND (agent_id = ? OR scope = 'shared')`,
+         WHERE id IN (${placeholders}) AND (agent_id = ? OR scope = 'shared')${filter.sql}`,
       )
-      .all(...matchingIds, agentId)
+      .all(...matchingIds, agentId, ...filter.params)
 
     // Preserve distance ordering
     const memMap = new Map(memRows.map((m) => [m.id, m]))
@@ -736,6 +778,7 @@ function searchByFTS(
   agentId: string,
   query: string,
   limit: number,
+  filters?: MemorySearchFilters,
 ): Promise<Array<{ id: string; content: string; category: string; subject: string | null; sourceContext: string | null; importance: number | null; retrievalCount: number; rank: number; scope: MemoryScope; agentId: string; updatedAt: Date | null }>> {
   try {
     // Escape FTS5 special characters, filter noise, build query with prefix matching
@@ -753,22 +796,25 @@ function searchByFTS(
     // Fallback: if AND is too strict, we'll catch empty results and retry with OR
     const ftsQueryOr = terms.map((term) => `"${term}"*`).join(' OR ')
 
+    // Columns are qualified: the FTS join brings two tables into scope.
+    const filter = buildFilterClause(filters, 'm.')
+
     const stmt = sqlite.query<
       { id: string; agent_id: string; content: string; category: string; subject: string | null; source_context: string | null; importance: number | null; retrieval_count: number; scope: string; rank: number; updated_at: string | null },
-      [string, string, number]
+      Array<string | number>
     >(
       `SELECT m.id, m.agent_id, m.content, m.category, m.subject, m.source_context, m.importance, m.retrieval_count, m.scope, fts.rank, m.updated_at
        FROM memories_fts fts
        JOIN memories m ON m.rowid = fts.rowid
-       WHERE memories_fts MATCH ? AND (m.agent_id = ? OR m.scope = 'shared')
+       WHERE memories_fts MATCH ? AND (m.agent_id = ? OR m.scope = 'shared')${filter.sql}
        ORDER BY fts.rank
        LIMIT ?`,
     )
 
     // Try AND first (precise), fall back to OR (broad) if no results
-    let rows = stmt.all(ftsQuery, agentId, limit)
+    let rows = stmt.all(ftsQuery, agentId, ...filter.params, limit)
     if (rows.length === 0 && terms.length > 1) {
-      rows = stmt.all(ftsQueryOr, agentId, limit)
+      rows = stmt.all(ftsQueryOr, agentId, ...filter.params, limit)
     }
 
     return Promise.resolve(rows.map((r) => ({ ...r, agentId: r.agent_id, sourceContext: r.source_context, retrievalCount: r.retrieval_count, scope: r.scope as MemoryScope, updatedAt: r.updated_at ? new Date(r.updated_at) : null })))

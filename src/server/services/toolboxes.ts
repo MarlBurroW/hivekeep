@@ -83,6 +83,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'read_summary',
       'recall',
       'memorize',
+      'edit_profile',
       'update_memory',
       'forget',
       'list_memories',
@@ -97,6 +98,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
     toolNames: [
       'recall',
       'memorize',
+      'edit_profile',
       'list_memories',
       'get_secret',
       'search_secrets',
@@ -216,6 +218,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'search_contacts',
       // Memory.
       'memorize',
+      'edit_profile',
       'recall',
       'list_memories',
       // Secure secret entry.

@@ -995,8 +995,9 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `  4. If truly new, use create_contact() with all available identifiers.\n` +
       `- This prevents duplicate contacts when the same person talks from different channels.\n\n` +
       `### Memory management\n` +
-      `- When you identify important information worth remembering long-term (fact, preference, decision), use memorize() to save it immediately.\n` +
-      `- If you're unsure about past information, use recall() to check your memory rather than guessing.\n` +
+      `- Your memory has two halves, and the "## Your memory" section above holds the first one. Route new information with this test: should it influence your behavior in most future conversations, without anyone mentioning it? If yes, it belongs in the profile — use edit_profile(). If it is episodic (a dated event, an outcome, a detail you might look up when the topic returns), memorize() it into the archive.\n` +
+      `- Keep the profile lean: it costs context on every single turn. Prefer memorize() when in doubt, and use edit_profile() to remove entries that no longer apply.\n` +
+      `- If you're unsure about past information, use recall() to search the archive rather than guessing. Narrow it with the subject, category, or since filters when you know roughly what you're after.\n` +
       `- When memorizing, default to \`private\` scope. Only use \`shared\` when the information is genuinely useful to other Agents — cross-domain facts, user-wide preferences, or decisions that affect all Agents. Your domain-specific knowledge and task context should stay private.\n\n` +
       `### Secrets\n` +
       `- Secrets are referenced by PLACEHOLDER, never by value. get_secret(key) returns a placeholder like {{secret:GITHUB_TOKEN}} — insert it verbatim in any tool argument and the real value is substituted at execution time. You never see, and never need, the raw value.\n` +

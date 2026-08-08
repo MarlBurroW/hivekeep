@@ -84,6 +84,7 @@ import {
   forgetTool,
   listMemoriesTool,
   reviewMemoriesTool,
+  editProfileTool,
 } from '@/server/tools/memory-tools'
 import { searchHistoryTool, browseHistoryTool, readMessageTool, listSummariesTool, readSummaryTool } from '@/server/tools/history-tools'
 import {
@@ -374,6 +375,7 @@ export function registerAllTools(): void {
   toolRegistry.register('forget', forgetTool, 'memory')
   toolRegistry.register('list_memories', listMemoriesTool, 'memory')
   toolRegistry.register('review_memories', reviewMemoriesTool, 'memory')
+  toolRegistry.register('edit_profile', editProfileTool, 'memory')
 
   // Phase 12: History tools
   toolRegistry.register('search_history', searchHistoryTool, 'memory')
