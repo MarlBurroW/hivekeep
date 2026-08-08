@@ -107,6 +107,8 @@ interface PromptParams {
   }
   contacts: ContactSummary[]
   relevantMemories: Memory[]
+  /** Curated memory profile document (see memory.md). Main-Agent prompt only. */
+  profile?: string | null
   relevantKnowledge?: Array<{ content: string; sourceId: string; score: number }>
   agentDirectory: AgentDirectoryEntry[]
   mcpTools?: MCPToolSummaryForPrompt[]
@@ -397,6 +399,41 @@ function formatMemoryLineCompact(m: Memory): string {
  */
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5)
+}
+
+/**
+ * Build the always-injected memory profile block (stable segment).
+ *
+ * The profile is the Agent's curated semantic memory: current state, standing
+ * preferences, active work. The episodic archive (`memories`) is NOT injected —
+ * the Agent reaches it through `recall`. The boundary test stated here is the
+ * same one used by the maintenance rewrite and by the memory tool descriptions,
+ * so all three decision points agree (see memory.md §3).
+ */
+function buildProfileBlock(profile: string, opts: { canEdit: boolean }): string {
+  const lines = [`## Your memory\n`]
+
+  const content = profile.trim()
+  if (content) {
+    lines.push(`This is your curated long-term memory. It is always current; trust it.\n`)
+    lines.push(`${content}\n`)
+  } else {
+    lines.push(
+      `Your profile is still empty — it fills itself as you have conversations.\n`,
+    )
+  }
+
+  const editGuidance = opts.canEdit
+    ? ` Rule of thumb: if it should shape your behavior in most future conversations unprompted, it belongs here (use edit_profile); if it is something you might need to look up when a topic comes back, memorize() it.`
+    : ''
+
+  lines.push(
+    `This document is what you *know*: current state, standing preferences, active work. ` +
+    `Your archive is what *happened*: dated events, past details, one-off facts, searchable with recall(query).${editGuidance} ` +
+    `Nothing is ever lost by going to the archive: search it with recall() BEFORE saying you don't remember.`,
+  )
+
+  return lines.join('\n')
 }
 
 function buildMemoriesBlock(memories: Memory[]): string {
@@ -792,6 +829,17 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     // [3.6] Configurator mission + knowledge (Queenie only)
     if (params.agent.kind === 'configurator') {
       stableBlocks.push(buildConfiguratorBlock())
+    }
+
+    // [3.7] Memory profile — stable. Unlike the v1 per-message memory
+    // injection, this changes only on a maintenance rewrite or an explicit
+    // edit, so it can live in the cached prefix.
+    if (toolsEnabled || params.profile?.trim()) {
+      // Quick sessions are told not to offer saving memories, so the block
+      // there stays read-only guidance (recall) without the edit affordances.
+      stableBlocks.push(
+        buildProfileBlock(params.profile ?? '', { canEdit: toolsEnabled && !params.isQuickSession }),
+      )
     }
   }
 

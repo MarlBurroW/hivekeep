@@ -235,6 +235,7 @@ export const fullMockSchema = {
   compactingSnapshots: {},
   compactingSummaries: {},
   memories: {},
+  agentProfiles: {},
   contacts: {},
   contactIdentifiers: {},
   contactPlatformIds: {},

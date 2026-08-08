@@ -1311,6 +1311,48 @@ agentRoutes.get('/:id/memories', async (c) => {
   return c.json({ memories: result, total, hasMore: offset + result.length < total })
 })
 
+// GET /api/agents/:id/profile — the curated memory profile document
+agentRoutes.get('/:id/profile', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const { getProfile, getProfileBudget } = await import('@/server/services/agent-profile')
+  const profile = await getProfile(existing.id)
+  return c.json({ profile: { ...profile, budget: getProfileBudget() } })
+})
+
+// PUT /api/agents/:id/profile — replace the profile document (user edit)
+agentRoutes.put('/:id/profile', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const body = await c.req.json<{ content?: string }>().catch(() => ({} as { content?: string }))
+  if (typeof body.content !== 'string') {
+    return c.json({ error: { code: 'INVALID_INPUT', message: 'content is required' } }, 400)
+  }
+
+  const { setProfile, getProfileBudget } = await import('@/server/services/agent-profile')
+  const { countTokens } = await import('@/shared/token-estimator')
+  const budget = getProfileBudget()
+  const tokens = countTokens(body.content.trim())
+  if (budget > 0 && tokens > budget) {
+    return c.json(
+      {
+        error: {
+          code: 'PROFILE_TOO_LARGE',
+          message: `The profile is ${tokens} tokens, over the ${budget}-token budget. Condense it or move detail to the archive.`,
+        },
+      },
+      400,
+    )
+  }
+
+  const profile = await setProfile(existing.id, body.content, 'user')
+  return c.json({ profile: { ...profile, budget } })
+})
+
 // DELETE /api/agents/:id/memories/:memoryId — delete a memory
 agentRoutes.delete('/:id/memories/:memoryId', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))

@@ -397,6 +397,10 @@ export const config = {
       contextualRewriteModel: contextualRewrite.model,
       contextualRewriteProviderId: contextualRewrite.providerId,
       contextualRewriteThreshold: Number(process.env.MEMORY_CONTEXTUAL_REWRITE_THRESHOLD ?? 80),
+      // Budget for the always-injected profile document (see memory.md).
+      // It sits in the cached stable prompt segment, so every line costs on
+      // every turn — the maintenance rewrite is told to stay under this.
+      profileMaxTokens: Number(process.env.MEMORY_PROFILE_MAX_TOKENS ?? 1500),
       tokenBudget: Number(process.env.MEMORY_TOKEN_BUDGET || 0), // 0 = unlimited (no budget enforcement)
       recencyBoostEnabled: process.env.MEMORY_RECENCY_BOOST !== 'false', // Boost very recent memories (default: true)
     }

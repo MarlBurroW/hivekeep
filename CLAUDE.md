@@ -15,6 +15,7 @@ Read these files **before starting any phase**. They are the source of truth.
 | `structure.md` | Project file tree, naming conventions, imports, i18n, error format |
 | `prompt-system.md` | How the Agent system prompt is assembled (blocks 1-12) |
 | `compacting.md` | Compacting algorithm + memory extraction pipeline |
+| `memory.md` | **Memory v2** design — always-injected per-Agent profile document + episodic archive searched via `recall`; replaces per-message retrieval injection and the scoring heuristics |
 | `queenie.md` | **Conversational onboarding** spec — the `Queenie` configurator Agent, vault-centralized secrets, secure-input tools, avatar-style customization (Phase 27) |
 | `files.md` | **Files section** spec — workspace file browser/editor (tree + tabs + CodeMirror), workspace REST API + `workspace:changed` SSE, share-to-file-storage, chat integrations (`@` file palette, clickable paths) |
 | `interactive-setup.md` | **Interactive setup cards** spec — generic, declarative in-chat OAuth sign-in + QR pairing (setup *methods* `secret`/`oauth`/`qr`), extending the `secret_prompts` card machinery without a DB migration |

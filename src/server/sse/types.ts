@@ -71,6 +71,9 @@ export type SSEEventType =
   | 'memory:created'
   | 'memory:updated'
   | 'memory:deleted'
+  // Agent long-term memory profile document. Distinct from 'profile:updated',
+  // which carries the signed-in user's profile.
+  | 'agent-profile:updated'
   | 'custom-tool:created'
   | 'custom-tool:updated'
   | 'custom-tool:deleted'

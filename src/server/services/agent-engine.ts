@@ -36,6 +36,7 @@ import { eventBus } from '@/server/services/events'
 import { hookRegistry } from '@/server/hooks/index'
 import { config } from '@/server/config'
 import { getRelevantMemories, rewriteQueryWithContext } from '@/server/services/memory'
+import { getProfile } from '@/server/services/agent-profile'
 import { maybeCompact, resolveCompactionBoundary, isAfterCompactionBoundary } from '@/server/services/compacting'
 import { getMCPToolsSummary } from '@/server/services/mcp'
 import { resolveToolset } from '@/server/services/toolset-resolver'
@@ -1505,10 +1506,12 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     }
 
     const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agent.id)
+    const memoryProfile = await getProfile(agentId)
     const systemSegments = buildSystemPrompt({
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: contactsWithSlug,
       relevantMemories,
+      profile: memoryProfile.content,
       relevantKnowledge,
       agentDirectory,
       mcpTools: mcpToolsSummary,
@@ -2546,6 +2549,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: apiContacts,
       relevantMemories,
+      profile: (await getProfile(agentId)).content,
       relevantKnowledge,
       agentDirectory: apiAgentDirectory,
       mcpTools: apiMcpToolsSummary,
