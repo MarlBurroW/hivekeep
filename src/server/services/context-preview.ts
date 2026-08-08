@@ -4,7 +4,6 @@ import { eq, and, isNull, desc, ne, asc, sql } from 'drizzle-orm'
 import { getFilesForMessages } from '@/server/services/files'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
 import { listActiveTriggerSummariesForAgent } from '@/server/services/account-triggers'
-import { getRelevantMemories } from '@/server/services/memory'
 import { listContactsForPrompt } from '@/server/services/contacts'
 import { listAvailableAgents } from '@/server/services/inter-agent'
 import { getMCPToolsSummary } from '@/server/services/mcp'
@@ -312,22 +311,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     role: k.role,
   }))
 
-  // Relevant memories — use the last user message as query, or fallback
-  let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-  try {
-    const lastUserMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.agentId, agentId), eq(messages.role, 'user'), isNull(messages.taskId), isNull(messages.sessionId)))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    const query = lastUserMsg?.content ?? agent.name
-    relevantMemories = await getRelevantMemories(agentId, query)
-  } catch {
-    // Non-fatal
-  }
-
   // Knowledge
   let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
   try {
@@ -460,7 +443,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: contactsWithSlug,
-    relevantMemories,
     relevantKnowledge,
     agentDirectory,
     mcpTools: mcpToolsSummary,
@@ -775,7 +757,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agentIdentity.name, slug: agentIdentity.slug, role: agentIdentity.role, character: agentIdentity.character, expertise: agentIdentity.expertise },
     contacts: [],
-    relevantMemories: [],
     agentDirectory,
     isSubAgent: true,
     taskDescription: task.description,
@@ -906,21 +887,6 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
   const firstProfile = db.select({ language: userProfiles.language, agentLanguage: userProfiles.agentLanguage }).from(userProfiles).limit(1).get()
   if (firstProfile) userLanguage = firstProfile.agentLanguage ?? firstProfile.language
 
-  // Memories (use last session message as query)
-  let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-  try {
-    const lastMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    if (lastMsg?.content) relevantMemories = await getRelevantMemories(agentId, lastMsg.content)
-  } catch {
-    // Non-fatal
-  }
-
   // Knowledge
   let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
   try {
@@ -942,7 +908,6 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: [],
-    relevantMemories,
     relevantKnowledge,
     agentDirectory: [],
     isSubAgent: false,

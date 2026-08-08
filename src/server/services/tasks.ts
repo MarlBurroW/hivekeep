@@ -1106,7 +1106,6 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         expertise: agentIdentity.expertise,
       },
       contacts: [],
-      relevantMemories: [],
       agentDirectory,
       isSubAgent: true,
       taskDescription: task.description,

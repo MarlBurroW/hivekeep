@@ -240,7 +240,6 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
                     senderName={isFromUser ? (user?.pseudonym ?? user?.firstName) : agentName}
                     timestamp={msg.createdAt}
                     toolCalls={toolCallsByMessage.get(msg.id)}
-                    injectedMemories={msg.injectedMemories}
                     stepLimitReached={msg.stepLimitReached}
                     emptyTurn={msg.emptyTurn}
                     finishReason={msg.finishReason}

@@ -12,7 +12,6 @@ import {
 import { config } from '@/server/config'
 import { getQueueSize } from '@/server/services/queue'
 import { getDefaultCompactingModel, getDefaultCompactingProviderId } from '@/server/services/app-settings'
-import { pruneStaleMemories } from '@/server/services/memory'
 import { sseManager } from '@/server/sse/index'
 import { getModelContextWindow } from '@/shared/model-context-windows'
 import { countTokens } from '@/shared/token-estimator'
@@ -600,41 +599,6 @@ export async function runCompacting(
       summary,
     })
 
-    // Run memory consolidation to merge near-duplicate memories
-    let memoriesConsolidated = 0
-    try {
-      const { consolidateMemories } = await import('@/server/services/consolidation')
-      memoriesConsolidated = await consolidateMemories(agentId)
-      if (memoriesConsolidated > 0) {
-        log.info({ agentId, memoriesConsolidated }, 'Memories consolidated after extraction')
-      }
-    } catch (err) {
-      log.error({ agentId, err }, 'Memory consolidation error')
-    }
-
-    // Recalibrate importance scores based on retrieval patterns
-    let memoriesRecalibrated = 0
-    try {
-      const { recalibrateImportance } = await import('@/server/services/memory')
-      memoriesRecalibrated = await recalibrateImportance(agentId)
-      if (memoriesRecalibrated > 0) {
-        log.info({ agentId, memoriesRecalibrated }, 'Memory importance recalibrated')
-      }
-    } catch (err) {
-      log.error({ agentId, err }, 'Memory importance recalibration error')
-    }
-
-    // Prune stale memories (low importance, never retrieved, old)
-    let memoriesPruned = 0
-    try {
-      memoriesPruned = await pruneStaleMemories(agentId)
-      if (memoriesPruned > 0) {
-        log.info({ agentId, memoriesPruned }, 'Stale memories pruned')
-      }
-    } catch (err) {
-      log.error({ agentId, err }, 'Stale memory pruning error')
-    }
-
     // Persist a system message so the compaction trace survives page refresh
     // role='system' is skipped by buildMessageHistory → won't pollute LLM context
     const compactingMessageId = uuid()
@@ -646,7 +610,7 @@ export async function runCompacting(
       sourceType: 'compacting',
       isRedacted: false,
       redactPending: false,
-      metadata: JSON.stringify({ memoriesExtracted, memoriesConsolidated, memoriesPruned }),
+      metadata: JSON.stringify({ memoriesExtracted }),
       createdAt: new Date(),
     })
 

@@ -22,7 +22,6 @@ function makeParams(overrides: Record<string, unknown> = {}) {
       expertise: 'General knowledge.',
     },
     contacts: [],
-    relevantMemories: [],
     agentDirectory: [],
     isSubAgent: false,
     userLanguage: 'en' as const,
@@ -96,18 +95,44 @@ describe('buildSystemPrompt', () => {
     expect(result).not.toContain('## Known contacts')
   })
 
-  it('includes relevant memories', () => {
+  it('injects the memory profile verbatim', () => {
     const result = buildSystemPrompt(makeParams({
-      relevantMemories: [
-        { category: 'fact', content: 'User likes cats', subject: 'User' },
-        { category: 'preference', content: 'Dark mode', subject: null },
-      ],
+      profile: '## Active projects\n\n- Ship memory v2.\n\n## Pinned\n\n- Never use em-dashes.',
     }))
-    expect(result).toContain('## Memories')
-    expect(result).toContain('[fact] User likes cats (subject: User)')
-    expect(result).toContain('[preference] Dark mode')
-    // No subject suffix when null
-    expect(result).not.toContain('Dark mode (subject:')
+    expect(result).toContain('## Your memory')
+    expect(result).toContain('- Ship memory v2.')
+    expect(result).toContain('- Never use em-dashes.')
+    expect(result).toContain('It is always current; trust it.')
+  })
+
+  it('states the profile is empty rather than omitting the block', () => {
+    const result = buildSystemPrompt(makeParams({ profile: '' }))
+    expect(result).toContain('## Your memory')
+    expect(result).toContain('Your profile is still empty')
+    expect(result).not.toContain('It is always current; trust it.')
+  })
+
+  it('points at recall for anything episodic', () => {
+    const result = buildSystemPrompt(makeParams({ profile: '## Pinned\n\n- Keep me.' }))
+    expect(result).toContain('searchable with recall(query)')
+    expect(result).toContain("BEFORE saying you don't remember")
+  })
+
+  it('offers edit_profile in a normal session but not in a quick session', () => {
+    const normal = buildSystemPrompt(makeParams({ profile: '## Pinned\n\n- Keep me.' }))
+    expect(normal).toContain('use edit_profile')
+
+    const quick = buildSystemPrompt(makeParams({ isQuickSession: true, profile: '## Pinned\n\n- Keep me.' }))
+    expect(quick).toContain('## Your memory')
+    expect(quick).toContain('- Keep me.')
+    // Quick sessions are told not to offer saving memories, so the block there
+    // stays read-only.
+    expect(quick).not.toContain('use edit_profile')
+  })
+
+  it('drops the memory block entirely when the model cannot call tools and has no profile', () => {
+    const result = buildSystemPrompt(makeParams({ profile: '', toolsEnabled: false }))
+    expect(result).not.toContain('## Your memory')
   })
 
   it('includes agent directory with collaboration instructions for main agent', () => {
@@ -270,15 +295,6 @@ describe('buildSystemPrompt', () => {
     expect(result).not.toContain('## Internal instructions')
   })
 
-  it('quick session includes memories', () => {
-    const result = buildSystemPrompt(makeParams({
-      isQuickSession: true,
-      relevantMemories: [{ category: 'fact', content: 'Important thing', subject: null }],
-    }))
-    expect(result).toContain('## Memories')
-    expect(result).toContain('Important thing')
-  })
-
   // --- Contact formatting ---
 
   it('formats contacts with nicknames as aka list', () => {
@@ -329,77 +345,6 @@ describe('buildSystemPrompt', () => {
       currentMessageSource: { platform: 'discord' },
     }))
     expect(result).toContain('No tables')
-  })
-
-  // --- Memory grouping ---
-
-  it('groups memories by category when more than 3', () => {
-    const memories = [
-      { category: 'fact', content: 'Lives in Paris', subject: 'User' },
-      { category: 'fact', content: 'Works at Acme', subject: 'User' },
-      { category: 'preference', content: 'Likes dark mode', subject: null },
-      { category: 'decision', content: 'Use PostgreSQL', subject: null },
-    ]
-    const result = buildSystemPrompt(makeParams({ relevantMemories: memories }))
-    expect(result).toContain('### Facts')
-    expect(result).toContain('### Preferences')
-    expect(result).toContain('### Decisions')
-  })
-
-  it('renders flat list when 3 or fewer memories', () => {
-    const memories = [
-      { category: 'fact', content: 'Lives in Paris', subject: null },
-      { category: 'preference', content: 'Likes dark mode', subject: null },
-    ]
-    const result = buildSystemPrompt(makeParams({ relevantMemories: memories }))
-    expect(result).toContain('## Memories')
-    expect(result).not.toContain('### Facts')
-  })
-
-  // --- Subject-grouped memories ---
-
-  it('groups memories by subject when ≥60% have subjects', () => {
-    const memories = [
-      { category: 'fact', content: 'Lives in Paris', subject: 'Alice' },
-      { category: 'preference', content: 'Likes coffee', subject: 'Alice' },
-      { category: 'fact', content: 'Works at Acme', subject: 'Bob' },
-      { category: 'decision', content: 'Use TypeScript', subject: 'Project' },
-      { category: 'preference', content: 'Dark mode', subject: null },
-    ]
-    const result = buildSystemPrompt(makeParams({ relevantMemories: memories }))
-    // Subject grouping: headers are subject names, not category labels
-    expect(result).toContain('### Alice')
-    expect(result).toContain('### Bob')
-    expect(result).toContain('### Project')
-    expect(result).toContain('### General') // null subject → General
-    expect(result).not.toContain('### Facts')
-  })
-
-  it('falls back to category grouping when <60% have subjects', () => {
-    const memories = [
-      { category: 'fact', content: 'Lives in Paris', subject: 'Alice' },
-      { category: 'preference', content: 'Likes dark mode', subject: null },
-      { category: 'fact', content: 'Has a cat', subject: null },
-      { category: 'decision', content: 'Use PostgreSQL', subject: null },
-    ]
-    const result = buildSystemPrompt(makeParams({ relevantMemories: memories }))
-    // Only 25% have subjects → category grouping
-    expect(result).toContain('### Facts')
-    expect(result).toContain('### Preferences')
-    expect(result).not.toContain('### Alice')
-  })
-
-  // --- High importance memories ---
-
-  it('marks high importance memories with ★', () => {
-    const memories = [
-      { category: 'fact', content: 'Important fact', subject: null, importance: 8 },
-      { category: 'fact', content: 'Normal fact', subject: null, importance: 5 },
-    ]
-    const result = buildSystemPrompt(makeParams({ relevantMemories: memories }))
-    expect(result).toContain('★')
-    expect(result).toContain('★ [fact] Important fact')
-    expect(result).not.toContain('★ [fact] Normal fact')
   })
 
   // --- Participants ---
@@ -634,24 +579,30 @@ describe('buildSystemPrompt', () => {
       expect(volatile).not.toContain('## Platform context')
     })
 
-    it('places date, language, contacts, memories and current speaker in the volatile segment', () => {
+    it('places date, language, contacts and current speaker in the volatile segment', () => {
       const { stable, volatile } = buildSystemPromptSegmented(makeParams({
         contacts: [{ id: 'c1', displayName: 'Alice', firstName: 'Alice', lastName: null, nicknames: [] }],
-        relevantMemories: [{ category: 'fact', content: 'Likes cats', subject: 'Alice' }],
         currentSpeaker: { firstName: 'Alice', lastName: null, pseudonym: 'alice', role: 'user' },
       }))
       expect(volatile).toContain('## Known contacts')
-      expect(volatile).toContain('## Memories')
       expect(volatile).toContain('## Current speaker')
       expect(volatile).toContain('## Language')
       expect(volatile).toContain('## Context')
       expect(volatile).toContain('Current date:')
       // None of those should pollute the stable segment
       expect(stable).not.toContain('## Known contacts')
-      expect(stable).not.toContain('## Memories')
       expect(stable).not.toContain('## Current speaker')
       expect(stable).not.toContain('## Language')
       expect(stable).not.toContain('Current date:')
+    })
+
+    it('places the memory profile in the stable segment, so it stays cacheable', () => {
+      const { stable, volatile } = buildSystemPromptSegmented(makeParams({
+        profile: '## Active projects\n\n- Memory v2 redesign.',
+      }))
+      expect(stable).toContain('## Your memory')
+      expect(stable).toContain('- Memory v2 redesign.')
+      expect(volatile).not.toContain('## Your memory')
     })
 
     it('places agent directory in the stable segment', () => {

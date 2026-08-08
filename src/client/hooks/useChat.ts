@@ -66,7 +66,6 @@ export interface ChatMessage {
   isRedacted: boolean
   toolCalls: ToolCallEntry[] | null
   resolvedTaskId: string | null
-  injectedMemories: Array<{ id: string; category: string; content: string; subject: string | null }> | null
   memoriesExtracted: number | null
   compactingError: string | null
   stepLimitReached: boolean
@@ -539,7 +538,6 @@ export function useChat(agentId: string | null) {
         isRedacted: false,
         toolCalls: null,
         resolvedTaskId,
-        injectedMemories: null,
         memoriesExtracted: null,
         compactingError: null,
         files: (data.files as MessageFile[] | undefined) ?? [],
@@ -795,7 +793,6 @@ export function useChat(agentId: string | null) {
         isRedacted: false,
         toolCalls: null,
         resolvedTaskId: null,
-        injectedMemories: null,
         memoriesExtracted: null,
         compactingError: null,
         files: optimisticFiles ?? [],

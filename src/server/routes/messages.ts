@@ -388,7 +388,6 @@ messageRoutes.get('/', async (c) => {
         isRedacted: m.isRedacted,
         toolCalls,
         resolvedTaskId: meta?.resolvedTaskId ?? meta?.relatedTaskId ?? null,
-        injectedMemories: meta?.injectedMemories ?? null,
         memoriesExtracted: meta?.memoriesExtracted ?? null,
         compactingError: meta?.error ?? null,
         stepLimitReached: meta?.stepLimitReached ?? false,

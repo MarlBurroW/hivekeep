@@ -232,7 +232,6 @@ sessionRoutes.get('/:id', async (c) => {
         isRedacted: m.isRedacted,
         toolCalls: m.toolCalls ? JSON.parse(m.toolCalls as string) : null,
         resolvedTaskId: null,
-        injectedMemories: meta?.injectedMemories ?? null,
         stepLimitReached: meta?.stepLimitReached ?? false,
         emptyTurn: meta?.emptyTurn ?? false,
         finishReason: meta?.finishReason ?? null,

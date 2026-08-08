@@ -65,18 +65,6 @@ interface ContactSummary {
   identifierSummary?: string
 }
 
-interface Memory {
-  category: string
-  content: string
-  subject: string | null
-  sourceContext?: string | null
-  importance?: number | null
-  scope?: string
-  authorAgentName?: string | null
-  updatedAt?: Date | null
-  score?: number | null
-}
-
 interface AgentDirectoryEntry {
   slug: string | null
   name: string
@@ -106,7 +94,6 @@ interface PromptParams {
     kind?: AgentKind
   }
   contacts: ContactSummary[]
-  relevantMemories: Memory[]
   /** Curated memory profile document (see memory.md). Main-Agent prompt only. */
   profile?: string | null
   relevantKnowledge?: Array<{ content: string; sourceId: string; score: number }>
@@ -205,47 +192,6 @@ function formatRelativeTime(date: Date | null | undefined): string | null {
   if (diffMonths < 12) return `${diffMonths}mo ago`
   const diffYears = Math.round(diffDays / 365)
   return `${diffYears}y ago`
-}
-
-/**
- * Convert a retrieval score ratio (0–1, relative to top score) into a relevance tag.
- */
-function formatRelevanceTag(ratio: number): string {
-  if (ratio >= 0.7) return '⬤'   // highly relevant
-  if (ratio >= 0.4) return '◉'   // relevant
-  return '○'                      // loosely related
-}
-
-/**
- * Format a single memory line with optional metadata (importance, recency).
- */
-function formatMemoryLine(m: Memory): string {
-  const parts: string[] = []
-  // Importance indicator: ★ for high (7-10), · for normal
-  if (m.importance != null && m.importance >= 7) {
-    parts.push('★')
-  }
-  // Relevance indicator from retrieval score
-  if (m.score != null) {
-    parts.push(formatRelevanceTag(m.score))
-  }
-  parts.push(`[${m.category}]`)
-  // Shared memory attribution
-  if (m.scope === 'shared' && m.authorAgentName) {
-    parts.push(`*[shared by ${m.authorAgentName}]*`)
-  }
-  parts.push(m.content)
-  if (m.subject) {
-    parts.push(`(subject: ${m.subject})`)
-  }
-  if (m.sourceContext) {
-    parts.push(`[context: ${m.sourceContext}]`)
-  }
-  const relTime = formatRelativeTime(m.updatedAt)
-  if (relTime) {
-    parts.push(`— ${relTime}`)
-  }
-  return `- ${parts.join(' ')}`
 }
 
 /**
@@ -352,56 +298,6 @@ function buildConversationStateBlock(state: PromptParams['conversationState']): 
 }
 
 /**
- * Category display order and labels for grouped memory rendering.
- */
-const MEMORY_CATEGORY_META: Record<string, { order: number; label: string }> = {
-  fact: { order: 1, label: 'Facts' },
-  preference: { order: 2, label: 'Preferences' },
-  decision: { order: 3, label: 'Decisions' },
-  knowledge: { order: 4, label: 'Knowledge' },
-}
-
-/**
- * Format a memory line for subject-grouped display (category as inline tag).
- */
-function formatMemoryLineCompact(m: Memory): string {
-  const parts: string[] = []
-  if (m.importance != null && m.importance >= 7) {
-    parts.push('★')
-  }
-  if (m.score != null) {
-    parts.push(formatRelevanceTag(m.score))
-  }
-  parts.push(`[${m.category}]`)
-  if (m.scope === 'shared' && m.authorAgentName) {
-    parts.push(`*[shared by ${m.authorAgentName}]*`)
-  }
-  parts.push(m.content)
-  const relTime = formatRelativeTime(m.updatedAt)
-  if (relTime) {
-    parts.push(`— ${relTime}`)
-  }
-  return `- ${parts.join(' ')}`
-}
-
-/**
- * Build the memories block using the most effective grouping strategy:
- * - If most memories have subjects, group by subject (more natural for the LLM)
- * - Otherwise, fall back to category-based grouping
- * - For ≤3 memories, use a flat list
- *
- * Subject grouping mirrors how humans organize knowledge: "what do I know
- * about X?" is more natural than "what facts vs preferences do I have?"
- */
-/**
- * Rough token estimation: ~3.5 chars per token for English/French mixed content.
- * Conservative to avoid over-trimming.
- */
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3.5)
-}
-
-/**
  * Build the always-injected memory profile block (stable segment).
  *
  * The profile is the Agent's curated semantic memory: current state, standing
@@ -434,115 +330,6 @@ function buildProfileBlock(profile: string, opts: { canEdit: boolean }): string 
   )
 
   return lines.join('\n')
-}
-
-function buildMemoriesBlock(memories: Memory[]): string {
-  const header = `## Memories — what you actually know\n\nThese are facts and context you've learned across past interactions. **Use them.** When the user references something past, don't ask them to remind you if it's here. When you're choosing how to phrase or scope a response, let these inform you — they're why you're not a stranger.\n\nGuidelines:\n- Weight ⬤ (highly relevant) and ★ (important) memories most. Treat ○ (loosely related) as background.\n- When memories conflict, prefer the most recent one.\n- Don't quote them mechanically — weave them into your reply naturally, as something you remember.\n- If a memory is clearly outdated or wrong relative to what the user just said, trust the user and the new info will eventually update the memory.\n\nLegend: ★ = high importance · ⬤ = highly relevant · ◉ = relevant · ○ = loosely related`
-
-  // Normalize scores relative to top score so relevance tags are scale-independent
-  const topScore = memories.reduce((max, m) => Math.max(max, m.score ?? 0), 0)
-  if (topScore > 0) {
-    for (const m of memories) {
-      if (m.score != null) m.score = m.score / topScore
-    }
-  }
-
-  // Token budget enforcement: trim lowest-relevance memories if budget is set
-  const budget = config.memory?.tokenBudget ?? 0
-  if (budget > 0 && memories.length > 1) {
-    // Sort by normalized score descending (preserve order for display later)
-    const scored = memories.map((m, i) => ({ m, i, score: m.score ?? 0 }))
-    scored.sort((a, b) => b.score - a.score)
-
-    let totalTokens = estimateTokens(header)
-    const kept: typeof scored = []
-
-    for (const entry of scored) {
-      const lineTokens = estimateTokens(formatMemoryLine(entry.m)) + 1 // +1 for newline
-      if (totalTokens + lineTokens > budget && kept.length >= 1) {
-        break // Budget exceeded, stop adding memories
-      }
-      totalTokens += lineTokens
-      kept.push(entry)
-    }
-
-    // Restore original order for display
-    kept.sort((a, b) => a.i - b.i)
-    memories = kept.map((k) => k.m)
-  }
-
-  if (memories.length <= 3) {
-    const memoryLines = memories.map(formatMemoryLine).join('\n')
-    return `${header}\n\n${memoryLines}`
-  }
-
-  // Decide grouping strategy: subject-first if ≥60% of memories have subjects
-  const withSubject = memories.filter((m) => m.subject)
-  const useSubjectGrouping = withSubject.length >= memories.length * 0.6
-
-  if (useSubjectGrouping) {
-    return buildSubjectGroupedMemories(header, memories)
-  }
-  return buildCategoryGroupedMemories(header, memories)
-}
-
-/**
- * Group memories by subject, with unsubject memories in a "General" group.
- * Within each subject group, memories are ordered by importance (desc).
- */
-function buildSubjectGroupedMemories(header: string, memories: Memory[]): string {
-  const groups = new Map<string, Memory[]>()
-  for (const m of memories) {
-    const key = m.subject ?? '_general'
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(m)
-  }
-
-  // Sort groups: largest first (most relevant subjects bubble up), _general last
-  const sortedKeys = [...groups.keys()].sort((a, b) => {
-    if (a === '_general') return 1
-    if (b === '_general') return -1
-    return groups.get(b)!.length - groups.get(a)!.length
-  })
-
-  const sections: string[] = []
-  for (const key of sortedKeys) {
-    const label = key === '_general' ? 'General' : key
-    const mems = groups.get(key)!
-    // Sort by importance descending within group
-    mems.sort((a, b) => (b.importance ?? 5) - (a.importance ?? 5))
-    const lines = mems.map(formatMemoryLineCompact).join('\n')
-    sections.push(`### ${label}\n${lines}`)
-  }
-
-  return `${header}\n\n${sections.join('\n\n')}`
-}
-
-/**
- * Group memories by category (original approach).
- */
-function buildCategoryGroupedMemories(header: string, memories: Memory[]): string {
-  const groups = new Map<string, Memory[]>()
-  for (const m of memories) {
-    const key = m.category
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(m)
-  }
-
-  const sortedCategories = [...groups.keys()].sort((a, b) => {
-    const orderA = MEMORY_CATEGORY_META[a]?.order ?? 99
-    const orderB = MEMORY_CATEGORY_META[b]?.order ?? 99
-    return orderA - orderB
-  })
-
-  const sections: string[] = []
-  for (const cat of sortedCategories) {
-    const label = MEMORY_CATEGORY_META[cat]?.label ?? cat
-    const lines = groups.get(cat)!.map(formatMemoryLine).join('\n')
-    sections.push(`### ${label}\n${lines}`)
-  }
-
-  return `${header}\n\n${sections.join('\n\n')}`
 }
 
 // code → English name for the Language prompt block. Sourced from the shared
@@ -845,12 +632,6 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
 
   // Quick session: skip contacts, agent directory, hidden instructions, and MCP blocks
   if (params.isQuickSession) {
-    // [5] Relevant memories (read-only) — volatile (depends on the incoming message)
-    // (Platform directives were already injected by the [3.5] block above.)
-    if (params.relevantMemories.length > 0) {
-      volatileBlocks.push(buildMemoriesBlock(params.relevantMemories))
-    }
-
     stableBlocks.push(
       `## Quick session\n\n` +
       `This is a quick session. You do not have access to the main conversation history, ` +
@@ -947,11 +728,6 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
       `- Use type "request" when you need a response back, "inform" for one-way notifications.\n` +
       `- When you receive an inter-agent request, use reply(request_id, message) to respond.`,
     )
-  }
-
-  // [5] Relevant memories — volatile (retrieved per incoming message)
-  if (params.relevantMemories.length > 0) {
-    volatileBlocks.push(buildMemoriesBlock(params.relevantMemories))
   }
 
   // [5.5] Relevant knowledge base chunks — volatile (retrieved per message)
