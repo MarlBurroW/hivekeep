@@ -161,10 +161,72 @@ export function enforceBudget(content: string, budget: number, tolerance = 1.2):
 
 // ─── Prompt ──────────────────────────────────────────────────────────────────
 
+/**
+ * Upper bound on how many archive memories are listed in the maintenance
+ * prompt. The list exists so the model can pick an `updateIndex` instead of
+ * duplicating an existing memory; it is not meant to be the whole archive.
+ * Unbounded, a long-lived Agent would ship its entire archive to the LLM on
+ * every single compaction.
+ */
+export const MAX_ARCHIVE_INDEX = 150
+
+export interface ArchiveIndexEntry {
+  id: string
+  content: string
+  category: string
+  subject: string | null
+  updatedAt: Date | null
+}
+
+/**
+ * Pick which archive memories to show the maintenance call.
+ *
+ * Two things make a memory worth listing: it is recent (so likely still live),
+ * or the batch being compacted talks about its subject (so it is a likely
+ * update target). Subject matches are capped at half the budget so a batch
+ * about one busy subject cannot crowd out everything recent.
+ *
+ * Returns newest-first, which is also the order the prompt numbers them in.
+ */
+export function selectArchiveIndex(
+  all: ArchiveIndexEntry[],
+  batchText: string,
+  limit = MAX_ARCHIVE_INDEX,
+): ArchiveIndexEntry[] {
+  if (all.length <= limit) {
+    return [...all].sort(byNewest)
+  }
+
+  const haystack = batchText.toLowerCase()
+  const sorted = [...all].sort(byNewest)
+
+  const picked = new Map<string, ArchiveIndexEntry>()
+  const subjectBudget = Math.floor(limit / 2)
+
+  for (const entry of sorted) {
+    if (picked.size >= subjectBudget) break
+    const subject = entry.subject?.trim().toLowerCase()
+    if (subject && haystack.includes(subject)) picked.set(entry.id, entry)
+  }
+
+  for (const entry of sorted) {
+    if (picked.size >= limit) break
+    if (!picked.has(entry.id)) picked.set(entry.id, entry)
+  }
+
+  return [...picked.values()].sort(byNewest)
+}
+
+function byNewest(a: ArchiveIndexEntry, b: ArchiveIndexEntry): number {
+  return (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0)
+}
+
 export function buildMaintenancePrompt(params: {
   currentProfile: string
   summary: string
   existingMemoriesSummary: string
+  /** Total archive size, when the listed index is only a slice of it. */
+  archiveTotal?: number
   formattedMessages: string
   budget: number
 }): string {
@@ -205,7 +267,9 @@ export function buildMaintenancePrompt(params: {
     `- If nothing durable changed, return the current profile unchanged.\n\n` +
     `## Current profile\n\n${params.currentProfile.trim() || '(empty — build it from what you learn here)'}\n\n` +
     `## Summary of the exchanges just archived\n\n${params.summary}\n\n` +
-    `## Existing archive memories (indexed)\n\n${params.existingMemoriesSummary}\n\n` +
+    (params.archiveTotal && params.archiveTotal > 0
+      ? `## Existing archive memories (indexed)\n\nThese are the most relevant ${params.archiveTotal} of a larger archive, listed so you can target an "update". Anything absent here is not gone: treat it as unseen rather than missing, and prefer "add" when unsure.\n\n${params.existingMemoriesSummary}\n\n`
+      : `## Existing archive memories (indexed)\n\n${params.existingMemoriesSummary}\n\n`) +
     `## Exchanges to analyze\n\n${params.formattedMessages}`
   )
 }
@@ -265,11 +329,26 @@ export async function runMemoryMaintenance(params: {
     return none
   }
 
-  const existingMemories = await db
-    .select({ id: memories.id, content: memories.content, category: memories.category, subject: memories.subject })
+  const allMemories = await db
+    .select({ id: memories.id, content: memories.content, category: memories.category, subject: memories.subject, updatedAt: memories.updatedAt })
     .from(memories)
     .where(eq(memories.agentId, agentId))
     .all()
+
+  const formattedMessages = messagesToAnalyze
+    .filter((m) => m.content)
+    .map((m) => `[${m.role}] ${m.content}`)
+    .join('\n\n')
+
+  // `updateIndex` in the response indexes into THIS list, so it is the one
+  // that must be applied later — never the full archive.
+  const existingMemories = selectArchiveIndex(allMemories, formattedMessages)
+  if (existingMemories.length < allMemories.length) {
+    log.info(
+      { agentId, listed: existingMemories.length, archiveTotal: allMemories.length },
+      'Archive index truncated for the maintenance prompt',
+    )
+  }
 
   const existingMemoriesSummary =
     existingMemories.length > 0
@@ -277,11 +356,6 @@ export async function runMemoryMaintenance(params: {
           .map((m, i) => `[${i}] [${m.category}] ${m.content}${m.subject ? ` (subject: ${m.subject})` : ''}`)
           .join('\n')
       : '(none)'
-
-  const formattedMessages = messagesToAnalyze
-    .filter((m) => m.content)
-    .map((m) => `[${m.role}] ${m.content}`)
-    .join('\n\n')
 
   const currentProfile = await getProfile(agentId)
   const budget = getProfileBudget()
@@ -294,6 +368,7 @@ export async function runMemoryMaintenance(params: {
         currentProfile: currentProfile.content,
         summary,
         existingMemoriesSummary,
+        archiveTotal: existingMemories.length < allMemories.length ? existingMemories.length : undefined,
         formattedMessages,
         budget,
       }),

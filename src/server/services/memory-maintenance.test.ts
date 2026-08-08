@@ -5,6 +5,7 @@ import {
   enforceBudget,
   buildMaintenancePrompt,
   BOUNDARY_TEST,
+  selectArchiveIndex,
 } from '@/server/services/memory-maintenance'
 import { countTokens } from '@/shared/token-estimator'
 
@@ -142,6 +143,67 @@ describe('enforceBudget', () => {
   it('is a no-op when no budget is set', () => {
     const content = long('Active projects', 200)
     expect(enforceBudget(content, 0)).toBe(content)
+  })
+})
+
+describe('selectArchiveIndex', () => {
+  const entry = (id: string, dayOffset: number, subject: string | null = null) => ({
+    id,
+    content: `memory ${id}`,
+    category: 'fact',
+    subject,
+    updatedAt: new Date(2026, 0, 1 + dayOffset),
+  })
+
+  it('returns everything, newest first, when the archive fits', () => {
+    const all = [entry('a', 0), entry('c', 2), entry('b', 1)]
+    expect(selectArchiveIndex(all, 'anything', 10).map((e) => e.id)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('keeps only the most recent entries when the archive is too large', () => {
+    const all = Array.from({ length: 20 }, (_, i) => entry(`m${i}`, i))
+    const picked = selectArchiveIndex(all, 'unrelated text', 5)
+    expect(picked).toHaveLength(5)
+    expect(picked.map((e) => e.id)).toEqual(['m19', 'm18', 'm17', 'm16', 'm15'])
+  })
+
+  it('pulls in an old memory whose subject the batch talks about', () => {
+    const all = [
+      ...Array.from({ length: 20 }, (_, i) => entry(`m${i}`, i + 5)),
+      entry('ancient', 0, 'Soupçon de Magie'),
+    ]
+    const picked = selectArchiveIndex(all, 'We discussed Soupçon de Magie invoicing today.', 5)
+    expect(picked.map((e) => e.id)).toContain('ancient')
+  })
+
+  it('matches subjects case-insensitively', () => {
+    const all = [
+      ...Array.from({ length: 20 }, (_, i) => entry(`m${i}`, i + 5)),
+      entry('ancient', 0, 'KinBot'),
+    ]
+    const picked = selectArchiveIndex(all, 'a question about kinbot deployment', 5)
+    expect(picked.map((e) => e.id)).toContain('ancient')
+  })
+
+  it('caps subject matches at half the budget so recent entries still get in', () => {
+    const all = Array.from({ length: 40 }, (_, i) => entry(`s${i}`, i, 'kinbot'))
+    const picked = selectArchiveIndex(all, 'all about kinbot', 10)
+    expect(picked).toHaveLength(10)
+    // The newest entries are present even though every memory matches the subject.
+    expect(picked.map((e) => e.id)).toContain('s39')
+  })
+
+  it('never exceeds the limit', () => {
+    const all = Array.from({ length: 500 }, (_, i) => entry(`m${i}`, i, 'kinbot'))
+    expect(selectArchiveIndex(all, 'kinbot kinbot kinbot', 150)).toHaveLength(150)
+  })
+
+  it('ignores an empty subject rather than matching everything', () => {
+    const all = [
+      ...Array.from({ length: 20 }, (_, i) => entry(`m${i}`, i + 5)),
+      entry('blank', 0, '   '),
+    ]
+    expect(selectArchiveIndex(all, 'any text at all', 5).map((e) => e.id)).not.toContain('blank')
   })
 })
 
