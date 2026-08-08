@@ -6,18 +6,17 @@ import { createLogger } from '@/server/logger'
 import {
   messages,
   compactingSummaries,
-  memories,
   agents,
   userProfiles,
 } from '@/server/db/schema'
 import { config } from '@/server/config'
 import { getQueueSize } from '@/server/services/queue'
-import { getExtractionModel, getExtractionProviderId, getDefaultCompactingModel, getDefaultCompactingProviderId } from '@/server/services/app-settings'
-import { createMemory, updateMemory, isDuplicateMemory, pruneStaleMemories } from '@/server/services/memory'
+import { getDefaultCompactingModel, getDefaultCompactingProviderId } from '@/server/services/app-settings'
+import { pruneStaleMemories } from '@/server/services/memory'
 import { sseManager } from '@/server/sse/index'
 import { getModelContextWindow } from '@/shared/model-context-windows'
 import { countTokens } from '@/shared/token-estimator'
-import type { AgentCompactingConfig, MemoryCategory } from '@/shared/types'
+import type { AgentCompactingConfig } from '@/shared/types'
 
 const log = createLogger('compacting')
 
@@ -589,8 +588,17 @@ export async function runCompacting(
       createdAt: new Date(),
     })
 
-    // Extract memories (awaited so we can report count)
-    const memoriesExtracted = await extractMemories(agentId, agent.model, agent.providerId, messagesToSummarize, lastSummarizedMessage.id)
+    // Memory maintenance: extract episodic memories into the archive AND
+    // rewrite the always-injected profile document, in one LLM call.
+    const { runMemoryMaintenance } = await import('@/server/services/memory-maintenance')
+    const { memoriesExtracted } = await runMemoryMaintenance({
+      agentId,
+      agentModel: agent.model,
+      agentProviderId: agent.providerId,
+      messagesToAnalyze: messagesToSummarize,
+      lastMessageId: lastSummarizedMessage.id,
+      summary,
+    })
 
     // Run memory consolidation to merge near-duplicate memories
     let memoriesConsolidated = 0
@@ -880,184 +888,6 @@ async function cleanupSummaries(agentId: string) {
         .delete(compactingSummaries)
         .where(inArray(compactingSummaries.id, idsToDelete))
     }
-  }
-}
-
-// ─── Memory Extraction Pipeline ──────────────────────────────────────────────
-
-async function addIfNotDuplicate(
-  agentId: string,
-  item: { content: string; category: string; subject?: string | null; sourceContext?: string | null },
-  importance: number | null,
-  lastMessageId: string,
-): Promise<boolean> {
-  if (await isDuplicateMemory(agentId, item.content)) return false
-
-  await createMemory(agentId, {
-    content: item.content,
-    category: item.category as MemoryCategory,
-    subject: item.subject || null,
-    sourceContext: item.sourceContext || null,
-    importance,
-    sourceMessageId: lastMessageId,
-    sourceChannel: 'automatic',
-  })
-  return true
-}
-
-async function extractMemories(
-  agentId: string,
-  agentModel: string,
-  agentProviderId: string | null,
-  messagesToAnalyze: Array<{ id: string; content: string | null; role: string }>,
-  lastMessageId: string,
-): Promise<number> {
-  const { resolveLLM } = await import('@/server/llm/core/resolve')
-  const settingsExtractionModel = await getExtractionModel()
-  const settingsExtractionProviderId = await getExtractionProviderId()
-  const effectiveExtractionModel = settingsExtractionModel ?? config.memory.extractionModel
-  const extractionProviderId = settingsExtractionProviderId
-    ?? config.memory.extractionProviderId
-    ?? (effectiveExtractionModel ? null : agentProviderId)
-  let resolved
-  try {
-    resolved = await resolveLLM({ modelId: effectiveExtractionModel ?? agentModel, providerId: extractionProviderId })
-  } catch {
-    return 0
-  }
-
-  // Get existing memories for dedup context (include IDs for UPDATE actions)
-  const existingMemories = await db
-    .select({ id: memories.id, content: memories.content, category: memories.category, subject: memories.subject })
-    .from(memories)
-    .where(eq(memories.agentId, agentId))
-    .all()
-
-  const existingMemoriesSummary =
-    existingMemories.length > 0
-      ? existingMemories
-          .map((m, i) => `[${i}] [${m.category}] ${m.content}${m.subject ? ` (subject: ${m.subject})` : ''}`)
-          .join('\n')
-      : '(none)'
-
-  const formattedMessages = messagesToAnalyze
-    .filter((m) => m.content)
-    .map((m) => `[${m.role}] ${m.content}`)
-    .join('\n\n')
-
-  const extractionPrompt =
-    `You are an assistant specialized in information extraction.\n` +
-    `Analyze the exchanges below and extract information that would help a future conversation feel like the model genuinely remembers the user — both stable identity AND active context (current projects, open threads, recent decisions, ongoing situations).\n\n` +
-    `For each piece of information, decide what action to take:\n` +
-    `- **"add"**: New information not present in existing memories\n` +
-    `- **"update"**: Information that contradicts, supersedes, or enriches an existing memory (e.g., a preference changed, a fact was corrected, new details about something already known)\n` +
-    `- Skip entirely if the information is already accurately captured\n\n` +
-    `Return a JSON array of objects with:\n` +
-    `- "action": "add" | "update"\n` +
-    `- "content": the fact or knowledge (a clear, standalone sentence)\n` +
-    `- "category": "fact" | "preference" | "decision" | "knowledge"\n` +
-    `- "subject": the person or context concerned (name or "general")\n` +
-    `- "importance": a number from 1 to 10\n` +
-    `  1 = mundane/trivial, 5 = moderately useful, 10 = critical/life-changing\n` +
-    `- "sourceContext": a brief 1-2 sentence summary of the conversational context in which this fact was mentioned (e.g. "While discussing weekend plans, user mentioned...")\n` +
-    `- "updateIndex": (only for "update" action) the index number [N] of the existing memory to update\n\n` +
-    `Rules:\n` +
-    `- Use "update" when new info CONTRADICTS or SUPERSEDES an existing memory (e.g., "likes Python" → "switched to Rust")\n` +
-    `- Use "update" to ENRICH an existing memory with significant new details\n` +
-    `- Do NOT update if the existing memory is already accurate and complete\n` +
-    `- Be honest with importance scores — most memories should be 3-7\n` +
-    `- Lean toward extracting more rather than fewer — under-extraction makes the model feel impersonal. Outdated memories will decay naturally over time.\n\n` +
-    `**Usefulness test — before adding ANY memory, ask yourself:**\n` +
-    `Would knowing this in a future conversation help the model respond more relevantly? Useful means anything from "still true in 3 months" (identity, lasting preferences) down to "still relevant in the next few weeks" (current project, open thread, recent commitment).\n\n` +
-    `**DO NOT extract:**\n` +
-    `- Pure one-shot events with no follow-up implication (had a party last night, weather today)\n` +
-    `- Strictly transient states (feeling sick today, traffic was bad this morning)\n` +
-    `- Trivial throwaway details (specific gift items, exact menu order on one occasion — UNLESS it reveals a preference)\n` +
-    `- General knowledge or widely known facts the model already has\n\n` +
-    `**DO extract:**\n` +
-    `- Identity facts (name, age, family, job, location)\n` +
-    `- Lasting preferences (tools, foods, styles, communication style)\n` +
-    `- Life changes (moving, new job, relationship changes)\n` +
-    `- Possessions that define the person (car model, pets, key tools)\n` +
-    `- Recurring habits and routines (weekly restaurant, morning routine, work schedule)\n` +
-    `- Skills and interests being actively pursued\n` +
-    `- Important relationships (family members, close contacts, colleagues mentioned recurrently)\n` +
-    `- **Active projects and current focus** (what they're working on, the goal, the stack/approach)\n` +
-    `- **Open threads and commitments** (things they said they'd do, questions left unanswered, decisions pending)\n` +
-    `- **Recent significant decisions** with their reasoning (so the model can reason about them later, not just acknowledge them)\n` +
-    `- **Recent meaningful experiences** worth knowing about (trips, events, milestones — not the weather)\n\n` +
-    `## Existing memories (indexed)\n\n${existingMemoriesSummary}\n\n` +
-    `## Exchanges to analyze\n\n${formattedMessages}\n\n` +
-    `Return a JSON array. If genuinely nothing useful to remember or update, return [].`
-
-  try {
-    const result = await safeGenerateText({
-      resolved,
-      prompt: extractionPrompt,
-      // Output is a compact JSON array — even a chatty extraction shouldn't
-      // need more than a few thousand tokens. Cap to prevent runaway output.
-      maxTokens: 4000,
-      // Hard timeout: extraction is awaited inside runCompacting which holds
-      // the compactingAgents lock. A stuck call would block all user messages
-      // for this Agent (same hazard as fa161f30 fixed for the summary call).
-      timeoutMs: 3 * 60 * 1000,
-      callSite: 'compacting',
-      agentId,
-    })
-
-    // Parse JSON array from response
-    const jsonMatch = result.text.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) return 0
-
-    const extracted = JSON.parse(jsonMatch[0]) as Array<{
-      action?: string
-      content: string
-      category: string
-      subject: string
-      importance?: number
-      sourceContext?: string
-      updateIndex?: number
-    }>
-
-    let count = 0
-    for (const item of extracted) {
-      if (!item.content || !item.category) continue
-
-      // Clamp importance to [1, 10], default to null if missing
-      const importance = typeof item.importance === 'number'
-        ? Math.max(1, Math.min(10, Math.round(item.importance)))
-        : null
-
-      const action = item.action ?? 'add'
-
-      if (action === 'update' && typeof item.updateIndex === 'number') {
-        // Update an existing memory
-        const target = existingMemories[item.updateIndex]
-        if (target) {
-          await updateMemory(target.id, agentId, {
-            content: item.content,
-            category: item.category as MemoryCategory,
-            subject: item.subject || null,
-            sourceContext: item.sourceContext || null,
-            importance,
-          })
-          count++
-          log.debug({ agentId, memoryId: target.id, oldContent: target.content, newContent: item.content }, 'Memory updated via extraction')
-        } else {
-          // Invalid index, fall back to add
-          await addIfNotDuplicate(agentId, item, importance, lastMessageId)
-          count++
-        }
-      } else {
-        // Add new memory (with dedup check)
-        const added = await addIfNotDuplicate(agentId, item, importance, lastMessageId)
-        if (added) count++
-      }
-    }
-    return count
-  } catch (err) {
-    log.error({ agentId, err }, 'Memory extraction LLM error')
-    return 0
   }
 }
 
