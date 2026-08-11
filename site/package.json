@@ -8,7 +8,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/react": "^3.6.3",
+    "@astrojs/react": "^5.0.7",
     "@astrojs/tailwind": "^5.1.5",
     "@iconify-json/lucide": "^1.2.30",
     "@iconify-json/simple-icons": "^1.2.30",
