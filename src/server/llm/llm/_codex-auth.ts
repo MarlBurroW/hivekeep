@@ -12,6 +12,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { REAL_HOME, normalizeAbsoluteHome } from '@/server/llm/llm/_home-paths'
 import { createLogger } from '@/server/logger'
 import type { ProviderConfig } from '@/server/llm/core/types'
 import { decodeJwtClaims, type PkceClient, type PkceTokenResponse } from '@/server/llm/llm/_oauth-pkce'
@@ -56,25 +57,22 @@ export function codexAccountIdFromTokens(tokens: PkceTokenResponse): Record<stri
   return accountId ? { accountId } : undefined
 }
 
-/**
- * Resolve the real user home directory.
- * Bun installed via snap sets HOME to a sandboxed path (e.g. ~/snap/bun-js/87/).
- * We prefer the REAL_HOME or the home from /etc/passwd via the USER env var.
- */
-function getRealHome(): string {
-  if (process.env.REAL_HOME) return process.env.REAL_HOME
-  const home = process.env.HOME ?? ''
-  const snapMatch = home.match(/^(\/home\/[^/]+)\/snap\//)
-  if (snapMatch) return snapMatch[1]!
-  if (process.env.USER) return `/home/${process.env.USER}`
-  return home
+// Search the plain env HOME first, then the snap-adjusted REAL_HOME. On macOS
+// and nonstandard homes REAL_HOME can resolve to the wrong place (e.g. getRealHome
+// builds /home/$USER while the real home is /Users/$USER), so the env HOME
+// candidate is what actually finds the file there.
+function codexAuthCandidates(): string[] {
+  const paths: string[] = []
+  for (const home of [process.env.HOME, REAL_HOME]) {
+    const base = normalizeAbsoluteHome(home)
+    if (!base) continue
+    const p = join(base, '.codex', 'auth.json')
+    if (!paths.includes(p)) paths.push(p)
+  }
+  return paths
 }
 
-const REAL_HOME = getRealHome()
-
-const CANDIDATE_PATHS = [
-  join(REAL_HOME, '.codex', 'auth.json'),
-]
+const CANDIDATE_PATHS = codexAuthCandidates()
 
 
 // ---------------------------------------------------------------------------
