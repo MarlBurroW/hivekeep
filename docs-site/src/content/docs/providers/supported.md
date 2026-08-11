@@ -14,7 +14,9 @@ Hivekeep ships with built-in providers across six capability families: language 
 | [OpenAI](https://platform.openai.com/api-keys) | ✅ | ✅ | ✅ | | ✅ | ✅ | ✅ |
 | OpenAI (Codex CLI) | ✅ | | | | | | ❌ (OAuth) |
 | [Google Gemini](https://aistudio.google.com/apikey) | ✅ | | ✅ | | | | ✅ |
-| [OpenRouter](https://openrouter.ai/keys) | ✅ | | | | | | ✅ |
+| [OpenRouter](https://openrouter.ai/keys) | ✅ | ✅ | ✅ | | | | ✅ |
+| [Kilo Gateway](https://kilo.ai/gateway) | ✅ | | | | | | ✅ |
+| [Ollama Cloud](https://ollama.com/) | ✅ | | | ✅ | | | ✅ |
 | [xAI](https://console.x.ai) | ✅ | | | | | | ✅ |
 | [DeepSeek](https://platform.deepseek.com/api_keys) | ✅ | | | | | | ✅ |
 | [MiniMax](https://platform.minimax.io/user-center/basic-information/interface-key) | ✅ | | | | | | ✅ |
@@ -29,8 +31,10 @@ Hivekeep ships with built-in providers across six capability families: language 
 
 This table is the exact set of built-in providers (see `src/shared/provider-metadata.ts`). Notably:
 
-- **Embeddings** are built in for **OpenAI** and the generic **OpenAI-compatible** connector (point it at Ollama, llama.cpp, LM Studio, vLLM, etc. for fully local embeddings). Other embedding sources come from plugins.
-- **Image generation** is built in for **OpenAI** and **Gemini**.
+- **Embeddings** are built in for **OpenAI**, **OpenRouter**, and the generic **OpenAI-compatible** connector (point it at Ollama, llama.cpp, LM Studio, vLLM, etc. for fully local embeddings). Other embedding sources come from plugins.
+- **Image generation** is built in for **OpenAI**, **Gemini**, and **OpenRouter**.
+- **Ollama Cloud** is built in for LLMs and result-only web search via Ollama's API.
+- **Kilo Gateway** is built in as an LLM gateway.
 - **STT and TTS** are built in for **OpenAI** and **ElevenLabs**.
 - **SearXNG** is a self-hosted search connector: point it at your own [SearXNG](https://github.com/searxng/searxng) instance (custom base URL) to run web search privately, with no commercial search API. The instance must have the `json` format enabled (`search.formats` in `settings.yml`); the API key is optional and only needed for protected instances (sent via a configurable auth header). Do not configure it through the Tavily provider: SearXNG is not Tavily-compatible and will fail with HTTP 401.
 - Providers such as **Mistral** and **Replicate** are not built in: they ship as plugins.
@@ -59,6 +63,7 @@ Search providers declare static capability flags so an Agent can pick the right 
 | Tavily | ✅ | ✅ | ✅ | ❌ | ❌ | Purpose-built for LLM grounding; native answer synthesis. |
 | Perplexity Sonar | ✅ | ✅ | ✅ | ❌ | ❌ | LLM-with-search; recency caps at one month (`year` → `month` with warning). |
 | SearXNG | ❌ | ✅ | ✅ | ✅ | ❌ | Self-hosted metasearch; needs `json` enabled in `search.formats`. Domain filter via `site:` operators. |
+| Ollama Cloud | ❌ | ❌ | ❌ | ❌ | ❌ | Result-only web search through Ollama's `/web_search` endpoint; no synthesized answer or advanced filters advertised. |
 
 ## Configuration
 
@@ -101,10 +106,10 @@ Hivekeep exposes several provider management endpoints:
 
 To use Hivekeep, you need at minimum:
 
-1. **One LLM provider**: For Agent conversations (Anthropic, OpenAI, Gemini, OpenRouter, xAI, or the built-in **OpenAI-compatible** connector pointed at any custom endpoint)
-2. **One embedding provider**: For memory to work. Built in via **OpenAI** (e.g. `text-embedding-3-small`) or the **OpenAI-compatible** connector pointed at a local endpoint (e.g. Ollama with `nomic-embed-text` or `qwen3-embedding`); other embedding sources come from plugins
+1. **One LLM provider**: For Agent conversations (Anthropic, OpenAI, Gemini, OpenRouter, Kilo Gateway, Ollama Cloud, xAI, or the built-in **OpenAI-compatible** connector pointed at any custom endpoint)
+2. **One embedding provider**: For memory to work. Built in via **OpenAI** (e.g. `text-embedding-3-small`), **OpenRouter**, or the **OpenAI-compatible** connector pointed at a local endpoint (e.g. Ollama with `nomic-embed-text` or `qwen3-embedding`); other embedding sources come from plugins
 
 Optional but recommended:
-- A **search provider** for `web_search` (Brave, SerpAPI, Tavily, Perplexity Sonar, or a self-hosted SearXNG instance)
-- An **image provider** for `generate_image` (OpenAI or Gemini)
+- A **search provider** for `web_search` (Brave, SerpAPI, Tavily, Perplexity Sonar, Ollama Cloud, or a self-hosted SearXNG instance)
+- An **image provider** for `generate_image` (OpenAI, Gemini, or OpenRouter)
 - A **voice provider** for `text_to_speech` / `transcribe_audio` (OpenAI or ElevenLabs)
