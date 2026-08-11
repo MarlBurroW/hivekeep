@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@astrojs/react": "^3.6.3",
-    "@astrojs/tailwind": "^5.1.5",
+    "@astrojs/tailwind": "^6.0.2",
     "@iconify-json/lucide": "^1.2.30",
     "@iconify-json/simple-icons": "^1.2.30",
     "@lobehub/icons": "^1.49.0",
