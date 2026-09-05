@@ -13,6 +13,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
 } from '@/client/components/ui/context-menu'
 import {
   AlertDialog,
@@ -24,7 +27,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/client/components/ui/alert-dialog'
-import { AlertTriangle, Bot, Coins, Download, Folder, GripVertical, Loader2, Network, Settings2, Trash2, Crown } from 'lucide-react'
+import { AlertTriangle, Bot, Check, Coins, Download, Folder, FolderPlus, FolderTree, GripVertical, Loader2, Network, Settings2, Trash2, Crown } from 'lucide-react'
+import type { AgentGroup } from '@/shared/types'
 
 export interface AgentCardProps extends HTMLAttributes<HTMLDivElement> {
   id: string
@@ -53,6 +57,16 @@ export interface AgentCardProps extends HTMLAttributes<HTMLDivElement> {
   onDelete?: () => void
   onExport?: () => void
   onViewUsage?: () => void
+  /** Groups offered by the "Move to" submenu. Omitted (or empty, with no
+   *  `onCreateGroup`) hides the submenu entirely, which is what a non-admin
+   *  sees — the server rejects group writes from members anyway. */
+  groups?: AgentGroup[]
+  /** Group this Agent currently belongs to; null = ungrouped. */
+  groupId?: string | null
+  /** File this Agent into a group (null ungroups it). */
+  onMoveToGroup?: (groupId: string | null) => void
+  /** Open the "new group" prompt; the caller creates it and moves this Agent. */
+  onCreateGroup?: () => void
   dragHandleProps?: Record<string, unknown>
 }
 
@@ -80,6 +94,10 @@ export const AgentCard = forwardRef<HTMLDivElement, AgentCardProps>(function Age
   onDelete,
   onExport,
   onViewUsage,
+  groups,
+  groupId = null,
+  onMoveToGroup,
+  onCreateGroup,
   dragHandleProps,
   style,
   className: extraClassName,
@@ -308,6 +326,46 @@ export const AgentCard = forwardRef<HTMLDivElement, AgentCardProps>(function Age
             <Folder className="size-4" />
             {t('files.browseWorkspace')}
           </ContextMenuItem>
+          {/* File this Agent into a sidebar group. Hidden when the caller
+              offers neither existing groups nor the ability to create one
+              (i.e. a member, who cannot write groups anyway). */}
+          {onMoveToGroup && (groups?.length || onCreateGroup) && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <FolderTree className="size-4" />
+                {t('sidebar.agents.contextMenu.moveToGroup')}
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="max-h-72 w-52 overflow-y-auto">
+                <ContextMenuItem
+                  onClick={() => onMoveToGroup(null)}
+                  disabled={groupId === null}
+                >
+                  {groupId === null && <Check className="size-4" />}
+                  {t('sidebar.agents.contextMenu.noGroup')}
+                </ContextMenuItem>
+                {(groups ?? []).length > 0 && <ContextMenuSeparator />}
+                {(groups ?? []).map((group) => (
+                  <ContextMenuItem
+                    key={group.id}
+                    onClick={() => onMoveToGroup(group.id)}
+                    disabled={groupId === group.id}
+                  >
+                    {groupId === group.id && <Check className="size-4" />}
+                    <span className="truncate">{group.name}</span>
+                  </ContextMenuItem>
+                ))}
+                {onCreateGroup && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={onCreateGroup}>
+                      <FolderPlus className="size-4" />
+                      {t('sidebar.agents.contextMenu.newGroup')}
+                    </ContextMenuItem>
+                  </>
+                )}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
           {onDelete && (
             <>
               <ContextMenuSeparator />

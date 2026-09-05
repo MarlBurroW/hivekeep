@@ -19,6 +19,7 @@ import { connectedAccountRoutes } from '@/server/routes/connected-accounts'
 import { pendingEmailSendRoutes } from '@/server/routes/pending-email-sends'
 import { sseRoutes } from '@/server/routes/sse'
 import { agentRoutes } from '@/server/routes/agents'
+import { agentGroupRoutes } from '@/server/routes/agent-groups'
 import { toolsRoutes } from '@/server/routes/tools'
 import { toolboxRoutes } from '@/server/routes/toolboxes'
 import { toolDomainRoutes } from '@/server/routes/tool-domains'
@@ -199,6 +200,7 @@ app.route('/api/connected-accounts', connectedAccountRoutes)
 app.route('/api/pending-email-sends', pendingEmailSendRoutes)
 app.route('/api/sse', sseRoutes)
 app.route('/api/agents', agentRoutes)
+app.route('/api/agent-groups', agentGroupRoutes)
 app.route('/api/tools', toolsRoutes)
 app.route('/api/toolboxes', toolboxRoutes)
 app.route('/api/tool-domains', toolDomainRoutes)

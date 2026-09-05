@@ -21,6 +21,7 @@ import { deleteMemory, createMemory, updateMemory } from '@/server/services/memo
 import type { AgentThinkingConfig, AgentThinkingEffort, MemoryCategory, MemoryScope } from '@/shared/types'
 import { sseManager } from '@/server/sse/index'
 import { resolveAgentByIdOrSlug } from '@/server/services/agent-resolver'
+import { resolveGroupIdForWrite } from '@/server/services/agent-groups'
 import {
   createAgent,
   updateAgent,
@@ -125,6 +126,7 @@ agentRoutes.get('/', async (c) => {
         avatarUrl: agentAvatarUrl(k.id, k.avatarPath, k.updatedAt),
         model: k.model,
         providerId: k.providerId ?? null,
+        groupId: k.groupId ?? null,
         createdAt: k.createdAt,
         thinkingEnabled: resolveThinkingConfig(k.thinkingConfig).enabled === true,
         thinkingEffort: resolveThinkingConfig(k.thinkingConfig).effort ?? null,
@@ -735,7 +737,20 @@ agentRoutes.patch('/:id', async (c) => {
     return c.json({ error: { code: validationError.code, message: validationError.message } }, 400)
   }
 
+  // Group membership. Resolved here so an unknown id comes back as a clean 404
+  // instead of an opaque FK constraint failure from SQLite. `null` (or '')
+  // ungroups; omitting the key leaves the current group untouched.
+  let groupId: string | null | undefined
+  if (body.groupId !== undefined) {
+    try {
+      groupId = resolveGroupIdForWrite(body.groupId)
+    } catch {
+      return c.json({ error: { code: 'AGENT_GROUP_NOT_FOUND', message: 'Agent group not found' } }, 404)
+    }
+  }
+
   const result = await updateAgent(existing.id, {
+    groupId,
     name: body.name,
     role: body.role,
     character: body.character,
@@ -772,6 +787,7 @@ agentRoutes.patch('/:id', async (c) => {
       expertise: details.expertise,
       model: details.model,
       providerId: details.providerId ?? null,
+      groupId: details.groupId ?? null,
       scoutModel: details.scoutModel ?? null,
       scoutProviderId: details.scoutProviderId ?? null,
       workspacePath: details.workspacePath,

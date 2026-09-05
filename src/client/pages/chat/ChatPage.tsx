@@ -23,7 +23,7 @@ import { useFaviconBadge } from '@/client/hooks/useFaviconBadge'
 import { Bot, ChevronRight, Command, MessageSquare, Network, Plus, Sparkles } from 'lucide-react'
 import { useUnreadPerAgent } from '@/client/hooks/useUnreadPerAgent'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/client/components/ui/tooltip'
-import { api } from '@/client/lib/api'
+import { api, toastError } from '@/client/lib/api'
 import { useAuth } from '@/client/hooks/useAuth'
 
 interface ChatPageProps {
@@ -178,6 +178,19 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
     }
   }, [updateAgent])
 
+  // File an Agent into a sidebar group (null ungroups it). The optimistic
+  // update inside updateAgent moves the card immediately; SSE carries it to
+  // other sessions.
+  const handleMoveAgentToGroup = useCallback(async (agentId: string, groupId: string | null) => {
+    try {
+      await updateAgent(agentId, { groupId })
+    } catch (err) {
+      // Surfaced rather than swallowed: a silent failure here leaves the card
+      // sitting in its old group with no explanation.
+      toastError(err)
+    }
+  }, [updateAgent])
+
   const selectedAgent = agents.find((k) => k.slug === selectedAgentSlug)
 
   // Fetch context usage when selecting an agent so the token counter is populated immediately
@@ -259,6 +272,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
         onEditAgent={handleOpenEditModal}
         onDeleteAgent={handleDeleteAgent}
         onReorderAgents={reorderAgents}
+        onMoveAgentToGroup={handleMoveAgentToGroup}
         onOpenSettings={handleOpenSettings}
       />
 
