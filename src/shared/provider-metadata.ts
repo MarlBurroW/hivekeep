@@ -48,7 +48,7 @@ export const PROVIDER_META = {
   deepseek:           { capabilities: ['llm'],                       displayName: 'DeepSeek',               lobehubIcon: 'DeepSeek',  apiKeyUrl: 'https://platform.deepseek.com/api_keys' },
   minimax:            { capabilities: ['llm'],                       displayName: 'MiniMax',                lobehubIcon: 'Minimax',   apiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key' },
   moonshot:           { capabilities: ['llm'],                       displayName: 'Kimi',                   lobehubIcon: 'Kimi',      apiKeyUrl: 'https://platform.moonshot.ai/console/api-keys' },
-  'openai-compatible': { capabilities: ['llm', 'embedding'],         displayName: 'OpenAI-compatible',      reactIcon: 'lu/LuServer', optionalApiKey: true },
+  'openai-compatible': { capabilities: ['llm', 'embedding', 'image'], displayName: 'OpenAI-compatible',      reactIcon: 'lu/LuServer', optionalApiKey: true },
   'brave-search':     { capabilities: ['search'],                    displayName: 'Brave Search',           reactIcon: 'si/SiBrave', brandColor: '#FB542B', apiKeyUrl: 'https://brave.com/search/api/' },
   'serpapi':          { capabilities: ['search'],                    displayName: 'SerpAPI',                                          apiKeyUrl: 'https://serpapi.com/manage-api-key' },
   'tavily':           { capabilities: ['search'],                    displayName: 'Tavily',                 lobehubIcon: 'Tavily',    apiKeyUrl: 'https://app.tavily.com/home' },

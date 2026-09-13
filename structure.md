@@ -80,7 +80,7 @@ hivekeep/
 │   │   │   ├── embedding/             # Providers embeddings
 │   │   │   │   └── openai.ts + registry/register
 │   │   │   ├── image/                 # Providers image generation
-│   │   │   │   └── openai.ts + registry/register
+│   │   │   │   └── openai.ts, gemini.ts, openai-compatible.ts + registry/register
 │   │   │   └── search/                # Providers web search
 │   │   │       └── brave.ts, serpapi.ts, tavily.ts, perplexity.ts + registry/register
 │   │   │
