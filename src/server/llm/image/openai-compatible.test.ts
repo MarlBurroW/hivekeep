@@ -6,6 +6,7 @@ import {
   parseImageModelIds,
 } from './openai-compatible'
 import { InvalidRequestError, ProviderServerError } from '@/server/llm/core/types'
+import { PROVIDER_META } from '@/shared/provider-metadata'
 
 // Capture the calls/responses the production code makes against the
 // mocked `openai` SDK. Reset before each test so assertions stay local.
@@ -70,6 +71,18 @@ beforeEach(() => {
   mockImagesEdit.mockReset()
   mockImagesGenerate.mockImplementation(() => Promise.resolve({ data: [{ b64_json: 'AAAA' }] }))
   mockImagesEdit.mockImplementation(() => Promise.resolve({ data: [{ b64_json: 'BBBB' }] }))
+})
+
+// ─── Metadata ────────────────────────────────────────────────────────────────
+
+describe('openaiCompatibleImageProvider — metadata', () => {
+  it('declares the openai-compatible type so it groups under the same provider row as chat and embeddings', async () => {
+    expect(openaiCompatibleImageProvider.type).toBe('openai-compatible')
+    expect(PROVIDER_META['openai-compatible'].capabilities).toContain('image')
+    expect(PROVIDER_META['openai-compatible'].capabilities).toContain('llm')
+    expect(PROVIDER_META.openai.capabilities).toContain('image')
+    expect(PROVIDER_META.gemini.capabilities).toContain('image')
+  })
 })
 
 // ─── Heuristics ──────────────────────────────────────────────────────────────
