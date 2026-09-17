@@ -1,7 +1,33 @@
 import { describe, expect, it } from 'bun:test'
-import { STATIC_CODEX_MODELS, mapCodexModel } from './openai-codex'
+import { STATIC_CODEX_MODELS, mapCodexModel, modelsCacheCandidates } from './openai-codex'
 import { codexAccountIdFromTokens } from './_codex-auth'
 import type { PkceTokenResponse } from './_oauth-pkce'
+
+describe('modelsCacheCandidates', () => {
+  it('tries the env HOME before REAL_HOME (macOS: /Users vs the /home/$USER fallback)', () => {
+    // On macOS getRealHome() can wrongly yield /home/$USER; the real cache lives
+    // under /Users/$USER, so the env HOME candidate must be searched first.
+    expect(modelsCacheCandidates('/Users/tester', '/home/tester')).toEqual([
+      '/Users/tester/.codex/models_cache.json',
+      '/home/tester/.codex/models_cache.json',
+    ])
+  })
+
+  it('dedupes when env HOME and REAL_HOME match', () => {
+    expect(modelsCacheCandidates('/home/u', '/home/u')).toEqual(['/home/u/.codex/models_cache.json'])
+  })
+
+  it('falls back to REAL_HOME when env HOME is missing or relative', () => {
+    expect(modelsCacheCandidates(undefined, '/home/u')).toEqual(['/home/u/.codex/models_cache.json'])
+    expect(modelsCacheCandidates('relative/path', '/home/u')).toEqual(['/home/u/.codex/models_cache.json'])
+  })
+
+  it('never emits a relative candidate (drops non-absolute homes)', () => {
+    expect(modelsCacheCandidates('relative/env', 'also/relative')).toEqual([])
+    expect(modelsCacheCandidates(undefined, undefined)).toEqual([])
+    expect(modelsCacheCandidates('/Users/t', '')).toEqual(['/Users/t/.codex/models_cache.json'])
+  })
+})
 
 describe('STATIC_CODEX_MODELS (last-resort fallback catalog)', () => {
   it('ships at least one API-listable Codex slug', () => {
