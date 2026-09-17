@@ -16,7 +16,7 @@ mock.module('@/server/sse/index', () => ({
 
 const { setTodosForTask, getTodosForTask, forgetTaskTodos, _resetAllTodos } = await import('./task-todos')
 
-const META = { parentAgentId: 'agent-1', ticketId: 'ticket-1' }
+const META = { parentAgentId: 'agent-1' }
 
 beforeEach(() => {
   _resetAllTodos()
@@ -43,7 +43,10 @@ describe('setTodosForTask', () => {
     expect(sseSent).toHaveLength(1)
     expect(sseSent[0]?.agentId).toBe('agent-1')
     expect(sseSent[0]?.event.type).toBe('task:todos')
-    expect(sseSent[0]?.event.data).toMatchObject({ taskId: 'task-1', ticketId: 'ticket-1' })
+    expect(sseSent[0]?.event.data).toMatchObject({
+      taskId: 'task-1',
+      todos: [{ id: 'a', subject: 'do', status: 'pending' }],
+    })
   })
 
   it('replaces the previous list (bulk-set semantics)', () => {

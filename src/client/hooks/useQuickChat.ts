@@ -16,7 +16,7 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
 
   const {
     streamingMessage, isStreaming,
-    handleToken, handleDone, resetStreaming, cleanup,
+    handleToken, handleTokenRetract, handleDone, resetStreaming, cleanup,
   } = useChatStreaming()
 
   // Fetch messages for this session
@@ -53,6 +53,17 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
       handleToken({
         messageId: data.messageId as string,
         token: data.token as string,
+        contentLength: typeof data.contentLength === 'number' ? data.contentLength : undefined,
+      })
+    },
+
+    'chat:token-retract': (data) => {
+      if (data.agentId !== agentId) return
+      if (data.sessionId !== sessionId) return
+
+      handleTokenRetract({
+        messageId: data.messageId as string,
+        contentLength: data.contentLength as number,
       })
     },
 
@@ -89,7 +100,6 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
         isRedacted: false,
         toolCalls: null,
         resolvedTaskId: null,
-        injectedMemories: null,
         memoriesExtracted: null,
         compactingError: null,
         files: (data.files as MessageFile[]) ?? [],
@@ -125,7 +135,6 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
         isRedacted: false,
         toolCalls: null,
         resolvedTaskId: null,
-        injectedMemories: null,
         memoriesExtracted: null,
         compactingError: null,
         files: optimisticFiles ?? [],

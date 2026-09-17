@@ -37,7 +37,11 @@ export function getRenderer(toolName: string): ComponentType<ToolResultRendererP
 const previewRegistry = new Map<string, ToolPreviewFn>()
 
 export function registerPreviewRenderer(toolName: string, fn: ToolPreviewFn) {
-  previewRegistry.set(toolName, fn)
+  // chat:tool-call-start can render a preview before streamed tool args have
+  // arrived. Normalize here so every current/future preview renderer can read
+  // fields like args.title / args.todos / args.command without crashing while
+  // the call is still pending.
+  previewRegistry.set(toolName, (props) => fn({ ...props, args: props.args ?? {} }))
 }
 
 export function getPreviewRenderer(toolName: string): ToolPreviewFn | undefined {

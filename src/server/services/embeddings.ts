@@ -6,6 +6,7 @@ import { getEmbeddingModel } from '@/server/services/app-settings'
 import { loadProviderConfig } from '@/server/services/provider-config'
 import { recordUsage } from '@/server/services/token-usage'
 import { getEmbeddingProvider } from '@/server/llm/embedding/registry'
+import { withTimeout } from '@/server/utils/with-timeout'
 
 const log = createLogger('embeddings')
 
@@ -33,10 +34,21 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
   // Pass a minimal model object — concrete dimensions/maxInputTokens aren't
   // used by `embed()` itself (only by callers that want to size/chunk input).
-  const result = await embeddingProvider.embed(
-    { id: embeddingModelId, name: embeddingModelId, dimensions: 0, maxInputTokens: 0 },
-    { text },
-    providerConfig,
+  //
+  // Bounded because this runs under the compacting lock (memory write-back).
+  // An embedding endpoint that accepts the connection and never answers would
+  // otherwise leave `compactingAgents` held forever, and the engine refuses
+  // every message for that Agent while it is — with no way to clear it short
+  // of a restart, since the force-compact route answers 409 in that state.
+  const result = await withTimeout(
+    embeddingProvider.embed(
+      { id: embeddingModelId, name: embeddingModelId, dimensions: 0, maxInputTokens: 0 },
+      { text },
+      providerConfig,
+    ),
+    config.memory.embeddingTimeoutMs,
+    undefined,
+    'Embedding request',
   )
 
   recordUsage({

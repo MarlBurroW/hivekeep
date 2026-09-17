@@ -4,7 +4,7 @@ import { eq, and, desc, asc, inArray, like, or, sql, gte, lte, isNull, isNotNull
 import { v4 as uuid } from 'uuid'
 import { db, sqlite } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
-import { tasks, agents, messages, tickets, projects } from '@/server/db/schema'
+import { tasks, agents, messages } from '@/server/db/schema'
 import { enqueueMessage } from '@/server/services/queue'
 import { buildSystemPrompt } from '@/server/services/prompt-builder'
 import { getSystemContext } from '@/server/services/system-context'
@@ -16,7 +16,7 @@ import { toolRegistry } from '@/server/tools/index'
 import { sseManager } from '@/server/sse/index'
 import { config } from '@/server/config'
 import { getGlobalPrompt, getMaxConcurrentTasks, getMaxQueuedTasks } from '@/server/services/app-settings'
-import { wrapToolsWithSpill } from '@/server/services/tool-output-spill'
+import { wrapToolsWithSpill, capToolResultText } from '@/server/services/tool-output-spill'
 import { executeToolBatch } from '@/server/services/tool-executor'
 import { recordUsage, aggregateUsages, getTaskTotals } from '@/server/services/token-usage'
 import { runStreamStep, type ReasoningSegment } from '@/server/services/stream-runner'
@@ -97,7 +97,7 @@ function parseTaskToolboxIds(raw: string | null): string[] | undefined {
  *   1. Explicit `tasks.toolbox_ids` (JSON string[]) frozen at spawn.
  *   2. Back-compat: map the legacy `tasks.tool_preset` to the built-in
  *      toolbox of the same name.
- *   3. Default: 'code' for ticket tasks, 'all' otherwise.
+ *   3. Default: the 'all' built-in.
  *
  * Returns an array of toolbox **ids** (resolving built-in names to ids via the
  * toolboxes service). The empty array is returned only when a referenced
@@ -106,7 +106,6 @@ function parseTaskToolboxIds(raw: string | null): string[] | undefined {
 export async function resolveTaskToolboxIds(task: {
   toolboxIds: string | null
   toolPreset: string | null
-  ticketId: string | null
 }): Promise<string[]> {
   // 1. Explicit toolbox ids on the task row.
   if (task.toolboxIds) {
@@ -130,9 +129,8 @@ export async function resolveTaskToolboxIds(task: {
     if (box) return [box.id]
   }
 
-  // 3. Default: 'code' for tickets, 'all' otherwise.
-  const defaultName = task.ticketId ? 'code' : 'all'
-  const box = getToolboxByName(defaultName)
+  // 3. Default: the 'all' built-in.
+  const box = getToolboxByName('all')
   return box ? [box.id] : []
 }
 
@@ -175,6 +173,10 @@ export function isTaskStreaming(taskId: string): boolean {
 export interface ActiveTaskStreamSnapshot {
   messageId: string
   content: string
+  /** In-flight provisional text of the current step, mirrored delta-by-delta
+   *  by the stream runner. Served appended to `content` for mid-stream
+   *  rehydration; cleared when the step commits or retracts. */
+  provisional: string
   toolCalls: Array<{ id: string; name: string; args: unknown; result?: unknown; offset: number }>
   reasoning: ReasoningSegment[]
   /** Running sum of output tokens reported so far this turn (one increment per
@@ -631,26 +633,19 @@ interface SpawnParams {
   allowHumanPrompt?: boolean
   channelOriginId?: string
   webhookId?: string
-  ticketId?: string
-  /** Specialized task variant — see schema. Defaults to 'execute'. */
-  kind?: 'execute' | 'enrich'
   thinkingConfig?: AgentThinkingConfig
   concurrencyGroup?: string
   concurrencyMax?: number
   /** Optional sub-Agent tool preset override (DEPRECATED — superseded by
    *  `toolboxIds`). When set and `toolboxIds` is absent, it is mapped to the
-   *  built-in toolbox of the same name at execution time. Use 'all' to
-   *  explicitly disable filtering on a ticket task. */
+   *  built-in toolbox of the same name at execution time. */
   toolPreset?: 'code' | 'research' | 'ops' | 'all'
   /** Optional array of toolbox ids defining the task's native toolset. Frozen
    *  onto the task row at spawn. When set, the resolved native allow-list is
    *  CORE_TOOLS unioned with every referenced toolbox's tool names ("*"
    *  expands to all native tools). When absent, falls back to the built-in
-   *  matching `toolPreset` (or 'code' for tickets / 'all' otherwise). */
+   *  matching `toolPreset`, then to 'all'. */
   toolboxIds?: string[]
-  /** Optional run-specific sur-prompt persisted on the task row and injected
-   *  into the ticket-assignment block at prompt-build time. Ticket tasks only. */
-  runPrompt?: string | null
   /** When true, insert the task row but do NOT kick off `executeSubAgent`. The
    *  caller is responsible for starting execution (e.g. after seeding cloned
    *  messages). Used by `retryTask`. */
@@ -659,8 +654,8 @@ interface SpawnParams {
 
 /**
  * Frozen-at-spawn snapshot of every piece of stable prompt context for a task.
- * Together with `tasks.ticket_assignment_snapshot`, this captures *all* the
- * sources of the sub-Agent's stable system prefix so that re-entries (request_input
+ * This captures *all* the sources of the sub-Agent's stable system prefix so
+ * that re-entries (request_input
  * replies, sub-sub-task completions, human_prompt answers, parent replies,
  * nudges) reuse a byte-identical prefix → the Anthropic prompt cache stays
  * warm across the entire lifetime of the task. External DB edits made during
@@ -713,7 +708,7 @@ async function captureTaskPromptContextSnapshot(params: {
     ? params.sourceAgentId
     : params.parentAgentId
   const identityAgent = await db.select().from(agents).where(eq(agents.id, identityAgentId)).get()
-  if (!identityAgent) throw new Error('IDENTITY_KIN_NOT_FOUND')
+  if (!identityAgent) throw new Error('IDENTITY_AGENT_NOT_FOUND')
 
   const [globalPrompt, agentDirectory] = await Promise.all([
     getGlobalPrompt(),
@@ -809,34 +804,9 @@ export async function spawnTask(params: SpawnParams) {
     }
   }
 
-  // Safety net: ticket-linked tasks must run in await mode (Phase 26 — projects.md § 5)
-  if (params.ticketId && params.mode === 'async') {
-    throw new Error('TICKET_TASK_REQUIRES_AWAIT')
-  }
-
-  // Freeze the ticket assignment context at spawn time so the sub-Agent's stable
-  // system prefix doesn't change for the lifetime of this task. Without the
-  // freeze, every re-entry (request_input reply, sub-sub-task completion,
-  // human_prompt answer, nudge) rebuilt the block live — and any change to
-  // ticket fields, tags, or comments invalidated the Anthropic prompt cache,
-  // forcing a full prefix recompute on each re-entry.
-  let ticketAssignmentSnapshot: string | null = null
-  if (params.ticketId) {
-    const { buildTicketAssignmentInfo } = await import('@/server/services/tickets')
-    // Pass the spawn-time runPrompt so the per-run sur-prompt block is baked
-    // into the frozen snapshot. Without this, the sub-Agent would see the run
-    // prompt only on the first turn (via the live-fetch path that no longer
-    // runs once the snapshot is present).
-    const info = await buildTicketAssignmentInfo(params.ticketId, {
-      runPrompt: params.runPrompt ?? null,
-      currentTaskId: taskId,
-    })
-    if (info) ticketAssignmentSnapshot = JSON.stringify(info)
-  }
-
-  // Freeze the rest of the stable system context (Agent identity, global prompt,
-  // Agent directory, cron context). Same motivation as the ticket snapshot above:
-  // make the sub-Agent's stable prefix byte-identical across re-entries so the
+  // Freeze the stable system context (Agent identity, global prompt,
+  // Agent directory, cron context). Freezing keeps the sub-Agent's stable
+  // prefix byte-identical across re-entries so the
   // Anthropic prompt cache survives.
   const promptContextSnapshot = JSON.stringify(
     await captureTaskPromptContextSnapshot({
@@ -847,67 +817,19 @@ export async function spawnTask(params: SpawnParams) {
     }),
   )
 
-  // Project-level defaults: if the task is ticket-bound and no explicit task
-  // override is set, inherit the project's defaults (model + thinking).
-  // Frozen at spawn so the task keeps the same config across all re-entries
-  // (same motivation as the ticket assignment snapshot above — keep Anthropic
-  // prompt cache warm).
-  // Priority chain (per field): params > project > agent (agent fallback happens
-  // at execution time when the task column stays null).
-  let effectiveModel = params.model ?? null
-  let effectiveProviderId = params.providerId ?? null
-  let effectiveThinkingConfig: AgentThinkingConfig | null = params.thinkingConfig ?? null
-  // Toolbox selection resolution chain: explicit spawn param > project
-  // default > runtime default ('code' for tickets / 'all' otherwise, resolved
-  // lazily by resolveTaskToolboxIds when this stays null). Freeze the project
-  // default onto the row so the task keeps the same toolset across re-entries.
-  const explicitToolboxIds = params.toolboxIds && params.toolboxIds.length > 0 ? params.toolboxIds : null
-  let effectiveToolboxIds: string[] | null = explicitToolboxIds
-  if ((!effectiveModel || !effectiveThinkingConfig || !effectiveToolboxIds) && params.ticketId) {
-    const projectRow = db
-      .select({
-        model: projects.model,
-        providerId: projects.providerId,
-        thinkingConfig: projects.thinkingConfig,
-        defaultToolboxIds: projects.defaultToolboxIds,
-      })
-      .from(tickets)
-      .innerJoin(projects, eq(projects.id, tickets.projectId))
-      .where(eq(tickets.id, params.ticketId))
-      .get()
-    if (!effectiveModel && projectRow?.model) {
-      effectiveModel = projectRow.model
-      effectiveProviderId = projectRow.providerId
-    }
-    if (!effectiveThinkingConfig && projectRow?.thinkingConfig) {
-      try {
-        effectiveThinkingConfig = JSON.parse(projectRow.thinkingConfig) as AgentThinkingConfig
-      } catch {
-        // Malformed JSON on the project row — ignore and fall back to the Agent.
-        effectiveThinkingConfig = null
-      }
-    }
-    if (!effectiveToolboxIds && projectRow?.defaultToolboxIds) {
-      try {
-        const parsed = JSON.parse(projectRow.defaultToolboxIds)
-        if (Array.isArray(parsed)) {
-          const ids = parsed.filter((x): x is string => typeof x === 'string')
-          if (ids.length > 0) effectiveToolboxIds = ids
-        }
-      } catch {
-        // Malformed JSON on the project row — ignore and fall back to the
-        // runtime default via resolveTaskToolboxIds.
-        effectiveToolboxIds = null
-      }
-    }
-  }
+  // Per-field config: an explicit spawn param, otherwise null so the Agent's
+  // own setting applies at execution time.
+  const effectiveModel = params.model ?? null
+  const effectiveProviderId = params.providerId ?? null
+  const effectiveThinkingConfig: AgentThinkingConfig | null = params.thinkingConfig ?? null
+  const effectiveToolboxIds: string[] | null =
+    params.toolboxIds && params.toolboxIds.length > 0 ? params.toolboxIds : null
 
   await db.insert(tasks).values({
     id: taskId,
     parentAgentId: params.parentAgentId,
     sourceAgentId: params.sourceAgentId ?? null,
     spawnType: params.spawnType,
-    kind: params.kind ?? 'execute',
     mode: params.mode,
     model: effectiveModel,
     providerId: effectiveProviderId,
@@ -919,14 +841,11 @@ export async function spawnTask(params: SpawnParams) {
     cronId: params.cronId ?? null,
     channelOriginId: params.channelOriginId ?? null,
     webhookId: params.webhookId ?? null,
-    ticketId: params.ticketId ?? null,
-    ticketAssignmentSnapshot,
     promptContextSnapshot,
     allowHumanPrompt: params.allowHumanPrompt ?? true,
     thinkingConfig: effectiveThinkingConfig ? JSON.stringify(effectiveThinkingConfig) : null,
     toolPreset: params.toolPreset ?? null,
     toolboxIds: effectiveToolboxIds ? JSON.stringify(effectiveToolboxIds) : null,
-    runPrompt: params.runPrompt ?? null,
     concurrencyGroup,
     concurrencyMax,
     queuedAt: initialStatus === 'queued' ? now : null,
@@ -1010,19 +929,18 @@ export interface StartOrphanTaskResult {
 }
 
 /**
- * Spawn a human-initiated standalone task on an Agent with NO project/ticket
- * binding. The Agent runs the given prompt in an ephemeral sub-Agent and its
- * result is deposited back as an informational message in the Agent's main
- * session (async mode — same shape as cron/webhook orphan tasks).
+ * Spawn a human-initiated standalone task on an Agent. The Agent runs the
+ * given prompt in an ephemeral sub-Agent and its result is deposited back as an
+ * informational message in the Agent's main session (async mode — same shape as
+ * cron/webhook orphan tasks).
  *
  * Resolution chains (all "inherit when unset"):
- *   - model/provider: explicit override → Agent's own model (no project to
- *     consult, since there is no ticket). model+providerId are coupled.
+ *   - model/provider: explicit override → Agent's own model. Coupled.
  *   - thinking/effort: explicit override → Agent's own config.
- *   - toolboxes: explicit selection → runtime default 'all' (non-ticket) via
+ *   - toolboxes: explicit selection → runtime default 'all' via
  *     resolveTaskToolboxIds when left null.
  *
- * Throws 'KIN_NOT_FOUND' / 'MODEL_AND_PROVIDER_MUST_BOTH_BE_SET' / 'EMPTY_PROMPT'.
+ * Throws 'AGENT_NOT_FOUND' / 'MODEL_AND_PROVIDER_MUST_BOTH_BE_SET' / 'EMPTY_PROMPT'.
  */
 export async function startOrphanTask(
   parentAgentId: string,
@@ -1036,7 +954,7 @@ export async function startOrphanTask(
   },
 ): Promise<StartOrphanTaskResult> {
   const agent = db.select({ id: agents.id }).from(agents).where(eq(agents.id, parentAgentId)).get()
-  if (!agent) throw new Error('KIN_NOT_FOUND')
+  if (!agent) throw new Error('AGENT_NOT_FOUND')
 
   const prompt = input.prompt?.trim() ?? ''
   if (!prompt) throw new Error('EMPTY_PROMPT')
@@ -1052,7 +970,7 @@ export async function startOrphanTask(
     parentAgentId,
     description: prompt,
     title: title ?? undefined,
-    // No parent queue to re-enter and no ticket gate → async, like crons.
+    // No parent queue to re-enter → async, like crons.
     mode: 'async',
     spawnType: 'self',
     model: modelSet ? input.model!.trim() : undefined,
@@ -1143,49 +1061,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
   })
 
   try {
-    // ─── Sub-task worktree setup ──────────────────────────────────────────
-    // For ticket tasks against a project with a ready GitHub clone, give the
-    // sub-Agent its own git worktree so concurrent sub-tasks can edit/commit/
-    // push without trampling each other (see worktree.ts). `effective*` are
-    // the values the rest of executeSubAgent uses — they fall through to the
-    // Agent's static workspace when there's no clone (legacy / non-code work).
-    let workspaceOverride: { path: string; env?: Record<string, string> } | undefined
-    let effectiveWorkspacePath: string | null = agentIdentity.workspacePath
-    if (task.ticketId) {
-      const ticketRow = await db
-        .select()
-        .from(tickets)
-        .where(eq(tickets.id, task.ticketId))
-        .get()
-      if (ticketRow?.projectId) {
-        const projectRow = await db
-          .select()
-          .from(projects)
-          .where(eq(projects.id, ticketRow.projectId))
-          .get()
-        if (
-          projectRow?.githubRepo
-          && projectRow.cloneStatus === 'ready'
-          && typeof ticketRow.number === 'number'
-        ) {
-          const { createWorktree } = await import('@/server/services/worktree')
-          const wt = await createWorktree({
-            projectId: projectRow.id,
-            ticketNumber: ticketRow.number,
-            taskId: task.id,
-          })
-          workspaceOverride = {
-            path: wt.path,
-            env: { HIVEKEEP_GH_TOKEN: wt.pat },
-          }
-          effectiveWorkspacePath = wt.path
-          log.info(
-            { taskId, projectId: projectRow.id, wtPath: wt.path, branch: wt.branch, baseBranch: wt.baseBranch },
-            'Sub-task worktree ready',
-          )
-        }
-      }
-    }
+    const effectiveWorkspacePath: string | null = agentIdentity.workspacePath
 
     // Cron context — prefer the frozen snapshot, fall back to live for legacy
     // tasks. We revive ISO timestamp strings back into Date objects because
@@ -1220,28 +1096,6 @@ async function executeSubAgent(taskId: string, isNudge = false) {
       ? promptSnapshot.agentDirectory
       : await (await import('@/server/services/inter-agent')).listAvailableAgents(agentIdentity.id)
 
-    // Ticket assignment context — read the snapshot frozen at spawn time so
-    // the sub-Agent's stable system prefix doesn't change across re-entries
-    // (which would bust the Anthropic prompt cache). Legacy ticket tasks
-    // without a snapshot fall back to a live fetch.
-    let ticketAssignment: import('@/server/services/prompt-builder').TicketAssignmentInfo | null = null
-    if (task.ticketId) {
-      if (task.ticketAssignmentSnapshot) {
-        try {
-          ticketAssignment = JSON.parse(task.ticketAssignmentSnapshot) as import('@/server/services/prompt-builder').TicketAssignmentInfo
-        } catch (err) {
-          log.warn({ taskId, err }, 'Failed to parse ticket_assignment_snapshot, falling back to live fetch')
-        }
-      }
-      if (!ticketAssignment) {
-        const { buildTicketAssignmentInfo } = await import('@/server/services/tickets')
-        ticketAssignment = await buildTicketAssignmentInfo(task.ticketId, {
-          runPrompt: task.runPrompt ?? null,
-          currentTaskId: task.id,
-        })
-      }
-    }
-
     const { getTodosForTask } = await import('@/server/services/task-todos')
     const systemSegments = buildSystemPrompt({
       agent: {
@@ -1252,7 +1106,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         expertise: agentIdentity.expertise,
       },
       contacts: [],
-      relevantMemories: [],
+      profile: null,
       agentDirectory,
       isSubAgent: true,
       taskDescription: task.description,
@@ -1261,7 +1115,6 @@ async function executeSubAgent(taskId: string, isNudge = false) {
       globalPrompt,
       userLanguage: 'en',
       workspacePath: effectiveWorkspacePath,
-      ticketAssignment: ticketAssignment ?? undefined,
       systemContext: getSystemContext(),
       taskTodos: getTodosForTask(taskId),
     })
@@ -1289,14 +1142,9 @@ async function executeSubAgent(taskId: string, isNudge = false) {
     // spawned Agent's MAIN surface (isSubAgent: false) intersected with the task's
     // toolboxes, then subtract the hard sub-Agent floor, then layer on the
     // sub-Agent-only comms tools (which are infrastructure, never toolbox-gated).
-    //
-    // `workspaceOverride` (set above for ticket-on-a-cloned-project tasks)
-    // scopes every filesystem + shell tool to the per-task worktree and injects
-    // HIVEKEEP_GH_TOKEN into spawned subprocesses for git auth.
     const taskToolboxIds = await resolveTaskToolboxIds({
       toolboxIds: task.toolboxIds as string | null,
       toolPreset: task.toolPreset as string | null,
-      ticketId: task.ticketId ?? null,
     })
 
     const { resolveToolset } = await import('@/server/services/toolset-resolver')
@@ -1311,8 +1159,6 @@ async function executeSubAgent(taskId: string, isNudge = false) {
       taskDepth: task.depth,
       channelOriginId: task.channelOriginId ?? undefined,
       cronId: task.cronId ?? undefined,
-      ticketId: task.ticketId ?? undefined,
-      workspaceOverride,
     })
 
     // Hard sub-Agent floor: removed AFTER the toolbox allow-list.
@@ -1321,9 +1167,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
     }
 
     // Sub-Agent-specific tools (scoped to parent for communication back).
-    // Same workspace override applies — these tools are mostly comms-only
-    // but `record_findings` and friends still write into the worktree. These
-    // are NOT toolbox-filtered (infrastructure for the task protocol).
+    // NOT toolbox-filtered (infrastructure for the task protocol).
     const subAgentTools = toolRegistry.resolve({
       agentId: task.parentAgentId,
       taskId,
@@ -1331,15 +1175,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
       isSubAgent: true,
       channelOriginId: task.channelOriginId ?? undefined,
       cronId: task.cronId ?? undefined,
-      workspaceOverride,
     })
-
-    // On ticket sub-Agents the parent Agent has nothing actionable to do with
-    // intermediate progress reports — the user reads the ticket UI instead.
-    // Remove `report_to_parent` so the sub-Agent doesn't waste calls on it.
-    if (task.ticketId) {
-      delete subAgentTools['report_to_parent']
-    }
 
     const tools = wrapToolsWithSpill(
       { ...mainSurface, ...subAgentTools },
@@ -1461,6 +1297,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
     const streamSnapshot: ActiveTaskStreamSnapshot = {
       messageId: assistantMessageId,
       content: '',
+      provisional: '',
       toolCalls: toolCallsLog,
       reasoning: reasoningSegments,
       outputTokens: 0,
@@ -1540,10 +1377,9 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         taskResolved.config,
       )
 
-      // Buffer text per step until finishReason is known — see stream-runner.ts.
-      // The 500ms DB checkpoint that used to live inline in `text-delta` is
-      // now driven by `ctx.checkpoint` and persists only *committed* content
-      // (the in-flight buffer is never written to DB).
+      // Text streams live as provisional tokens (see stream-runner.ts).
+      // The 500ms DB checkpoint is driven by `ctx.checkpoint` and persists
+      // only *committed* content (provisional text is never written to DB).
       const outcome = await runStreamStep(stream, {
         agentId: task.parentAgentId,
         assistantMessageId,
@@ -1554,7 +1390,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         onCommittedText: (delta) => { fullContent += delta },
         onDroppedText: (txt, idx) => log.debug(
           { taskId, agentId: task.parentAgentId, assistantMessageId, step: idx, droppedChars: txt.length, preview: txt.slice(0, 200) },
-          'Dropped pre-narration from intermediate step (sub-Agent)',
+          'Dropped in-flight step text (step died: error/abort/stall, sub-Agent)',
         ),
         checkpoint: {
           intervalMs: 500,
@@ -1660,7 +1496,7 @@ async function executeSubAgent(taskId: string, isNudge = false) {
       //     request → awaiting_agent_response, scout → awaiting_subtask): the
       //     sub-Agent resumes via resumeSubAgent() once the response arrives.
       //     Without this the LLM kept emitting tool calls — observed on prod
-      //     task `4e4f1760` (ticket #22): 40+ calls after request_input,
+      //     task `4e4f1760`: 40+ calls after request_input,
       //     incl. a `git commit --no-verify` only stopped by the hook guard.
       //   - completed/failed (update_task_status): resolveTask already ran
       //     inside the batch and does NOT abort the stream, so without this
@@ -1706,7 +1542,14 @@ async function executeSubAgent(taskId: string, isNudge = false) {
         content: batch.toolResults.map((tr) => ({
           type: 'tool-result',
           toolUseId: tr.toolCallId,
-          content: stringifyToolResultValue(tr.output.value),
+          // Capped here too: within a turn these are re-sent at every later
+          // step, so an oversized result is paid for again and again. The
+          // history rebuild applies the same cap on the next turn.
+          content: capToolResultText(
+            stringifyToolResultValue(tr.output.value),
+            tr.toolName ?? 'unknown',
+            config.toolResultSizeCapTokens,
+          ),
         })),
       })
 
@@ -1937,18 +1780,6 @@ async function executeSubAgent(taskId: string, isNudge = false) {
 
 // ─── Task Resolution ─────────────────────────────────────────────────────────
 
-/** Build the inline reminder appended to ticket-linked task_result messages.
- *  Returns null if the linked ticket has been deleted (graceful fallback). */
-async function buildTicketLinkedReminder(ticketId: string): Promise<string | null> {
-  const ticketRow = await db.select().from(tickets).where(eq(tickets.id, ticketId)).get()
-  if (!ticketRow) return null
-  const projectRow = await db.select().from(projects).where(eq(projects.id, ticketRow.projectId)).get()
-  if (!projectRow) return null
-
-  const idShort = ticketRow.id.slice(0, 8)
-  return `\n\n---\nLinked ticket: #${idShort} "${ticketRow.title}" (project: ${projectRow.title}, current status: ${ticketRow.status}). Review the result above and update the ticket via update_ticket() if needed — status, description, tags. The kanban does not move automatically.`
-}
-
 export async function resolveTask(
   taskId: string,
   status: 'completed' | 'failed',
@@ -1999,51 +1830,6 @@ export async function resolveTask(
   // Resolve executing Agent info for SSE metadata
   const executingAgent = await db.select().from(agents).where(eq(agents.id, executingAgentId)).get()
 
-  // Auto-comment on the linked ticket (if any) so the ticket UI shows the
-  // final report or failure reason without the sub-Agent having to post it
-  // manually. We do this best-effort so a comment service hiccup never blocks
-  // task resolution.
-  if (task.ticketId) {
-    try {
-      // Finalize the per-task git worktree (push branch, optional rebase,
-      // cleanup) for ticket sub-tasks that ran against a cloned project.
-      // The outcome enriches the auto-comment with the branch URL + any
-      // "needs manual merge" / "worktree kept for debug" notes.
-      const { finalizeTicketSubTaskWorktree, maybeRemoveFinalizedWorktree } = await import(
-        '@/server/services/worktree-finalize'
-      )
-      let suffix = ''
-      try {
-        const outcome = await finalizeTicketSubTaskWorktree({
-          taskId,
-          ticketId: task.ticketId,
-          status,
-        })
-        suffix = outcome.contentSuffix
-        // Fire-and-forget removal — a slow `git worktree remove` shouldn't
-        // hold up the comment / SSE flow.
-        void maybeRemoveFinalizedWorktree(taskId, task.ticketId, outcome).catch((err) => {
-          log.warn({ taskId, err }, 'Worktree removal after finalize failed')
-        })
-      } catch (err) {
-        log.warn({ taskId, err }, 'Worktree finalize threw — comment posted without git suffix')
-      }
-
-      const { createTicketComment } = await import('@/server/services/ticket-comments')
-      const base = status === 'completed'
-        ? (result ?? '_Task completed without a result message._')
-        : `**Task failed.**\n\n${error ?? 'Unknown error'}`
-      await createTicketComment({
-        ticketId: task.ticketId,
-        author: { type: 'agent', id: executingAgentId },
-        content: `${base}${suffix}`,
-        metadata: { fromTaskId: taskId, autoGenerated: true },
-      })
-    } catch (err) {
-      log.warn({ taskId, ticketId: task.ticketId, err }, 'Failed to auto-comment on ticket')
-    }
-  }
-
   // Emit SSE
   sseManager.sendToAgent(task.parentAgentId, {
     type: 'task:done',
@@ -2076,10 +1862,6 @@ export async function resolveTask(
 
   const taskMetadata = JSON.stringify({ resolvedTaskId: taskId })
 
-  // Build optional ticket-linked reminder appended after the result.
-  // The reminder nudges the Agent to update the ticket status via update_ticket()
-  // since ticket statuses are not auto-managed on task lifecycle (projects.md § 5).
-  const ticketReminder = task.ticketId ? (await buildTicketLinkedReminder(task.ticketId)) ?? '' : ''
 
   // Scout / sub-task parent resume: when this finishing task is the `await`
   // child of a TASK parent that suspended itself into 'awaiting_subtask'
@@ -2116,7 +1898,7 @@ export async function resolveTask(
     await enqueueMessage({
       agentId: task.parentAgentId,
       messageType: 'task_result',
-      content: `[Task: ${taskLabel}] Result: ${result}${ticketReminder}`,
+      content: `[Task: ${taskLabel}] Result: ${result}`,
       sourceType: 'task',
       sourceId: executingAgentId,
       priority: config.queue.taskPriority,
@@ -2127,7 +1909,7 @@ export async function resolveTask(
     await enqueueMessage({
       agentId: task.parentAgentId,
       messageType: 'task_result',
-      content: `[Task failed: ${taskLabel}] Error: ${error ?? 'Unknown error'}${ticketReminder}`,
+      content: `[Task failed: ${taskLabel}] Error: ${error ?? 'Unknown error'}`,
       sourceType: 'task',
       sourceId: executingAgentId,
       priority: config.queue.taskPriority,
@@ -2333,7 +2115,7 @@ export class TaskNotRetryableError extends Error {
  *     sub-Agent runner — only text content survives across reload).
  *
  * The original failed task is left intact for audit. The new task carries
- * the same parent/source/ticket/cron/webhook/concurrency wiring as the
+ * the same parent/source/cron/webhook/concurrency wiring as the
  * original. The "retry of" relationship is not persisted yet — callers
  * should hold the original id client-side if they want to surface it.
  */
@@ -2368,8 +2150,6 @@ export async function retryTask(
     cronId: original.cronId ?? undefined,
     channelOriginId: original.channelOriginId ?? undefined,
     webhookId: original.webhookId ?? undefined,
-    ticketId: original.ticketId ?? undefined,
-    kind: (original.kind ?? 'execute') as 'execute' | 'enrich',
     model: original.model ?? undefined,
     providerId: original.providerId ?? undefined,
     allowHumanPrompt: original.allowHumanPrompt,
@@ -2931,25 +2711,8 @@ export async function requestInput(taskId: string, question: string) {
     .set({ requestInputCount: task.requestInputCount + 1, updatedAt: new Date() })
     .where(eq(tasks.id, taskId))
 
-  // Ticket sub-Agents ask the user directly: route through the human-prompt
-  // pipeline so the task is suspended with `awaiting_human_input`, a
-  // notification is created, and the answer resumes the sub-Agent. Without this
-  // routing the question would be silently enqueued into the parent Agent's
-  // queue, which has no visible effect on the ticket and frustrated users.
-  if (task.ticketId) {
-    const { createHumanPrompt } = await import('@/server/services/human-prompts')
-    await createHumanPrompt({
-      agentId: task.parentAgentId,
-      taskId,
-      promptType: 'text',
-      question,
-      options: [],
-    })
-    return { success: true }
-  }
-
-  // Non-ticket sub-Agents ask their parent Agent: deposit the question in the
-  // parent's queue, where it's processed as a normal task_input message.
+  // Sub-Agents ask their parent Agent: deposit the question in the parent's
+  // queue, where it's processed as a normal task_input message.
   await enqueueMessage({
     agentId: task.parentAgentId,
     messageType: 'task_input',

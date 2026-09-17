@@ -46,8 +46,6 @@ export const MINI_APP_SUBSCRIBABLE_EVENT_PREFIXES = new Set([
   'channel',    // channel:message-received/sent, channel:user-*, channel:*
   'notification',
   'contact',    // contact:created/updated/deleted
-  'project',    // project:*, project-tag handled under its own prefix below
-  'ticket',     // ticket:*
   'memory',     // memory:created/updated/deleted
   'trigger',    // trigger:fired/created/updated/deleted
   'webhook',    // webhook:triggered/created/updated/deleted
@@ -59,8 +57,8 @@ export const MINI_APP_SUBSCRIBABLE_EVENT_PREFIXES = new Set([
 /** Event types never deliverable to a mini-app even if the prefix is allowed (noisy/internal). */
 const EVENT_TYPE_DENYLIST = new Set([
   'chat:token',
+  'chat:token-retract',
   'chat:reasoning-token',
-  'chat:reasoning-done',
   'chat:tool-call-start',
   'chat:tool-call',
   'chat:tool-result',
@@ -69,7 +67,6 @@ const EVENT_TYPE_DENYLIST = new Set([
   'task:todos',
   'queue:update',
   'agent:read',
-  'agent:active-project',
 ])
 
 /** The prefix of an SSE event type (part before the first colon). */

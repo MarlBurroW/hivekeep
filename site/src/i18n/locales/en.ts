@@ -300,11 +300,6 @@ export default {
               blurb: 'Agents schedule their own future work (<b>“wake me in 2 hours”</b>) so follow-ups and reminders actually happen.',
               icon: 'alarm-clock',
             },
-            {
-              title: 'Agent-run kanban',
-              blurb: 'Organize work into projects and tickets, then <b>assign tickets to agents</b> that execute them and report back as comments.',
-              icon: 'kanban',
-            },
           ],
         },
         {
@@ -325,11 +320,6 @@ export default {
               title: 'Knowledge bases',
               blurb: 'Upload documents once; relevant excerpts are <b>auto-surfaced</b> into context whenever the topic comes up.',
               icon: 'book-open',
-            },
-            {
-              title: 'Project knowledge',
-              blurb: 'Each project keeps curated facts, decisions, and gotchas: <b>pinned entries</b> ride along in every agent turn.',
-              icon: 'notebook-pen',
             },
             {
               title: 'Searchable past',
@@ -454,7 +444,7 @@ export default {
         'A team of agents that collaborate',
         'Polished web app (PWA)',
         'Rendered tool calls (UI, not JSON)',
-        'Mini-apps & projects (Kanban)',
+        'Mini-apps your agents build',
         'Conversational setup (no CLI)',
         'Secrets never sent to the LLM',
         'Token & context transparency',
@@ -478,7 +468,7 @@ export default {
     tourTeaser: {
       kicker: 'Inside the app',
       heading: 'See it for real.',
-      p: 'Real screenshots from a running hive: conversations, tool calls, the vault, mini-apps, the kanban and more.',
+      p: 'Real screenshots from a running hive: conversations, tool calls, the vault, mini-apps and more.',
       cta: 'Take the tour',
     },
   },
@@ -487,7 +477,7 @@ export default {
     meta: {
       title: 'Hivekeep, in screenshots',
       description:
-        'A guided tour of Hivekeep in 30+ real screenshots: agent conversations, tool calls, the encrypted vault, mini-apps, kanban, scheduled jobs, and more.',
+        'A guided tour of Hivekeep in 30+ real screenshots: agent conversations, tool calls, the encrypted vault, mini-apps, scheduled jobs, and more.',
     },
     kicker: 'The tour',
     heading: 'See inside the hive.',
@@ -508,7 +498,7 @@ export default {
       },
       organize: {
         title: 'Organize & automate',
-        sub: 'A shared kanban, delegated tasks, scheduled jobs and webhooks: several things move at once.',
+        sub: 'Delegated tasks, scheduled jobs and webhooks: several things move at once.',
       },
       control: {
         title: 'The control room',
@@ -542,9 +532,6 @@ export default {
       'files': { t: 'A real workspace', d: 'Browse and edit every agent\'s files with a proper editor, tabs and all.' },
       'terminal': { t: 'A real terminal', d: 'Drop into any agent\'s workspace shell, right from the browser.' },
       'toolboxes': { t: 'Scoped capabilities', d: 'Toolboxes decide exactly which tools each agent sees. Focused agents, lighter models.' },
-      'kanban': { t: 'A shared kanban', d: 'Projects and tickets that both you and the agents work on.' },
-      'ticket': { t: 'Agents report back', d: 'Forge compared three contractor quotes and posted the verdict as a comment.' },
-      'knowledge': { t: 'Project knowledge', d: 'Decisions and facts pinned to the project, injected into every related turn.' },
       'tasks': { t: 'Mission control', d: 'Every delegated job and sub-agent, live, with status and results.' },
       'crons': { t: 'Scheduled jobs', d: 'Agents run on a schedule: briefings, checks, digests, with run journals.' },
       'webhooks': { t: 'Wake on webhook', d: 'Any HTTP event can wake an agent, with filtering and task dispatch.' },

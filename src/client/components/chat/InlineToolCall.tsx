@@ -32,6 +32,10 @@ interface InlineToolCallProps {
   toolCall: ToolCallViewItem
 }
 
+export function normalizeToolCallArgs(args: unknown): Record<string, unknown> {
+  return (args ?? {}) as Record<string, unknown>
+}
+
 /** Compact collapsible inline tool call shown within the Agent's message flow. */
 export const InlineToolCall = memo(function InlineToolCall({ toolCall }: InlineToolCallProps) {
   const { t } = useTranslation()
@@ -54,7 +58,8 @@ export const InlineToolCall = memo(function InlineToolCall({ toolCall }: InlineT
     ? toolCall.name.slice('custom_'.length)
     : null
   const previewFn = getPreviewRenderer(toolCall.name)
-  const preview = previewFn?.({ toolName: toolCall.name, args: toolCall.args as Record<string, unknown>, status: toolCall.status })
+  const args = normalizeToolCallArgs(toolCall.args)
+  const preview = previewFn?.({ toolName: toolCall.name, args, status: toolCall.status })
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -83,7 +88,7 @@ export const InlineToolCall = memo(function InlineToolCall({ toolCall }: InlineT
             {CustomRenderer ? (
               <CustomRenderer
                 toolName={toolCall.name}
-                args={toolCall.args as Record<string, unknown>}
+                args={args}
                 result={toolCall.result}
                 status={toolCall.status}
               />
@@ -91,12 +96,12 @@ export const InlineToolCall = memo(function InlineToolCall({ toolCall }: InlineT
               <CustomToolRenderer
                 slug={customSlug}
                 result={toolCall.result}
-                args={toolCall.args}
+                args={args}
               />
             ) : (
               <>
                 <JsonViewer
-                  data={toolCall.args}
+                  data={args}
                   label={t('tools.viewer.input')}
                   maxHeight="max-h-40"
                 />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Wrench } from 'lucide-react'
+import { Wrench, AlertTriangle } from 'lucide-react'
 import { ChatAvatar } from '@/client/components/chat/ChatAvatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 
@@ -15,7 +15,14 @@ interface TypingIndicatorProps {
   toolCallCount?: number
   /** Opens the tool-calls side panel when the tool counter is clicked */
   onOpenToolCalls?: () => void
+  /** Force-unblocks the Agent. Surfaced only once the turn has run long enough
+   *  to look wedged, so the escape hatch is discoverable exactly when needed
+   *  without inviting people to interrupt healthy long turns. */
+  onForceReset?: () => void
 }
+
+/** Elapsed seconds after which a turn is treated as suspect in the UI. */
+const STUCK_AFTER_SECONDS = 15 * 60
 
 /** Compact token formatting: 1234 → "1.2k", 980 → "980". */
 function formatTokens(n: number): string {
@@ -30,6 +37,7 @@ export function TypingIndicator({
   tokenCount = 0,
   toolCallCount = 0,
   onOpenToolCalls,
+  onForceReset,
 }: TypingIndicatorProps) {
   const { t } = useTranslation()
   const [elapsed, setElapsed] = useState(0)
@@ -97,6 +105,22 @@ export function TypingIndicator({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">{t('chat.thinkingToolsHint')}</TooltipContent>
+            </Tooltip>
+          )}
+
+          {onForceReset && elapsed >= STUCK_AFTER_SECONDS && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onForceReset}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-destructive border-l border-border/60 transition-colors hover:bg-destructive/10"
+                >
+                  <AlertTriangle className="size-3" />
+                  {t('chat.forceReset')}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{t('chat.forceResetHint')}</TooltipContent>
             </Tooltip>
           )}
         </div>

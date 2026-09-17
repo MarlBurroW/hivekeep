@@ -9,14 +9,14 @@ import type { TaskStatus, AgentThinkingEffort, TaskTokenUsage } from '@/shared/t
 
 /**
  * Normalized view-model for a task card. Both the Tasks page (`TaskSummary`)
- * and the ticket panel (`TicketTaskSummary`) map their richer/leaner shapes
+ * and the task panel map their richer/leaner shapes
  * onto this so the card stays visually identical across the app. Timestamps are
  * Unix-ms numbers; the optional meta fields are only populated where available.
  */
 export interface TaskCardModel {
   id: string
   status: TaskStatus
-  /** Primary line — task title/prompt, or a kind label for ticket tasks. */
+  /** Primary line — task title/prompt. */
   title: string
   /** Secondary line — the acting Agent (matches the avatar). */
   agentName: string
@@ -45,7 +45,7 @@ function formatTokenCount(n: number): string {
  * status badge, optional model/thinking/origin meta, and a footer with the run
  * duration (live off the shared `nowMs` clock while executing, frozen once
  * terminal) plus token consumption. Sections collapse when their data is
- * absent, so a lean ticket task degrades to a clean status card.
+ * absent, so a lean task degrades to a clean status card.
  */
 export function TaskCard({
   task,

@@ -6,6 +6,7 @@ import { readFile, writeFile, mkdir } from 'fs/promises'
 import { createLogger } from '@/server/logger'
 import { noteReadFile, formatReadRange, recordReadPath, hasReadPath, recordGuardFire } from '@/server/services/tool-call-tracker'
 import type { ToolRegistration } from '@/server/tools/types'
+import { config } from '@/server/config'
 import { resolveToolWorkspace } from '@/server/tools/workspace'
 import { emitWorkspaceChangedForTool } from '@/server/services/workspace-files'
 
@@ -25,6 +26,17 @@ const DEFAULT_IGNORE = new Set([
 const BLOCKED_PATHS = [
   '/etc/shadow', '/etc/passwd', '/etc/sudoers',
   '/root', '/proc', '/sys',
+]
+
+// Files that decrypt or ARE the platform's own state: with the encryption key
+// plus the DB file, the whole vault is decryptable offline. Agents keep broad
+// host access by design (trusted agents administer the machine), but never
+// through these.
+const SENSITIVE_PLATFORM_FILES = [
+  resolve(config.dataDir, '.encryption-key'),
+  resolve(config.db.path),
+  resolve(config.db.path) + '-wal',
+  resolve(config.db.path) + '-shm',
 ]
 
 const EXTENSION_LANGUAGES: Record<string, string> = {
@@ -64,8 +76,9 @@ export function isPathBlocked(absPath: string): boolean {
   for (const blocked of BLOCKED_PATHS) {
     if (absPath === blocked || absPath.startsWith(blocked + '/')) return true
   }
-  // Block SSH keys
-  if (absPath.includes('/.ssh/')) return true
+  if (SENSITIVE_PLATFORM_FILES.includes(absPath)) return true
+  // Block SSH keys and the GPG keyring
+  if (absPath.includes('/.ssh/') || absPath.includes('/.gnupg/')) return true
   return false
 }
 

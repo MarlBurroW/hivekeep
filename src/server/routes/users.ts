@@ -4,6 +4,7 @@ import { user, userProfiles, session, account, contacts, agents } from '@/server
 import { eq } from 'drizzle-orm'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:users')
 
@@ -49,8 +50,9 @@ userRoutes.get('/mentionables', async (c) => {
   })
 })
 
-// GET /api/users — list all users with full profile data
-userRoutes.get('/', async (c) => {
+// GET /api/users — list all users with full profile data (admin-only:
+// exposes every member's email and role)
+userRoutes.get('/', requireAdmin, async (c) => {
   const users = db
     .select({
       id: user.id,
@@ -69,6 +71,35 @@ userRoutes.get('/', async (c) => {
     .all()
 
   return c.json({ users })
+})
+
+// PATCH /api/users/:id/role — change a user's role (admin-only). Changing
+// your own role is rejected, which guarantees at least one admin remains.
+userRoutes.patch('/:id/role', requireAdmin, async (c) => {
+  const targetId = c.req.param('id')
+  if (!targetId) {
+    return c.json({ error: { code: 'INVALID_INPUT', message: 'User id is required' } }, 400)
+  }
+  const currentUser = c.get('user')
+  if (targetId === currentUser.id) {
+    return c.json({ error: { code: 'CANNOT_CHANGE_OWN_ROLE', message: 'You cannot change your own role' } }, 400)
+  }
+  const body = await c.req.json().catch(() => ({}) as Record<string, unknown>)
+  const role = (body as Record<string, unknown>).role
+  if (role !== 'admin' && role !== 'member') {
+    return c.json({ error: { code: 'INVALID_ROLE', message: "role must be 'admin' or 'member'" } }, 400)
+  }
+  const profile = db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, targetId))
+    .get()
+  if (!profile) {
+    return c.json({ error: { code: 'USER_NOT_FOUND', message: 'User not found' } }, 404)
+  }
+  await db.update(userProfiles).set({ role }).where(eq(userProfiles.userId, targetId))
+  log.info({ targetId, role }, 'User role updated')
+  return c.json({ success: true })
 })
 
 // DELETE /api/users/:id — delete a user account

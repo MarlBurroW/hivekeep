@@ -52,21 +52,11 @@ export interface BuiltinToolboxDef {
 export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
   {
     name: 'code',
-    description: 'Ticket-bound implementation work: project/ticket tools, web docs lookup, read-only memory, and project knowledge.',
+    description: 'Implementation work: task introspection, web docs lookup, and read-only memory.',
     toolNames: [
-      // Project & ticket tools.
-      'list_projects',
-      'get_project',
-      'list_project_tags',
-      'list_tickets',
-      'get_ticket',
+      // Task introspection.
       'get_task_detail',
       'get_task_messages',
-      'update_ticket',
-      'create_ticket',
-      'add_ticket_tag',
-      'remove_ticket_tag',
-      'set_active_project',
       // Web.
       'web_search',
       'browse_url',
@@ -74,20 +64,13 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       // Memory (read-only).
       'recall',
       'list_memories',
-      // Project knowledge.
-      'add_project_knowledge',
-      'search_project_knowledge',
-      'list_project_knowledge',
-      'get_project_knowledge',
-      'update_project_knowledge',
-      'pin_project_knowledge',
       // Delegation — offload heavy read-only exploration to a cheap scout model.
       'scout',
     ],
   },
   {
     name: 'research',
-    description: 'Web research and knowledge capture: browsing, history, summaries, and full memory read/write.',
+    description: 'Web research and memory capture: browsing, history, summaries, and full memory read/write.',
     toolNames: [
       'web_search',
       'browse_url',
@@ -100,6 +83,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'read_summary',
       'recall',
       'memorize',
+      'edit_profile',
       'update_memory',
       'forget',
       'list_memories',
@@ -114,10 +98,11 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
     toolNames: [
       'recall',
       'memorize',
+      'edit_profile',
       'list_memories',
       'get_secret',
       'search_secrets',
-      'redact_message',
+      'redact_secret_leak',
       'http_request',
       'get_system_info',
       // Delegation — offload heavy read-only exploration to a cheap scout model.
@@ -233,6 +218,7 @@ export const BUILTIN_TOOLBOXES: readonly BuiltinToolboxDef[] = [
       'search_contacts',
       // Memory.
       'memorize',
+      'edit_profile',
       'recall',
       'list_memories',
       // Secure secret entry.

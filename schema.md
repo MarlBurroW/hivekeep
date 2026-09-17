@@ -109,7 +109,6 @@ Agents IA de la plateforme.
 | `workspace_path` | text | NOT NULL | Chemin du dossier de travail |
 | `tool_config` | text | | JSON : AgentToolConfig (outils désactivés, accès MCP, opt-in, search provider) |
 | `compacting_config` | text | | JSON : AgentCompactingConfig (seuil de tours, modèle de compacting, provider) |
-| `active_project_id` | text | FK → projects.id, ON DELETE SET NULL | Projet actif du Agent. NULL si aucun. Injecté dans le bloc volatile du prompt système. Voir `projects.md` |
 | `created_by` | text | FK → user.id | Utilisateur qui a créé le Agent |
 | `created_at` | integer | NOT NULL | |
 | `updated_at` | integer | NOT NULL | |
@@ -223,9 +222,33 @@ Résumés de compacting avec accumulation multi-summary et merge télescopique.
 
 ---
 
+### `agent_profiles`
+
+Document de mémoire curé, un par Agent : injecté dans le segment **stable**
+(caché) du prompt système à chaque tour. Complément de `memories`, qui est
+l'archive épisodique atteinte à la demande via l'outil `recall`. Voir
+`memory.md`.
+
+| Colonne | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | text PK | UUID | |
+| `agent_id` | text | FK → agents.id, NOT NULL, UNIQUE, ON DELETE CASCADE | |
+| `content` | text | NOT NULL, DEFAULT '' | Le document markdown |
+| `token_estimate` | integer | NOT NULL, DEFAULT 0 | Recalculé à chaque écriture (jamais désynchronisé de `content`) |
+| `last_rewrite_at` | integer | | Dernière réécriture par l'appel de maintenance ou une régénération |
+| `manually_edited_at` | integer | | Dernière édition utilisateur via l'UI |
+| `created_at` | integer | NOT NULL | |
+| `updated_at` | integer | NOT NULL | |
+
+**Index** :
+- `agent_profiles_agent_id_unique` (UNIQUE) sur `agent_id`
+
+---
+
 ### `memories`
 
-Mémoire long terme des Agents (faits, préférences, décisions, connaissances).
+Archive épisodique des Agents (faits, préférences, décisions, connaissances).
+Jamais injectée automatiquement : cherchée à la demande via `recall`.
 
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|
@@ -482,7 +505,6 @@ Sous-Agents éphémères (tâches déléguées).
 | `pending_request_id` | text | | request_id en attente de réponse inter-Agent |
 | `channel_origin_id` | text | | ID de la chaîne causale canal pour auto-delivery |
 | `webhook_id` | text | FK → webhooks.id, ON DELETE SET NULL | Webhook qui a spawné cette tâche (mode dispatch "task") |
-| `ticket_id` | text | FK → tickets.id, ON DELETE SET NULL | Ticket auquel la tâche est liée. NULL si task non-projet. Voir `projects.md` |
 | `allow_human_prompt` | integer | NOT NULL, DEFAULT 1 | Si la tâche peut utiliser prompt_human |
 | `concurrency_group` | text | | Nom du groupe de concurrence (ex: "batch-issues") |
 | `concurrency_max` | integer | | Nombre max de tâches concurrentes dans ce groupe |
@@ -496,7 +518,6 @@ Sous-Agents éphémères (tâches déléguées).
 - `idx_tasks_cron` sur `cron_id`
 - `idx_tasks_concurrency` sur (`concurrency_group`, `status`, `queued_at`)
 - `idx_tasks_webhook` sur `webhook_id`
-- `idx_tasks_ticket` sur `ticket_id`
 
 ---
 
@@ -609,7 +630,7 @@ Déclencheurs par compte email connecté : quand un nouvel email correspond à l
 | `dispatch_mode` | text | NOT NULL, DEFAULT 'conversation' | 'conversation' (injecté dans la session principale, avec contexte) ou 'task' (sous-tâche isolée, sans historique) |
 | `max_concurrent_tasks` | integer | NOT NULL, DEFAULT 1 | Max tâches concurrentes (mode task). 0 = illimité |
 | `needs_body` | integer | NOT NULL, DEFAULT 0 | 1 si une condition vise le corps/pièces jointes (fetch du message complet requis au polling) |
-| `disable_after_fire` | integer | NOT NULL, DEFAULT 0 | 1 = one-shot : le trigger se désactive (`is_active=0`) après le premier match. Utilisé par l'option `watch_reply` de `send_email` (attente de la réponse à un mail envoyé) |
+| `disable_after_fire` | integer | NOT NULL, DEFAULT 0 | 1 = one-shot : la ligne est supprimée après le premier match (sa condition vise un seul thread/Message-ID, elle ne peut plus rematcher, et les lignes consommées saturaient le quota par compte). Utilisé par l'option `watch_reply` de `send_email`. Les one-shots jamais déclenchés sont purgés après `EMAIL_TRIGGER_ONE_SHOT_TTL_DAYS` |
 | `last_triggered_at` | integer | | Dernier déclenchement |
 | `trigger_count` | integer | NOT NULL, DEFAULT 0 | Nombre de déclenchements |
 | `created_by` | text | NOT NULL, DEFAULT 'user' | 'user' ou 'agent' |
@@ -799,86 +820,6 @@ Suivi des consommations de tokens LLM pour toutes les invocations AI (chat, tâc
 
 ---
 
-### `projects`
-
-Projets de la plateforme. Entités indépendantes des Agents (partagées entre tous les utilisateurs, n'importe quel Agent peut sélectionner n'importe quel projet). Voir `projects.md` pour la spec complète.
-
-| Colonne | Type | Contraintes | Description |
-|---|---|---|---|
-| `id` | text PK | UUID | |
-| `title` | text | NOT NULL | Titre du projet |
-| `description` | text | NOT NULL, DEFAULT '' | Description complète injectée dans le bloc volatile du prompt système des Agents quand le projet est actif. Pas de cap dur en DB (cap pratique à l'injection : 8000 tokens, cf. `config.md`) |
-| `github_url` | text | | URL externe (metadata uniquement, pas d'intégration tool au MVP) |
-| `created_at` | integer | NOT NULL | |
-| `updated_at` | integer | NOT NULL | |
-
-**Index** :
-- `idx_projects_created` sur `created_at`
-
----
-
-### `project_tags`
-
-Tags propres à chaque projet. Bibliothèque non partagée entre projets — un tag "bug" dans le projet A est distinct d'un tag "bug" dans le projet B.
-
-| Colonne | Type | Contraintes | Description |
-|---|---|---|---|
-| `id` | text PK | UUID | |
-| `project_id` | text | FK → projects.id, ON DELETE CASCADE, NOT NULL | |
-| `label` | text | NOT NULL | Libellé du tag (ex: 'bug', 'feature') |
-| `color` | text | NOT NULL | Couleur hex (ex: '#ef4444') |
-| `created_at` | integer | NOT NULL | |
-| `updated_at` | integer | NOT NULL | |
-
-**Contrainte UNIQUE** : (`project_id`, `label`)
-
-**Index** :
-- `idx_project_tags_project` sur `project_id`
-
-> À la création d'un projet, un seed `DEFAULT_PROJECT_TAGS` (défini dans `src/shared/constants.ts`) est appliqué : `bug`, `feature`, `chore`, `doc` avec couleurs par défaut. Les tags restent ensuite librement éditables.
-
----
-
-### `tickets`
-
-Unités de travail au sein d'un projet. Visualisées dans un kanban à 5 colonnes.
-
-| Colonne | Type | Contraintes | Description |
-|---|---|---|---|
-| `id` | text PK | UUID | |
-| `project_id` | text | FK → projects.id, ON DELETE CASCADE, NOT NULL | |
-| `title` | text | NOT NULL | Titre du ticket |
-| `description` | text | NOT NULL, DEFAULT '' | Détails du ticket |
-| `status` | text | NOT NULL, DEFAULT 'backlog' | `'backlog' \| 'todo' \| 'in_progress' \| 'blocked' \| 'done'` |
-| `position` | integer | NOT NULL, DEFAULT 0 | Ordre dans la colonne kanban. Inséré à `max(position) + 1024` dans la colonne cible. |
-| `created_at` | integer | NOT NULL | |
-| `updated_at` | integer | NOT NULL | |
-
-**Index** :
-- `idx_tickets_project_status_position` sur (`project_id`, `status`, `position` ASC) — rendu kanban
-- `idx_tickets_project_updated` sur (`project_id`, `updated_at` DESC) — vues "récents"
-
-> Pas de champ `priority` au MVP. Si le besoin émerge, le modéliser comme tag plutôt qu'enum figée.
-
----
-
-### `ticket_tags`
-
-Table de liaison N-N tickets ↔ project_tags.
-
-| Colonne | Type | Contraintes | Description |
-|---|---|---|---|
-| `ticket_id` | text | FK → tickets.id, ON DELETE CASCADE, NOT NULL | |
-| `tag_id` | text | FK → project_tags.id, ON DELETE CASCADE, NOT NULL | |
-
-**PK composite** : (`ticket_id`, `tag_id`)
-
-**Index** :
-- `idx_ticket_tags_ticket` sur `ticket_id`
-- `idx_ticket_tags_tag` sur `tag_id`
-
----
-
 ### `mini_apps`
 
 Mini-applications web (UI iframe + backend `_server.js` optionnel) construites par les Agents. Les fichiers vivent sur disque dans `{MINI_APPS_DIR}/<agent_id>/<app_id>/` ; cette table porte les métadonnées. Le manifest `app.json` (sur disque, pas en DB) déclare les dépendances (import map), `background: true` (backend chargé au boot, redémarré à chaque édition) et `permissions` (capacités demandées).
@@ -1016,14 +957,7 @@ agents
  │         └── 1:N  cron_learnings  (FIFO cap 20, ON DELETE CASCADE)
  ├── 1:N  webhooks
  ├── 1:N  queue_items
- ├── 1:N  files
- └── N:1  projects            (via agents.active_project_id, ON DELETE SET NULL)
-
-projects (entités indépendantes, partagées)
- ├── 1:N  project_tags        (ON DELETE CASCADE)
- ├── 1:N  tickets             (ON DELETE CASCADE)
- │         └── N:M  project_tags  (via ticket_tags, ON DELETE CASCADE des deux côtés)
- └── 1:N  tasks               (via tasks.ticket_id, ON DELETE SET NULL — historique préservé)
+ └── 1:N  files
 
 contacts (registre partagé)
  ├── 1:N  contact_identifiers
@@ -1034,8 +968,7 @@ tasks
  ├── 1:N  messages            (session de tâche: task_id = tasks.id)
  ├── 1:N  tasks               (sous-tâches: parent_task_id)
  ├── N:1  crons               (si spawné par un cron)
- ├── N:1  webhooks            (si spawné par un webhook en mode task)
- └── N:1  tickets             (si spawné depuis un ticket, via tasks.ticket_id)
+ └── N:1  webhooks            (si spawné par un webhook en mode task)
 
 webhooks
  ├── 1:N  webhook_logs

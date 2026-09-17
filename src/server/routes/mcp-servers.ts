@@ -7,10 +7,15 @@ import { disconnectServer, getConnectionStatus, testConnection } from '@/server/
 import { sseManager } from '@/server/sse/index'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:mcp-servers')
 
 export const mcpServerRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Reads stay member-accessible (pickers, list views); mutations are platform
+// configuration and admin-only.
+mcpServerRoutes.use('*', (c, next) => (c.req.method === 'GET' ? next() : requireAdmin(c, next)))
 
 function serialize(server: typeof mcpServers.$inferSelect) {
   // Never expose env var values to the frontend — only return keys with empty strings

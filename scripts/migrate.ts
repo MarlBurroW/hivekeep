@@ -5,7 +5,7 @@
  */
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import { runMigrations } from '../src/server/db/run-migrations'
 import { mkdirSync, existsSync } from 'fs'
 import { dirname, resolve } from 'path'
 
@@ -26,7 +26,7 @@ const db = drizzle(sqlite)
 const migrationsFolder = resolve(import.meta.dir, '../src/server/db/migrations')
 
 console.log(`Migrating database at ${dbPath}...`)
-migrate(db, { migrationsFolder })
+runMigrations(sqlite, db, migrationsFolder)
 console.log('Migrations complete.')
 
 sqlite.close()

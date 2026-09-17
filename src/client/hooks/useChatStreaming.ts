@@ -1,15 +1,25 @@
 import { useState, useRef, useCallback } from 'react'
+import { createSmoothReveal, type SmoothReveal } from '@/client/lib/smooth-stream'
 import type { ChatMessage } from '@/client/hooks/useChat'
 
-const STREAMING_BATCH_MS = 50
 /** After this many ms without a text token, consider the output "stalled" (e.g. tool call being generated) */
 const TOKEN_STALL_MS = 1500
 
 export interface StreamingTokenData {
   messageId: string
   token: string
+  /** Total content length (committed + provisional) AFTER this token, as
+   *  computed by the server. Used to skip tokens already covered by a
+   *  rehydration snapshot. Absent on some synthetic fallback events. */
+  contentLength?: number
   sourceName?: string | null
   sourceAvatarUrl?: string | null
+}
+
+export interface StreamingTokenRetractData {
+  messageId: string
+  /** Committed length to truncate the streaming content back to. */
+  contentLength: number
 }
 
 export interface StreamingReasoningTokenData {
@@ -72,16 +82,32 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
   const streamingContentRef = useRef('')
   const streamingMessageIdRef = useRef<string | null>(null)
   const streamingReasoningRef = useRef('')
-  const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reasoningBatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tokenStallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Adaptive typewriter (see smooth-stream.ts): refs hold the full received
+  // text; the reveals advance a cursor into them so coarse provider chunks
+  // render as a continuous flow instead of visible jumps.
+  const contentRevealRef = useRef<SmoothReveal | null>(null)
+  if (!contentRevealRef.current) {
+    contentRevealRef.current = createSmoothReveal((len) => {
+      setStreamingMessage((prev) =>
+        prev ? { ...prev, content: streamingContentRef.current.slice(0, len) } : prev,
+      )
+    })
+  }
+  const reasoningRevealRef = useRef<SmoothReveal | null>(null)
+  if (!reasoningRevealRef.current) {
+    reasoningRevealRef.current = createSmoothReveal((len) => {
+      setStreamingReasoning(streamingReasoningRef.current.slice(0, len))
+    })
+  }
 
   /**
    * Handle an incoming text token from SSE.
    * Call this from the `chat:token` SSE handler after your own filtering.
    */
   const handleToken = useCallback((data: StreamingTokenData) => {
-    const { messageId, token, sourceName, sourceAvatarUrl } = data
+    const { messageId, token, contentLength, sourceName, sourceAvatarUrl } = data
 
     // Reset token stall timer
     if (trackTokenStall) {
@@ -90,16 +116,26 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
       tokenStallTimerRef.current = setTimeout(() => setTokenStalled(true), TOKEN_STALL_MS)
     }
 
-    if (!streamingMessageIdRef.current) {
-      // First token — create the streaming message
+    if (!streamingMessageIdRef.current || streamingMessageIdRef.current !== messageId) {
+      // First token of a stream, or a NEW messageId while an old one was
+      // still tracked (chat:done was missed, e.g. during a reconnect gap):
+      // start fresh instead of appending a new turn onto a stale bubble.
+      if (streamingMessageIdRef.current && streamingMessageIdRef.current !== messageId) {
+        streamingReasoningRef.current = ''
+        setStreamingReasoning('')
+        setStreamingOutputTokens(0)
+        reasoningRevealRef.current!.reset()
+      }
+      contentRevealRef.current!.reset()
       streamingMessageIdRef.current = messageId
       streamingContentRef.current = token
       setIsStreaming(true)
 
+      // The bubble starts empty; the reveal cursor types the text in.
       setStreamingMessage({
         id: messageId,
         role: 'assistant',
-        content: token,
+        content: '',
         sourceType: 'agent',
         sourceId: null,
         sourceName: sourceName ?? null,
@@ -107,7 +143,6 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         isRedacted: false,
         toolCalls: null,
         resolvedTaskId: null,
-        injectedMemories: null,
         memoriesExtracted: null,
         compactingError: null,
         files: [],
@@ -121,19 +156,32 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         createdAt: new Date().toISOString(),
       })
     } else {
-      // Accumulate token, batch UI updates
-      streamingContentRef.current += token
-
-      if (!batchTimerRef.current) {
-        batchTimerRef.current = setTimeout(() => {
-          batchTimerRef.current = null
-          setStreamingMessage((prev) =>
-            prev ? { ...prev, content: streamingContentRef.current } : prev,
-          )
-        }, STREAMING_BATCH_MS)
+      // Skip tokens the local content already covers: the server tags each
+      // token with the total length AFTER appending, and the rehydration
+      // snapshot is always at a token boundary, so this comparison is exact.
+      // Guards the race where a mid-stream mount seeds the snapshot AND the
+      // same tokens arrive live over SSE (they used to double-append).
+      if (contentLength !== undefined && contentLength <= streamingContentRef.current.length) {
+        return
       }
+      streamingContentRef.current += token
     }
+    contentRevealRef.current!.setTarget(streamingContentRef.current.length)
   }, [trackTokenStall])
+
+  /**
+   * Handle a `chat:token-retract` SSE event: the step whose text was being
+   * streamed died (error, abort, stall): truncate the streaming bubble back
+   * to the committed length. The reasoning stream and tool cards are
+   * unaffected.
+   */
+  const handleTokenRetract = useCallback((data: StreamingTokenRetractData) => {
+    if (streamingMessageIdRef.current !== data.messageId) return
+    if (data.contentLength >= streamingContentRef.current.length) return
+    streamingContentRef.current = streamingContentRef.current.slice(0, data.contentLength)
+    // A target below the reveal cursor snaps the visible text down immediately.
+    contentRevealRef.current!.setTarget(data.contentLength)
+  }, [])
 
   /**
    * Handle an incoming reasoning/thinking token from SSE.
@@ -142,8 +190,18 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
     const { messageId } = data
 
     // If we haven't started streaming yet, initialize the streaming message
-    // (reasoning can arrive before the first text token)
-    if (!streamingMessageIdRef.current) {
+    // (reasoning can arrive before the first text token). A DIFFERENT
+    // messageId while one is still tracked means chat:done was missed:
+    // start fresh instead of appending onto the stale turn.
+    if (!streamingMessageIdRef.current || streamingMessageIdRef.current !== messageId) {
+      if (streamingMessageIdRef.current && streamingMessageIdRef.current !== messageId) {
+        streamingContentRef.current = ''
+        streamingReasoningRef.current = ''
+        setStreamingReasoning('')
+        setStreamingOutputTokens(0)
+        contentRevealRef.current!.reset()
+        reasoningRevealRef.current!.reset()
+      }
       streamingMessageIdRef.current = messageId
       setIsStreaming(true)
       setStreamingMessage({
@@ -157,7 +215,6 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         isRedacted: false,
         toolCalls: null,
         resolvedTaskId: null,
-        injectedMemories: null,
         memoriesExtracted: null,
         compactingError: null,
         files: [],
@@ -180,13 +237,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
     }
 
     streamingReasoningRef.current += data.token
-
-    if (!reasoningBatchTimerRef.current) {
-      reasoningBatchTimerRef.current = setTimeout(() => {
-        reasoningBatchTimerRef.current = null
-        setStreamingReasoning(streamingReasoningRef.current)
-      }, STREAMING_BATCH_MS)
-    }
+    reasoningRevealRef.current!.setTarget(streamingReasoningRef.current.length)
   }, [trackTokenStall])
 
   /**
@@ -206,15 +257,8 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
    * messages array and triggering any post-done actions (e.g. fetchMessages).
    */
   const handleDone = useCallback((data?: StreamingDoneData): ChatMessage | null => {
-    // Flush pending timers
-    if (batchTimerRef.current) {
-      clearTimeout(batchTimerRef.current)
-      batchTimerRef.current = null
-    }
-    if (reasoningBatchTimerRef.current) {
-      clearTimeout(reasoningBatchTimerRef.current)
-      reasoningBatchTimerRef.current = null
-    }
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
     if (tokenStallTimerRef.current) {
       clearTimeout(tokenStallTimerRef.current)
       tokenStallTimerRef.current = null
@@ -234,7 +278,6 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
         isRedacted: false,
         toolCalls: null,
         resolvedTaskId: null,
-        injectedMemories: null,
         memoriesExtracted: null,
         compactingError: null,
         files: [],
@@ -287,6 +330,9 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
 
     streamingMessageIdRef.current = snapshot.messageId
     streamingContentRef.current = content
+    // Pre-existing text shows at once (no typewriter over old content); only
+    // tokens arriving after the seed animate.
+    contentRevealRef.current!.prime(content.length)
 
     const reasoningText = snapshot.reasoning && snapshot.reasoning.length > 0
       ? snapshot.reasoning.map((r) => r.text).join('')
@@ -294,6 +340,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
     if (reasoningText && streamingReasoningRef.current.length < reasoningText.length) {
       streamingReasoningRef.current = reasoningText
       setStreamingReasoning(reasoningText)
+      reasoningRevealRef.current!.prime(reasoningText.length)
     }
 
     if (typeof snapshot.outputTokens === 'number') {
@@ -321,7 +368,6 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
       isRedacted: false,
       toolCalls: null,
       resolvedTaskId: null,
-      injectedMemories: null,
       memoriesExtracted: null,
       compactingError: null,
       files: [],
@@ -340,14 +386,8 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
    * Reset all streaming state. Call when the context changes (e.g. agentId switch).
    */
   const resetStreaming = useCallback(() => {
-    if (batchTimerRef.current) {
-      clearTimeout(batchTimerRef.current)
-      batchTimerRef.current = null
-    }
-    if (reasoningBatchTimerRef.current) {
-      clearTimeout(reasoningBatchTimerRef.current)
-      reasoningBatchTimerRef.current = null
-    }
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
     if (tokenStallTimerRef.current) {
       clearTimeout(tokenStallTimerRef.current)
       tokenStallTimerRef.current = null
@@ -366,8 +406,8 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
    * Cleanup function — call in a useEffect return to clear timers on unmount.
    */
   const cleanup = useCallback(() => {
-    if (batchTimerRef.current) clearTimeout(batchTimerRef.current)
-    if (reasoningBatchTimerRef.current) clearTimeout(reasoningBatchTimerRef.current)
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
     if (tokenStallTimerRef.current) clearTimeout(tokenStallTimerRef.current)
   }, [])
 
@@ -378,6 +418,7 @@ export function useChatStreaming(options?: UseChatStreamingOptions) {
     streamingReasoning,
     streamingOutputTokens,
     handleToken,
+    handleTokenRetract,
     handleReasoningToken,
     handleTokenUsage,
     handleDone,

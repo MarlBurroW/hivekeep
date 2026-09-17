@@ -3,13 +3,13 @@ import type { AgentThinkingConfig, AgentThinkingEffort } from '@/shared/types'
 /**
  * A single-select choice for a thinking/effort dial in a form.
  *
- * - `'inherit'` → no override; fall back to the project/Agent default (config = `null`).
+ * - `'inherit'` → no override; fall back to the Agent default (config = `null`).
  * - `'off'`     → reasoning explicitly disabled (`{ enabled: false }`).
  * - `'on'`      → reasoning enabled with no effort dial (toggle-only models —
  *                 `{ enabled: true }`, effort left unset).
  * - effort      → reasoning enabled at the given effort (`{ enabled: true, effort }`).
  *
- * Used by project settings and the task-start dialogs so every effort dial maps
+ * Used by the Agent settings and task-start dialogs so every effort dial maps
  * to/from the on-the-wire `AgentThinkingConfig | null` shape identically.
  */
 export type ThinkingChoice = 'inherit' | 'off' | 'on' | AgentThinkingEffort

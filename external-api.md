@@ -30,7 +30,7 @@ correlation layer on top; we do not touch the Agent loop.
 
 | Piece | File | Role we reuse |
 |---|---|---|
-| Enqueue | `src/server/services/queue.ts` (`enqueueMessage`, `EnqueueParams`) | `sourceType` / `sourceId` / `requestId` / `sessionId` fields already exist |
+| Enqueue | `src/server/services/queue.ts` (`enqueueMessage`, `EnqueueParams`) | `sourceType` / `sourceId` / `requestId` / `sessionId` fields already exist. API messages enqueue at **user priority** (like inbound channel messages): a `mode:'wait'` caller must not starve behind task results and inter-agent traffic |
 | Correlation id | `src/server/services/inter-agent.ts` | `requestId` column already routes a reply back to its request; same idea, external caller |
 | Turn-completion delivery hook | `src/server/services/agent-engine.ts` (channel branch around the `deliverChannelResponse` call) | precedent for "on turn done, push the reply somewhere by source"; we add an `'api'` branch |
 | Isolated lane | `dequeueMessage(agentId, 'quick')` + `processNextQuickSessionMessage` (`agent-engine.ts`), `quick_sessions` table, `messages.session_id` | the existing "a message with a `session_id` runs in its own context lane" mechanism. We reuse the *lane* (separate dequeue + `session_id`-scoped context) but run the **full** capability profile, not the minimal quick-chat one (see §3.3, §7) |
@@ -214,7 +214,10 @@ or `202 { requestId, status: "pending", conversationId? }` (async, or wait timeo
 **`GET /api/v1/agents/:agentId/conversations`** -> list this client's threads.
 
 **`GET /api/v1/conversations/:conversationId/messages?limit=&before=`** ->
-paginated transcript (this client's thread only).
+paginated transcript (this client's thread only). `limit` is clamped to
+1..100 (default 50). `before` is a message id and pages BACKWARD from it
+(the cursor resolves to that message's position; unknown ids are a 400
+`INVALID_CURSOR`); each page is returned in chronological order.
 
 **`POST /api/v1/conversations/:conversationId/close`** -> close the thread.
 

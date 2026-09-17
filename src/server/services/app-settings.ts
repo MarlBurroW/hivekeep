@@ -214,7 +214,7 @@ export async function setDefaultLlmProviderId(providerId: string | null): Promis
 // ─── Default Scout Model (cheap delegation for the `scout` tool) ─────────────
 //
 // Global fallback for the scout model resolved by resolveScoutModel(). Sits
-// near the end of the chain: per-spawn override → project scout → Agent scout →
+// near the end of the chain: per-spawn override → Agent scout →
 // THIS global default → Agent's own main model. Mirrors getDefaultLlmModel /
 // setDefaultLlmModel exactly (k/v, no dedicated column). A scout-less install
 // leaves both null and every scout falls back to the main model.
@@ -238,7 +238,7 @@ export async function setDefaultScoutProviderId(providerId: string | null): Prom
 }
 
 /** Global default reasoning config for scouts (JSON: AgentThinkingConfig).
- *  One tier of resolveScoutThinking()'s chain: per-call override → project
+ *  One tier of resolveScoutThinking()'s chain: per-call override → Agent
  *  scout thinking → Agent scout thinking → THIS → the calling Agent's own
  *  general thinking config. Null = unset. */
 export async function getDefaultScoutThinking(): Promise<AgentThinkingConfig | null> {

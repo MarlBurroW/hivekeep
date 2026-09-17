@@ -25,6 +25,7 @@ import { AvatarPickerModal, type AvatarPickerResult } from '@/client/components/
 import { AgentToolsTab } from '@/client/components/agent/AgentToolsTab'
 import { CompactingAnimation } from '@/client/components/agent/CompactingAnimation'
 import { MemoryList } from '@/client/components/memory/MemoryList'
+import { AgentProfileEditor } from '@/client/components/memory/AgentProfileEditor'
 import { Switch } from '@/client/components/ui/switch'
 import {
   Select,
@@ -41,7 +42,7 @@ import { useAuth } from '@/client/hooks/useAuth'
 import { useHasCapability } from '@/client/hooks/useHasCapability'
 import { cn } from '@/client/lib/utils'
 import { api, getErrorMessage, toastError } from '@/client/lib/api'
-import type { AgentCompactingConfig, AgentThinkingConfig } from '@/shared/types'
+import type { AgentCompactingConfig, AgentKind, AgentThinkingConfig } from '@/shared/types'
 import type { GeneratedAgentConfig } from '@/client/hooks/useAgents'
 import type { ProviderModel } from '@/client/hooks/useModels'
 import { modelReasoningInfo, clampEffort } from '@/client/lib/model-efforts'
@@ -55,6 +56,7 @@ interface AgentDetail {
   slug: string
   name: string
   role: string
+  kind?: AgentKind
   avatarUrl: string | null
   character: string
   expertise: string
@@ -282,7 +284,7 @@ export function AgentFormModal({
   const [providerId, setProviderId] = useState<string | null>(null)
   const [scoutModel, setScoutModel] = useState<string | null>(null)
   const [scoutProviderId, setScoutProviderId] = useState<string | null>(null)
-  // 'inherit' = unset tier (scouts fall back to project/global/Agent config)
+  // 'inherit' = unset tier (scouts fall back to the global/Agent config)
   const [scoutThinking, setScoutThinking] = useState<ThinkingChoice>('inherit')
   const [toolboxIds, setToolboxIds] = useState<string[] | null>(null)
   const [extraToolNames, setExtraToolNames] = useState<string[] | null>(null)
@@ -525,7 +527,7 @@ export function AgentFormModal({
 
     // Tool grants are managed exclusively through toolboxes. An Agent with no
     // toolbox selected has only the core floor — pick toolboxes in the Tools
-    // tab to grant web/memory/projects/etc. (the resolver no longer treats an
+    // tab to grant web/memory/etc. (the resolver no longer treats an
     // empty selection as "all").
 
     markDirty()
@@ -1144,7 +1146,7 @@ export function AgentFormModal({
                           {/* Scout model — cheap, fast model the `scout` tool
                               delegates heavy read-only exploration to. Clearing
                               it (the "inherit" option) falls back to the
-                              project → global → main-model chain. */}
+                              global → main-model chain. */}
                           <FormField
                             className="border-t border-border/40 pt-4"
                             label={t('agent.create.scoutModel')}
@@ -1166,8 +1168,8 @@ export function AgentFormModal({
                           </FormField>
 
                           {/* Scout reasoning — per-Agent tier of the scout
-                              thinking chain (project beats this; per-call
-                              override beats everything). 'inherit' = unset. */}
+                              thinking chain (a per-call override beats it).
+                              'inherit' = unset. */}
                           <FormField
                             label={t('agent.create.scoutThinking')}
                             tip={t('agent.create.scoutThinkingTip')}
@@ -1215,7 +1217,11 @@ export function AgentFormModal({
                               <ConfirmDeleteButton
                                 onConfirm={handleDelete}
                                 title={t('agent.settings.delete')}
-                                description={t('agent.settings.deleteConfirm')}
+                                description={
+                                  agent?.kind === 'configurator'
+                                    ? t('agent.settings.deleteConfiguratorConfirm')
+                                    : t('agent.settings.deleteConfirm')
+                                }
                                 confirmLabel={t('agent.settings.deleteAction')}
                                 trigger={
                                   <Button type="button" variant="destructive" size="sm" disabled={isDeleting}>
@@ -1263,7 +1269,17 @@ export function AgentFormModal({
 
                       {activeTab === 'memory' && isEdit && (
                         <div className="space-y-6">
-                          <MemoryList agentId={agent.id} compact />
+                          <AgentProfileEditor agentId={agent.id} />
+                          <div className="space-y-2">
+                            <Label className="inline-flex items-center gap-1.5 text-sm font-medium">
+                              <Archive className="size-4" />
+                              {t('agent.memoryArchive.title')}
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              {t('agent.memoryArchive.description')}
+                            </p>
+                            <MemoryList agentId={agent.id} compact />
+                          </div>
                         </div>
                       )}
 

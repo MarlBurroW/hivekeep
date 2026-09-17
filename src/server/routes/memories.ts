@@ -4,8 +4,12 @@ import { db } from '@/server/db/index'
 import { memories } from '@/server/db/schema'
 
 import type { AppVariables } from '@/server/app'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const memoryRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Platform configuration: every route in this family is admin-only.
+memoryRoutes.use('*', requireAdmin)
 
 // GET /api/memories — list all memories across all Agents
 memoryRoutes.get('/', async (c) => {
@@ -57,24 +61,6 @@ memoryRoutes.get('/', async (c) => {
 
   const total = countResult[0]?.count ?? 0
   return c.json({ memories: result, total, hasMore: offset + result.length < total })
-})
-
-// POST /api/memories/backfill-importance — score importance for unscored memories
-memoryRoutes.post('/backfill-importance', async (c) => {
-  const body = await c.req.json<{ agentId?: string }>().catch(() => ({} as { agentId?: string }))
-  const { agentId } = body
-  const { backfillImportance } = await import('@/server/services/importance-backfill')
-  const result = await backfillImportance(agentId || undefined)
-  return c.json(result)
-})
-
-// POST /api/memories/consolidate — trigger memory consolidation manually
-memoryRoutes.post('/consolidate', async (c) => {
-  const { agentId } = await c.req.json<{ agentId: string }>()
-  if (!agentId) return c.json({ error: 'agentId is required' }, 400)
-  const { consolidateMemories } = await import('@/server/services/consolidation')
-  const removed = await consolidateMemories(agentId)
-  return c.json({ removed })
 })
 
 // POST /api/memories/reembed — re-embed all memories with the current embedding model

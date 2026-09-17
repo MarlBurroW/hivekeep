@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import { Hono } from 'hono'
 import { handleWhatsAppWebhook } from '@/server/channels/whatsapp'
 import { handleIncomingChannelMessage, getChannel } from '@/server/services/channels'
@@ -34,7 +35,9 @@ channelWhatsAppRoutes.get('/:channelId', async (c) => {
   }
 
   const expectedToken = await getSecretValue(verifyTokenKey)
-  if (token !== expectedToken) {
+  const tokenBuf = Buffer.from(token ?? '')
+  const expectedBuf = Buffer.from(expectedToken ?? '')
+  if (!expectedToken || tokenBuf.length !== expectedBuf.length || !timingSafeEqual(tokenBuf, expectedBuf)) {
     log.warn({ channelId }, 'Webhook verification token mismatch')
     return c.text('Forbidden', 403)
   }

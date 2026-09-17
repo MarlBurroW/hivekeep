@@ -1,8 +1,12 @@
 import { Hono } from 'hono'
 import { logStore } from '@/server/services/log-store'
 import type { AppVariables } from '@/server/app'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 export const logRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Platform configuration: every route in this family is admin-only.
+logRoutes.use('*', requireAdmin)
 
 logRoutes.get('/', (c) => {
   const level = c.req.query('level') || undefined

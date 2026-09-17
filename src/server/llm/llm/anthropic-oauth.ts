@@ -18,6 +18,7 @@
  */
 
 import Anthropic, { APIError } from '@anthropic-ai/sdk'
+import { createLogger } from '@/server/logger'
 import type {
   MessageCreateParamsStreaming,
   TextBlockParam,
@@ -25,6 +26,7 @@ import type {
 import {
   getOAuthAccessToken,
   OAUTH_HEADERS,
+  LONG_CONTEXT_BETA,
   REQUIRED_SYSTEM_BLOCK,
   buildBillingHeaderText,
   getOAuthUserId,
@@ -158,6 +160,8 @@ function mapModel(raw: AnthropicOAuthModel): LLMModel {
 
 // ─── Custom fetch wrapper (the OAuth glue) ───────────────────────────────────
 
+const log = createLogger('anthropic-oauth')
+
 function buildOAuthFetch(config: ProviderConfig): typeof fetch {
   return (async (url: URL | RequestInfo, init: RequestInit | undefined) => {
     const accessToken = await getOAuthAccessToken(config)
@@ -221,7 +225,31 @@ function buildOAuthFetch(config: ProviderConfig): typeof fetch {
       }
     }
 
-    return globalThis.fetch(target, { ...finalInit, headers })
+    const response = await globalThis.fetch(target, { ...finalInit, headers })
+
+    // Some models are not entitled to the 1M-context beta on a subscription
+    // plan (Haiku is the one that bites here), and the API rejects the whole
+    // request rather than ignoring the header. The beta is sent unconditionally
+    // to match the Claude Code fingerprint, so rather than dropping it for
+    // everyone — which would change that fingerprint for the requests it does
+    // work on — retry once without it.
+    if (response.status === 400 && headers.get('anthropic-beta')?.includes(LONG_CONTEXT_BETA)) {
+      const body = await response.clone().text().catch(() => '')
+      if (/long context beta is not/i.test(body)) {
+        const retryHeaders = new Headers(headers)
+        retryHeaders.set(
+          'anthropic-beta',
+          (headers.get('anthropic-beta') ?? '')
+            .split(',')
+            .filter((b) => b.trim() !== LONG_CONTEXT_BETA)
+            .join(','),
+        )
+        log.debug('Anthropic rejected the 1M-context beta for this model — retrying without it')
+        return globalThis.fetch(target, { ...finalInit, headers: retryHeaders })
+      }
+    }
+
+    return response
   }) as unknown as typeof fetch
 }
 

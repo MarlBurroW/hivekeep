@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, and, isNull, lt, gt, desc, inArray } from 'drizzle-orm'
-import { db } from '@/server/db/index'
+import { eq, and, isNull, gt, desc, inArray, sql } from 'drizzle-orm'
+import { db, sqlite } from '@/server/db/index'
 import { messages, agents, channels, channelMessageLinks, compactingSnapshots, compactingSummaries, memories as agentMemories, files, humanPrompts, messageReactions } from '@/server/db/schema'
 import { enqueueMessage, getPendingQueueItems, removeQueueItem, isAgentProcessing } from '@/server/services/queue'
 import { deleteMessagesCascade } from '@/server/services/message-deletion'
@@ -22,7 +22,7 @@ messageRoutes.post('/', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const user = c.get('user') as { id: string; name: string }
   const body = await c.req.json()
@@ -54,7 +54,7 @@ messageRoutes.post('/', async (c) => {
     clientMessageId: reconcileToken,
   })
 
-  log.debug({ agentId, messageId: id, contentLength: content.length, fileCount: fileIds?.length ?? 0 }, 'Message enqueued')
+  log.debug({ agentId, messageId: id, contentLength: content?.length ?? 0, fileCount: fileIds?.length ?? 0 }, 'Message enqueued')
 
   // Fire-and-forget: parse @mentions and notify mentioned users
   if (content) {
@@ -68,41 +68,65 @@ messageRoutes.post('/', async (c) => {
   return c.json({ messageId: id, queuePosition }, 202)
 })
 
+/**
+ * Rows the chat timeline may render: everything except messages flagged hidden
+ * (e.g. the onboarding kickoff trigger, which exists only to drive an LLM turn).
+ *
+ * This belongs in the WHERE clause, never after the limit. Filtering afterwards
+ * made a page of `limit` come back short, down to empty, while `hasMore` still
+ * said true, which left the client with an unmoved cursor and no way to make
+ * progress. json_valid() guards rows whose metadata isn't parseable JSON:
+ * json_extract raises on those, and they must stay visible.
+ */
+export const VISIBLE_MESSAGE_PREDICATE =
+  "(metadata IS NULL OR json_valid(metadata) = 0 OR json_extract(metadata, '$.hidden') IS NOT 1)"
+
 // GET /api/agents/:agentId/messages — get message history (accepts UUID or slug)
 messageRoutes.get('/', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const before = c.req.query('before')
-  const limit = Math.min(Number(c.req.query('limit') ?? 50), 100)
+  const limit = Math.min(Math.max(Number(c.req.query('limit')) || 50, 1), 100)
 
-  let query = db
+  // Resolve the cursor message to (created_at, rowid). Message ids are random
+  // UUIDs, so the old `id < before` cursor had no relation to time: paging up
+  // duplicated the newest page and permanently skipped part of the history.
+  let cursor: { createdAt: number; rowid: number } | null = null
+  if (before) {
+    const row = sqlite
+      .query<{ created_at: number; rowid: number }, [string]>('SELECT created_at, rowid FROM messages WHERE id = ?')
+      .get(before)
+    if (!row) {
+      return c.json({ error: { code: 'INVALID_CURSOR', message: 'Unknown `before` message id' } }, 400)
+    }
+    cursor = { createdAt: row.created_at, rowid: row.rowid }
+  }
+
+  const conditions = [
+    eq(messages.agentId, agentId),
+    isNull(messages.taskId),
+    isNull(messages.sessionId),
+    sql.raw(VISIBLE_MESSAGE_PREDICATE),
+  ]
+  if (cursor) {
+    conditions.push(
+      sql`(${messages.createdAt} < ${cursor.createdAt} OR (${messages.createdAt} = ${cursor.createdAt} AND rowid < ${cursor.rowid}))`,
+    )
+  }
+
+  const rawResult = await db
     .select()
     .from(messages)
-    .where(
-      before
-        ? and(
-            eq(messages.agentId, agentId),
-            isNull(messages.taskId),
-            isNull(messages.sessionId),
-            lt(messages.id, before),
-          )
-        : and(eq(messages.agentId, agentId), isNull(messages.taskId), isNull(messages.sessionId)),
-    )
-    .orderBy(desc(messages.createdAt))
+    .where(and(...conditions))
+    .orderBy(desc(messages.createdAt), desc(sql`rowid`))
     .limit(limit + 1) // +1 to check hasMore
+    .all()
 
-  const rawResult = await query.all()
-  // Drop messages flagged hidden (e.g. the onboarding kickoff trigger) — they
-  // exist only to drive an LLM turn and must never render in the chat.
-  const result = rawResult.filter((m) => {
-    if (!m.metadata) return true
-    try { return (JSON.parse(m.metadata as string) as { hidden?: boolean }).hidden !== true } catch { return true }
-  })
-  const hasMore = result.length > limit
-  const messageList = hasMore ? result.slice(0, limit) : result
+  const hasMore = rawResult.length > limit
+  const messageList = hasMore ? rawResult.slice(0, limit) : rawResult
 
   // Reverse for chronological order
   messageList.reverse()
@@ -277,7 +301,11 @@ messageRoutes.get('/', async (c) => {
   const streamingMessage = streamSnapshot
     ? {
         messageId: streamSnapshot.messageId,
-        content: streamSnapshot.content,
+        // Committed + provisional: keeps the seeded bubble aligned with the
+        // `contentLength` values on live `chat:token` events (exact dedup). A
+        // later `chat:token-retract` truncates the provisional part if the
+        // step turns out to be an intermediate tool-call step.
+        content: streamSnapshot.content + streamSnapshot.provisional,
         reasoning: streamSnapshot.reasoning.length > 0 ? streamSnapshot.reasoning : null,
         toolCalls: streamSnapshot.toolCalls.length > 0 ? streamSnapshot.toolCalls : null,
         outputTokens: streamSnapshot.outputTokens,
@@ -360,7 +388,6 @@ messageRoutes.get('/', async (c) => {
         isRedacted: m.isRedacted,
         toolCalls,
         resolvedTaskId: meta?.resolvedTaskId ?? meta?.relatedTaskId ?? null,
-        injectedMemories: meta?.injectedMemories ?? null,
         memoriesExtracted: meta?.memoriesExtracted ?? null,
         compactingError: meta?.error ?? null,
         stepLimitReached: meta?.stepLimitReached ?? false,
@@ -386,7 +413,7 @@ messageRoutes.post('/stop', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const aborted = abortAgentStream(agentId)
@@ -402,7 +429,7 @@ messageRoutes.post('/inject', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const user = c.get('user') as { id: string; name: string }
@@ -445,7 +472,7 @@ messageRoutes.delete('/', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   try {
@@ -526,7 +553,7 @@ messageRoutes.delete('/:messageId', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const messageId = c.req.param('messageId')
   if (messageId === 'queue') return c.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404)
@@ -566,7 +593,7 @@ messageRoutes.post('/rewind', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const { messageId } = (await c.req.json().catch(() => ({}))) as { messageId?: string }
   if (!messageId) {
@@ -630,7 +657,7 @@ messageRoutes.get('/queue', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const items = await getPendingQueueItems(agentId)
@@ -642,7 +669,7 @@ messageRoutes.delete('/queue/:itemId', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const itemId = c.req.param('itemId')

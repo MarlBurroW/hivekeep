@@ -10,11 +10,8 @@ import { useInputHistory } from '@/client/hooks/useInputHistory'
 import { MAX_MESSAGE_LENGTH } from '@/shared/constants'
 import { MentionPopover, getMentionItemCount, getMentionItemAt, type MentionItem } from '@/client/components/chat/MentionPopover'
 import { CommandPopover, getFilteredCommands, SLASH_COMMANDS, type SlashCommand } from '@/client/components/chat/CommandPopover'
-import { TicketMentionPopover, TICKET_MENTION_MAX_VISIBLE } from '@/client/components/chat/TicketMentionPopover'
 import { useWorkspaceFileSearch } from '@/client/hooks/useWorkspaceFileSearch'
-import { useTicketSearch, type TicketSearchHit } from '@/client/hooks/useTicketSearch'
 import { getCaretCoordinates } from '@/client/lib/getCaretCoordinates'
-import { PROJECT_SLUG_REGEX } from '@/shared/constants'
 import type { MentionableUser, MentionableAgent } from '@/client/hooks/useMentionables'
 import type { PendingFile } from '@/client/hooks/useFileUpload'
 import { ModelPicker, modelPickerValue } from '@/client/components/common/ModelPicker'
@@ -57,12 +54,6 @@ interface MessageInputProps {
   mentionableUsers?: MentionableUser[]
   /** Agents available for @mention autocomplete */
   mentionableAgents?: MentionableAgent[]
-  /** Active project UUID for the `#` ticket mention autocomplete. When null,
-   *  bare `#N` searches return nothing — the user must use a `slug#` prefix. */
-  activeProjectId?: string | null
-  /** Active project slug — used to short-circuit ticket mention insertion: a
-   *  hit in the active project becomes `#42`, anywhere else becomes `slug#42`. */
-  activeProjectSlug?: string | null
   // ── Generation controls (relocated from the conversation header) ──
   /** Models available for the model picker. When omitted the picker is hidden. */
   llmModels?: ProviderModel[]
@@ -103,8 +94,6 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
   agentId,
   mentionableUsers,
   mentionableAgents,
-  activeProjectId,
-  activeProjectSlug,
   llmModels,
   model,
   providerId,
@@ -151,35 +140,6 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
   const [commandPosition, setCommandPosition] = useState<{ top: number; left: number }>({ top: 8, left: 0 })
   const isCommandOpen = commandQuery !== null
 
-  // Ticket mention autocomplete state.
-  //   - ticketQuery: the text after the `#` (sans optional `slug#` prefix)
-  //   - ticketProjectSlug: the optional slug typed before `#`. When set, the
-  //     server scopes the search to that project (cross-project mention).
-  //   - ticketStartIndex: position of the first char of the matched token in
-  //     the textarea value. Used to compute the replacement range on select.
-  const [ticketQuery, setTicketQuery] = useState<string | null>(null)
-  const [ticketProjectSlug, setTicketProjectSlug] = useState<string | null>(null)
-  const [ticketStartIndex, setTicketStartIndex] = useState(0)
-  const [ticketSelectedIndex, setTicketSelectedIndex] = useState(0)
-  const [ticketPosition, setTicketPosition] = useState<{ top: number; left: number }>({ top: 8, left: 0 })
-  const isTicketOpen = ticketQuery !== null
-
-  const { hits: ticketHits, isLoading: isTicketLoading } = useTicketSearch({
-    query: ticketQuery ?? '',
-    projectId: activeProjectId ?? null,
-    projectSlug: ticketProjectSlug,
-    enabled: isTicketOpen,
-  })
-
-  // Cap the visible slice; the inner list scrolls if the server returned more.
-  const visibleTicketHits = ticketHits.slice(0, TICKET_MENTION_MAX_VISIBLE * 2)
-
-  // Reset the selected row whenever the result set changes so the highlight
-  // never points beyond the array bounds.
-  useEffect(() => {
-    setTicketSelectedIndex(0)
-  }, [ticketHits])
-
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
   }))
@@ -217,58 +177,6 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
     setMentionQuery(null)
   }, [])
 
-  /** Detect `#ticket` trigger from the current cursor position. Recognises:
-   *    - `#abc`           → bare ref, active project scope
-   *    - `slug#abc`       → qualified ref, cross-project scope
-   *  The match window starts at the `#` (or at the slug for qualified refs)
-   *  and ends at the cursor. A non-alphanumeric char terminates the match. */
-  const detectTicketMention = useCallback((text: string, cursorPos: number) => {
-    // Walk backwards from cursor while the chars are part of the ticket query.
-    // Allowed inside the query: letters/digits/`-`/`_` (so `slug#login-fix`
-    // is matched as a whole). The `#` separator is handled below.
-    let i = cursorPos - 1
-    while (i >= 0 && /[a-zA-Z0-9_-]/.test(text[i]!)) i--
-
-    // We expect a `#` at position `i`. If not, no trigger.
-    if (i < 0 || text[i] !== '#') {
-      setTicketQuery(null)
-      setTicketProjectSlug(null)
-      return
-    }
-
-    // Look for an optional slug just before the `#`. A slug is a contiguous
-    // run of [a-z0-9-] starting with a letter. We stop at the first char that
-    // breaks the slug regex or hits the start of the input.
-    let slugStart = i
-    while (slugStart > 0 && /[a-z0-9-]/.test(text[slugStart - 1]!)) slugStart--
-    const slugCandidate = text.slice(slugStart, i)
-    const hasSlug = slugCandidate.length > 0 && PROJECT_SLUG_REGEX.test(slugCandidate)
-
-    // The token must be preceded by whitespace, start-of-text, or a non-word
-    // boundary. This prevents `email#42` (where `email` is not a slug we know)
-    // from triggering as well as `abc#42` glued to the previous word.
-    const tokenStart = hasSlug ? slugStart : i
-    if (tokenStart > 0 && !/[\s({[]/.test(text[tokenStart - 1]!)) {
-      setTicketQuery(null)
-      setTicketProjectSlug(null)
-      return
-    }
-
-    const query = text.slice(i + 1, cursorPos)
-    setTicketQuery(query)
-    setTicketProjectSlug(hasSlug ? slugCandidate : null)
-    setTicketStartIndex(tokenStart)
-
-    // Position the popover under the caret line (bottom-anchored like @mention).
-    const textarea = textareaRef.current
-    if (textarea) {
-      const coords = getCaretCoordinates(textarea, tokenStart)
-      const textareaRect = textarea.getBoundingClientRect()
-      const distanceFromBottom = textareaRect.height - coords.top - coords.height
-      setTicketPosition({ top: Math.max(distanceFromBottom, 8), left: coords.left })
-    }
-  }, [])
-
   /** Detect /command trigger: only when / is at position 0 and no space yet (typing the command name) */
   const detectCommand = useCallback((text: string, cursorPos: number) => {
     // Command must start at beginning of input with /
@@ -301,9 +209,8 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
       const cursor = textareaRef.current?.selectionStart ?? newValue.length
       detectMention(newValue, cursor)
       detectCommand(newValue, cursor)
-      detectTicketMention(newValue, cursor)
     })
-  }, [onChange, detectMention, detectCommand, detectTicketMention])
+  }, [onChange, detectMention, detectCommand])
 
   /** Insert selected mention into the text */
   const handleMentionSelect = useCallback((item: MentionItem) => {
@@ -324,36 +231,6 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
       textareaRef.current?.focus()
     })
   }, [value, onChange, mentionStartIndex, mentionQuery])
-
-  /** Insert the selected ticket mention into the textarea. The inserted form
-   *  is the minimum readable representation:
-   *    - same project   → `#42`
-   *    - other project  → `slug#42`
-   *  This relies on the renderer (remark-ticket-mentions) to keep both forms
-   *  clickable post-render. */
-  const handleTicketSelect = useCallback((hit: TicketSearchHit) => {
-    // The matched token spans from ticketStartIndex to the current cursor.
-    // We replace it with the canonical form + trailing space for ergonomics.
-    const cursor = textareaRef.current?.selectionStart ?? value.length
-    const before = value.slice(0, ticketStartIndex)
-    const after = value.slice(cursor)
-
-    const insertion =
-      hit.projectSlug && hit.projectSlug !== activeProjectSlug
-        ? `${hit.projectSlug}#${hit.number}`
-        : `#${hit.number}`
-
-    const newValue = `${before}${insertion} ${after}`
-    onChange(newValue)
-    setTicketQuery(null)
-    setTicketProjectSlug(null)
-
-    const cursorPos = ticketStartIndex + insertion.length + 1
-    requestAnimationFrame(() => {
-      textareaRef.current?.setSelectionRange(cursorPos, cursorPos)
-      textareaRef.current?.focus()
-    })
-  }, [value, onChange, ticketStartIndex, activeProjectSlug])
 
   /** Handle selecting a slash command from the popover */
   const handleCommandSelect = useCallback((cmd: SlashCommand) => {
@@ -432,37 +309,6 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
       if (e.key === 'Escape') {
         e.preventDefault()
         setCommandQuery(null)
-        return
-      }
-    }
-
-    // Ticket mention popover keyboard navigation. Handled before the user
-    // mention popover so they can't both react to the same key on a frame
-    // where both happen to be open (only one is ever open in practice).
-    if (isTicketOpen) {
-      const count = visibleTicketHits.length
-      if (count > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault()
-          setTicketSelectedIndex((prev) => (prev + 1) % count)
-          return
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault()
-          setTicketSelectedIndex((prev) => (prev - 1 + count) % count)
-          return
-        }
-        if (e.key === 'Enter' || e.key === 'Tab') {
-          e.preventDefault()
-          const hit = visibleTicketHits[ticketSelectedIndex]
-          if (hit) handleTicketSelect(hit)
-          return
-        }
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setTicketQuery(null)
-        setTicketProjectSlug(null)
         return
       }
     }
@@ -770,21 +616,8 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
             />
           )}
 
-          {/* #ticket autocomplete popover */}
-          {isTicketOpen && (
-            <TicketMentionPopover
-              hits={visibleTicketHits}
-              isLoading={isTicketLoading}
-              selectedIndex={ticketSelectedIndex}
-              position={ticketPosition}
-              scopeProjectSlug={ticketProjectSlug}
-              onSelect={handleTicketSelect}
-              onHover={setTicketSelectedIndex}
-            />
-          )}
-
           {/* /command autocomplete popover */}
-          {isCommandOpen && !isMentionOpen && !isTicketOpen && (
+          {isCommandOpen && !isMentionOpen && (
             <CommandPopover
               query={commandQuery!}
               selectedIndex={commandSelectedIndex}

@@ -111,7 +111,7 @@ Automation does not mean losing control:
 
 - **Agent-created crons need your approval** before they ever run.
 - **Webhooks require a secret token**, are rate-limited and size-capped, and can be filtered to only the events you care about, deactivated, or deleted at any time.
-- **Cron tasks cannot prompt you.** The `prompt_human` tool (which suspends a task to ask a question) is disabled in cron-triggered tasks, because there is no interactive session waiting on the other side. Use webhook conversation mode or a normal task if you want a back-and-forth. (See [Projects and tickets](/docs/features/projects/) for how `prompt_human` works on interactive ticket tasks.)
+- **Cron tasks cannot prompt you.** The `prompt_human` tool (which suspends a task to ask a question) is disabled in cron-triggered tasks, because there is no interactive session waiting on the other side. Use webhook conversation mode or a normal task if you want a back-and-forth.
 - **By default cron results are informational**, so a scheduled Agent reports rather than barging into your conversation; opt into a parent turn only when you want the Agent to react.
 
 ## Related

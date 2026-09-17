@@ -26,7 +26,7 @@ export async function authMiddleware(c: Context, next: Next) {
 
   // Skip auth for Better Auth routes, onboarding, health check, and the public
   // mini-app SDK assets (loaded by the opaque-origin iframe without credentials).
-  if (path.startsWith('/api/auth/') || path.startsWith('/api/onboarding') || path === '/api/health' || path.startsWith('/api/mini-apps/sdk/') || path.startsWith('/s/') || path.startsWith('/api/webhooks/incoming/') || path.startsWith('/api/channels/telegram/') || path.startsWith('/api/channels/slack/') || path.startsWith('/api/channels/whatsapp/') || path.startsWith('/api/channels/signal/') || path.startsWith('/api/channels/plugin/') || /^\/api\/invitations\/[^/]+\/validate$/.test(path)) {
+  if (path.startsWith('/api/auth/') || path.startsWith('/api/onboarding') || path === '/api/health' || path.startsWith('/api/mini-apps/sdk/') || path.startsWith('/s/') || path.startsWith('/api/webhooks/incoming/') || path.startsWith('/api/plugin-hooks/') || path.startsWith('/api/channels/telegram/') || path.startsWith('/api/channels/slack/') || path.startsWith('/api/channels/whatsapp/') || path.startsWith('/api/channels/signal/') || path.startsWith('/api/channels/plugin/') || /^\/api\/invitations\/[^/]+\/validate$/.test(path)) {
     return next()
   }
 
@@ -87,9 +87,18 @@ export async function authMiddleware(c: Context, next: Next) {
   if (miniAppMatch) {
     const token = c.req.header('x-hivekeep-app-token') ?? c.req.query('_t')
     if (token) {
-      const { resolveAppToken } = await import('@/server/services/mini-app-token')
+      const { resolveAppToken, isMiniAppTokenPathAllowed } = await import('@/server/services/mini-app-token')
       const resolved = resolveAppToken(token)
       if (resolved && resolved.appId === miniAppMatch[1]) {
+        // The token is readable by the app's own JS, so it only unlocks the
+        // runtime SDK surface — file writes, permission grants and app CRUD
+        // require the parent's cookie session.
+        if (!isMiniAppTokenPathAllowed(c.req.method, path, resolved.appId)) {
+          return c.json(
+            { error: { code: 'FORBIDDEN', message: 'This endpoint requires a signed-in session' } },
+            403,
+          )
+        }
         c.set('user', { id: resolved.userId, name: '', email: '' } as never)
         c.set('session', { id: 'mini-app', userId: resolved.userId, token: 'mini-app' } as never)
         return next()

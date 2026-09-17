@@ -10,7 +10,6 @@ import { FeedbackBanner } from '@/client/components/feedback/FeedbackBanner'
 import { useAgentTools } from '@/client/hooks/useAgentTools'
 import { TypingIndicator } from '@/client/components/chat/TypingIndicator'
 import { ConversationHeader } from '@/client/components/chat/ConversationHeader'
-import { ActiveProjectChip } from '@/client/components/project/ActiveProjectChip'
 import { ToolCallsViewer } from '@/client/components/chat/ToolCallsViewer'
 import { TaskResultCard } from '@/client/components/chat/TaskResultCard'
 import { CompactingCard } from '@/client/components/chat/CompactingCard'
@@ -52,12 +51,11 @@ import { TimeGapIndicator } from '@/client/components/chat/TimeGapIndicator'
 import { SearchHighlightProvider } from '@/client/components/chat/SearchHighlightContext'
 import { MentionLookupProvider } from '@/client/components/chat/MentionContext'
 import { useMentionables } from '@/client/hooks/useMentionables'
-import { useProject } from '@/client/hooks/useProjects'
 import { cn, getUserInitials } from '@/client/lib/utils'
 import { useSidePanel } from '@/client/contexts/SidePanelContext'
 import { ArrowDown, ArrowUp, Upload, Pin, PinOff, AlertTriangle, Bot, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '@/client/lib/api'
+import { api, getErrorMessage } from '@/client/lib/api'
 
 interface AgentInfo {
   id: string
@@ -66,7 +64,6 @@ interface AgentInfo {
   model: string
   providerId: string | null
   avatarUrl: string | null
-  activeProjectId?: string | null
   thinkingEnabled?: boolean
   thinkingEffort?: AgentThinkingEffort | null
 }
@@ -99,6 +96,11 @@ interface ChatPanelProps {
   hideThinking?: boolean
 }
 
+/** The scrollable element inside a ScrollArea, where scrollTop/scrollHeight live. */
+function getScrollViewport(scrollArea: HTMLElement | null): HTMLElement | null {
+  return scrollArea?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null
+}
+
 export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueState, onModelChange, onEditAgent, onOpenSettings, compact = false, hideThinking = false }: ChatPanelProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -113,10 +115,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   const [showQuickHistory, setShowQuickHistory] = useState(false)
   const { exportAsMarkdown, exportAsJSON } = useExportConversation(messages, agent.name)
   const { users: mentionableUsers, agents: mentionableAgents } = useMentionables()
-  // Active project (if any) drives the `#ticket` autocomplete: it gives us
-  // the projectId to scope search to + the slug so the popover knows when a
-  // hit can use the short form (`#42`) vs. the qualified form (`slug#42`).
-  const { project: activeProject } = useProject(agent.activeProjectId ?? null)
   const { toggleReaction } = useReactions(agent.id)
   const [thinkingEnabled, setThinkingEnabled] = useState(agent.thinkingEnabled ?? false)
   const [isToolCallsOpen, setIsToolCallsOpen] = useState(false)
@@ -186,6 +184,9 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   const inputRef = useRef<MessageInputHandle>(null)
   const prevScrollHeightRef = useRef<number | null>(null)
   const isLoadingMoreRef = useRef(false)
+  // Message count captured when a page was requested, so the settle handler can
+  // tell whether that page actually prepended anything. null = no page in flight.
+  const pendingPageCountRef = useRef<number | null>(null)
   const knownMessageIdsRef = useRef<Set<string>>(new Set())
   const initialLoadDoneRef = useRef(false)
 
@@ -230,6 +231,15 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
       } else {
         toast.error(t('chat.compacting.error'))
       }
+    }
+  }, [agent.id, t])
+
+  const handleForceReset = useCallback(async () => {
+    try {
+      await api.post(`/agents/${agent.id}/force-reset`)
+      toast.success(t('chat.forceResetDone'))
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err))
     }
   }, [agent.id, t])
 
@@ -361,23 +371,34 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   const fetchOlderMessagesRef = useRef(fetchOlderMessages)
   fetchOlderMessagesRef.current = fetchOlderMessages
 
+  const messageCountRef = useRef(messages.length)
+  messageCountRef.current = messages.length
+
+  // Single owner of the "request the next page" protocol: arm the scroll-restore
+  // handoff, block the observer, remember the pre-fetch count. Both the observer
+  // and the post-load re-check go through here so the three writes stay together.
+  const requestOlderPage = useCallback((viewport: HTMLElement) => {
+    // fetchOlderMessages bails on an empty list without ever toggling
+    // isLoadingMore, which would leave the guard ref latched true forever.
+    if (messageCountRef.current === 0) return
+    pendingPageCountRef.current = messageCountRef.current
+    prevScrollHeightRef.current = viewport.scrollHeight
+    isLoadingMoreRef.current = true
+    fetchOlderMessagesRef.current()
+  }, [])
+
   // IntersectionObserver — trigger loading older messages when top sentinel is visible.
   // Uses a ref for the callback + hasMore to keep the observer stable and avoid
   // reconnection loops that would cause infinite fetch cascades.
   useEffect(() => {
     const sentinel = topSentinelRef.current
-    const scrollArea = scrollAreaRef.current
-    if (!sentinel || !scrollArea) return
-    const viewport = scrollArea.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement | null
-    if (!viewport) return
+    const viewport = getScrollViewport(scrollAreaRef.current)
+    if (!sentinel || !viewport) return
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && !isLoadingMoreRef.current) {
-          // Save scroll height before fetch so we can restore position after prepend
-          prevScrollHeightRef.current = viewport.scrollHeight
-          isLoadingMoreRef.current = true
-          fetchOlderMessagesRef.current()
+          requestOlderPage(viewport)
         }
       },
       { root: viewport, threshold: 0 },
@@ -388,10 +409,38 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, agent.id])
 
-  // Keep isLoadingMoreRef in sync for the observer guard
+  // Keep isLoadingMoreRef in sync for the observer guard.
   useEffect(() => {
     isLoadingMoreRef.current = isLoadingMore
   }, [isLoadingMore])
+
+  // When a page settles, re-check the sentinel manually: IntersectionObserver
+  // only fires on crossings, so a short page can leave the sentinel inside the
+  // viewport and pagination would stall until the user jiggles the scroll.
+  useEffect(() => {
+    if (isLoadingMore) return
+    const pendingCount = pendingPageCountRef.current
+    if (pendingCount === null) return
+    pendingPageCountRef.current = null
+    if (pendingCount === messages.length) {
+      // The page prepended nothing: rows already loaded, or a failed request.
+      // The cursor hasn't moved, so re-firing would re-request the identical
+      // page forever. Drop the armed scroll-restore too, since the layout
+      // effect that consumes it only runs on a length change and would
+      // otherwise apply this stale height to some later, unrelated update.
+      prevScrollHeightRef.current = null
+      return
+    }
+    if (!hasMore) return
+    const sentinel = topSentinelRef.current
+    const viewport = getScrollViewport(scrollAreaRef.current)
+    if (!sentinel || !viewport) return
+    const vRect = viewport.getBoundingClientRect()
+    const sRect = sentinel.getBoundingClientRect()
+    if (sRect.bottom >= vRect.top && sRect.top <= vRect.bottom) {
+      requestOlderPage(viewport)
+    }
+  }, [isLoadingMore, hasMore, messages.length, requestOlderPage])
 
   // Restore scroll position after older messages are prepended.
   // Only runs when messages.length changes to avoid consuming prevScrollHeightRef
@@ -436,26 +485,25 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
 
     let rafId: number | null = null
     let pendingNearBottom = false
-    let pendingStreaming = false
     const scrollToEnd = () => {
-      // Capture scroll state synchronously at mutation time, before a scroll
-      // event can flip isNearBottomRef to false due to increased scrollHeight.
+      // Capture scroll state synchronously at mutation time, before a resize/
+      // scroll handler can flip isNearBottomRef to false due to the content
+      // growth itself. This capture is what makes gating on near-bottom safe
+      // during streaming: after each auto-scroll we reset the ref to true, so
+      // only a REAL user scroll away from the bottom flips it, and that must
+      // pause auto-scroll (streaming included), otherwise the user can never
+      // scroll up to read history while the Agent responds.
       const nearNow = isNearBottomRef.current
-      const streamNow = isStreamingRef.current
       if (rafId !== null) {
         // Already coalescing — keep the most permissive state
         pendingNearBottom = pendingNearBottom || nearNow
-        pendingStreaming = pendingStreaming || streamNow
         return
       }
       pendingNearBottom = nearNow
-      pendingStreaming = streamNow
       rafId = requestAnimationFrame(() => {
         rafId = null
         if (!autoScrollRef.current) return
-        // During active streaming, always scroll (don't rely on isNearBottom
-        // which can flip to false between batched token updates)
-        if (!pendingNearBottom && !pendingStreaming) return
+        if (!pendingNearBottom) return
         if (needsInstantScrollRef.current) return
         viewport.scrollTop = viewport.scrollHeight
         isNearBottomRef.current = true
@@ -471,11 +519,9 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
     }
   }, []) // stable — reads refs only
 
-  // Keep refs for autoScroll and isStreaming so the MutationObserver callback can read them
+  // Keep a ref for autoScroll so the MutationObserver callback can read it
   const autoScrollRef = useRef(autoScroll)
   useEffect(() => { autoScrollRef.current = autoScroll }, [autoScroll])
-  const isStreamingRef = useRef(isStreaming)
-  useEffect(() => { isStreamingRef.current = isStreaming }, [isStreaming])
 
   // Still trigger a scroll on dependency changes that may not mutate DOM
   // (e.g. isProcessing flipping, queueItems count)
@@ -500,6 +546,19 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+    setNewMessageCount(0)
+  }, [])
+
+  // Jump to the bottom and re-arm auto-scroll. Deliberately instant: a smooth
+  // animation emits scroll events for hundreds of ms, and each one re-runs
+  // checkNearBottom, which flips isNearBottomRef back to false while the
+  // animation is still far from the bottom. Tokens arriving in that window
+  // would then be gated out and the reply would stream off-screen.
+  const jumpToBottom = useCallback(() => {
+    const viewport = getScrollViewport(scrollAreaRef.current)
+    if (!viewport) return
+    viewport.scrollTop = viewport.scrollHeight
+    isNearBottomRef.current = true
     setNewMessageCount(0)
   }, [])
 
@@ -575,11 +634,15 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
       if (success) {
         clearDraft()
         clearFiles()
+        // Sending from a scrolled-up position must bring the user's own message
+        // (and the upcoming reply) into view. Auto-scroll alone won't, since it
+        // respects the scrolled-away state.
+        jumpToBottom()
       } else {
         toast.error(t('chat.sendFailed'))
       }
     },
-    [sendMessage, clearDraft, clearFiles, pendingFiles, t],
+    [sendMessage, clearDraft, clearFiles, pendingFiles, t, jumpToBottom],
   )
 
   // Inject a message into the current streaming response (/btw)
@@ -670,7 +733,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
     // tokens arrive before the first text token, since reasoning lives in a
     // separate batched state), so merging it unconditionally flashed a blank
     // bubble *alongside* the typing indicator until the first token landed.
-    // Same guard as the task panel (TaskPanelContent). See ticket hivekeep#55 / #44.
+    // Same guard as the task panel (TaskPanelContent).
     const hasContent = streamingMessage.content.length > 0
     // When thinking is hidden (onboarding), reasoning-only doesn't count toward
     // showing the bubble — otherwise a blank bubble would flash next to the
@@ -908,7 +971,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
                       userInitials={isFromUser ? userInitials : undefined}
                       timestamp={msg.createdAt}
                       toolCalls={toolCallsByMessage.get(msg.id)}
-                      injectedMemories={msg.injectedMemories}
                       stepLimitReached={msg.stepLimitReached}
                     emptyTurn={msg.emptyTurn}
                     finishReason={msg.finishReason}
@@ -972,10 +1034,11 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
                     tokenCount={streamingOutputTokens}
                     toolCallCount={streamingToolCallCount}
                     onOpenToolCalls={openToolCalls}
+                    onForceReset={handleForceReset}
                   />
                 )}
               </div>
-  ), [timeline, openTask, agent, compact, hideThinking, user, userInitials, toolCallsByMessage, liveTasks, toggleReaction, handleQuoteReply, handleEditResend, lastAssistantMsgId, isStreaming, isProcessing, handleRegenerate, deleteMessage, lastDisplayMsgId, setRewindTarget, streamingMessage, streamingReasoning, liveCompacting, pendingPrompts, respondToPrompt, isResponding, queueState, tokenStalled, streamingOutputTokens, streamingToolCallCount, openToolCalls])
+  ), [timeline, openTask, agent, compact, hideThinking, user, userInitials, toolCallsByMessage, liveTasks, toggleReaction, handleQuoteReply, handleEditResend, lastAssistantMsgId, isStreaming, isProcessing, handleRegenerate, deleteMessage, lastDisplayMsgId, setRewindTarget, streamingMessage, streamingReasoning, liveCompacting, pendingPrompts, respondToPrompt, isResponding, queueState, tokenStalled, streamingOutputTokens, streamingToolCallCount, openToolCalls, handleForceReset])
 
   return (
     <WorkspacePathProvider agentId={agent.id}>
@@ -995,15 +1058,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
             </div>
             <p className="text-sm font-medium">{t('chat.dropFiles')}</p>
           </div>
-        </div>
-      )}
-
-      {/* Active project chip — only rendered when this Agent has an activeProjectId */}
-      {agent.activeProjectId && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card/40 px-4 py-1">
-          <Suspense fallback={null}>
-            <ActiveProjectChip projectId={agent.activeProjectId} />
-          </Suspense>
         </div>
       )}
 
@@ -1081,7 +1135,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         </Suspense>
       )}
 
-      {/* Orphan task launcher — standalone task on this Agent (no project/ticket) */}
+      {/* Orphan task launcher — standalone task on this Agent */}
       {isOrphanTaskOpen && (
         <Suspense fallback={null}>
           <OrphanTaskDialog
@@ -1104,7 +1158,10 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         <ScrollArea className="min-h-0 flex-1">
           <SearchHighlightProvider value={searchQuery}>
           <MentionLookupProvider users={mentionableUsers} agents={mentionableAgents}>
-          <div className="mx-auto min-w-0 max-w-3xl py-4 px-2 md:px-0">
+          {/* overflow-anchor:none: scroll position after prepending older pages
+              is compensated manually (exact delta); letting the browser's native
+              scroll anchoring also adjust would double-compensate and jump. */}
+          <div className="mx-auto min-w-0 max-w-3xl py-4 px-2 md:px-0 [overflow-anchor:none]">
             {/* Sentinel for infinite scroll — triggers loading older messages */}
             {hasMore && <div ref={topSentinelRef} className="h-px" />}
             {isLoadingMore && (
@@ -1219,7 +1276,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
           />
         </div>
 
-        {/* Mini-app / task / ticket side panel is mounted at ChatPage level
+        {/* Mini-app / task side panel is mounted at ChatPage level
             so it works even when no Agent is selected (an empty Agents page can
             still preview a task or open a mini-app from the sidebar). */}
       </div>
@@ -1276,8 +1333,6 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         agentId={agent.id}
         mentionableUsers={mentionableUsers}
         mentionableAgents={mentionableAgents}
-        activeProjectId={agent.activeProjectId ?? null}
-        activeProjectSlug={activeProject?.slug ?? null}
         llmModels={llmModels}
         model={agent.model}
         providerId={agent.providerId}

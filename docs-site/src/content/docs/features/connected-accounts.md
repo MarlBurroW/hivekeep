@@ -109,14 +109,16 @@ If that account is in approval mode, step 3 queues the reply and you approve it 
 
 ## Waiting for a reply
 
-When an Agent sends an email and needs to act on the answer, it can set `watch_reply` on `send_email`. That creates a **one-shot email trigger** for the first reply: it starts a new turn for the Agent, then disables itself. Any reply counts, even one from a different person than the original recipient (a colleague in copy, an alias, a forwarded thread). A plain "wait for an email from `<recipient>`" condition would miss those.
+When an Agent sends an email and needs to act on the answer, it can set `watch_reply` on `send_email`. That creates a **one-shot email trigger** for the first reply: it starts a new turn for the Agent, then deletes itself. Any reply counts, even one from a different person than the original recipient (a colleague in copy, an alias, a forwarded thread). A plain "wait for an email from `<recipient>`" condition would miss those.
 
 How the reply is recognized depends on the provider:
 
 - **Gmail and Microsoft** thread messages server-side, so the trigger matches on the thread id of the sent message.
 - **IMAP and iCloud** have no thread id, so the trigger matches on the `In-Reply-To` header: a reply references the sent message's `Message-ID`. (If your SMTP server rewrites the `Message-ID` on send, the match can miss; most do not.)
 
-`watch_reply_prompt` sets the instruction the Agent receives when the reply arrives; omit it for a sensible default. The trigger shows up in the account's trigger list like any other (tagged one-shot) and can be edited or removed there. If the account is in approval mode, the trigger is created once you approve and the email is actually sent.
+`watch_reply_prompt` sets the instruction the Agent receives when the reply arrives; omit it for a sensible default. The trigger shows up in the account's trigger list like any other (tagged one-shot) and can be edited or removed there. Once the reply arrives it disappears from the list, so watches never pile up against the 20-triggers-per-account limit; a watch whose reply never comes is collected after 30 days. If the account is in approval mode, the trigger is created once you approve and the email is actually sent.
+
+If a reply matches both the watch and one of your standing triggers on the same Agent, the Agent is woken only once (the watch wins, since its prompt is the more specific one). The standing trigger records the match in its log as skipped.
 
 This is built on the same per-account email triggers you can create by hand, which match new mail against a condition tree (sender, subject, body, labels, attachments, thread, in-reply-to) and dispatch to an Agent. `watch_reply` is just the common "follow up on my own email" case wired into the send.
 

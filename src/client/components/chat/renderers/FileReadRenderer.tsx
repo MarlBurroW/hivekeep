@@ -10,7 +10,7 @@ export function FileReadRenderer({ args, result, status }: ToolResultRendererPro
   const [showRaw, setShowRaw] = useState(false)
 
   const res = result as Record<string, unknown> | null | undefined
-  const filePath = typeof args.path === 'string' ? args.path : null
+  const filePath = typeof args?.path === 'string' ? args.path : null
   const success = res?.success === true
   const content = typeof res?.content === 'string' ? res.content : null
   const language = typeof res?.language === 'string' ? res.language : null

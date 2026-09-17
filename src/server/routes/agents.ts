@@ -42,9 +42,19 @@ import { createLogger } from '@/server/logger'
 import { recordUsage } from '@/server/services/token-usage'
 import { getLastContextUsage, compactingAgents, resolveThinkingConfig } from '@/server/services/agent-engine'
 import { getModelContextWindow } from '@/shared/model-context-windows'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:agents')
 const agentRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Agent CRUD and maintenance are platform configuration (admin-only).
+// Members keep conversational usage: all reads, sending messages/reactions
+// (separate routers), launching standalone tasks, and marking read.
+agentRoutes.use('*', (c, next) => {
+  if (c.req.method === 'GET') return next()
+  if (/^\/api\/agents\/[^/]+\/(tasks|mark-read)$/.test(c.req.path)) return next()
+  return requireAdmin(c, next)
+})
 
 /**
  * Parse the stored `agents.toolbox_ids` JSON column into a clean array (or null
@@ -82,17 +92,22 @@ function normalizeToolboxIdsInput(raw: unknown): string[] | null | undefined {
 agentRoutes.get('/', async (c) => {
   const [allAgents, allQueueItems] = await Promise.all([
     db.select().from(agents).all(),
-    db.select({ agentId: queueItems.agentId, status: queueItems.status, createdAt: queueItems.createdAt }).from(queueItems).all(),
+    db.select({ agentId: queueItems.agentId, status: queueItems.status, createdAt: queueItems.createdAt, processingStartedAt: queueItems.processingStartedAt })
+      .from(queueItems)
+      .where(inArray(queueItems.status, ['pending', 'processing']))
+      .all(),
   ])
 
-  // Build per-agent queue state from all queue items
+  // Build per-agent queue state from the live queue items (done items are
+  // irrelevant here and reading them all made this hot endpoint scale with
+  // total history instead of current load)
   const queueStateMap = new Map<string, { isProcessing: boolean; queueSize: number; processingStartedAt?: number }>()
   for (const item of allQueueItems) {
     const state = queueStateMap.get(item.agentId) ?? { isProcessing: false, queueSize: 0 }
     if (item.status === 'processing') {
       state.isProcessing = true
-      // Use the queue item's createdAt as a proxy for when processing started
-      state.processingStartedAt = item.createdAt instanceof Date ? item.createdAt.getTime() : Number(item.createdAt)
+      const started = item.processingStartedAt ?? item.createdAt
+      state.processingStartedAt = started instanceof Date ? started.getTime() : Number(started)
     }
     if (item.status === 'pending') state.queueSize++
     queueStateMap.set(item.agentId, state)
@@ -110,7 +125,6 @@ agentRoutes.get('/', async (c) => {
         avatarUrl: agentAvatarUrl(k.id, k.avatarPath, k.updatedAt),
         model: k.model,
         providerId: k.providerId ?? null,
-        activeProjectId: k.activeProjectId ?? null,
         createdAt: k.createdAt,
         thinkingEnabled: resolveThinkingConfig(k.thinkingConfig).enabled === true,
         thinkingEffort: resolveThinkingConfig(k.thinkingConfig).effort ?? null,
@@ -394,7 +408,7 @@ agentRoutes.get('/avatar-base/image', async (c) => {
 agentRoutes.get('/:id/context-usage', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Compute compacting proximity (always fresh)
@@ -493,7 +507,7 @@ agentRoutes.get('/:id/context-usage', async (c) => {
 agentRoutes.get('/:id/context-preview', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const taskId = c.req.query('taskId')
@@ -540,7 +554,7 @@ agentRoutes.get('/:id/context-preview', async (c) => {
 agentRoutes.get('/:id/tools', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const user = c.get('user') as { id: string }
   const quick = c.req.query('quick') === '1' || c.req.query('quick') === 'true'
@@ -570,12 +584,12 @@ agentRoutes.get('/:id/tools', async (c) => {
 agentRoutes.get('/:id', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const details = await getAgentDetails(agent.id)
   if (!details) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Get queue info
@@ -594,6 +608,7 @@ agentRoutes.get('/:id', async (c) => {
     slug: details.slug,
     name: details.name,
     role: details.role,
+    kind: details.kind,
     avatarUrl: details.avatarUrl,
     character: details.character,
     expertise: details.expertise,
@@ -701,7 +716,7 @@ agentRoutes.post('/', async (c) => {
 agentRoutes.patch('/:id', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const body = await c.req.json()
@@ -776,54 +791,27 @@ agentRoutes.patch('/:id', async (c) => {
 agentRoutes.delete('/:id', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const deleted = await deleteAgent(existing.id)
   if (!deleted) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   return c.json({ success: true })
 })
 
-// PATCH /api/agents/:id/active-project — set or clear the active project for an Agent
-agentRoutes.patch('/:id/active-project', async (c) => {
-  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
-  if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
-  }
-  const body = await c.req.json().catch(() => ({}))
-  // null is an explicit "deactivate" — distinguish from undefined (missing field)
-  if (!('projectId' in body) || (body.projectId !== null && typeof body.projectId !== 'string')) {
-    return c.json({ error: { code: 'INVALID_INPUT', message: 'projectId must be a string or null' } }, 400)
-  }
-  const { setActiveProject } = await import('@/server/services/projects')
-  try {
-    const result = await setActiveProject(existing.id, body.projectId)
-    return c.json({ activeProjectId: result.activeProjectId })
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (msg === 'PROJECT_NOT_FOUND') {
-      return c.json({ error: { code: 'PROJECT_NOT_FOUND', message: 'Project not found' } }, 404)
-    }
-    if (msg === 'KIN_NOT_FOUND') {
-      return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
-    }
-    return c.json({ error: { code: 'INTERNAL', message: msg } }, 500)
-  }
-})
-
 const ORPHAN_TASK_VALID_EFFORTS: readonly AgentThinkingEffort[] = THINKING_EFFORTS
 
-// POST /api/agents/:id/tasks — start a standalone (orphan) task on this Agent with
-// NO project/ticket binding. Body: { prompt, title?, model?, providerId?,
+// POST /api/agents/:id/tasks — start a standalone (orphan) task on this Agent.
+// Body: { prompt, title?, model?, providerId?,
 // thinkingConfig?, toolboxIds? }. model + providerId are coupled (both or
 // neither). Result is deposited back into the Agent's main session (async mode).
 agentRoutes.post('/:id/tasks', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const body = await c.req.json().catch(() => ({}))
 
@@ -852,7 +840,7 @@ agentRoutes.post('/:id/tasks', async (c) => {
     thinkingConfig = { enabled, ...(effort !== null ? { effort } : {}) }
   }
 
-  // Optional toolbox selection. Absent → runtime default ('all' for non-ticket).
+  // Optional toolbox selection. Absent → runtime default ('all').
   let toolboxIds: string[] | undefined
   if (body.toolboxIds !== undefined) {
     if (!Array.isArray(body.toolboxIds) || body.toolboxIds.some((id: unknown) => typeof id !== 'string')) {
@@ -867,8 +855,8 @@ agentRoutes.post('/:id/tasks', async (c) => {
     return c.json({ task }, 201)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (msg === 'KIN_NOT_FOUND') {
-      return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    if (msg === 'AGENT_NOT_FOUND') {
+      return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
     }
     if (msg === 'EMPTY_PROMPT') {
       return c.json({ error: { code: 'INVALID_INPUT', message: 'prompt is required' } }, 400)
@@ -886,7 +874,7 @@ agentRoutes.post('/:id/mark-read', async (c) => {
   const sessionUser = c.get('user') as { id: string }
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   await markAgentAsRead(sessionUser.id, existing.id)
   return c.json({ success: true })
@@ -896,7 +884,7 @@ agentRoutes.post('/:id/mark-read', async (c) => {
 agentRoutes.post('/:id/avatar', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const id = existing.id
 
@@ -948,7 +936,7 @@ agentRoutes.post('/:id/avatar', async (c) => {
 agentRoutes.post('/:id/avatar/generate', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const id = existing.id
 
@@ -1041,13 +1029,29 @@ agentRoutes.post('/:id/avatar/generate', async (c) => {
   }
 })
 
+// POST /api/agents/:id/force-reset — break an Agent out of a stuck state
+//
+// The escape hatch that did not exist. `/messages/stop` only works while a
+// stream is live, and force-compact refuses with 409 precisely when compacting
+// is what is stuck — so a wedged Agent required restarting the whole server.
+// Unconditional by design: it has to work when the state is inconsistent.
+agentRoutes.post('/:id/force-reset', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const { forceResetAgent } = await import('@/server/services/agent-engine')
+  const result = await forceResetAgent(existing.id)
+  return c.json({ ok: true, ...result })
+})
+
 // ─── Compacting routes ───────────────────────────────────────────────────────
 
 // POST /api/agents/:id/compacting/run — force compaction immediately
 agentRoutes.post('/:id/compacting/run', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Refuse if compacting is already running for this Agent. Without this guard,
@@ -1129,7 +1133,7 @@ agentRoutes.post('/:id/compacting/run', async (c) => {
 agentRoutes.post('/:id/compacting/purge', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
 
@@ -1145,7 +1149,7 @@ agentRoutes.post('/:id/compacting/purge', async (c) => {
 agentRoutes.get('/:id/compacting/summaries', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
 
@@ -1174,7 +1178,7 @@ agentRoutes.get('/:id/compacting/snapshots', async (c) => {
   // Redirect internally to the new summaries route
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
 
@@ -1200,7 +1204,7 @@ agentRoutes.get('/:id/compacting/snapshots', async (c) => {
 agentRoutes.post('/:id/compacting/rollback', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!resolvedAgent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = resolvedAgent.id
   const body = (await c.req.json()) as { summaryId?: string; snapshotId?: string }
@@ -1256,7 +1260,7 @@ agentRoutes.post('/:id/compacting/rollback', async (c) => {
 agentRoutes.get('/:id/memories', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
   const category = c.req.query('category')
@@ -1307,11 +1311,71 @@ agentRoutes.get('/:id/memories', async (c) => {
   return c.json({ memories: result, total, hasMore: offset + result.length < total })
 })
 
+// GET /api/agents/:id/profile — the curated memory profile document
+agentRoutes.get('/:id/profile', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const { getProfile, getProfileBudget } = await import('@/server/services/agent-profile')
+  const profile = await getProfile(existing.id)
+  return c.json({ profile: { ...profile, budget: getProfileBudget() } })
+})
+
+// PUT /api/agents/:id/profile — replace the profile document (user edit)
+agentRoutes.put('/:id/profile', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const body = await c.req.json<{ content?: string }>().catch(() => ({} as { content?: string }))
+  if (typeof body.content !== 'string') {
+    return c.json({ error: { code: 'INVALID_INPUT', message: 'content is required' } }, 400)
+  }
+
+  const { setProfile, getProfileBudget } = await import('@/server/services/agent-profile')
+  const { countTokens } = await import('@/shared/token-estimator')
+  const budget = getProfileBudget()
+  const tokens = countTokens(body.content.trim())
+  if (budget > 0 && tokens > budget) {
+    return c.json(
+      {
+        error: {
+          code: 'PROFILE_TOO_LARGE',
+          message: `The profile is ${tokens} tokens, over the ${budget}-token budget. Condense it or move detail to the archive.`,
+        },
+      },
+      400,
+    )
+  }
+
+  const profile = await setProfile(existing.id, body.content, 'user')
+  return c.json({ profile: { ...profile, budget } })
+})
+
+// POST /api/agents/:id/profile/regenerate — recompile the profile from the archive
+agentRoutes.post('/:id/profile/regenerate', async (c) => {
+  const existing = resolveAgentByIdOrSlug(c.req.param('id'))
+  if (!existing) {
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  }
+  const agentId = existing.id
+
+  // Fire-and-forget: the compile is an LLM call over the whole archive. The
+  // client learns the outcome from the agent-profile:updated SSE event.
+  const { compileProfileFromArchive } = await import('@/server/services/agent-profile-bootstrap')
+  void compileProfileFromArchive(agentId).catch(() => {
+    // compileProfileFromArchive already logs; a failure leaves the profile as-is.
+  })
+
+  return c.json({ started: true }, 202)
+})
+
 // DELETE /api/agents/:id/memories/:memoryId — delete a memory
 agentRoutes.delete('/:id/memories/:memoryId', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!resolvedAgent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = resolvedAgent.id
   const memoryId = c.req.param('memoryId')
@@ -1328,7 +1392,7 @@ agentRoutes.delete('/:id/memories/:memoryId', async (c) => {
 agentRoutes.post('/:id/memories', async (c) => {
   const existing = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!existing) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = existing.id
   const { content, category, subject, scope } = (await c.req.json()) as {
@@ -1373,7 +1437,7 @@ agentRoutes.post('/:id/memories', async (c) => {
 agentRoutes.patch('/:id/memories/:memoryId', async (c) => {
   const resolvedAgent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!resolvedAgent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
   const agentId = resolvedAgent.id
   const memoryId = c.req.param('memoryId')
@@ -1415,12 +1479,12 @@ agentRoutes.patch('/:id/memories/:memoryId', async (c) => {
 agentRoutes.get('/:id/export', async (c) => {
   const agent = resolveAgentByIdOrSlug(c.req.param('id'))
   if (!agent) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const details = await getAgentDetails(agent.id)
   if (!details) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   // Get MCP server details for this agent

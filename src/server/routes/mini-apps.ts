@@ -197,7 +197,7 @@ miniAppRoutes.patch('/:id', async (c) => {
   if (body.maintainerAgentId !== undefined) {
     const targetAgentId = resolveAgentId(body.maintainerAgentId)
     if (!targetAgentId) {
-      return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Target Agent not found' } }, 400)
+      return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Target Agent not found' } }, 400)
     }
     try {
       const moved = await setMiniAppMaintainer(id, targetAgentId)

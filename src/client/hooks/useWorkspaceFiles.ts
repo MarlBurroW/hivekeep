@@ -284,7 +284,7 @@ export function useWorkspaceFiles(source: WorkspaceSourceRef | null) {
 
   // ── Mutations (files.md § 4/6.5/6.6) — each reloads the affected dirs ──────
 
-  /** Build a request URL for the active source (carries the worktree query). */
+  /** Build a request URL for the active source. */
   const reqUrl = useCallback(
     (suffix: string, params: Record<string, string> = {}) =>
       source ? `${sourceApiBase(source)}${suffix}${sourceQuery(source, params)}` : '',

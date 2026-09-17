@@ -50,7 +50,9 @@ export const recallTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Search your long-term memory for facts, preferences, decisions, or knowledge from past interactions.',
+        'Search your memory archive: dated events, past details, one-off facts, and decisions from earlier interactions. ' +
+        'Your profile already holds the durable context, so use this for anything episodic that is not there — and use it ' +
+        'BEFORE telling someone you do not remember something.',
       inputSchema: z.object({
         query: z.string(),
         limit: z
@@ -60,10 +62,36 @@ export const recallTool: ToolRegistration = {
           .max(20)
           .optional()
           .describe('Default: 10'),
+        subject: z
+          .string()
+          .optional()
+          .describe('Narrow to one subject (person, project). Must match the stored subject exactly.'),
+        category: z
+          .enum(CATEGORIES)
+          .optional()
+          .describe('Narrow to one category.'),
+        since: z
+          .string()
+          .optional()
+          .describe('ISO date (e.g. "2026-07-01"). Only return memories updated on or after it.'),
       }),
-      execute: async ({ query, limit }) => {
-        log.debug({ agentId: ctx.agentId, query }, 'Recall invoked')
-        const results = await searchMemories(ctx.agentId, query, limit)
+      execute: async ({ query, limit, subject, category, since }) => {
+        log.debug({ agentId: ctx.agentId, query, subject, category, since }, 'Recall invoked')
+
+        let sinceDate: Date | undefined
+        if (since) {
+          const parsed = new Date(since)
+          if (Number.isNaN(parsed.getTime())) {
+            return { error: `Invalid "since" date: "${since}". Use an ISO date such as 2026-07-01.` }
+          }
+          sinceDate = parsed
+        }
+
+        const results = await searchMemories(ctx.agentId, query, limit, {
+          subject,
+          category,
+          since: sinceDate,
+        })
         return {
           memories: results.map((m) => ({
             id: m.id,
@@ -90,7 +118,9 @@ export const memorizeTool: ToolRegistration = {
   create: (ctx) =>
     tool({
       description:
-        'Save important information to long-term memory for future interactions.',
+        'Save an episodic fact to your memory archive: something that may matter when a topic comes back later. ' +
+        'If the information should instead shape your behavior in most future conversations without anyone mentioning it ' +
+        '(a standing preference, an active project, a durable convention), use edit_profile instead.',
       inputSchema: z.object({
         content: z.string().describe('Clear, standalone sentence to remember'),
         category: z
@@ -241,6 +271,66 @@ export const listMemoriesTool: ToolRegistration = {
             age: formatMemoryAge(m.updatedAt),
             ...(m.sourceContext ? { sourceContext: m.sourceContext } : {}),
           })),
+        }
+      },
+    }),
+}
+
+/**
+ * edit_profile — patch the curated profile document that is always in context.
+ * Available to main agents only.
+ */
+export const editProfileTool: ToolRegistration = {
+  availability: ['main'],
+  create: (ctx) =>
+    tool({
+      description:
+        'Edit your memory profile: the curated document always present in your context. ' +
+        'Use it only for information that should shape your behavior in most future conversations without anyone ' +
+        'mentioning it (a standing preference, an active project, a durable convention, a decision that still applies). ' +
+        'Anything episodic — dated events, one-off details you might look up later — belongs in the archive via memorize. ' +
+        'The profile has a limited token budget, so keep entries short and remove what no longer applies.',
+      inputSchema: z.object({
+        section: z
+          .string()
+          .describe('Section heading, e.g. "Active projects", "Preferences & conventions", "Open threads". Created if absent.'),
+        operation: z
+          .enum(['append', 'replace_section', 'remove_line'])
+          .describe(
+            '"append" adds a line to the section. "replace_section" overwrites the whole section body. ' +
+            '"remove_line" deletes the line matching `content` exactly.',
+          ),
+        content: z
+          .string()
+          .describe('The line to add or remove, or the full new body for replace_section. Use "- " bullets.'),
+        pin: z
+          .boolean()
+          .optional()
+          .describe(
+            'Put the entry in the "Pinned" section, which is never altered by automatic rewrites. ' +
+            'Use for instructions the user explicitly asked you to always follow.',
+          ),
+      }),
+      execute: async ({ section, operation, content, pin }) => {
+        log.debug({ agentId: ctx.agentId, section, operation, pin }, 'Edit profile invoked')
+        const { editProfile, ProfileBudgetError, ProfileLineNotFoundError } = await import(
+          '@/server/services/agent-profile'
+        )
+        try {
+          const profile = await editProfile(ctx.agentId, { section, operation, content, pin })
+          return {
+            success: true,
+            tokenEstimate: profile.tokenEstimate,
+            budget: config.memory.profileMaxTokens,
+            profile: profile.content,
+          }
+        } catch (err) {
+          // Both carry an actionable message (what to prune / what was missing),
+          // so the model can correct itself instead of retrying blindly.
+          if (err instanceof ProfileBudgetError || err instanceof ProfileLineNotFoundError) {
+            return { error: err.message }
+          }
+          throw err
         }
       },
     }),

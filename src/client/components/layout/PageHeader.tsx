@@ -5,7 +5,7 @@ import { cn } from '@/client/lib/utils'
 /**
  * Canonical section-page header.
  *
- * One consistent header band across the routed section pages (Agents, Projects,
+ * One consistent header band across the routed section pages (Agents, Tasks,
  * Tasks, Scheduled Tasks, Mini-Apps): an optional leading slot (e.g. a mobile
  * drawer trigger), an accent icon, the title, and a right-aligned actions slot
  * for search / tabs / buttons. The global AppTopBar and the in-conversation

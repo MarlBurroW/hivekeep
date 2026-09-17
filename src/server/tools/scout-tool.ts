@@ -1,8 +1,5 @@
 import { tool } from '@/server/tools/tool-helper'
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
-import { db } from '@/server/db/index'
-import { tickets, agents } from '@/server/db/schema'
 import { spawnTask, suspendTaskForChild } from '@/server/services/tasks'
 import { resolveScoutModel, resolveScoutThinking } from '@/server/llm/core/resolve-scout'
 import { createLogger } from '@/server/logger'
@@ -18,7 +15,7 @@ const log = createLogger('tools:scout')
  * burning Opus steps on it.
  *
  * Behaviour: spawn an `await` sub-task on the resolved scout model
- * (resolveScoutModel: per-spawn override → project scout → Agent scout → global
+ * (resolveScoutModel: per-spawn override → Agent scout → global
  * scout default → the Agent's own model) with the read-only 'scout' built-in
  * toolbox (grep / read_file / list_directory / web_search / browse_url /
  * extract_links — NO writes, NO scout/spawn tools, so a scout is always a
@@ -89,45 +86,17 @@ export const scoutTool: ToolRegistration = {
           }
         }
 
-        // Resolve the project context (for the project tier of the scout chain).
-        // Priority: the calling task's ticket project (ticket tasks), then the
-        // Agent's persistent active project (main sessions and non-ticket tasks).
-        //
-        // Without the active-project fallback the project scout tier was only
-        // ever consulted for ticket-bound tasks: a scout dispatched from a main
-        // session (or a plain spawn) on an Agent with an active project silently
-        // skipped the project's scout_model and fell through to the Agent's own
-        // main model (e.g. Opus instead of the project's configured Haiku).
-        let projectId: string | null = null
-        if (ctx.ticketId) {
-          const ticketRow = await db
-            .select({ projectId: tickets.projectId })
-            .from(tickets)
-            .where(eq(tickets.id, ctx.ticketId))
-            .get()
-          projectId = ticketRow?.projectId ?? null
-        }
-        if (!projectId) {
-          const agentRow = await db
-            .select({ activeProjectId: agents.activeProjectId })
-            .from(agents)
-            .where(eq(agents.id, ctx.agentId))
-            .get()
-          projectId = agentRow?.activeProjectId ?? null
-        }
-
         // Resolve the cheap scout model via the fallback chain.
         const scout = await resolveScoutModel({
           agentId: ctx.agentId,
-          projectId,
           override: model ? { modelId: model, providerId: provider_id ?? null } : null,
         })
 
         // Reasoning for the scout — same priority principle as the model:
-        // per-call override → project scout thinking → Agent scout thinking →
-        // global scout default → (at execution) the calling Agent's own general
-        // thinking config. Frozen on the task row when a tier hits; left null
-        // otherwise so the execution-time Agent fallback applies.
+        // per-call override → Agent scout thinking → global scout default →
+        // (at execution) the calling Agent's own general thinking config.
+        // Frozen on the task row when a tier hits; left null otherwise so the
+        // execution-time Agent fallback applies.
         const thinkingOverride: AgentThinkingConfig | null = thinking_effort === 'off'
           ? { enabled: false }
           : thinking_effort
@@ -135,7 +104,6 @@ export const scoutTool: ToolRegistration = {
             : null
         const thinkingConfig = await resolveScoutThinking({
           agentId: ctx.agentId,
-          projectId,
           override: thinkingOverride,
         })
 

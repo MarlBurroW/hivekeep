@@ -290,11 +290,6 @@ const dict: typeof en = {
               blurb: 'Agenci sami planują swoją przyszłą pracę (<b>„obudź mnie za 2 godziny”</b>), więc follow-upy i przypomnienia naprawdę się dzieją.',
               icon: 'alarm-clock',
             },
-            {
-              title: 'Kanban prowadzony przez agentów',
-              blurb: 'Organizuj pracę w projekty i tickety, a potem <b>przypisuj tickety agentom</b>, którzy je wykonują i raportują w komentarzach.',
-              icon: 'kanban',
-            },
           ],
         },
         {
@@ -315,11 +310,6 @@ const dict: typeof en = {
               title: 'Bazy wiedzy',
               blurb: 'Wgraj dokumenty raz; trafne fragmenty są <b>automatycznie podsuwane</b> do kontekstu, gdy tylko temat wraca.',
               icon: 'book-open',
-            },
-            {
-              title: 'Wiedza projektowa',
-              blurb: 'Każdy projekt trzyma wyselekcjonowane fakty, decyzje i pułapki: <b>przypięte wpisy</b> jadą z każdą turą agenta.',
-              icon: 'notebook-pen',
             },
             {
               title: 'Przeszukiwalna przeszłość',
@@ -444,7 +434,7 @@ const dict: typeof en = {
         'Zespół agentów, którzy współpracują',
         'Dopracowana aplikacja webowa (PWA)',
         'Renderowane wywołania narzędzi (UI, nie JSON)',
-        'Mini-aplikacje i projekty (Kanban)',
+        'Mini-aplikacje tworzone przez agentów',
         'Konfiguracja przez rozmowę (bez CLI)',
         'Sekrety nigdy nie trafiają do LLM-a',
         'Przejrzystość tokenów i kontekstu',
@@ -468,7 +458,7 @@ const dict: typeof en = {
     tourTeaser: {
       kicker: 'Wnętrze aplikacji',
       heading: 'Zobacz na żywo.',
-      p: 'Prawdziwe zrzuty ekranu z działającego ula: rozmowy, wywołania narzędzi, sejf, mini-aplikacje, kanban i więcej.',
+      p: 'Prawdziwe zrzuty ekranu z działającego ula: rozmowy, wywołania narzędzi, sejf, mini-aplikacje i więcej.',
       cta: 'Rozpocznij tour',
     },
   },
@@ -477,7 +467,7 @@ const dict: typeof en = {
   tour: {
     meta: {
       title: 'Hivekeep na zrzutach ekranu',
-      description: 'Przewodnik po Hivekeep w ponad 30 prawdziwych zrzutach: rozmowy agentów, narzędzia, szyfrowany sejf, mini-aplikacje, kanban, zadania cykliczne i więcej.',
+      description: 'Przewodnik po Hivekeep w ponad 30 prawdziwych zrzutach: rozmowy agentów, narzędzia, szyfrowany sejf, mini-aplikacje, zadania cykliczne i więcej.',
     },
     kicker: 'Tour',
     heading: 'Zajrzyj do ula.',
@@ -487,7 +477,7 @@ const dict: typeof en = {
       chat: { title: 'Codzienność z agentami', sub: 'Jedna ciągła rozmowa na agenta, użyte narzędzia widoczne w treści, nie ukryte.' },
       trust: { title: 'Sekrety i przejrzystość', sub: 'Agenci mogą prosić o dane logowania, nigdy ich nie widząc, a każdy token jest policzony.' },
       build: { title: 'Budują dla ciebie', sub: 'Mini-aplikacje, własne narzędzia, przestrzeń plików i prawdziwy terminal: platforma rośnie, bo rozwijają ją twoi agenci.' },
-      organize: { title: 'Organizacja i automatyzacja', sub: 'Wspólny kanban, delegowane zadania, zaplanowane joby i webhooki: kilka spraw toczy się naraz.' },
+      organize: { title: 'Organizacja i automatyzacja', sub: 'Delegowane zadania, zaplanowane joby i webhooki: kilka spraw toczy się naraz.' },
       control: { title: 'Sterownia', sub: 'Dostawcy, modele, kanały, pamięć, kontakty: wszystko do wglądu i pod kontrolą.' },
       anywhere: { title: 'Wszędzie, w dowolnym stylu', sub: 'Prawdziwa aplikacja na telefonie i 18 palet w trybie jasnym i ciemnym.' },
     },
@@ -514,9 +504,6 @@ const dict: typeof en = {
       'files': { t: 'Prawdziwa przestrzeń robocza', d: 'Przeglądaj i edytuj pliki każdego agenta w porządnym edytorze.' },
       'terminal': { t: 'Prawdziwy terminal', d: 'Wejdź do shella przestrzeni dowolnego agenta, z przeglądarki.' },
       'toolboxes': { t: 'Zakres możliwości', d: 'Toolboxy decydują, które narzędzia widzi agent. Skupieni agenci, lżejsze modele.' },
-      'kanban': { t: 'Wspólny kanban', d: 'Projekty i tickety, nad którymi pracujecie ty i agenci.' },
-      'ticket': { t: 'Agenci zdają raport', d: 'Forge porównał trzy wyceny i wrzucił werdykt jako komentarz.' },
-      'knowledge': { t: 'Wiedza projektu', d: 'Decyzje i fakty przypięte do projektu, wstrzykiwane w każdą turę.' },
       'tasks': { t: 'Centrum dowodzenia', d: 'Każde delegowane zadanie i sub-agent, na żywo, ze statusem i wynikiem.' },
       'crons': { t: 'Zadania cykliczne', d: 'Agenci według harmonogramu: briefingi, kontrole, podsumowania, z dziennikiem.' },
       'webhooks': { t: 'Pobudka webhookie m', d: 'Dowolne zdarzenie HTTP może obudzić agenta, z filtrami i dyspozycją.' },

@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test'
+import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from 'bun:test'
 
 // We test the URL guard indirectly through the tool's execute function. The
 // direct helper below mirrors the source logic for edge-case unit coverage
@@ -114,6 +114,19 @@ describe('httpRequestTool registration', () => {
 describe('httpRequestTool execute', () => {
   const originalFetch = globalThis.fetch
   let mockFetchFn: ReturnType<typeof mock>
+
+  // The safety check resolves DNS names and fails closed on errors, so tests
+  // stub the resolver (no network in CI). Local-network addresses stay
+  // allowed by design, so a private answer works for the .local test too.
+  const originalDnsLookup = Bun.dns.lookup
+  beforeEach(() => {
+    ;(Bun.dns as { lookup: unknown }).lookup = async (host: string) => [
+      { address: host.endsWith('.local') ? '192.168.1.10' : '93.184.216.34', family: 4 },
+    ]
+  })
+  afterAll(() => {
+    ;(Bun.dns as { lookup: unknown }).lookup = originalDnsLookup
+  })
 
   beforeEach(() => {
     mockFetchFn = mock(() =>

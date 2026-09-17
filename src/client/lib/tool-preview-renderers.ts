@@ -9,44 +9,59 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
 
+function getArg(args: Record<string, unknown> | null | undefined, key: string): unknown {
+  return args?.[key]
+}
+
+function getStringArg(args: Record<string, unknown> | null | undefined, key: string): string | undefined {
+  const value = getArg(args, key)
+  return typeof value === 'string' ? value : undefined
+}
+
+function getPathArg(args: Record<string, unknown> | null | undefined): string | null {
+  return getStringArg(args, 'path') || null
+}
+
 // --- Shell / system ---
 
 registerPreviewRenderer('run_shell', ({ args }) => {
-  const cmd = args.command as string | undefined
+  const cmd = getStringArg(args, 'command')
   return cmd ? truncate(cmd, 60) : null
 })
 
 registerPreviewRenderer('execute_sql', ({ args }) => {
-  return (args.sql as string) ? truncate(args.sql as string, 50) : null
+  const sql = getStringArg(args, 'sql')
+  return sql ? truncate(sql, 50) : null
 })
 
 // --- File operations ---
 
 registerPreviewRenderer('read_file', ({ args }) => {
-  return (args.path as string) || null
+  return getPathArg(args)
 })
 
 registerPreviewRenderer('write_file', ({ args }) => {
-  return (args.path as string) || null
+  return getPathArg(args)
 })
 
 registerPreviewRenderer('edit_file', ({ args }) => {
-  return (args.path as string) || null
+  return getPathArg(args)
 })
 
 registerPreviewRenderer('multi_edit', ({ args }) => {
-  const path = args.path as string
-  const count = Array.isArray(args.edits) ? args.edits.length : undefined
+  const path = getPathArg(args)
+  const edits = getArg(args, 'edits')
+  const count = Array.isArray(edits) ? edits.length : undefined
   return path ? `${path}${count ? ` (${count} edits)` : ''}` : null
 })
 
 registerPreviewRenderer('list_directory', ({ args }) => {
-  return (args.path as string) || '.'
+  return getPathArg(args) || '.'
 })
 
 registerPreviewRenderer('grep', ({ args }) => {
-  const pattern = args.pattern as string
-  const glob = args.glob as string | undefined
+  const pattern = getStringArg(args, 'pattern')
+  const glob = getStringArg(args, 'glob')
   return pattern ? `"${truncate(pattern, 30)}"${glob ? ` in ${glob}` : ''}` : null
 })
 
@@ -227,12 +242,6 @@ registerPreviewRenderer('browser_delete_state', ({ args }) => {
   return args.name ? `delete "${args.name}"` : null
 })
 
-// --- Knowledge ---
-
-registerPreviewRenderer('search_knowledge', ({ args }) => {
-  return (args.query as string) ? `"${truncate(args.query as string, 40)}"` : null
-})
-
 // --- Notify ---
 
 registerPreviewRenderer('notify', ({ args }) => {
@@ -312,7 +321,7 @@ registerPreviewRenderer('wake_me_in', ({ args }) => {
 // --- Mini apps ---
 
 registerPreviewRenderer('write_mini_app_file', ({ args }) => {
-  return (args.path as string) || null
+  return getPathArg(args)
 })
 
 registerPreviewRenderer('create_mini_app', ({ args }) => {
@@ -490,7 +499,7 @@ registerPreviewRenderer('uninstall_plugin', ({ args }) => {
 // --- Mini app file read ---
 
 registerPreviewRenderer('read_mini_app_file', ({ args }) => {
-  return (args.path as string) || null
+  return getPathArg(args)
 })
 
 // --- Secret retrieval ---
@@ -616,7 +625,7 @@ registerPreviewRenderer('update_memory', ({ args }) => {
 // --- Mini app file deletion ---
 
 registerPreviewRenderer('delete_mini_app_file', ({ args }) => {
-  return (args.path as string) || null
+  return getPathArg(args)
 })
 
 // --- Email ---

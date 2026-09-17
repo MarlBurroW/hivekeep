@@ -30,6 +30,8 @@ import {
   SearchResolveError,
 } from '@/server/services/search-resolver'
 import type { SearchRequest } from '@/server/llm/search/types'
+// Aliased: `config` is already bound to the resolved provider credentials below.
+import { config as appConfig } from '@/server/config'
 import { createLogger } from '@/server/logger'
 import type { ToolRegistration } from '@/server/tools/types'
 
@@ -245,6 +247,10 @@ export const webSearchTool: ToolRegistration = {
           ...(lang !== undefined ? { lang } : {}),
           ...(location !== undefined ? { location } : {}),
           ...(answer !== undefined ? { answer } : {}),
+          // Providers already plumb `request.signal` down to their fetch; it
+          // was simply never set, leaving every web search unbounded on a turn
+          // that holds the Agent's lock.
+          signal: AbortSignal.timeout(appConfig.search.requestTimeoutMs),
         }
 
         log.debug(

@@ -68,8 +68,14 @@ async function connectToServer(serverId: string): Promise<MCPConnection | null> 
     )
     await Promise.race([connectPromise, timeoutPromise])
 
-    // Discover tools
-    const toolsResult = await client.listTools()
+    // Discover tools. Bounded like `connect` above: a server that completes the
+    // handshake and then goes quiet would otherwise hang the first toolset
+    // resolution — which happens inside a turn.
+    const toolsResult = await withTimeout(
+      client.listTools(),
+      MCP_CONNECT_TIMEOUT_MS,
+      `MCP listTools for ${server.name}`,
+    )
     const tools: MCPToolDef[] = (toolsResult.tools ?? []).map((t) => ({
       name: t.name,
       description: t.description ?? '',

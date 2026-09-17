@@ -1,6 +1,6 @@
 /**
  * Tests for remark-workspace-paths (files.md § 5.2). Mirrors the
- * remark-ticket-mentions test harness: parse markdown, run the plugin,
+ * Test harness: parse markdown, run the plugin,
  * inspect the synthetic `workspace-path` nodes. False positives are cheap
  * (they degrade to text after server verification) — false NEGATIVES on
  * realistic paths (spaces/accents in backticks) are the real regression risk.

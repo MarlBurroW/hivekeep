@@ -135,194 +135,103 @@ describe('ChannelQueueMeta contract', () => {
   })
 })
 
-// ─── ChannelOriginMeta (with TTL) ───────────────────────────────────────────
+// ─── ChannelOriginMeta (freshness window) ───────────────────────────────────
+// The real store lives in `channel_origins` (see setChannelOriginMeta /
+// getChannelOriginMeta). Only the freshness rule applied on read is replicated
+// here: a row is returned when `now - createdAt <= config.channels.originTtlMs`,
+// and dropped otherwise. Kept in lockstep with getChannelOriginMeta.
 
-interface ChannelOriginMeta {
+interface ChannelOriginRow {
   channelId: string
   platformChatId: string
   platformMessageId: string
   platformUserId: string
   createdAt: number
-  ttlMs: number
 }
 
+const ORIGIN_TTL_MS = 86_400_000
+
 function createOriginMetaStore() {
-  const store = new Map<string, ChannelOriginMeta>()
+  const store = new Map<string, ChannelOriginRow>()
   return {
-    set: (id: string, meta: ChannelOriginMeta) => store.set(id, meta),
-    get: (id: string, now?: number): ChannelOriginMeta | undefined => {
-      const meta = store.get(id)
-      if (!meta) return undefined
-      if ((now ?? Date.now()) - meta.createdAt > meta.ttlMs) {
+    set: (id: string, row: ChannelOriginRow) => store.set(id, row),
+    get: (id: string, now: number): ChannelOriginRow | undefined => {
+      const row = store.get(id)
+      if (!row) return undefined
+      if (now - row.createdAt > ORIGIN_TTL_MS) {
         store.delete(id)
         return undefined
       }
-      return meta
+      return row
     },
+    has: (id: string) => store.has(id),
     clear: () => store.clear(),
   }
 }
 
 describe('ChannelOriginMeta contract', () => {
   const store = createOriginMetaStore()
+  const NOW = 1_800_000_000_000
   let idCounter = 0
-  const nextId = () => `test-origin-${Date.now()}-${++idCounter}`
+  const nextId = () => `test-origin-${++idCounter}`
 
-  const makeMeta = (overrides?: Partial<ChannelOriginMeta>): ChannelOriginMeta => ({
+  const makeRow = (overrides?: Partial<ChannelOriginRow>): ChannelOriginRow => ({
     channelId: 'ch-origin-001',
     platformChatId: 'chat-origin-123',
     platformMessageId: 'msg-origin-456',
     platformUserId: 'user-origin-789',
-    createdAt: Date.now(),
-    ttlMs: 60_000,
+    createdAt: NOW,
     ...overrides,
   })
 
   beforeEach(() => store.clear())
 
-  describe('set + get', () => {
-    it('stores and retrieves origin metadata', () => {
-      const id = nextId()
-      const meta = makeMeta()
-      store.set(id, meta)
-      expect(store.get(id)).toEqual(meta)
-    })
-
-    it('returns undefined for unknown origin ID', () => {
-      expect(store.get('nonexistent-origin')).toBeUndefined()
-    })
-
-    it('overwrites existing origin metadata', () => {
-      const id = nextId()
-      store.set(id, makeMeta({ channelId: 'ch-old' }))
-      store.set(id, makeMeta({ channelId: 'ch-new' }))
-      expect(store.get(id)?.channelId).toBe('ch-new')
-    })
-
-    it('stores multiple origin entries independently', () => {
-      const id1 = nextId()
-      const id2 = nextId()
-      store.set(id1, makeMeta({ channelId: 'ch-a' }))
-      store.set(id2, makeMeta({ channelId: 'ch-b' }))
-      expect(store.get(id1)?.channelId).toBe('ch-a')
-      expect(store.get(id2)?.channelId).toBe('ch-b')
-    })
-
-    it('preserves all fields in the returned metadata', () => {
-      const id = nextId()
-      const meta: ChannelOriginMeta = {
-        channelId: 'ch-full',
-        platformChatId: 'pchat-123',
-        platformMessageId: 'pmsg-456',
-        platformUserId: 'puser-789',
-        createdAt: Date.now(),
-        ttlMs: 300_000,
-      }
-      store.set(id, meta)
-      const result = store.get(id)!
-      expect(result.channelId).toBe('ch-full')
-      expect(result.platformChatId).toBe('pchat-123')
-      expect(result.platformMessageId).toBe('pmsg-456')
-      expect(result.platformUserId).toBe('puser-789')
-      expect(result.ttlMs).toBe(300_000)
-    })
+  it('returns every field of a stored origin', () => {
+    const id = nextId()
+    const row = makeRow()
+    store.set(id, row)
+    expect(store.get(id, NOW)).toEqual(row)
   })
 
-  describe('TTL expiry', () => {
-    it('returns metadata when within TTL', () => {
-      const id = nextId()
-      const now = 1000000
-      const meta = makeMeta({ createdAt: now - 30_000, ttlMs: 60_000 })
-      store.set(id, meta)
-      expect(store.get(id, now)).toEqual(meta)
-    })
+  it('returns undefined for an unknown origin id', () => {
+    expect(store.get('nonexistent-origin', NOW)).toBeUndefined()
+  })
 
-    it('returns undefined and cleans up when TTL has expired', () => {
-      const id = nextId()
-      const now = 1000000
-      const meta = makeMeta({ createdAt: now - 120_000, ttlMs: 60_000 })
-      store.set(id, meta)
-      expect(store.get(id, now)).toBeUndefined()
-      // Entry should be deleted
-      expect(store.get(id, now)).toBeUndefined()
-    })
+  it('keeps origins independent', () => {
+    const id1 = nextId()
+    const id2 = nextId()
+    store.set(id1, makeRow({ channelId: 'ch-a' }))
+    store.set(id2, makeRow({ channelId: 'ch-b' }))
+    expect(store.get(id1, NOW)?.channelId).toBe('ch-a')
+    expect(store.get(id2, NOW)?.channelId).toBe('ch-b')
+  })
 
-    it('returns undefined when TTL is exactly elapsed', () => {
-      const id = nextId()
-      const now = 1000000
-      const meta = makeMeta({ createdAt: now - 60_001, ttlMs: 60_000 })
-      store.set(id, meta)
-      expect(store.get(id, now)).toBeUndefined()
-    })
+  it('still resolves an origin far beyond the old 5-minute in-memory TTL', () => {
+    const id = nextId()
+    store.set(id, makeRow({ createdAt: NOW - 3 * 60 * 60 * 1000 }))
+    expect(store.get(id, NOW)?.channelId).toBe('ch-origin-001')
+  })
 
-    it('returns metadata when TTL has not quite elapsed', () => {
-      const id = nextId()
-      const now = 1000000
-      const meta = makeMeta({ createdAt: now - 59_999, ttlMs: 60_000 })
-      store.set(id, meta)
-      expect(store.get(id, now)).toEqual(meta)
-    })
+  it('resolves an origin exactly at the freshness boundary', () => {
+    const id = nextId()
+    store.set(id, makeRow({ createdAt: NOW - ORIGIN_TTL_MS }))
+    expect(store.get(id, NOW)).toBeDefined()
+  })
 
-    it('handles zero TTL (expires immediately)', () => {
-      const id = nextId()
-      const now = 1000000
-      const meta = makeMeta({ createdAt: now - 1, ttlMs: 0 })
-      store.set(id, meta)
-      expect(store.get(id, now)).toBeUndefined()
-    })
+  it('drops an origin past the freshness window', () => {
+    const id = nextId()
+    store.set(id, makeRow({ createdAt: NOW - ORIGIN_TTL_MS - 1 }))
+    expect(store.get(id, NOW)).toBeUndefined()
+    expect(store.has(id)).toBe(false)
+  })
 
-    it('does not expire other entries when one expires', () => {
-      const id1 = nextId()
-      const id2 = nextId()
-      const now = 1000000
-
-      store.set(id1, makeMeta({ channelId: 'ch-expired', createdAt: now - 120_000, ttlMs: 60_000 }))
-      store.set(id2, makeMeta({ channelId: 'ch-fresh', createdAt: now, ttlMs: 60_000 }))
-
-      expect(store.get(id1, now)).toBeUndefined()
-      expect(store.get(id2, now)?.channelId).toBe('ch-fresh')
-    })
-
-    it('handles very large TTL values', () => {
-      const id = nextId()
-      const now = 1000000
-      const meta = makeMeta({ createdAt: now - 86_400_000, ttlMs: 86_400_000 * 7 })
-      store.set(id, meta)
-      expect(store.get(id, now)).toEqual(meta)
-    })
-
-    it('correctly expires after multiple gets (idempotent delete)', () => {
-      const id = nextId()
-      const now = 1000000
-      store.set(id, makeMeta({ createdAt: now - 120_000, ttlMs: 60_000 }))
-
-      // Multiple gets all return undefined
-      expect(store.get(id, now)).toBeUndefined()
-      expect(store.get(id, now)).toBeUndefined()
-      expect(store.get(id, now)).toBeUndefined()
-    })
-
-    it('entry accessible before TTL, then expired after TTL', () => {
-      const id = nextId()
-      const createdAt = 500_000
-      store.set(id, makeMeta({ createdAt, ttlMs: 60_000 }))
-
-      // Before TTL (30s later)
-      expect(store.get(id, createdAt + 30_000)).toBeDefined()
-
-      // After TTL (120s later)
-      expect(store.get(id, createdAt + 120_000)).toBeUndefined()
-    })
-
-    it('boundary: elapsed equals ttlMs exactly (not expired)', () => {
-      const id = nextId()
-      const now = 1000000
-      // elapsed = now - createdAt = 60000, ttlMs = 60000
-      // Condition: elapsed > ttlMs → 60000 > 60000 → false → NOT expired
-      const meta = makeMeta({ createdAt: now - 60_000, ttlMs: 60_000 })
-      store.set(id, meta)
-      expect(store.get(id, now)).toEqual(meta)
-    })
+  it('expiring one origin leaves the others resolvable', () => {
+    const stale = nextId()
+    const fresh = nextId()
+    store.set(stale, makeRow({ channelId: 'ch-stale', createdAt: NOW - ORIGIN_TTL_MS - 1 }))
+    store.set(fresh, makeRow({ channelId: 'ch-fresh', createdAt: NOW }))
+    expect(store.get(stale, NOW)).toBeUndefined()
+    expect(store.get(fresh, NOW)?.channelId).toBe('ch-fresh')
   })
 })
 

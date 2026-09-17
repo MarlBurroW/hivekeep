@@ -125,7 +125,8 @@ describe('config', () => {
     })
 
     it('tools defaults', () => {
-      expect(config.tools.maxSteps).toBe(0)
+      expect(config.tools.maxSteps).toBe(100)
+      expect(config.tools.turnTimeoutMs).toBe(1_800_000)
     })
 
     it('humanPrompts defaults', () => {
@@ -460,9 +461,9 @@ describe('config', () => {
       expect(c.interAgent.maxChainDepth).toBe(10)
     })
 
-    it('CHANNEL_PENDING_ORIGIN_TTL override', async () => {
-      const c = await loadConfigWithEnv({ CHANNEL_PENDING_ORIGIN_TTL: '600000' })
-      expect(c.channels.pendingOriginTtlMs).toBe(600000)
+    it('CHANNEL_ORIGIN_TTL override', async () => {
+      const c = await loadConfigWithEnv({ CHANNEL_ORIGIN_TTL: '600000' })
+      expect(c.channels.originTtlMs).toBe(600000)
     })
   })
 })

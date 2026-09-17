@@ -12,7 +12,7 @@ import { __setSnapshotForTests } from '@/server/llm/metadata/models-dev'
 // Some earlier test files stub `@/server/db/schema` via mock.module (every table
 // becomes `{}`). When this file runs after one of those, the static
 // `import { modelRegistry } from schema` inside the SUT throws. Detect pollution
-// and skip cleanly — same pattern as ticket-comments.test.ts.
+// and skip cleanly — same pattern as the other DB-backed service tests.
 const schemaIsReal = !!(schema as { modelRegistry?: { id?: unknown } }).modelRegistry?.id
 const d = schemaIsReal ? describe : describe.skip
 

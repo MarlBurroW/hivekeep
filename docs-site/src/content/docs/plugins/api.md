@@ -240,7 +240,7 @@ type HookHandler<H extends HookName = HookName> = (
 |---|---|---|
 | `beforeChat` | Once per Agent turn, before the system prompt is assembled. | `message` |
 | `afterChat` | Once per Agent turn, after the assistant response is finalized. | `message`, `response` |
-| `beforeToolCall` | Before each tool call in a turn. | `toolName`, `toolArgs`, `taskId?`, `isSubAgent`, `channelOriginId?`, `cronId?`, `ticketId?` |
+| `beforeToolCall` | Before each tool call in a turn. | `toolName`, `toolArgs`, `taskId?`, `isSubAgent`, `channelOriginId?`, `cronId?` |
 | `afterToolCall` | After each tool call. | the `beforeToolCall` fields plus `toolResult` |
 
 > **Runtime-tolerated extras.** The host's manifest/exports validator also accepts `beforeCompacting`, `afterCompacting`, `onTaskSpawn`, and `onCronTrigger` without warning, but they are **not** in `HookPayloadMap` (so they are untyped) and the host does **not** currently fire any of them. Registering a handler for one of these names is silently a no-op today. Stick to the four typed hooks above.

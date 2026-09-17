@@ -32,6 +32,7 @@ mock.module('@/server/services/channels', () => ({
     return meta
   },
   // Stubs for any other exports that might be imported
+  reportUndeliveredChannelReply: async () => {},
   createChannel: mock(() => Promise.resolve({})),
   updateChannel: mock(() => Promise.resolve({})),
   deleteChannel: mock(() => Promise.resolve()),

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/client/lib/utils'
-import { ChevronDown, ChevronRight, FilePen, FileWarning } from 'lucide-react'
+import { ChevronDown, ChevronRight, FilePen, FileWarning, Loader2 } from 'lucide-react'
 import { JsonViewer } from '@/client/components/common/JsonViewer'
 import type { ToolResultRendererProps } from '@/client/lib/tool-renderers'
 
@@ -10,16 +10,18 @@ export function FileEditRenderer({ args, result, status }: ToolResultRendererPro
   const [showRaw, setShowRaw] = useState(false)
 
   const res = result as Record<string, unknown> | null | undefined
-  const filePath = typeof res?.path === 'string' ? res.path : typeof args.path === 'string' ? args.path : null
+  const filePath = typeof res?.path === 'string' ? res.path : typeof args?.path === 'string' ? args.path : null
   const success = res?.success === true
   const applied = res?.applied === true
-  const oldText = typeof res?.oldText === 'string' ? res.oldText : typeof args.oldText === 'string' ? args.oldText : null
-  const newText = typeof res?.newText === 'string' ? res.newText : typeof args.newText === 'string' ? args.newText : null
+  const oldText = typeof res?.oldText === 'string' ? res.oldText : typeof args?.oldText === 'string' ? args.oldText : null
+  const newText = typeof res?.newText === 'string' ? res.newText : typeof args?.newText === 'string' ? args.newText : null
   const language = typeof res?.language === 'string' ? res.language : null
   const editLine = typeof res?.editLine === 'number' ? res.editLine : null
   const error = typeof res?.error === 'string' ? res.error : null
 
-  if (!success) {
+  const failed = status === 'error' || error !== null || (result !== undefined && !success)
+
+  if (failed) {
     return (
       <div className="space-y-2">
         <div className="rounded-md bg-zinc-950 text-zinc-100 text-xs font-mono overflow-hidden">
@@ -29,6 +31,21 @@ export function FileEditRenderer({ args, result, status }: ToolResultRendererPro
             <span className="ml-auto shrink-0 text-[10px] text-red-400">{t('tools.renderers.failed')}</span>
           </div>
           <div className="px-3 py-2 text-red-300 break-words">{error ?? t('tools.renderers.editFailed')}</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!success) {
+    return (
+      <div className="space-y-2">
+        <div className="rounded-md bg-zinc-950 text-zinc-100 text-xs font-mono overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border-b border-zinc-800">
+            <Loader2 className="size-3 text-blue-400 shrink-0 animate-spin" />
+            <span className="min-w-0 truncate text-zinc-400 text-[10px]">{filePath ?? t('tools.renderers.file')}</span>
+            <span className="ml-auto shrink-0 text-[10px] text-blue-400">{t('tools.status.pending', { defaultValue: 'Pending' })}</span>
+          </div>
+          <div className="px-3 py-2 text-zinc-400 break-words">{t('tools.renderers.editingFile', { defaultValue: 'Preparing edit preview…' })}</div>
         </div>
       </div>
     )

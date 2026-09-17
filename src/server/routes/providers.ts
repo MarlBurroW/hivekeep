@@ -30,9 +30,14 @@ import type { ConfigField } from '@hivekeep/sdk'
 import { createLogger } from '@/server/logger'
 import { sseManager } from '@/server/sse/index'
 import { generateProviderSlug } from '@/server/services/provider-slug'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:providers')
 const providerRoutes = new Hono()
+
+// Reads stay member-accessible (pickers, list views); mutations are platform
+// configuration and admin-only.
+providerRoutes.use('*', (c, next) => (c.req.method === 'GET' ? next() : requireAdmin(c, next)))
 
 // GET /api/providers — list all providers
 providerRoutes.get('/', async (c) => {

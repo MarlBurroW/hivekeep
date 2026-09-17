@@ -7,13 +7,13 @@ Every Agent has a **workspace**: a directory on your server where it reads and w
 
 The typical moment: an Agent says "I saved the report in `reports/q2.md`" and you want to tweak it yourself, right now. Open Files (or click the path in the chat), edit, save. None of this triggers an LLM turn. It is a direct view of the disk.
 
-Files is available to all authenticated users, from the activity bar (folder icon) or at `/files`. Beyond Agent workspaces, the same browser also opens **project repositories** (including their git worktrees), **mini-app source directories**, and **arbitrary server folders** you add (see [Browse sources](#browse-sources)).
+Files is available to all authenticated users, from the activity bar (folder icon) or at `/files`. Beyond Agent workspaces, the same browser also opens **mini-app source directories** and **arbitrary server folders** you add (see [Browse sources](#browse-sources)).
 
 ## The layout
 
 The page works like a lightweight code editor:
 
-- **Source selector**: a searchable picker at the top of the left panel switches between source kinds: **Agents** (each Agent's workspace), **Projects** (a project's cloned repo), **Mini-apps** (a mini-app's source directory) and **Folders** (any folder on the server you add yourself). Category segments and a search box keep the right workspace one keystroke away even with many sources; the last source you visited is remembered. See [Browse sources](#browse-sources) below.
+- **Source selector**: a searchable picker at the top of the left panel switches between source kinds: **Agents** (each Agent's workspace), **Mini-apps** (a mini-app's source directory) and **Folders** (any folder on the server you add yourself). Category segments and a search box keep the right workspace one keystroke away even with many sources; the last source you visited is remembered. See [Browse sources](#browse-sources) below.
 - **File tree**: folders load lazily as you expand them (a workspace can contain a cloned repo with `node_modules`; nothing is walked until you open it). Everything on disk is shown, dotfiles included. A **filter box** narrows the loaded tree by name, and **collapse-all / expand-all** buttons sit in the tree header. The panel is **resizable** (drag the divider; the width is remembered). On mobile the tree lives in a slide-in drawer.
 - **Tabs**: every opened file gets a tab, with a dirty indicator for unsaved changes. **Drag to reorder** tabs, and right-click (or the tab-bar "⋯") for **close others / close to the right / close all**, reveal in tree, and copy path. Tabs are remembered per workspace for the session; `Ctrl/Cmd+Shift+T` reopens the last closed one. Closing a dirty tab asks for confirmation, and the browser warns you before leaving the page with unsaved work.
 - **Editor / viewers**: the server decides how a file is displayed: text files open in the code editor (syntax highlighting by extension, in-editor **search** with `Ctrl/Cmd+F` and go-to-line, a **word-wrap** toggle, and a status bar showing the caret position and language), Markdown and HTML files add an **Edit / Preview** toggle (HTML also offers **Export to PDF**), images render in a **zoomable, pannable** viewer, PDFs render inline, binary or oversized files show a metadata panel with a download button. A **breadcrumb** above the editor shows the file path; clicking a segment reveals that folder in the tree, and a reveal button locates the active file.
@@ -22,18 +22,17 @@ You can also jump straight to a specific Agent's files from its agent card or fr
 
 ## Browse sources
 
-The same browser, editor, tabs, search and file operations work over four kinds of source, picked from the searchable selector:
+The same browser, editor, tabs, search and file operations work over three kinds of source, picked from the searchable selector:
 
 - **Agents**: an Agent's workspace (`data/workspaces/<agentId>/`). This is the default and the only source with the chat integrations (Share, Insert in chat, `@` mentions), since those are tied to a conversation.
-- **Projects**: the cloned repository of a [project](/docs/features/projects/) that has a GitHub repo attached (only repos that finished cloning appear). You can edit the repo directly from the browser. When the repo has **git worktrees** (created for sub-task work), a second selector under the source picker lets you switch between the base clone and each live worktree. A small **branch badge** shows the current branch and the number of uncommitted changes. Click it for the **changed-files panel** (see [Git integration](#git-integration)). Worktrees are ephemeral: they come and go as sub-tasks run, and the list reflects whatever git reports right now.
 - **Mini-apps**: the source directory of a [mini-app](/docs/mini-apps/), so you can edit an app's files directly. Any user can edit any mini-app; the maintainer Agent is shown as a subtitle in the picker.
 - **Folders**: any absolute folder on the server. Click **Add a folder…** in the selector, give it a name and an absolute path, and it shows up for everyone. Folders are full read/write like a workspace. Use the same dialog to remove a folder later. (Because a folder has no owning Agent, the chat-only actions are hidden for folder sources.)
 
-Project repos, mini-apps and folders are deep-linkable as `/files/project/<id>`, `/files/miniapp/<id>` and `/files/folder/<id>` (with `?path=` and, for projects, `?worktree=`). Every source goes through the exact same strict path confinement described under [Security notes](#security-notes).
+Mini-apps and folders are deep-linkable as `/files/miniapp/<id>` and `/files/folder/<id>` (with `?path=`). Every source goes through the exact same strict path confinement described under [Security notes](#security-notes).
 
 ## Git integration
 
-When the source root is a git repository (project repos, and git-backed folders or workspaces), Files surfaces git state without leaving the page:
+When the source root is a git repository (a git-backed workspace, folder or mini-app dir), Files surfaces git state without leaving the page:
 
 - The **branch badge** under the source picker shows the current branch and the uncommitted-change count. Clicking the count opens a **changed-files panel** listing each modified file with its status code; clicking a file opens it.
 - Any text file offers a **Diff** toggle in the editor toolbar that swaps the editor for a read-only, color-coded unified diff of the working tree vs `HEAD` (untracked files are shown as all-additions). Toggle it off to return to editing.
@@ -118,7 +117,7 @@ The Files section has a few server-side limits, all overridable by environment v
 
 ## Security notes
 
-The HTTP API behind this section is **stricter than the Agents' own filesystem tools**: a path can never leave the target source root (no absolute paths, no `..`, no symlink escape), and that holds identically for agent workspaces, project repos and folders. Raw file serving never lets the browser sniff content types, and only inert formats (images, PDF, plain text) are ever displayed inline. Active formats like SVG or HTML are downloaded rather than served inline. The HTML **preview** is the one place HTML is rendered, and it runs in a sandboxed frame with no access to your session (no cookies, no app origin); the **PDF export** renders the file in the same isolated headless browser used for web browsing.
+The HTTP API behind this section is **stricter than the Agents' own filesystem tools**: a path can never leave the target source root (no absolute paths, no `..`, no symlink escape), and that holds identically for agent workspaces, mini-app dirs and folders. Raw file serving never lets the browser sniff content types, and only inert formats (images, PDF, plain text) are ever displayed inline. Active formats like SVG or HTML are downloaded rather than served inline. The HTML **preview** is the one place HTML is rendered, and it runs in a sandboxed frame with no access to your session (no cookies, no app origin); the **PDF export** renders the file in the same isolated headless browser used for web browsing.
 
 One deliberate trade-off: a **Folder** source points at an arbitrary absolute path on the server, and (like Agent workspaces) folders are visible and editable by every authenticated user. Add a folder only when you are comfortable with that. The path is canonicalized and re-checked on every browse, so a folder removed from disk fails cleanly rather than escaping its root.
 

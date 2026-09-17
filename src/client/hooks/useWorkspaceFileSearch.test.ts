@@ -1,8 +1,7 @@
 /**
  * Tests for `buildWorkspaceSearchUrl` — the pure helper of
  * useWorkspaceFileSearch (repo convention: no DOM renderer, hooks stay thin
- * wrappers around setTimeout/setState; the request-sequencing pattern is the
- * same as useTicketSearch).
+ * wrappers around setTimeout/setState).
  */
 import { describe, it, expect } from 'bun:test'
 import { buildWorkspaceSearchUrl } from './useWorkspaceFileSearch'
@@ -28,8 +27,8 @@ describe('buildWorkspaceSearchUrl', () => {
     expect(url).toContain('q=Rapport+final+%C3%A9')
   })
 
-  it('carries the project worktree as a query param', () => {
-    const url = buildWorkspaceSearchUrl({ source: { type: 'project', id: 'p1', worktree: 'wt-2' }, query: 'x', limit: 8 })
-    expect(url).toBe('/workspace/project/p1/search?q=x&limit=8&worktree=wt-2')
+  it('builds the scoped search URL for a mini-app source', () => {
+    const url = buildWorkspaceSearchUrl({ source: { type: 'miniapp', id: 'app-1' }, query: 'index', limit: 8 })
+    expect(url).toBe('/workspace/miniapp/app-1/search?q=index&limit=8')
   })
 })

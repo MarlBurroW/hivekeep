@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/client/lib/utils'
-import { ChevronDown, ChevronRight, Folder, FolderOpen, FileText, FolderSearch } from 'lucide-react'
+import { ChevronDown, ChevronRight, Folder, FolderOpen, FileText, FolderSearch, Loader2 } from 'lucide-react'
 import { JsonViewer } from '@/client/components/common/JsonViewer'
 import type { ToolResultRendererProps } from '@/client/lib/tool-renderers'
 
@@ -75,11 +75,16 @@ export function ListDirectoryRenderer({ args, result, status }: ToolResultRender
 
   const res = result as Record<string, unknown> | null | undefined
   const success = res?.success === true
-  const dirPath = typeof res?.path === 'string' ? res.path : typeof args.path === 'string' ? args.path : '.'
+  const dirPath = typeof res?.path === 'string' ? res.path : typeof args?.path === 'string' ? args.path : '.'
   const entries = Array.isArray(res?.entries) ? (res.entries as DirEntry[]) : null
   const error = typeof res?.error === 'string' ? res.error : null
 
-  if (!success) {
+  // Only a real error or a completed-but-unsuccessful result is a failure; an
+  // as-yet-unresolved call (no result) is pending, not failed. Mirrors
+  // FileEditRenderer / FileWriteRenderer.
+  const failed = status === 'error' || error !== null || (result !== undefined && !success)
+
+  if (failed) {
     return (
       <div className="space-y-2">
         <div className="rounded-md bg-zinc-950 text-zinc-100 text-xs font-mono overflow-hidden">
@@ -89,6 +94,21 @@ export function ListDirectoryRenderer({ args, result, status }: ToolResultRender
             <span className="ml-auto shrink-0 text-[10px] text-red-400">{t('tools.renderers.error')}</span>
           </div>
           <div className="px-3 py-2 text-red-300 break-words">{error ?? t('tools.renderers.failedToListDirectory')}</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!success) {
+    return (
+      <div className="space-y-2">
+        <div className="rounded-md bg-zinc-950 text-zinc-100 text-xs font-mono overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border-b border-zinc-800">
+            <Loader2 className="size-3 text-blue-400 shrink-0 animate-spin" />
+            <span className="min-w-0 truncate text-zinc-400 text-[10px]">{dirPath}</span>
+            <span className="ml-auto shrink-0 text-[10px] text-blue-400">{t('tools.status.pending', { defaultValue: 'Pending' })}</span>
+          </div>
+          <div className="px-3 py-2 text-zinc-400 break-words">{t('tools.renderers.listingDirectory', { defaultValue: 'Preparing directory listing…' })}</div>
         </div>
       </div>
     )

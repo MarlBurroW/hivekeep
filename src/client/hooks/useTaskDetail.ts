@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { api } from '@/client/lib/api'
 import { useSSE, useSSEResync } from '@/client/hooks/useSSE'
 import { getToolDomain as lookupToolDomain } from '@/client/lib/tool-domain-lookup'
+import { createSmoothReveal, type SmoothReveal } from '@/client/lib/smooth-stream'
 import { isTerminalStatus } from '@/client/lib/task-status'
 import type { TaskStatus, ToolCallEntry, ToolDomain, MessageTokenUsage, AgentThinkingEffort, TaskTodo, TaskTokenUsage } from '@/shared/types'
 import type { ToolCallViewItem, ToolCallStatus } from '@/client/hooks/useToolCalls'
@@ -25,14 +26,6 @@ interface TaskDetail {
   concurrencyGroup: string | null
   concurrencyMax: number | null
   cronId: string | null
-  /** Parent ticket this task was spawned on, if any. Null for non-ticket
-   *  tasks. Used by the task panel to show the ticket ref (e.g. hivekeep#42)
-   *  and offer a jump-back to the ticket. */
-  ticket?: { id: string; number: number | null; projectSlug: string | null } | null
-  /** Optional run-specific sur-prompt captured at spawn time for ticket tasks.
-   *  Surfaced in the task panel so the user can audit what scope this run
-   *  was given, distinct from the ticket description itself. */
-  runPrompt?: string | null
   /** Roll-up of every LLM call billed to this task. Null until the first step
    *  records usage. Pushed live via `task:token-usage` SSE so the running
    *  counter updates without polling. */
@@ -81,8 +74,6 @@ interface TaskDetailResponse {
   todos: TaskTodo[]
 }
 
-const STREAMING_BATCH_MS = 50
-
 function getToolDomain(toolName: string): ToolDomain {
   return lookupToolDomain(toolName)
 }
@@ -113,8 +104,23 @@ export function useTaskDetail(taskId: string | null) {
   const streamingContentRef = useRef('')
   const streamingMessageIdRef = useRef<string | null>(null)
   const streamingReasoningRef = useRef('')
-  const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reasoningBatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Adaptive typewriter (see smooth-stream.ts): refs hold the full received
+  // text; the reveals advance a cursor into them so coarse provider chunks
+  // render as a continuous flow instead of visible jumps.
+  const contentRevealRef = useRef<SmoothReveal | null>(null)
+  if (!contentRevealRef.current) {
+    contentRevealRef.current = createSmoothReveal((len) => {
+      setStreamingMessage((prev) =>
+        prev ? { ...prev, content: streamingContentRef.current.slice(0, len) } : prev,
+      )
+    })
+  }
+  const reasoningRevealRef = useRef<SmoothReveal | null>(null)
+  if (!reasoningRevealRef.current) {
+    reasoningRevealRef.current = createSmoothReveal((len) => {
+      setStreamingReasoning(streamingReasoningRef.current.slice(0, len))
+    })
+  }
 
   // Streaming tool calls (accumulated during streaming, merged into allToolCalls)
   const [streamingToolCalls, setStreamingToolCalls] = useState<ToolCallViewItem[]>([])
@@ -158,14 +164,8 @@ export function useTaskDetail(taskId: string | null) {
     setStreamingToolCalls([])
     setStreamingStartedAt(null)
     setStreamingOutputTokens(0)
-    if (batchTimerRef.current) {
-      clearTimeout(batchTimerRef.current)
-      batchTimerRef.current = null
-    }
-    if (reasoningBatchTimerRef.current) {
-      clearTimeout(reasoningBatchTimerRef.current)
-      reasoningBatchTimerRef.current = null
-    }
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
   }, [taskId])
 
   const fetchDetail = useCallback(async () => {
@@ -228,6 +228,8 @@ export function useTaskDetail(taskId: string | null) {
         if (inflight && inflight.role === 'assistant') {
           streamingMessageIdRef.current = inflight.id
           streamingContentRef.current = inflight.content
+          // Seeded text shows at once; only later live tokens animate.
+          contentRevealRef.current!.prime(inflight.content.length)
           setIsStreaming(true)
           setStreamingMessage(inflight)
         }
@@ -250,6 +252,8 @@ export function useTaskDetail(taskId: string | null) {
     const baseContent = (existing?.content ?? '') + extraContent
     streamingMessageIdRef.current = messageId
     streamingContentRef.current = baseContent
+    // Seeded text shows at once; only later live tokens animate.
+    contentRevealRef.current!.prime(baseContent.length)
     setIsStreaming(true)
     // Anchor the thinking-bubble chrono to the moment the live stream began.
     // Only set it once per turn — a mid-stream mount already seeded the real
@@ -278,12 +282,7 @@ export function useTaskDetail(taskId: string | null) {
     }
 
     streamingReasoningRef.current += token
-    if (!reasoningBatchTimerRef.current) {
-      reasoningBatchTimerRef.current = setTimeout(() => {
-        reasoningBatchTimerRef.current = null
-        setStreamingReasoning(streamingReasoningRef.current)
-      }, STREAMING_BATCH_MS)
-    }
+    reasoningRevealRef.current!.setTarget(streamingReasoningRef.current.length)
   }
 
   function handleToolCallStart(data: Record<string, unknown>) {
@@ -308,15 +307,20 @@ export function useTaskDetail(taskId: string | null) {
         return
       }
       streamingContentRef.current += token
-      if (!batchTimerRef.current) {
-        batchTimerRef.current = setTimeout(() => {
-          batchTimerRef.current = null
-          setStreamingMessage((prev) =>
-            prev ? { ...prev, content: streamingContentRef.current } : prev,
-          )
-        }, STREAMING_BATCH_MS)
-      }
+      contentRevealRef.current!.setTarget(streamingContentRef.current.length)
     }
+  }
+
+  function handleTokenRetract(data: Record<string, unknown>) {
+    const messageId = data.messageId as string
+    const contentLength = data.contentLength as number
+    if (streamingMessageIdRef.current !== messageId) return
+    if (contentLength >= streamingContentRef.current.length) return
+    // The step whose text was being streamed died (error/abort/stall):
+    // truncate back to committed length. A target below the reveal cursor
+    // snaps the visible text down immediately.
+    streamingContentRef.current = streamingContentRef.current.slice(0, contentLength)
+    contentRevealRef.current!.setTarget(contentLength)
   }
 
   function handleToolCall(data: Record<string, unknown>) {
@@ -355,14 +359,8 @@ export function useTaskDetail(taskId: string | null) {
   }
 
   function handleDone(data: Record<string, unknown>) {
-    if (batchTimerRef.current) {
-      clearTimeout(batchTimerRef.current)
-      batchTimerRef.current = null
-    }
-    if (reasoningBatchTimerRef.current) {
-      clearTimeout(reasoningBatchTimerRef.current)
-      reasoningBatchTimerRef.current = null
-    }
+    contentRevealRef.current!.reset()
+    reasoningRevealRef.current!.reset()
 
     const finalContent = (data.content as string) ?? streamingContentRef.current
     const doneMessageId = (data.messageId as string) ?? streamingMessageIdRef.current
@@ -410,6 +408,7 @@ export function useTaskDetail(taskId: string | null) {
       switch (type) {
         case 'chat:tool-call-start': handleToolCallStart(data); break
         case 'chat:token': handleToken(data); break
+        case 'chat:token-retract': handleTokenRetract(data); break
         case 'chat:reasoning-token': handleReasoningToken(data); break
         case 'chat:tool-call': handleToolCall(data); break
         case 'chat:tool-result': handleToolResult(data); break
@@ -442,6 +441,8 @@ export function useTaskDetail(taskId: string | null) {
       setTask(null)
       setMessages([])
       setTodos([])
+      contentRevealRef.current!.reset()
+      reasoningRevealRef.current!.reset()
       setIsStreaming(false)
       setStreamingMessage(null)
       setStreamingReasoning('')
@@ -470,14 +471,8 @@ export function useTaskDetail(taskId: string | null) {
       )
       // Terminal or paused status → clear streaming state (safety net if chat:done was missed)
       if (isTerminalStatus(status) || status === 'paused') {
-        if (batchTimerRef.current) {
-          clearTimeout(batchTimerRef.current)
-          batchTimerRef.current = null
-        }
-        if (reasoningBatchTimerRef.current) {
-          clearTimeout(reasoningBatchTimerRef.current)
-          reasoningBatchTimerRef.current = null
-        }
+        contentRevealRef.current!.reset()
+        reasoningRevealRef.current!.reset()
         setIsStreaming(false)
         setStreamingMessage(null)
         setStreamingReasoning('')
@@ -510,14 +505,8 @@ export function useTaskDetail(taskId: string | null) {
     'task:done': (data) => {
       if (data.taskId !== taskId) return
       // Clear streaming state — task is finished
-      if (batchTimerRef.current) {
-        clearTimeout(batchTimerRef.current)
-        batchTimerRef.current = null
-      }
-      if (reasoningBatchTimerRef.current) {
-        clearTimeout(reasoningBatchTimerRef.current)
-        reasoningBatchTimerRef.current = null
-      }
+      contentRevealRef.current!.reset()
+      reasoningRevealRef.current!.reset()
       setIsStreaming(false)
       setStreamingMessage(null)
       setStreamingReasoning('')
@@ -569,6 +558,12 @@ export function useTaskDetail(taskId: string | null) {
       if (data.taskId !== taskId) return
       if (!readyRef.current) { pendingEventsRef.current.push({ type: 'chat:token', data }); return }
       handleToken(data)
+    },
+
+    'chat:token-retract': (data) => {
+      if (data.taskId !== taskId) return
+      if (!readyRef.current) { pendingEventsRef.current.push({ type: 'chat:token-retract', data }); return }
+      handleTokenRetract(data)
     },
 
     'chat:reasoning-token': (data) => {
@@ -700,12 +695,8 @@ export function useTaskDetail(taskId: string | null) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (batchTimerRef.current) {
-        clearTimeout(batchTimerRef.current)
-      }
-      if (reasoningBatchTimerRef.current) {
-        clearTimeout(reasoningBatchTimerRef.current)
-      }
+      contentRevealRef.current!.reset()
+      reasoningRevealRef.current!.reset()
     }
   }, [])
 

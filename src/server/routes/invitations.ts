@@ -7,10 +7,17 @@ import {
   validateInvitation,
 } from '@/server/services/invitations'
 import { createLogger } from '@/server/logger'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:invitations')
 
 export const invitationRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Minting and revoking invitations is admin-only. The public
+// GET /:token/validate (two segments, used by the signup page without a
+// session) is deliberately NOT matched by these single-segment guards.
+invitationRoutes.use('/', requireAdmin)
+invitationRoutes.use('/:id', requireAdmin)
 
 // GET /api/invitations — list all invitations
 invitationRoutes.get('/', async (c) => {

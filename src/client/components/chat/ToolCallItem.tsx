@@ -57,7 +57,8 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
   const customSlug = isCustomTool ? toolCall.name.slice('custom_'.length) : null
   const humanName = customName ?? t(`tools.names.${toolCall.name}`, { defaultValue: toolCall.name })
   const previewFn = getPreviewRenderer(toolCall.name)
-  const preview = previewFn?.({ toolName: toolCall.name, args: toolCall.args as Record<string, unknown>, status: toolCall.status })
+  const args = (toolCall.args ?? {}) as Record<string, unknown>
+  const preview = previewFn?.({ toolName: toolCall.name, args, status: toolCall.status })
   const timeStr = new Date(toolCall.timestamp).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -92,7 +93,7 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
             {CustomRenderer ? (
               <CustomRenderer
                 toolName={toolCall.name}
-                args={toolCall.args as Record<string, unknown>}
+                args={args}
                 result={toolCall.result}
                 status={toolCall.status}
               />
@@ -105,7 +106,7 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
             ) : (
               <>
                 <JsonViewer
-                  data={toolCall.args}
+                  data={args}
                   label={t('tools.viewer.input')}
                   maxHeight="max-h-40"
                 />

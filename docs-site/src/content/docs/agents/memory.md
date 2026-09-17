@@ -3,27 +3,32 @@ title: Agent Memory
 description: How Agents remember and learn across conversations.
 ---
 
-Hivekeep gives every Agent **persistent long-term memory**: a dual-channel system that combines automatic extraction with explicit storage, searchable via hybrid vector + full-text search.
+Hivekeep gives every Agent **persistent long-term memory**, in two layers:
 
-## How it works
+| Layer | What it holds | How the Agent sees it |
+|---|---|---|
+| **Profile** | What the Agent *knows*: current state, standing preferences, active work | Always present in its context |
+| **Archive** | What *happened*: dated events, past details, one-off facts | Searched on demand with `recall` |
 
-### Automatic extraction
+The split is what keeps memory both reliable and cheap. The profile is small and always there, so the Agent never has to get lucky with a search to know who you are and what you are working on. The archive is unbounded and costs nothing until queried, so it can keep everything else.
 
-After every LLM turn, Hivekeep runs an **extraction pipeline** that identifies important information from the conversation and saves it as memories. This happens silently in the background, so the Agent doesn't need to do anything.
+## The profile
 
-Each extracted memory includes a **source context**: a brief description of the conversational context in which the fact was mentioned (e.g. *"While discussing weekend plans, user mentioned..."*). This gives memories episodic flavor, helping the Agent understand not just *what* was said but *when and why*.
+A short markdown document (default budget: 1500 tokens) injected into every prompt. It has conventional sections: `Pinned`, `Active projects`, `Preferences & conventions`, `Key decisions`, `Open threads`.
 
-### Explicit memorization
+It is maintained three ways:
 
-Agents can also deliberately save information using the `memorize` tool:
+- **Automatically**, during compaction: the maintenance pass rewrites it, folding in what is new and dropping what is resolved.
+- **By the Agent**, with `edit_profile`, when you tell it something durable and it should not wait for the next compaction.
+- **By you**, in the Agent's **Memory** tab: edit the markdown directly, watch the token count, or regenerate the whole document from the archive.
 
-```
-memorize("Nicolas prefers dark mode and French responses", category: "preference", subject: "Nicolas")
-```
+### Pinned entries
 
-### Memory categories
+Anything under `## Pinned` is copied verbatim by every automatic rewrite and never edited or dropped. Use it for instructions you want followed forever ("always write GitHub issues in English"). Both `edit_profile(..., pin: true)` and the editor can put entries there.
 
-Each memory has a category:
+## The archive
+
+Individual memories, saved automatically during compaction or explicitly with `memorize`. Each carries a category, an optional subject, an importance score, and a **source context** describing where it came from (e.g. *"While discussing weekend plans, user mentioned..."*).
 
 | Category | Use case |
 |---|---|
@@ -32,38 +37,26 @@ Each memory has a category:
 | `decision` | Decisions that were made and their rationale |
 | `knowledge` | Learned domain knowledge |
 
-### Importance scoring
+The archive is never injected into the prompt. The Agent searches it with `recall`, which runs **hybrid search**: vector similarity (embeddings) fused with full-text keyword matching (FTS5). Results are ranked by relevance to the query alone; `subject`, `category` and `since` filters narrow the search when the Agent knows roughly what it is after.
 
-Memories have an importance score from 1-10. Higher-importance memories are prioritized during retrieval. The automatic pipeline and the Agent can both set importance.
+## Which layer gets what
 
-## Retrieval
+Agents route information with a single test:
 
-Before each LLM turn, Hivekeep:
+> Should this influence the Agent's behavior in most future conversations, without anyone mentioning it?
 
-1. Takes the current user message
-2. Optionally rewrites the query using recent conversation context for better semantic matching
-3. Searches memories using **hybrid search**: vector similarity (embeddings) + full-text keyword matching (FTS5)
-4. Injects the most relevant memories into the system prompt
-
-This means the Agent always has relevant context without needing to explicitly recall information.
-
-### Manual recall
-
-Agents can also search memory explicitly:
-
-- `recall("Nicolas's infrastructure setup")`: semantic + keyword search
-- `list_memories(category: "decision")`: browse by category
-- `search_history("kubernetes deployment")`: search past conversation messages
+Yes means the profile. No, but it may matter when a topic comes back, means the archive. Moving something to the archive is filing, not forgetting: it stays searchable, and a finished project leaves the profile at the next rewrite while its decisions remain in the archive.
 
 ## Memory tools
 
 | Tool | Purpose |
 |---|---|
-| `recall` | Search memories (semantic + keyword, includes shared) |
-| `memorize` | Save new information (private or shared) |
-| `update_memory` | Update an existing memory (content, category, scope) |
-| `forget` | Delete a memory |
-| `list_memories` | Browse memories by category or scope |
+| `recall` | Search the archive (semantic + keyword, includes shared, optional filters) |
+| `memorize` | Save an episodic fact to the archive (private or shared) |
+| `edit_profile` | Add, replace or remove a profile entry (optionally pinned) |
+| `update_memory` | Update an existing archive memory (content, category, scope) |
+| `forget` | Delete an archive memory |
+| `list_memories` | Browse the archive by category or scope |
 | `review_memories` | LLM-powered audit for contradictions, duplicates, stale entries |
 | `search_history` | Search conversation message history |
 
@@ -74,6 +67,8 @@ Memories default to **private** (only the owning Agent can see them), but Agents
 - Use `memorize(..., scope: "shared")` or `update_memory(..., scope: "shared")`
 - `recall` automatically searches both private and shared memories
 - Shared memories include author attribution (e.g. *[shared by Assistant]*)
+
+Profiles are always per-Agent: each Agent curates its own. Cross-Agent context travels through shared archive memories and global contact notes.
 
 ## Session compacting
 
@@ -87,6 +82,6 @@ When context usage exceeds the threshold (default: 75% of the model's context wi
 
 ## Memory and privacy
 
-- Memories are **per-Agent** by default: each Agent has its own memory store
+- Profiles and archives are **per-Agent** by default: each Agent has its own memory store
 - **Shared** memories are readable by all Agents but still owned by the creator
 - Vault secrets are **never** stored in memories (redaction prevents leaking into compacted summaries)

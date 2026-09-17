@@ -7,12 +7,13 @@ Agents interact with the world through **tools**: functions they can call during
 
 ## Built-in tools
 
-### Memory & Knowledge
+### Memory
 
 | Tool | Description |
 |---|---|
-| `recall` | Semantic search across memories |
-| `memorize` | Store a new memory |
+| `recall` | Search the memory archive (semantic + keyword) |
+| `memorize` | Store an episodic memory in the archive |
+| `edit_profile` | Edit the always-injected memory profile |
 | `update_memory` | Edit an existing memory |
 | `forget` | Delete a memory |
 | `list_memories` | Browse all memories with filters |
@@ -21,8 +22,6 @@ Agents interact with the world through **tools**: functions they can call during
 | `browse_history` | Browse messages by date range with pagination |
 | `list_summaries` | List all compacting summaries (active and archived) with metadata |
 | `read_summary` | Read the full text of a specific compacting summary by ID |
-| `search_knowledge` | Search the knowledge base (uploaded documents) |
-| `list_knowledge_sources` | List available knowledge sources |
 
 ### Web & Browsing
 
@@ -54,7 +53,7 @@ Agents interact with the world through **tools**: functions they can call during
 | `update_secret` | Update an existing secret |
 | `delete_secret` | Remove a secret |
 | `search_secrets` | Search secrets by query |
-| `redact_message` | Redact sensitive content from a chat message |
+| `redact_secret_leak` | Redact a leaked secret value from past chat messages |
 | `get_vault_entry` | Retrieve a structured vault entry |
 | `create_vault_entry` | Create a structured vault entry |
 | `create_vault_type` | Define a custom vault type (e.g. "WiFi Network") |
@@ -336,7 +335,7 @@ Assign toolboxes in the Agent's settings page in the UI.
 | Toolbox | Purpose |
 |---|---|
 | `all` | All native tools plus all enabled custom tools (MCP/plugin tools still granted by name) |
-| `code` | Ticket-bound implementation: project/ticket tools, web docs lookup, read-only memory, project knowledge |
+| `code` | Implementation work: task introspection, web docs lookup, read-only memory |
 | `research` | Web browsing, history/summaries, full memory read/write |
 | `ops` | Memory, vault secrets, redaction, HTTP requests, system info |
 | `scout` | Read-only exploration: grep, file/directory reads, web lookups (no writes) |

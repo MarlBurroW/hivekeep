@@ -4,6 +4,7 @@ import type { ChannelAdapterMeta } from '@/server/channels/adapter'
 import { getSecretValue } from '@/server/services/vault'
 import { extractAttachments } from '@/server/channels/telegram-utils'
 import { config } from '@/server/config'
+import { channelWebhookToken } from '@/server/channels/webhook-token'
 import { createLogger } from '@/server/logger'
 
 const log = createLogger('channel:telegram')
@@ -137,7 +138,10 @@ export class TelegramAdapter implements ChannelAdapter {
       log.info({ channelId, mode: 'polling' }, 'Telegram polling started')
     } else {
       const webhookUrl = `${config.publicUrl}${config.channels.telegramWebhookPath}/${channelId}`
-      await telegramApi(token, 'setWebhook', { url: webhookUrl })
+      await telegramApi(token, 'setWebhook', {
+        url: webhookUrl,
+        secret_token: channelWebhookToken('telegram', channelId),
+      })
       log.info({ channelId, mode: 'webhook', webhookUrl }, 'Telegram webhook set')
     }
   }
@@ -191,7 +195,18 @@ export class TelegramAdapter implements ChannelAdapter {
           try {
             await this.processUpdate(state, message)
           } catch (err) {
+            // The offset already moved past this update, so the message is gone
+            // for good: Telegram will never resend it and the sender gets no
+            // hint that anything went wrong. Tell them, so a dropped message is
+            // never silent.
             log.error({ channelId: state.channelId, err }, 'Error processing Telegram update')
+            const chatId = (message.chat as { id?: number | string } | undefined)?.id
+            if (chatId !== undefined) {
+              telegramApi(state.token, 'sendMessage', {
+                chat_id: chatId,
+                text: '⚠️ Your message could not be processed and was not delivered to the agent. Please send it again.',
+              }).catch(() => {})
+            }
           }
         }
       } catch (err) {

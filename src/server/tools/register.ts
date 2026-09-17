@@ -84,6 +84,7 @@ import {
   forgetTool,
   listMemoriesTool,
   reviewMemoriesTool,
+  editProfileTool,
 } from '@/server/tools/memory-tools'
 import { searchHistoryTool, browseHistoryTool, readMessageTool, listSummariesTool, readSummaryTool } from '@/server/tools/history-tools'
 import {
@@ -144,49 +145,7 @@ import {
   updateToolDomainTool,
   deleteToolDomainTool,
 } from '@/server/tools/custom-tool-tools'
-import {
-  listProjectsTool,
-  getProjectTool,
-  createProjectTool,
-  updateProjectTool,
-  deleteProjectTool,
-  updateProjectDescriptionTool,
-  appendProjectDescriptionTool,
-  patchProjectDescriptionTool,
-  setActiveProjectTool,
-  listProjectTagsTool,
-  createTagTool,
-  updateTagTool,
-  deleteTagTool,
-  listTicketsTool,
-  getTicketTool,
-  createTicketTool,
-  updateTicketTool,
-  addTicketTagTool,
-  removeTicketTagTool,
-  deleteTicketTool,
-  startTicketTaskTool,
-  enrichTicketTool,
-  addTicketCommentTool,
-  listTicketCommentsTool,
-  deleteTicketCommentTool,
-} from '@/server/tools/project-tools'
-import {
-  addProjectKnowledgeTool,
-  searchProjectKnowledgeTool,
-  listProjectKnowledgeTool,
-  getProjectKnowledgeTool,
-  updateProjectKnowledgeTool,
-  deleteProjectKnowledgeTool,
-  pinProjectKnowledgeTool,
-} from '@/server/tools/project-knowledge-tools'
-import {
-  listTicketAttachmentsTool,
-  readTicketAttachmentTool,
-  addTicketAttachmentTool,
-  updateTicketAttachmentTool,
-  deleteTicketAttachmentTool,
-} from '@/server/tools/ticket-attachment-tools'
+import { getCustomToolDocsTool } from '@/server/tools/custom-tool-docs'
 import { generateImageTool, listImageModelsTool, describeImageModelTool } from '@/server/tools/image-tools'
 import { listProvidersTool, listModelsTool } from '@/server/tools/provider-tools'
 import {
@@ -257,10 +216,6 @@ import {
   deactivateChannelTool,
   transferChannelTool,
 } from '@/server/tools/channel-tools'
-import {
-  searchKnowledgeTool,
-  listKnowledgeSourcesTool,
-} from '@/server/tools/knowledge-tools'
 import { getPlatformLogsTool, getPlatformConfigTool, listPlatformConfigOptionsTool, updatePlatformConfigTool, restartPlatformTool } from '@/server/tools/platform-tools'
 import { getSystemInfoTool } from '@/server/tools/system-info-tools'
 import { getSetupHealthTool } from '@/server/tools/health-tools'
@@ -416,6 +371,7 @@ export function registerAllTools(): void {
   toolRegistry.register('forget', forgetTool, 'memory')
   toolRegistry.register('list_memories', listMemoriesTool, 'memory')
   toolRegistry.register('review_memories', reviewMemoriesTool, 'memory')
+  toolRegistry.register('edit_profile', editProfileTool, 'memory')
 
   // Phase 12: History tools
   toolRegistry.register('search_history', searchHistoryTool, 'memory')
@@ -478,55 +434,10 @@ export function registerAllTools(): void {
   toolRegistry.register('get_cron_journal', getCronJournalTool, 'crons')
   toolRegistry.register('trigger_cron', triggerCronTool, 'crons')
 
-  // Phase 26: Project & ticket tools
-  // Main agents get the full set ; sub-Agents only get read/update tools when their task has ticket_id set (cf. project-tools.ts).
-  toolRegistry.register('list_projects', listProjectsTool, 'projects')
-  toolRegistry.register('get_project', getProjectTool, 'projects')
-  toolRegistry.register('create_project', createProjectTool, 'projects')
-  toolRegistry.register('update_project', updateProjectTool, 'projects')
-  toolRegistry.register('delete_project', deleteProjectTool, 'projects')
-  toolRegistry.register('update_project_description', updateProjectDescriptionTool, 'projects')
-  toolRegistry.register('append_project_description', appendProjectDescriptionTool, 'projects')
-  toolRegistry.register('patch_project_description', patchProjectDescriptionTool, 'projects')
-  toolRegistry.register('set_active_project', setActiveProjectTool, 'projects')
-  toolRegistry.register('list_project_tags', listProjectTagsTool, 'projects')
-  toolRegistry.register('create_tag', createTagTool, 'projects')
-  toolRegistry.register('update_tag', updateTagTool, 'projects')
-  toolRegistry.register('delete_tag', deleteTagTool, 'projects')
-  toolRegistry.register('list_tickets', listTicketsTool, 'projects')
-  toolRegistry.register('get_ticket', getTicketTool, 'projects')
-  toolRegistry.register('create_ticket', createTicketTool, 'projects')
-  toolRegistry.register('update_ticket', updateTicketTool, 'projects')
-  toolRegistry.register('add_ticket_tag', addTicketTagTool, 'projects')
-  toolRegistry.register('remove_ticket_tag', removeTicketTagTool, 'projects')
-  toolRegistry.register('delete_ticket', deleteTicketTool, 'projects')
-  toolRegistry.register('start_ticket_task', startTicketTaskTool, 'projects')
-  toolRegistry.register('enrich_ticket', enrichTicketTool, 'projects')
-  toolRegistry.register('add_ticket_comment', addTicketCommentTool, 'projects')
-  toolRegistry.register('list_ticket_comments', listTicketCommentsTool, 'projects')
-  toolRegistry.register('delete_ticket_comment', deleteTicketCommentTool, 'projects')
-  toolRegistry.register('list_ticket_attachments', listTicketAttachmentsTool, 'projects')
-  toolRegistry.register('read_ticket_attachment', readTicketAttachmentTool, 'projects')
-  toolRegistry.register('add_ticket_attachment', addTicketAttachmentTool, 'projects')
-  toolRegistry.register('update_ticket_attachment', updateTicketAttachmentTool, 'projects')
-  toolRegistry.register('delete_ticket_attachment', deleteTicketAttachmentTool, 'projects')
-
-  // Project knowledge: curated facts/decisions/gotchas per project, available
-  // to main Agents (active project) and ticket-bound sub-Agents (ticket's project).
-  // Every entry's title lands in the system-prompt index. Pinned entries
-  // (max config.projectKnowledge.pinCap) ALSO inline their markdown body in
-  // the prompt — unpinned ones are fetched on demand via get_project_knowledge.
-  toolRegistry.register('add_project_knowledge', addProjectKnowledgeTool, 'projects')
-  toolRegistry.register('search_project_knowledge', searchProjectKnowledgeTool, 'projects')
-  toolRegistry.register('list_project_knowledge', listProjectKnowledgeTool, 'projects')
-  toolRegistry.register('get_project_knowledge', getProjectKnowledgeTool, 'projects')
-  toolRegistry.register('update_project_knowledge', updateProjectKnowledgeTool, 'projects')
-  toolRegistry.register('delete_project_knowledge', deleteProjectKnowledgeTool, 'projects')
-  toolRegistry.register('pin_project_knowledge', pinProjectKnowledgeTool, 'projects')
-
   // Custom tools (GLOBAL, first-class). Authoring/admin tools are main-only;
   // the resulting tools are exposed separately as `custom_<slug>` (resolved by
   // services/custom-tools.ts, MCP-style — not registered here).
+  toolRegistry.register('get_custom_tool_docs', getCustomToolDocsTool, 'custom')
   toolRegistry.register('create_custom_tool', createCustomToolTool, 'custom')
   toolRegistry.register('write_custom_tool_file', writeCustomToolFileTool, 'custom')
   toolRegistry.register('run_custom_tool_setup', runCustomToolSetupTool, 'custom')
@@ -692,10 +603,6 @@ export function registerAllTools(): void {
 
   // Sub-Agent structured planning (TodoWrite-equivalent).
   toolRegistry.register('task_todos', taskTodosTool, 'tasks')
-
-  // Knowledge base tools (main only)
-  toolRegistry.register('search_knowledge', searchKnowledgeTool, 'memory')
-  toolRegistry.register('list_knowledge_sources', listKnowledgeSourcesTool, 'memory')
 
   log.info({ count: toolRegistry.registeredCount }, 'Native tools registered')
 }

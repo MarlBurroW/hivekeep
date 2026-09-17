@@ -41,9 +41,9 @@ Real-time message streaming and conversation events.
 | Event | Description | Scope |
 |-------|-------------|-------|
 | `chat:message` | New message created (user or AI) | Per-Agent |
-| `chat:token` | Streaming token chunk during AI response | Per-Agent |
+| `chat:token` | Streaming text delta during AI response | Per-Agent |
+| `chat:token-retract` | Truncate streamed text back to committed length (step died: error/abort/stall) | Per-Agent |
 | `chat:reasoning-token` | Streaming reasoning/thinking token chunk | Per-Agent |
-| `chat:reasoning-done` | Reasoning/thinking block finished | Per-Agent |
 | `chat:tool-call-start` | Tool call started | Per-Agent |
 | `chat:tool-call` | Tool call arguments resolved | Per-Agent |
 | `chat:tool-result` | Tool result received | Per-Agent |
@@ -83,9 +83,10 @@ Real-time message streaming and conversation events.
 
 | Event | Description | Scope |
 |-------|-------------|-------|
-| `memory:created` | Memory created | Per-Agent |
-| `memory:updated` | Memory updated | Per-Agent |
-| `memory:deleted` | Memory deleted | Per-Agent |
+| `memory:created` | Archive memory created | Per-Agent |
+| `memory:updated` | Archive memory updated | Per-Agent |
+| `memory:deleted` | Archive memory deleted | Per-Agent |
+| `agent-profile:updated` | Memory profile rewritten (`source`: `maintenance`, `tool`, `user` or `regenerate`) | Per-Agent |
 
 ### Compacting
 
@@ -236,7 +237,7 @@ Emitted when an Agent queues an outbound email that needs human approval.
 
 ### Other resource events
 
-Most CRUD resources also broadcast `created` / `updated` / `deleted` events so any open tab stays in sync. Beyond the families above, these include: `agent` (plus `agent:active-project`, `agent:read`), `provider`, `mcp-server`, `contact`, `cron`, `webhook`, `memory`, `custom-tool`, `toolbox`, `tool-domain`, `email-account`, `connected-account`, `project`, `project-tag`, and `ticket` (plus `ticket:comment-added` / `comment-updated` / `comment-deleted`). The canonical, exhaustive list of event names lives in `src/server/sse/types.ts`.
+Most CRUD resources also broadcast `created` / `updated` / `deleted` events so any open tab stays in sync. Beyond the families above, these include: `agent` (plus `agent:read`), `provider`, `mcp-server`, `contact`, `cron`, `webhook`, `memory`, `custom-tool`, `toolbox`, `tool-domain`, `email-account`, and `connected-account`. The canonical, exhaustive list of event names lives in `src/server/sse/types.ts`.
 
 ## Delivery Scope
 

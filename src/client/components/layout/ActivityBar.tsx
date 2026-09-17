@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home, FolderKanban, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, MessageSquarePlus } from 'lucide-react'
+import { Home, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, MessageSquarePlus } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { useTasksContext } from '@/client/contexts/TasksContext'
 import { useCronsContext } from '@/client/contexts/CronsContext'
@@ -24,7 +24,6 @@ interface ActivityBarItem {
 const ITEMS: ActivityBarItem[] = [
   // Default landing — "Agents" matches any path not claimed by a section below.
   { matchPrefix: '/', navigateTo: '/', icon: Home, labelKey: 'activityBar.agents' },
-  { matchPrefix: '/projects', navigateTo: '/projects', icon: FolderKanban, labelKey: 'activityBar.projects' },
   { matchPrefix: '/tasks', navigateTo: '/tasks', icon: ListTodo, labelKey: 'activityBar.tasks', badgeKey: 'tasks' },
   { matchPrefix: '/crons', navigateTo: '/crons', icon: CalendarClock, labelKey: 'activityBar.crons', badgeKey: 'crons' },
   { matchPrefix: '/files', navigateTo: '/files', icon: Folder, labelKey: 'activityBar.files' },
@@ -33,7 +32,7 @@ const ITEMS: ActivityBarItem[] = [
   { matchPrefix: '/terminal', navigateTo: '/terminal', icon: SquareTerminal, labelKey: 'activityBar.terminal', adminOnly: true },
 ]
 
-const SECTION_PREFIXES = ['/projects', '/tasks', '/crons', '/files', '/mini-apps', '/models', '/terminal']
+const SECTION_PREFIXES = ['/tasks', '/crons', '/files', '/mini-apps', '/models', '/terminal']
 
 export function ActivityBar() {
   const { t } = useTranslation()

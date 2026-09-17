@@ -1,10 +1,10 @@
 import { db } from '@/server/db/index'
 import { agents, messages, userProfiles, compactingSummaries, tasks } from '@/server/db/schema'
-import { eq, and, isNull, desc, ne, asc } from 'drizzle-orm'
+import { eq, and, isNull, desc, ne, asc, sql } from 'drizzle-orm'
 import { getFilesForMessages } from '@/server/services/files'
 import { buildSystemPrompt, joinSystemPrompt } from '@/server/services/prompt-builder'
+import { getProfile } from '@/server/services/agent-profile'
 import { listActiveTriggerSummariesForAgent } from '@/server/services/account-triggers'
-import { getRelevantMemories } from '@/server/services/memory'
 import { listContactsForPrompt } from '@/server/services/contacts'
 import { listAvailableAgents } from '@/server/services/inter-agent'
 import { getMCPToolsSummary } from '@/server/services/mcp'
@@ -15,7 +15,7 @@ import { fetchCronLearnings } from '@/server/services/cron-learnings'
 import { getActiveChannelsForAgent } from '@/server/services/channels'
 import type { AgentCompactingConfig, ContextTokenBreakdown } from '@/shared/types'
 import { getModelContextWindow } from '@/shared/model-context-windows'
-import { resolveTriggerTokens } from '@/server/services/compacting'
+import { resolveTriggerTokens, resolveCompactionBoundary, isAfterCompactionBoundary } from '@/server/services/compacting'
 import { config } from '@/server/config'
 
 interface MessageMetadataTokenUsage {
@@ -312,38 +312,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     role: k.role,
   }))
 
-  // Relevant memories — use the last user message as query, or fallback
-  let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-  try {
-    const lastUserMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.agentId, agentId), eq(messages.role, 'user'), isNull(messages.taskId), isNull(messages.sessionId)))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    const query = lastUserMsg?.content ?? agent.name
-    relevantMemories = await getRelevantMemories(agentId, query)
-  } catch {
-    // Non-fatal
-  }
-
-  // Knowledge
-  let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-  try {
-    const { searchKnowledge } = await import('@/server/services/knowledge')
-    const lastUserMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.agentId, agentId), eq(messages.role, 'user'), isNull(messages.taskId), isNull(messages.sessionId)))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    relevantKnowledge = await searchKnowledge(agentId, lastUserMsg?.content ?? agent.name, 5)
-  } catch {
-    // Non-fatal
-  }
-
   // MCP tools summary for prompt
   const mcpToolsSummary = await getMCPToolsSummary(agentId)
 
@@ -371,9 +339,9 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
       }))
     : null
 
-  // Resolve cutoff timestamp from the latest summary
+  // Resolve the boundary of the latest summary (rowid-based — see compacting.ts)
   const latestSummary = activeSummaries.length > 0 ? activeSummaries[activeSummaries.length - 1]! : null
-  const cutoffTimestamp = latestSummary ? (latestSummary.lastMessageAt as unknown as number) : null
+  const boundary = resolveCompactionBoundary(latestSummary)
 
   // Fetch recent messages for history preview
   const recentMessages = db
@@ -383,6 +351,7 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
       content: messages.content,
       toolCalls: messages.toolCalls,
       createdAt: messages.createdAt,
+      rowid: sql<number>`rowid`,
     })
     .from(messages)
     .where(and(
@@ -403,9 +372,7 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
   recentMessages.reverse()
 
   // Filter to post-snapshot messages (mirrors buildMessageHistory logic)
-  const visibleMessages = cutoffTimestamp
-    ? recentMessages.filter((m) => m.createdAt && (m.createdAt as unknown as number) > cutoffTimestamp)
-    : recentMessages
+  const visibleMessages = recentMessages.filter((m) => isAfterCompactionBoundary(boundary, m))
 
   // Pre-load attached files for all visible messages so we can count their
   // tokens (images, inlined text files, PDFs) — matches what agent-engine sends
@@ -455,24 +422,14 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
     userLanguage = firstProfile.agentLanguage ?? firstProfile.language
   }
 
-  // Active project block — mirrors agent-engine.processAgentQueue so the preview
-  // shows the exact prompt the Agent will receive (including pinned project
-  // knowledge). Without it, the preview misleads users editing knowledge in
-  // the UI because they wouldn't see their pins land in the prompt.
-  let activeProject: import('@/server/services/prompt-builder').ActiveProjectPromptInfo | null = null
-  if (agent.activeProjectId) {
-    const { buildActiveProjectInfo } = await import('@/server/services/projects')
-    activeProject = await buildActiveProjectInfo(agent.activeProjectId)
-  }
-
   const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agentId)
 
   // Build system prompt
+  const memoryProfile = await getProfile(agentId)
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: contactsWithSlug,
-    relevantMemories,
-    relevantKnowledge,
+    profile: memoryProfile.content,
     agentDirectory,
     mcpTools: mcpToolsSummary,
     isSubAgent: false,
@@ -487,7 +444,6 @@ export async function buildContextPreview(agentId: string): Promise<ContextPrevi
       hasCompactedHistory,
     },
     workspacePath: agent.workspacePath,
-    activeProject: activeProject ?? undefined,
   }))
 
   // Resolve tools — unified resolver (toolbox is the sole grant primitive
@@ -784,32 +740,10 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
         : fetchCronLearnings(task.cronId))
     : undefined
 
-  // Ticket assignment context — mirror executeSubAgent: prefer the spawn-time
-  // snapshot so the visualizer shows exactly what the sub-Agent is actually
-  // seeing (frozen for cache stability), and fall back to a live fetch for
-  // legacy ticket tasks without a snapshot.
-  let ticketAssignment: import('@/server/services/prompt-builder').TicketAssignmentInfo | null = null
-  if (task.ticketId) {
-    if (task.ticketAssignmentSnapshot) {
-      try {
-        ticketAssignment = JSON.parse(task.ticketAssignmentSnapshot) as import('@/server/services/prompt-builder').TicketAssignmentInfo
-      } catch {
-        // Corrupt snapshot, fall through to live fetch
-      }
-    }
-    if (!ticketAssignment) {
-      const { buildTicketAssignmentInfo } = await import('@/server/services/tickets')
-      ticketAssignment = await buildTicketAssignmentInfo(task.ticketId, {
-        runPrompt: task.runPrompt ?? null,
-        currentTaskId: task.id,
-      })
-    }
-  }
-
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agentIdentity.name, slug: agentIdentity.slug, role: agentIdentity.role, character: agentIdentity.character, expertise: agentIdentity.expertise },
     contacts: [],
-    relevantMemories: [],
+    profile: null,
     agentDirectory,
     isSubAgent: true,
     taskDescription: task.description,
@@ -818,7 +752,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
     globalPrompt,
     userLanguage: 'en',
     workspacePath: agentIdentity.workspacePath,
-    ticketAssignment: ticketAssignment ?? undefined,
   }))
 
   // Messages: only this task's messages
@@ -867,7 +800,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
   const taskToolboxIds = await resolveTaskToolboxIds({
     toolboxIds: task.toolboxIds as string | null,
     toolPreset: task.toolPreset as string | null,
-    ticketId: task.ticketId ?? null,
   })
   const mainSurface = await resolveToolset({
     agentId: agentIdentity.id,
@@ -881,11 +813,6 @@ export async function buildTaskContextPreview(taskId: string): Promise<ContextPr
   }
 
   const subAgentTools = toolRegistry.resolve({ agentId: task.parentAgentId, taskId, taskDepth: task.depth, isSubAgent: true })
-  // Mirror executeSubAgent: ticket sub-Agents drop report_to_parent (the parent has
-  // nothing actionable to do with intermediate reports — the user reads the UI).
-  if (task.ticketId) {
-    delete subAgentTools['report_to_parent']
-  }
   const allTools = { ...mainSurface, ...subAgentTools }
   const taskSourceMap = buildSourceMap(allTools)
 
@@ -947,59 +874,19 @@ export async function buildQuickSessionContextPreview(agentId: string, sessionId
   const firstProfile = db.select({ language: userProfiles.language, agentLanguage: userProfiles.agentLanguage }).from(userProfiles).limit(1).get()
   if (firstProfile) userLanguage = firstProfile.agentLanguage ?? firstProfile.language
 
-  // Memories (use last session message as query)
-  let relevantMemories: Array<{ id: string; category: string; content: string; subject: string | null; importance: number | null; updatedAt: Date | null; score: number }> = []
-  try {
-    const lastMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    if (lastMsg?.content) relevantMemories = await getRelevantMemories(agentId, lastMsg.content)
-  } catch {
-    // Non-fatal
-  }
-
-  // Knowledge
-  let relevantKnowledge: Array<{ content: string; sourceId: string; score: number }> = []
-  try {
-    const { searchKnowledge } = await import('@/server/services/knowledge')
-    const lastMsg = db
-      .select({ content: messages.content })
-      .from(messages)
-      .where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
-      .orderBy(desc(messages.createdAt))
-      .limit(1)
-      .get()
-    if (lastMsg?.content) relevantKnowledge = await searchKnowledge(agentId, lastMsg.content, 5)
-  } catch {
-    // Non-fatal
-  }
-
   const globalPrompt = await getGlobalPrompt()
 
-  // Mirror agent-engine's quick-session path: include the active project block
-  // (with pinned knowledge) so the preview matches the real prompt.
-  let quickSessionActiveProject: import('@/server/services/prompt-builder').ActiveProjectPromptInfo | null = null
-  if (agent.activeProjectId) {
-    const { buildActiveProjectInfo } = await import('@/server/services/projects')
-    quickSessionActiveProject = await buildActiveProjectInfo(agent.activeProjectId)
-  }
-
+  const quickProfile = await getProfile(agentId)
   const systemPrompt = joinSystemPrompt(buildSystemPrompt({
     agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
     contacts: [],
-    relevantMemories,
-    relevantKnowledge,
+    profile: quickProfile.content,
     agentDirectory: [],
     isSubAgent: false,
     isQuickSession: true,
     globalPrompt,
     userLanguage,
     workspacePath: agent.workspacePath,
-    activeProject: quickSessionActiveProject ?? undefined,
   }))
 
   // Messages: only this session

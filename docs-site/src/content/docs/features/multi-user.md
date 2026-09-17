@@ -17,17 +17,23 @@ A few specifics from how accounts are actually created:
 
 - Onboarding is open only while no admin exists. The principle is "completed equals an admin exists": once an admin profile is present, the public onboarding path is closed and new accounts require an invitation.
 - A new account needs both a Better Auth login (email and password, minimum 8 characters) and a Hivekeep **profile** (first name, last name, pseudonym, interface language, and optionally the Agent language). A login without a profile cannot reach any protected route; the middleware blocks it until onboarding is complete.
-- Every account that completes onboarding is currently created with the `admin` role. In practice this means the household members you invite can also manage global configuration, not just chat.
+- The first account gets the `admin` role; everyone who joins through an invitation is a **member**.
+
+## Roles: admin and member
+
+A **member** uses the platform: they chat with the Agents, launch standalone tasks, manage their own profile, notification preferences, contacts, and stored files. An **admin** additionally owns the platform configuration: providers and models, channels, the Vault, custom tools, toolboxes, plugins, MCP servers, mini-app management, crons, Agent creation and deletion, email and connected accounts, webhooks, users and invitations, logs, usage, and updates. The settings navigation only shows members the sections they can use, and the API enforces the same split server-side.
+
+Admins can promote a member to admin (or demote one) from Settings > Users; you can never change your own role, so at least one admin always remains.
 
 :::note
-The data model carries a `role` field on user profiles (with a `member` default at the schema level), and admin-only actions check for `role === 'admin'`. Today the onboarding flow assigns `admin` to everyone it creates, so the distinction is not yet surfaced as separate permission tiers in the UI. Plan around the behaviour described above rather than around a member-versus-admin split.
+Instances installed before roles were enforced had every account created as admin. On upgrade, a migration keeps the oldest admin and moves everyone else to member; re-promote from Settings > Users if some of them should stay admins.
 :::
 
 ## Inviting people
 
 Because open sign-up is closed once an admin exists, additional household members join through invitations.
 
-1. From the app, an existing user creates an invitation. You can give it a label and an expiry in days.
+1. From the app, an admin creates an invitation. You can give it a label and an expiry in days.
 2. Hivekeep produces an invitation token (a link).
 3. The invited person opens it, signs up, and completes their profile. The token is validated server-side, and is marked used once their account is created.
 

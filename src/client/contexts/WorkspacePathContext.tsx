@@ -1,6 +1,6 @@
 /**
  * Workspace path resolution cache (files.md § 5.2) — sibling of
- * TicketMentionContext, scoped by agent.
+ * mention contexts, scoped by agent.
  *
  * Chat renderers call `useWorkspacePath(path)` to learn whether a candidate
  * path (emitted by remark-workspace-paths) actually exists in the current

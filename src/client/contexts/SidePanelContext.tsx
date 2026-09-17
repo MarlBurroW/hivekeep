@@ -1,13 +1,14 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { useSSE } from '@/client/hooks/useSSE'
 
-type ActiveTab = 'mini-app' | 'task' | 'ticket'
+type ActiveTab = 'mini-app' | 'task'
 
-/** Lightweight reference to a parent entity, used for back-navigation in the side panel.
- *  E.g. opening a task from a ticket sets `parent: { type: 'ticket', id }` so the
- *  panel shows a "← Back to ticket" button. Depth 1 max. */
+/** Lightweight reference to a parent entity, used for back-navigation in the
+ *  side panel. E.g. opening a sub-task from a task sets
+ *  `parent: { type: 'task', id }` so the panel shows a "← Back" button.
+ *  Depth 1 max. */
 export interface SidePanelParentRef {
-  type: 'task' | 'ticket'
+  type: 'task'
   id: string
 }
 
@@ -15,11 +16,6 @@ interface TaskPanelInfo {
   taskId: string
   agentName?: string
   agentAvatarUrl?: string | null
-  parent?: SidePanelParentRef
-}
-
-interface TicketPanelInfo {
-  ticketId: string
   parent?: SidePanelParentRef
 }
 
@@ -40,9 +36,6 @@ interface SidePanelContextValue {
   // Task state
   activeTask: TaskPanelInfo | null
 
-  // Ticket state
-  activeTicket: TicketPanelInfo | null
-
   // Mini-app actions
   openApp: (appId: string) => void
   closePanel: () => void
@@ -54,10 +47,6 @@ interface SidePanelContextValue {
   // Task actions
   openTask: (info: TaskPanelInfo) => void
   closeTask: () => void
-
-  // Ticket actions
-  openTicket: (info: TicketPanelInfo) => void
-  closeTicket: () => void
 
   // Tab switching
   switchTab: (tab: ActiveTab) => void
@@ -74,7 +63,6 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
   const [badges, setBadgesState] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<ActiveTab | null>(null)
   const [activeTask, setActiveTask] = useState<TaskPanelInfo | null>(null)
-  const [activeTicket, setActiveTicket] = useState<TicketPanelInfo | null>(null)
 
   const openApp = useCallback((appId: string) => {
     setActiveAppId(appId)
@@ -92,56 +80,33 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
 
   const closeTask = useCallback(() => {
     setActiveTask(null)
-    // Fall back to the next available tab, in priority order: ticket → mini-app → none
-    if (activeTicket) setActiveTab('ticket')
-    else if (activeAppId) setActiveTab('mini-app')
+    // Fall back to the next available tab, in priority order: mini-app → none
+    if (activeAppId) setActiveTab('mini-app')
     else setActiveTab(null)
-  }, [activeAppId, activeTicket])
-
-  const openTicket = useCallback((info: TicketPanelInfo) => {
-    setActiveTicket(info)
-    setActiveTab('ticket')
-    setIsFullPage(false)
-  }, [])
-
-  const closeTicket = useCallback(() => {
-    setActiveTicket(null)
-    // Fall back to the next available tab, in priority order: task → mini-app → none
-    if (activeTask) setActiveTab('task')
-    else if (activeAppId) setActiveTab('mini-app')
-    else setActiveTab(null)
-  }, [activeAppId, activeTask])
+  }, [activeAppId])
 
   const closePanel = useCallback(() => {
     // Close whichever tab is active, then fall back to the next available one.
-    // Priority order: mini-app → task → ticket → null
+    // Priority order: mini-app → task → null
     if (activeTab === 'mini-app') {
       setActiveAppId(null)
       setIsFullPage(false)
       setCustomTitle(null)
       if (activeTask) setActiveTab('task')
-      else if (activeTicket) setActiveTab('ticket')
       else setActiveTab(null)
     } else if (activeTab === 'task') {
       setActiveTask(null)
-      if (activeTicket) setActiveTab('ticket')
-      else if (activeAppId) setActiveTab('mini-app')
-      else setActiveTab(null)
-    } else if (activeTab === 'ticket') {
-      setActiveTicket(null)
-      if (activeTask) setActiveTab('task')
-      else if (activeAppId) setActiveTab('mini-app')
+      if (activeAppId) setActiveTab('mini-app')
       else setActiveTab(null)
     } else {
       // Close everything
       setActiveAppId(null)
       setActiveTask(null)
-      setActiveTicket(null)
       setIsFullPage(false)
       setCustomTitle(null)
       setActiveTab(null)
     }
-  }, [activeTab, activeTask, activeTicket, activeAppId])
+  }, [activeTab, activeTask, activeAppId])
 
   const toggleFullPage = useCallback(() => {
     setIsFullPage((v) => !v)
@@ -156,10 +121,8 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
       setActiveTab('mini-app')
     } else if (tab === 'task' && activeTask) {
       setActiveTab('task')
-    } else if (tab === 'ticket' && activeTicket) {
-      setActiveTab('ticket')
     }
-  }, [activeAppId, activeTask, activeTicket])
+  }, [activeAppId, activeTask])
 
   const setBadge = useCallback((appId: string, value: string | null) => {
     setBadgesState((prev) => {
@@ -206,8 +169,7 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
 
   const panelOpen = activeTab !== null && (
     (activeTab === 'mini-app' && activeAppId !== null) ||
-    (activeTab === 'task' && activeTask !== null) ||
-    (activeTab === 'ticket' && activeTicket !== null)
+    (activeTab === 'task' && activeTask !== null)
   )
 
   return (
@@ -222,7 +184,6 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
         customTitle,
         badges,
         activeTask,
-        activeTicket,
         openApp,
         closePanel,
         toggleFullPage,
@@ -231,8 +192,6 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
         setBadge,
         openTask,
         closeTask,
-        openTicket,
-        closeTicket,
         switchTab,
       }}
     >

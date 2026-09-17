@@ -14,7 +14,7 @@ interface ThinkingEffortSelectProps {
   value: ThinkingChoice
   onChange: (value: ThinkingChoice) => void
   disabled?: boolean
-  /** Label shown for the `inherit` option. Lets callers say "project/Agent" vs "Agent".
+  /** Label shown for the `inherit` option. Lets callers pick the wording.
    *  Omit to hide the inherit option entirely (e.g. cron overrides). */
   inheritLabel?: string
   /**
@@ -32,7 +32,7 @@ interface ThinkingEffortSelectProps {
 /**
  * Single-select reasoning-effort dial backed by `ThinkingChoice`.
  *
- * The shared effort selector for forms (project settings, task-start dialogs,
+ * The shared effort selector for forms (Agent settings, task-start dialogs,
  * cron overrides). Options adapt to the selected model's registry metadata via
  * the `reasoning` prop — callers are responsible for clamping a stored value
  * when the model changes (see `clampEffort`).

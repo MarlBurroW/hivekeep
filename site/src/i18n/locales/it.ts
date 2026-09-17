@@ -290,11 +290,6 @@ const dict: typeof en = {
               blurb: 'Gli agenti si pianificano da soli il lavoro futuro (<b>"svegliami tra 2 ore"</b>), così follow-up e promemoria succedono davvero.',
               icon: 'alarm-clock',
             },
-            {
-              title: 'Kanban gestito dagli agenti',
-              blurb: 'Organizza il lavoro in progetti e ticket, poi <b>assegna i ticket agli agenti</b>, che li eseguono e riferiscono nei commenti.',
-              icon: 'kanban',
-            },
           ],
         },
         {
@@ -315,11 +310,6 @@ const dict: typeof en = {
               title: 'Basi di conoscenza',
               blurb: "Carica i documenti una volta sola; gli estratti rilevanti <b>emergono da soli</b> nel contesto ogni volta che l'argomento salta fuori.",
               icon: 'book-open',
-            },
-            {
-              title: 'Conoscenza di progetto',
-              blurb: "Ogni progetto conserva fatti, decisioni e insidie selezionati: le <b>voci fissate</b> viaggiano in ogni turno dell'agente.",
-              icon: 'notebook-pen',
             },
             {
               title: 'Un passato ricercabile',
@@ -444,7 +434,7 @@ const dict: typeof en = {
         'Un team di agenti che collaborano',
         'Web app curata (PWA)',
         'Tool call renderizzate (UI, non JSON)',
-        'Mini-app e progetti (Kanban)',
+        'Mini-app costruite dai tuoi agenti',
         'Setup conversazionale (niente CLI)',
         "Segreti mai inviati all'LLM",
         'Trasparenza su token e contesto',
@@ -468,7 +458,7 @@ const dict: typeof en = {
     tourTeaser: {
       kicker: 'Dentro l\'app',
       heading: 'Guardatelo dal vero.',
-      p: 'Screenshot reali di un alveare in attività: conversazioni, chiamate agli strumenti, la cassaforte, mini-app, il kanban e altro.',
+      p: 'Screenshot reali di un alveare in attività: conversazioni, chiamate agli strumenti, la cassaforte, mini-app e altro.',
       cta: 'Fai il tour',
     },
   },
@@ -477,7 +467,7 @@ const dict: typeof en = {
   tour: {
     meta: {
       title: 'Hivekeep in screenshot',
-      description: 'Un tour guidato di Hivekeep in oltre 30 screenshot reali: conversazioni degli agenti, strumenti, cassaforte cifrata, mini-app, kanban, job pianificati e altro.',
+      description: 'Un tour guidato di Hivekeep in oltre 30 screenshot reali: conversazioni degli agenti, strumenti, cassaforte cifrata, mini-app, job pianificati e altro.',
     },
     kicker: 'Il tour',
     heading: 'Guarda dentro l\'alveare.',
@@ -487,7 +477,7 @@ const dict: typeof en = {
       chat: { title: 'La vita quotidiana con gli agenti', sub: 'Una conversazione continua per agente, con gli strumenti usati in chiaro, mai nascosti.' },
       trust: { title: 'Segreti e trasparenza', sub: 'Gli agenti possono chiederti credenziali senza mai vederle, e ogni token speso è registrato.' },
       build: { title: 'Costruiscono per te', sub: 'Mini-app, strumenti su misura, uno spazio file e un vero terminale: la piattaforma cresce perché la fanno crescere i tuoi agenti.' },
-      organize: { title: 'Organizzare e automatizzare', sub: 'Un kanban condiviso, compiti delegati, job pianificati e webhook: più cose avanzano insieme.' },
+      organize: { title: 'Organizzare e automatizzare', sub: 'Compiti delegati, job pianificati e webhook: più cose avanzano insieme.' },
       control: { title: 'La sala di controllo', sub: 'Provider, modelli, canali, memorie, contatti: tutto ispezionabile e plasmabile.' },
       anywhere: { title: 'Ovunque, con qualsiasi look', sub: 'Una vera app sul telefono e 18 palette in chiaro e scuro.' },
     },
@@ -514,9 +504,6 @@ const dict: typeof en = {
       'files': { t: 'Un vero workspace', d: 'Sfoglia e modifica i file di ogni agente con un editor vero, schede comprese.' },
       'terminal': { t: 'Un vero terminale', d: 'Entra nella shell del workspace di qualsiasi agente, dal browser.' },
       'toolboxes': { t: 'Capacità delimitate', d: 'Le toolbox decidono quali strumenti vede ogni agente. Agenti focalizzati, modelli leggeri.' },
-      'kanban': { t: 'Un kanban condiviso', d: 'Progetti e ticket su cui lavorate tu e gli agenti.' },
-      'ticket': { t: 'Gli agenti riferiscono', d: 'Forge ha confrontato tre preventivi e pubblicato il verdetto come commento.' },
-      'knowledge': { t: 'Conoscenza di progetto', d: 'Decisioni e fatti fissati al progetto, iniettati in ogni turno collegato.' },
       'tasks': { t: 'Controllo missione', d: 'Ogni lavoro delegato e sub-agente, dal vivo, con stato e risultato.' },
       'crons': { t: 'Job pianificati', d: 'Agenti a orario: briefing, controlli, riassunti, con diario.' },
       'webhooks': { t: 'Sveglia via webhook', d: 'Qualsiasi evento HTTP può svegliare un agente, con filtri e smistamento.' },

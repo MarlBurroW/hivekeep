@@ -112,7 +112,7 @@ supports**, from the registry's reasoning metadata. The full ladder is
 - A reasoning model with no granularity (e.g. Kimi K2.5) shows a single
   **Enabled** toggle.
 - A model with no reasoning support shows **Off** with a hint.
-- No model context (project defaults) or an unknown model falls back to the
+- No model context or an unknown model falls back to the
   generic ladder; the provider clamps the request to the closest supported
   level at run time either way.
 

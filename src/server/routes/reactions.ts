@@ -33,7 +33,7 @@ reactionRoutes.post('/', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const messageId = c.req.param('messageId')!

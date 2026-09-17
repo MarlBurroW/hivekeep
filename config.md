@@ -63,6 +63,7 @@ All configurable values of the platform, grouped by domain. These values are def
 |---|---|---|---|
 | `toolOutputs.spillThreshold` | `TOOL_OUTPUT_SPILL_THRESHOLD` | `10000` | Threshold in bytes above which a tool result is saved to a temporary file instead of being included in full in the context |
 | `toolOutputs.previewLines` | `TOOL_OUTPUT_PREVIEW_LINES` | `200` | Number of preview lines included in the compact reference when a result is "spilled" |
+| `toolOutputs.previewMaxChars` | `TOOL_OUTPUT_PREVIEW_MAX_CHARS` | `4000` | Hard size bound on that preview. The line count alone is not a bound: `JSON.stringify` escapes newlines, so a single-string result (email body, grep output, shell stdout) serializes to a few very long lines and "200 lines" keeps the whole payload. Keep it below `spillThreshold`. |
 | `toolOutputs.ttlHours` | `TOOL_OUTPUT_TTL_HOURS` | `24` | Retention duration of temporary files (hours). Older files are deleted automatically |
 
 ---
@@ -71,11 +72,42 @@ All configurable values of the platform, grouped by domain. These values are def
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `tools.maxSteps` | `TOOLS_MAX_STEPS` | `0` | Max number of tool-calling steps per LLM turn. 0 = unlimited (capped at 100 internally) |
+| `tools.maxSteps` | `TOOLS_MAX_STEPS` | `100` | Max number of tool-calling steps per LLM turn. Runaway guard, not a budget. 0 = truly unlimited (the old default, which let a looping model run until the process restarted) |
+| `tools.turnTimeoutMs` | `TOOLS_TURN_TIMEOUT` | `1800000` (30 min) | Wall-clock ceiling for one turn, measured from dequeue (queue wait excluded). Aborts via the turn's own AbortController so the failure is reported, including back to the originating channel. 0 disables |
 | `tools.concurrencyCap` | `TOOLS_CONCURRENCY_CAP` | `5` | Max number of parallel read-only tool executions. When all tool calls in a step are read-only, they run in parallel (limited to this value). Mixed batches with at least one mutating tool stay sequential |
 | `tools.temperature` | `TOOLS_TEMPERATURE` | `0` | Sampling temperature applied on tool-enabled turns. Local backends (Ollama, llama.cpp, LM Studio) default to ~0.7-0.8, which makes small models emit unreliable tool-call JSON; a low value steadies it. Reasoning models are exempted automatically (they reject a custom temperature). Set to `off` to defer to the backend default |
 | `shell.defaultTimeoutMs` | `HIVEKEEP_SHELL_TIMEOUT` | `30000` | Default timeout for a `run_shell` command (ms), used when the Agent does not provide a `timeout` |
 | `shell.maxTimeoutMs` | `HIVEKEEP_SHELL_MAX_TIMEOUT` | `600000` | Maximum timeout an Agent can request per `run_shell` call (ms). The tool's `timeout` parameter is capped at this value (10 min by default, raise it for longer test suites/builds) |
+
+---
+
+## Turn reliability (timeouts)
+
+Every wait on the turn path is bounded. An await that never settles holds the
+Agent's lock, skips its `finally`, and used to be recoverable only by restarting
+the process.
+
+| Key | Env var | Default | Description |
+|---|---|---|---|
+| `llm.streamIdleTimeoutMs` | `LLM_STREAM_IDLE_TIMEOUT` | `120000` (2 min) | Inactivity ceiling while reading a provider's response stream, reset on every chunk (a slow-but-alive generation is never cut). Provider SDKs clear their own request timeout once response headers arrive, leaving the streamed body unbounded. 0 disables |
+| `hooks.handlerTimeoutMs` | `HOOK_HANDLER_TIMEOUT` | `30000` | Ceiling for one plugin hook handler. Handlers run in-process on the turn path, after the abort controller is released, so one that never settles pins the Agent |
+| `memory.embeddingTimeoutMs` | `MEMORY_EMBEDDING_TIMEOUT` | `60000` | Ceiling for an embedding call. These run under the compacting lock, where a hang makes the engine refuse every message for that Agent |
+| `search.requestTimeoutMs` | `SEARCH_REQUEST_TIMEOUT` | `30000` | Ceiling for one `web_search` round-trip |
+| `email.requestTimeoutMs` | `EMAIL_REQUEST_TIMEOUT` | `60000` | Ceiling for one Gmail / Microsoft Graph call (IMAP has its own socket timeouts) |
+
+---
+
+## Stuck-Agent detection
+
+| Key | Env var | Default | Description |
+|---|---|---|---|
+| `queue.stuckSweepIntervalMs` | `QUEUE_STUCK_SWEEP_INTERVAL` | `300000` (5 min) | How often Agents wedged in `processing` are swept for |
+| `queue.stuckWarnMs` | `QUEUE_STUCK_WARN` | `900000` (15 min) | Past this age a human is notified, but the turn is left running (it may be legitimately long) |
+| `queue.stuckRecoverMs` | `QUEUE_STUCK_RECOVER` | `3600000` (1 h) | Past this age (beyond any plausible turn) the queue item is requeued so the Agent answers again. 0 disables |
+
+Manual escape hatch: `POST /api/agents/:id/force-reset` aborts any stream, clears
+the in-memory lock and the compacting flag, and requeues that Agent's in-flight
+items. Surfaced in the UI inside the typing indicator after 15 minutes.
 
 ---
 
@@ -95,9 +127,10 @@ All configurable values of the platform, grouped by domain. These values are def
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `memory.extractionModel` | `MEMORY_EXTRACTION_MODEL` | — | Lightweight model for extracting memories (e.g. Haiku). If not set, uses the Agent's model |
-| `memory.maxRelevantMemories` | `MEMORY_MAX_RELEVANT` | `10` | Max number of memories injected into the system prompt |
-| `memory.similarityThreshold` | `MEMORY_SIMILARITY_THRESHOLD` | `0.7` | Minimum cosine similarity score for a memory to be considered relevant |
+| `memory.extractionModel` | `MEMORY_EXTRACTION_MODEL` | — | Model for the compaction-time memory maintenance call (archive extraction + profile rewrite), e.g. Haiku. If not set, uses the Agent's model |
+| `memory.maxRelevantMemories` | `MEMORY_MAX_RELEVANT` | `10` | Default number of results returned by a `recall` search |
+| `memory.profileMaxTokens` | `MEMORY_PROFILE_MAX_TOKENS` | `1500` | Token budget for the always-injected profile document (see `memory.md`) |
+| `memory.similarityThreshold` | `MEMORY_SIMILARITY_THRESHOLD` | `0.5` | Minimum cosine similarity for a vector-search candidate. A spam filter, not a relevance gate |
 | `memory.embeddingModel` | `MEMORY_EMBEDDING_MODEL` | `text-embedding-3-small` | Default embedding model |
 | `memory.embeddingDimension` | `MEMORY_EMBEDDING_DIMENSION` | `1536` | Dimension of embedding vectors |
 
@@ -177,9 +210,8 @@ Limits of the **Files** section (workspace browser/editor — see `files.md`).
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `upload.dir` | `UPLOAD_DIR` | `{dataDir}/uploads` | Storage directory for files (chat, ticket attachments) |
-| `upload.maxFileSizeMb` | `UPLOAD_MAX_FILE_SIZE` | `50` | Max size of an uploaded file (MB). Also serves as the default for ticket attachments |
-| — | `TICKET_ATTACHMENT_MAX_SIZE` | `UPLOAD_MAX_FILE_SIZE` | Specific override for ticket attachments, in MB. Files are stored under `{upload.dir}/tickets/<projectId>/<ticketId>/<id>.<ext>` and cascade-deleted when the ticket is destroyed |
+| `upload.dir` | `UPLOAD_DIR` | `{dataDir}/uploads` | Storage directory for uploaded files (chat, channel media) |
+| `upload.maxFileSizeMb` | `UPLOAD_MAX_FILE_SIZE` | `50` | Max size of an uploaded file (MB) |
 
 ---
 
@@ -241,28 +273,40 @@ Internal tuning parameters — most deployments never touch them, the defaults a
 
 ## Memory (long-term)
 
+Memory has two layers (full design in `memory.md`): a curated **profile**
+document always injected into the cached system prompt, and the episodic
+**archive** the Agent searches on demand with `recall`.
+
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `MEMORY_SIMILARITY_THRESHOLD` | `0.5` | Cosine similarity threshold for vector search candidates (lowered to 0.5 for more diversity). |
-| `MEMORY_TEMPORAL_DECAY_LAMBDA` | `0.01` | Temporal decay rate; higher = decays faster. |
-| `MEMORY_TEMPORAL_DECAY_FLOOR` | `0.7` | Score floor for old memories (prevents very old ones from reaching zero). |
-| `MEMORY_CONSOLIDATION_SIMILARITY` | `0.85` | Threshold for merging two memories during consolidation. |
-| `MEMORY_CONSOLIDATION_MAX_GEN` | `5` | Max number of consolidation generations before forced merge. |
-| `MEMORY_ADAPTIVE_K` | `true` | Enables the adaptive K heuristic to prune low-score results. |
-| `MEMORY_ADAPTIVE_K_MIN_SCORE_RATIO` | `0.15` | Min ratio vs the top to avoid winner-take-all. |
-| `MEMORY_ADAPTIVE_K_LARGEST_GAP_RATIO` | `0.6` | Largest-gap heuristic: truncate only if there is a drop >60% of the top-current delta. |
+| `MEMORY_PROFILE_MAX_TOKENS` | `1500` | Token budget for the profile document. The maintenance rewrite is told to stay under it; a rewrite far over drops trailing sections (never `## Pinned`). |
+| `MEMORY_MAX_RELEVANT` | `10` | Default number of results returned by a `recall` search. |
+| `MEMORY_SIMILARITY_THRESHOLD` | `0.5` | Cosine similarity floor for vector search candidates. |
 | `MEMORY_RRF_K` | `60` | Reciprocal Rank Fusion parameter for hybrid search (vector + FTS). |
-| `MEMORY_FTS_BOOST` | `0.5` | FTS score multiplier in the hybrid ranking. |
-| `MEMORY_SUBJECT_BOOST` | `1.3` | Relevance multiplier for the subject field. |
-| `MEMORY_CATEGORY_BOOST` | `1.25` | Relevance multiplier for the category field. |
-| `MEMORY_CONTEXTUAL_REWRITE_THRESHOLD` | `80` | Token threshold triggering contextual rewriting of queries. |
-| `MEMORY_TOKEN_BUDGET` | `0` | Max token budget for memory injection; 0 = unlimited. |
-| `MEMORY_RECENCY_BOOST` | `true` | Boosts very recent memories in the ranking. |
-| `MEMORY_CONSOLIDATION_MODEL` | — | Model for consolidation (`providerId:modelId` format); falls back to the Agent's. |
-| `MEMORY_MULTI_QUERY_MODEL` | — | Model for multi-query expansion. |
-| `MEMORY_HYDE_MODEL` | — | Model for HyDE reranking. |
-| `MEMORY_RERANK_MODEL` | — | Model for secondary reranking. |
-| `MEMORY_CONTEXTUAL_REWRITE_MODEL` | — | Model for contextual rewriting of long queries. |
+| `MEMORY_FTS_BOOST` | `0.5` | Weight of the FTS arm relative to the vector arm at the same rank. |
+| `MEMORY_EXTRACTION_MODEL` | — | Model for the compaction-time maintenance call (`providerId:modelId`). Falls back to the Agent's model. |
+| `MEMORY_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for archive search and insert-time dedup. |
+| `MEMORY_EMBEDDING_DIMENSION` | `1536` | Dimension of embedding vectors. |
+| `MEMORY_EMBEDDING_TIMEOUT` | `60000` | Ceiling for an embedding call. |
+
+### Removed in memory v2
+
+These variables no longer exist. Relevance to the query is now the only
+ranking signal, so the decay, boost, and adaptive-K knobs are gone with the
+heuristics they tuned; multi-query, HyDE, rerank and contextual rewrite were
+opt-in retrieval enhancements that the on-demand `recall` model no longer
+needs. Consolidation was dropped as well (insert-time dedup covers it).
+Setting any of them is now a no-op:
+
+`MEMORY_TEMPORAL_DECAY_LAMBDA`, `MEMORY_TEMPORAL_DECAY_FLOOR`,
+`MEMORY_ADAPTIVE_K`, `MEMORY_ADAPTIVE_K_MIN_SCORE_RATIO`,
+`MEMORY_ADAPTIVE_K_LARGEST_GAP_RATIO`, `MEMORY_SUBJECT_BOOST`,
+`MEMORY_CATEGORY_BOOST`, `MEMORY_RECENCY_BOOST`, `MEMORY_TOKEN_BUDGET`,
+`MEMORY_RETRIEVAL_LLM_TIMEOUT`, `MEMORY_MULTI_QUERY_MODEL`,
+`MEMORY_HYDE_MODEL`, `MEMORY_RERANK_MODEL`,
+`MEMORY_CONTEXTUAL_REWRITE_MODEL`, `MEMORY_CONTEXTUAL_REWRITE_THRESHOLD`,
+`MEMORY_CONSOLIDATION_MODEL`, `MEMORY_CONSOLIDATION_SIMILARITY`,
+`MEMORY_CONSOLIDATION_MAX_GEN`.
 
 ## Browser sessions
 
@@ -337,6 +381,7 @@ Triggers on connected email accounts: a matching incoming email prompts a target
 | `EMAIL_TRIGGER_MAX_PER_CYCLE` | `50` | Anti-flood cap: max messages processed per (account, folder) per cycle. |
 | `EMAIL_TRIGGER_LOG_RETENTION_DAYS` | `30` | Retention of trigger evaluation logs. |
 | `EMAIL_TRIGGER_MAX_LOGS_PER_TRIGGER` | `500` | Max log entries retained per trigger. |
+| `EMAIL_TRIGGER_ONE_SHOT_TTL_DAYS` | `30` | Age after which a one-shot reply-watch that never fired is deleted. Fired ones are deleted immediately. |
 | `EMAIL_TRIGGER_SEEN_IDS_RING` | `200` | Size of the per-(account, folder) seen-ids dedup ring. |
 
 > Whether Agent-created triggers need user approval is a runtime setting (`agent_triggers_require_approval` in `app_settings`, default off), not an env var.
@@ -346,8 +391,11 @@ Triggers on connected email accounts: a matching incoming email prompts a target
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `CHANNELS_MAX_PER_KIN` | `5` | Max number of channels connected per Agent. |
-| `CHANNEL_PENDING_ORIGIN_TTL` | `300_000` (5 min) | TTL of the pending origin verification during setup. |
+| `CHANNEL_ORIGIN_TTL` | `86_400_000` (24 h) | How long after an inbound channel message an Agent reply is still auto-delivered back to that channel. The origin is persisted in `channel_origins`, so it survives restarts; this is only a freshness guard. Rows past it are pruned. |
 | `CHANNEL_MAX_PENDING_BUFFERED` | `10` | Max messages buffered per pending contact while they await approval. On approval the buffer is replayed as a single Agent turn; only the most recent N are kept (older ones are dropped). |
+| `CHANNEL_TYPING_REFRESH` | `5_000` | How often the platform "typing" hint is refreshed while a turn runs. Platforms expire it in seconds, so without this a long turn is silent and indistinguishable from a dead one. |
+| `CHANNEL_SEND_RETRIES` | `3` | Attempts for one outbound send (1 = no retry). A transient 429 or 5xx used to drop the reply silently. |
+| `CHANNEL_MAX_RETRY_DELAY` | `60_000` | Upper bound on a backoff wait, including a platform-provided `retry_after`. |
 | `WHATSAPP_WEB_DIR` | `<data>/whatsapp-web` | Directory holding the per-channel WhatsApp-Web (QR pairing) session state. One subfolder per channel; persisted so a paired session reconnects after restart. |
 
 ## Tasks (sub-Agents)
@@ -391,14 +439,6 @@ Triggers on connected email accounts: a matching incoming email prompts a target
 |---------|---------|-------------|
 | `WAKEUPS_MAX_PENDING_PER_KIN` | `20` | Max number of scheduled wakeups per Agent. |
 | `HUMAN_PROMPTS_MAX_PENDING` | `5` | Max number of pending human prompts per Agent. |
-
-## Projects (Kanban & tickets)
-
-| Env Var | Default | Description |
-|---------|---------|-------------|
-| `PROJECTS_MAX_DESCRIPTION_PROMPT_TOKENS` | `8000` | Strict ceiling on project description tokens injected into the prompt. |
-| `PROJECTS_MAX_TICKETS_IN_PROMPT` | `50` | Max number of non-done tickets injected (sorted by `updated_at` DESC). |
-| `PROJECTS_KANBAN_POSITION_STEP` | `1024` | Step between consecutive positions when inserting at the head of a column. |
 
 ## Mini-apps
 

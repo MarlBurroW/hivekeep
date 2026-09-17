@@ -1,8 +1,8 @@
-import { eq, and, asc, desc, count, inArray } from 'drizzle-orm'
+import { eq, and, asc, desc, count, inArray, lt } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
-import { messages, channels, channelUserMappings, channelPendingMessages, channelMessageLinks, contactPlatformIds, contactNicknames, agents, contacts, userProfiles } from '@/server/db/schema'
+import { messages, channels, channelUserMappings, channelPendingMessages, channelMessageLinks, channelOrigins, contactPlatformIds, contactNicknames, agents, contacts, userProfiles } from '@/server/db/schema'
 import { enqueueMessage } from '@/server/services/queue'
 import { downloadChannelAttachments } from '@/server/services/files'
 import { createSecret, deleteSecret, getSecretValue, getSecretByKey } from '@/server/services/vault'
@@ -13,6 +13,7 @@ import { config } from '@/server/config'
 import { agentAvatarUrl } from '@/server/services/field-validator'
 import { getContactDisplayName } from '@/shared/contact-display'
 import { applyAgentNamePrefix } from '@/server/services/channel-prefix'
+import { isRetryableSendError, resolveRetryDelayMs } from '@/server/services/channel-retry'
 import type { IncomingMessage, OutboundAttachment, DeliveryStatusUpdate, ChannelPairingEvent } from '@/server/channels/adapter'
 import type { ChannelPlatform, ChannelStatus } from '@/shared/types'
 import QRCode from 'qrcode'
@@ -159,30 +160,69 @@ export function popChannelTransferHint(channelId: string): ChannelTransferHint |
 }
 
 // ─── Channel origin store (causal chain tracking for follow-up delivery) ─────
+//
+// Persisted in `channel_origins`, NOT in RAM: the whole point is that a reply
+// written long after the inbound message (sub-Agent finished, wake-up fired,
+// server restarted in between) still knows where to go.
 
-export interface ChannelOriginMeta {
-  channelId: string
-  platformChatId: string
-  platformMessageId: string
-  platformUserId: string
+export interface ChannelOriginMeta extends ChannelQueueMeta {
   createdAt: number
-  ttlMs: number
 }
 
-const channelOriginStore = new Map<string, ChannelOriginMeta>()
-
-export function setChannelOriginMeta(originId: string, meta: ChannelOriginMeta): void {
-  channelOriginStore.set(originId, meta)
+export function setChannelOriginMeta(originId: string, meta: ChannelQueueMeta): void {
+  db.insert(channelOrigins)
+    .values({
+      originId,
+      channelId: meta.channelId,
+      platformChatId: meta.platformChatId,
+      platformMessageId: meta.platformMessageId,
+      platformUserId: meta.platformUserId,
+      createdAt: new Date(),
+    })
+    .onConflictDoNothing()
+    .run()
 }
 
 export function getChannelOriginMeta(originId: string): ChannelOriginMeta | undefined {
-  const meta = channelOriginStore.get(originId)
-  if (!meta) return undefined
-  if (Date.now() - meta.createdAt > meta.ttlMs) {
-    channelOriginStore.delete(originId)
+  const row = db.select().from(channelOrigins).where(eq(channelOrigins.originId, originId)).get()
+  if (!row) return undefined
+  const createdAt = row.createdAt.getTime()
+  if (Date.now() - createdAt > config.channels.originTtlMs) {
+    db.delete(channelOrigins).where(eq(channelOrigins.originId, originId)).run()
     return undefined
   }
-  return meta
+  return {
+    channelId: row.channelId,
+    platformChatId: row.platformChatId,
+    platformMessageId: row.platformMessageId,
+    platformUserId: row.platformUserId,
+    createdAt,
+  }
+}
+
+let originPruneInterval: ReturnType<typeof setInterval> | null = null
+
+/** Drop origin rows past the freshness window. Lazy deletion on read only
+ *  covers origins somebody still asks about; this collects the rest. */
+function pruneChannelOrigins(): void {
+  const cutoff = new Date(Date.now() - config.channels.originTtlMs)
+  const stale = db.select({ originId: channelOrigins.originId }).from(channelOrigins).where(lt(channelOrigins.createdAt, cutoff)).all()
+  if (stale.length === 0) return
+  db.delete(channelOrigins).where(lt(channelOrigins.createdAt, cutoff)).run()
+  log.info({ count: stale.length }, 'Pruned stale channel origins')
+}
+
+export function startChannelOriginCleanup(): void {
+  if (originPruneInterval) return
+  const run = () => {
+    try {
+      pruneChannelOrigins()
+    } catch (err) {
+      log.error({ err }, 'Channel origin cleanup failed')
+    }
+  }
+  setTimeout(run, 60_000)
+  originPruneInterval = setInterval(run, 6 * 60 * 60 * 1000)
 }
 
 // ─── Locale resolution (channel → agent → owner → user_profiles.language) ─────
@@ -772,8 +812,6 @@ async function enqueueChannelTurn(
     platformChatId: last.platformChatId,
     platformMessageId: last.platformMessageId,
     platformUserId: last.platformUserId,
-    createdAt: Date.now(),
-    ttlMs: config.channels.pendingOriginTtlMs,
   })
 
   // Send typing indicator (fire-and-forget)
@@ -967,6 +1005,124 @@ export async function sendToChannelAs(
   }
 }
 
+// ─── Turn liveness + failure surfacing ──────────────────────────────────────
+
+/**
+ * Resolve where a turn's output should go WITHOUT consuming the one-shot
+ * sideband. `popChannelQueueMeta` is destructive, so the delivery path could
+ * not share its lookup with the error path — which is a large part of why
+ * failures never reached the channel. Peek here, pop at delivery time.
+ */
+export function peekChannelTarget(queueItem: {
+  id: string
+  sourceType: string
+  channelOriginId?: string | null
+}): ChannelQueueMeta | undefined {
+  if (queueItem.sourceType === 'channel') {
+    const meta = getChannelQueueMeta(queueItem.id)
+    if (meta) return meta
+  }
+  if (!queueItem.channelOriginId) return undefined
+  const origin = getChannelOriginMeta(queueItem.channelOriginId)
+  if (!origin) return undefined
+  return {
+    channelId: origin.channelId,
+    platformChatId: origin.platformChatId,
+    platformMessageId: origin.platformMessageId,
+    platformUserId: origin.platformUserId,
+  }
+}
+
+/**
+ * Keep the platform's "typing" hint alive for as long as a turn runs.
+ *
+ * Platforms expire the hint quickly (Telegram: ~5s), and it was only ever sent
+ * once per turn. A 10-minute turn therefore looked exactly like a dead one: no
+ * typing, no message, nothing. Refreshing it is what makes "working" and
+ * "broken" distinguishable for someone whose only view is the chat app.
+ *
+ * Returns a stop function; callers MUST call it in a `finally`.
+ */
+export function startTypingKeepalive(meta: ChannelQueueMeta): () => void {
+  let stopped = false
+  const ping = async () => {
+    try {
+      const channel = await getChannel(meta.channelId)
+      if (!channel || channel.status !== 'active') return
+      const adapter = channelAdapters.get(channel.platform)
+      if (!adapter?.sendTypingIndicator) return
+      const cfg = JSON.parse(channel.platformConfig) as Record<string, unknown>
+      await adapter.sendTypingIndicator(channel.id, cfg, meta.platformChatId)
+    } catch {
+      // Liveness is best-effort; never let it disturb the turn.
+    }
+  }
+  void ping()
+  const timer = setInterval(() => {
+    if (!stopped) void ping()
+  }, config.channels.typingRefreshMs)
+  return () => {
+    stopped = true
+    clearInterval(timer)
+  }
+}
+
+/**
+ * Tell the channel that the turn failed.
+ *
+ * The engine's error path only ever wrote to the web timeline and SSE, so a
+ * user whose sole view is Telegram saw nothing at all — the agent simply went
+ * quiet, indefinitely. This is the counterpart of `deliverChannelResponse` for
+ * every non-success outcome: the invariant is that a turn which started from a
+ * channel ends with either a reply or a notice on that same channel.
+ *
+ * Deliberately terse and prefixed, so it reads as a system notice rather than
+ * something the Agent said.
+ */
+export async function notifyChannelOfFailure(meta: ChannelQueueMeta, reason: string): Promise<void> {
+  try {
+    const channel = await getChannel(meta.channelId)
+    if (!channel || channel.status !== 'active') return
+    const adapter = channelAdapters.get(channel.platform)
+    if (!adapter) return
+    const cfg = JSON.parse(channel.platformConfig) as Record<string, unknown>
+    const locale = resolveChannelLocale(meta.channelId)
+    await adapter.sendMessage(channel.id, cfg, {
+      chatId: meta.platformChatId,
+      content: `⚠️ ${reason}`,
+      replyToMessageId: meta.platformMessageId,
+      locale,
+    })
+    log.info({ channelId: meta.channelId, platform: channel.platform }, 'Channel failure notice delivered')
+  } catch (err) {
+    // Last resort: if we cannot even deliver the failure notice, at least the
+    // operator sees why in the logs.
+    log.error({ channelId: meta.channelId, err }, 'Failed to deliver channel failure notice')
+  }
+}
+
+/**
+ * Send with bounded retries. A single transient failure used to drop the
+ * Agent's reply on the floor with nothing but a `log.error` — invisible to the
+ * person waiting for it.
+ */
+async function sendWithRetry<T>(send: () => Promise<T>): Promise<T> {
+  const attempts = Math.max(1, config.channels.sendRetries)
+  let lastError: unknown
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await send()
+    } catch (err) {
+      lastError = err
+      if (attempt === attempts || !isRetryableSendError(err)) throw err
+      const wait = resolveRetryDelayMs(err, attempt)
+      log.warn({ attempt, attempts, waitMs: wait, err }, 'Channel send failed, retrying')
+      await new Promise((r) => setTimeout(r, wait))
+    }
+  }
+  throw lastError
+}
+
 // ─── Response delivery ──────────────────────────────────────────────────────
 
 export async function deliverChannelResponse(
@@ -1015,13 +1171,15 @@ export async function deliverChannelResponse(
 
   try {
     const locale = resolveChannelLocale(meta.channelId)
-    const result = await adapter.sendMessage(meta.channelId, cfg, {
-      chatId: meta.platformChatId,
-      content: outboundContent,
-      replyToMessageId: meta.platformMessageId,
-      attachments: attachments?.length ? attachments : undefined,
-      locale,
-    })
+    const result = await sendWithRetry(() =>
+      adapter.sendMessage(meta.channelId, cfg, {
+        chatId: meta.platformChatId,
+        content: outboundContent,
+        replyToMessageId: meta.platformMessageId,
+        attachments: attachments?.length ? attachments : undefined,
+        locale,
+      }),
+    )
 
     // Record the outbound link. Auto-delivered replies are authored by the
     // channel's current owner Agent, so sentByAgentId mirrors channel.agentId.
@@ -1089,6 +1247,80 @@ export async function deliverChannelResponse(
     log.info({ channelId: meta.channelId, agentId: channel.agentId, platform: channel.platform }, 'Channel response delivered')
   } catch (err) {
     log.error({ channelId: meta.channelId, err }, 'Failed to deliver channel response')
+    // Retries are exhausted and the reply is lost. Mark the message so the UI
+    // shows it, tell the Agent so it can resend explicitly, and notify the
+    // operator — previously this was a log line and nothing else, which is how
+    // replies vanished with everyone believing they had been sent.
+    await reportUndeliveredChannelReply({
+      agentId: channel.agentId,
+      assistantMessageId,
+      reason: err instanceof Error ? err.message : 'channel delivery failed',
+    }).catch(() => {})
+    import('@/server/services/notifications')
+      .then(({ createNotification }) =>
+        createNotification({
+          type: 'agent:error',
+          title: 'Channel delivery failed',
+          body: `A reply could not be delivered on ${channel.platform}. The Agent was told to resend it.`,
+          agentId: channel.agentId,
+          relatedId: channel.id,
+          relatedType: 'agent',
+        }),
+      )
+      .catch(() => {})
+  }
+}
+
+/**
+ * The Agent wrote a reply for a turn that came from an external channel, but no
+ * destination could be resolved (origin row missing or past the freshness
+ * window). Without this the reply vanishes silently and the Agent believes it
+ * answered. Tell it, in its own conversation, so it can resend explicitly.
+ *
+ * Callers must have established that the turn really had a channel origin.
+ * This must never fire for a plain web-UI or external-API reply.
+ */
+export async function reportUndeliveredChannelReply(params: {
+  agentId: string
+  assistantMessageId: string
+  channelOriginId?: string
+  reason: string
+}): Promise<void> {
+  const { agentId, assistantMessageId, channelOriginId, reason } = params
+  const content =
+    '⚠️ Your previous reply was NOT delivered to any external channel: the originating channel context could not be resolved ' +
+    `(${reason}). If it was meant for a contact or a channel, send it again explicitly with send_to_contact() or send_channel_message().`
+
+  const msgId = uuid()
+  const createdAt = new Date()
+  await db.insert(messages).values({
+    id: msgId,
+    agentId,
+    role: 'user',
+    content,
+    sourceType: 'system',
+    metadata: JSON.stringify({ systemEvent: 'channel_delivery_failed', assistantMessageId, channelOriginId: channelOriginId ?? null, reason }),
+    createdAt,
+  })
+
+  sseManager.sendToAgent(agentId, {
+    type: 'chat:message',
+    agentId,
+    data: { id: msgId, role: 'user', content, sourceType: 'system', createdAt: createdAt.getTime() },
+  })
+
+  // Mirror the success path's `channelDelivery` marker so the undelivered state
+  // is visible on the Agent's own message, not only in the follow-up note.
+  try {
+    const existing = await db.select({ metadata: messages.metadata }).from(messages).where(eq(messages.id, assistantMessageId)).get()
+    let merged: Record<string, unknown> = {}
+    if (existing?.metadata) {
+      try { merged = JSON.parse(existing.metadata as string) as Record<string, unknown> } catch { /* corrupted, overwrite */ }
+    }
+    merged.channelDelivery = { status: 'undelivered', reason }
+    await db.update(messages).set({ metadata: JSON.stringify(merged) }).where(eq(messages.id, assistantMessageId))
+  } catch (err) {
+    log.warn({ messageId: assistantMessageId, err }, 'Failed to mark message as undelivered')
   }
 }
 

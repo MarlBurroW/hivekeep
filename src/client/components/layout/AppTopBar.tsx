@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, FolderKanban, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, ChevronDown } from 'lucide-react'
+import { Home, ListTodo, CalendarClock, Folder, Blocks, Boxes, SquareTerminal, ChevronDown } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -29,7 +29,7 @@ interface AppTopBarProps {
 }
 
 /**
- * Persistent top bar shown across all authenticated pages (Agents, Projets, etc.).
+ * Persistent top bar shown across all authenticated pages.
  *
  * Hosts global actions: brand, SSE indicator, palette/theme toggles, notifications,
  * user menu. Lives at the App.tsx layout level so it doesn't disappear when the
@@ -62,11 +62,10 @@ export function AppTopBar({ onOpenSettings, onOpenAccount }: AppTopBarProps) {
   // admin-only Models entry).
   const isAdmin = user?.role === 'admin'
   const path = location.pathname
-  const sectionPrefixes = ['/projects', '/tasks', '/crons', '/files', '/mini-apps', '/models', '/terminal']
+  const sectionPrefixes = ['/tasks', '/crons', '/files', '/mini-apps', '/models', '/terminal']
   const isSection = (prefix: string) => path.startsWith(prefix)
   const modeItems: Array<{ key: string; to: string; icon: typeof Home; active: boolean; label: string; badgeKey?: 'tasks' | 'crons' }> = [
     { key: 'agents', to: '/', icon: Home, active: !sectionPrefixes.some(isSection), label: t('activityBar.agents') },
-    { key: 'projects', to: '/projects', icon: FolderKanban, active: isSection('/projects'), label: t('activityBar.projects') },
     { key: 'tasks', to: '/tasks', icon: ListTodo, active: isSection('/tasks'), label: t('activityBar.tasks'), badgeKey: 'tasks' },
     { key: 'crons', to: '/crons', icon: CalendarClock, active: isSection('/crons'), label: t('activityBar.crons'), badgeKey: 'crons' },
     { key: 'files', to: '/files', icon: Folder, active: isSection('/files'), label: t('activityBar.files') },

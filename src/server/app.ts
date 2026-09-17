@@ -31,9 +31,6 @@ import { vaultRoutes } from '@/server/routes/vault'
 import { contactRoutes } from '@/server/routes/contacts'
 import { taskRoutes } from '@/server/routes/tasks'
 import { cronRoutes } from '@/server/routes/crons'
-import { projectRoutes } from '@/server/routes/projects'
-import { tagRoutes } from '@/server/routes/tags'
-import { ticketRoutes } from '@/server/routes/tickets'
 import { mcpServerRoutes } from '@/server/routes/mcp-servers'
 import { fileRoutes } from '@/server/routes/files'
 import { fileStorageRoutes } from '@/server/routes/file-storage'
@@ -43,6 +40,7 @@ import { memoryRoutes } from '@/server/routes/memories'
 import { sharedRoutes } from '@/server/routes/shared'
 import { webhookRoutes } from '@/server/routes/webhooks'
 import { webhookIncomingRoutes } from '@/server/routes/webhooks-incoming'
+import { pluginHookRoutes } from '@/server/routes/plugin-hooks'
 import { accountTriggerRoutes } from '@/server/routes/account-triggers'
 import { channelRoutes } from '@/server/routes/channels'
 import { channelTelegramRoutes } from '@/server/routes/channel-telegram'
@@ -58,7 +56,6 @@ import { feedbackRoutes } from '@/server/routes/feedback'
 import { miniAppRoutes, miniAppSdkRoutes } from '@/server/routes/mini-apps'
 import { pluginRoutes } from '@/server/routes/plugins'
 import { pluginCardRoutes } from '@/server/routes/plugin-cards'
-import { knowledgeRoutes } from '@/server/routes/knowledge'
 import { workspaceFilesRoutes } from '@/server/routes/workspace-files'
 import { workspaceSourceRoutes } from '@/server/routes/workspace-sources'
 import { workspaceFolderRoutes } from '@/server/routes/workspace-folders'
@@ -107,6 +104,12 @@ app.use('*', async (c, next) => {
 
 // Global error handler — ensures all unhandled exceptions return JSON, not plain text
 app.onError((err, c) => {
+  // A malformed request body is the CALLER's error, not a server fault: most
+  // handlers call c.req.json() unguarded, and the SyntaxError it throws used
+  // to surface as 500 INTERNAL_ERROR (and pollute the error logs).
+  if (err instanceof SyntaxError && err.message.toLowerCase().includes('json')) {
+    return c.json({ error: { code: 'INVALID_JSON', message: 'Request body is not valid JSON' } }, 400)
+  }
   log.error({ err }, 'Unhandled error')
   return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500)
 })
@@ -211,9 +214,6 @@ app.route('/api/feedback', feedbackRoutes)
 app.route('/api/contacts', contactRoutes)
 app.route('/api/tasks', taskRoutes)
 app.route('/api/crons', cronRoutes)
-app.route('/api/projects', projectRoutes)
-app.route('/api/tags', tagRoutes)
-app.route('/api/tickets', ticketRoutes)
 app.route('/api/mcp-servers', mcpServerRoutes)
 app.route('/api/files', fileRoutes)
 app.route('/api/file-storage', fileStorageRoutes)
@@ -221,6 +221,8 @@ app.route('/api/prompts', promptRoutes)
 app.route('/api/secret-prompts', secretPromptRoutes)
 app.route('/api/memories', memoryRoutes)
 app.route('/api/webhooks/incoming', webhookIncomingRoutes)
+// Plugin-declared HTTP routes (public — handlers authenticate themselves).
+app.route('/api/plugin-hooks', pluginHookRoutes)
 app.route('/api/webhooks', webhookRoutes)
 // External machine-to-machine API (bearer auth) + its admin management surface.
 app.route('/api/v1', externalApiRoutes)
@@ -231,7 +233,6 @@ app.route('/api/channels/slack/webhook', channelSlackRoutes)
 app.route('/api/channels/whatsapp/webhook', channelWhatsAppRoutes)
 app.route('/api/channels/signal/webhook', channelSignalRoutes)
 app.route('/api/channels', channelRoutes)
-app.route('/api/agents/:agentId/knowledge', knowledgeRoutes)
 app.route('/api/agents/:agentId/workspace', workspaceFilesRoutes)
 app.route('/api/workspace/:sourceType/:sourceId', workspaceSourceRoutes)
 app.route('/api/workspace-folders', workspaceFolderRoutes)

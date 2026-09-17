@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import type { ChannelAdapter, ChannelConfigSchema, IncomingAttachment, IncomingMessageHandler, OutboundMessageParams } from '@/server/channels/adapter'
 import { readAttachmentBlob, attachmentFileName } from '@/server/channels/adapter'
 import type { ChannelAdapterMeta } from '@/server/channels/adapter'
@@ -99,7 +100,9 @@ async function verifySlackSignature(
     .join('')
 
   const expected = `v0=${hexHash}`
-  return expected === signature
+  const a = Buffer.from(expected)
+  const b = Buffer.from(signature)
+  return a.length === b.length && timingSafeEqual(a, b)
 }
 
 // In-memory state per channel

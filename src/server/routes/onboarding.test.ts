@@ -191,29 +191,25 @@ describe('onboarding routes', () => {
       })
     })
 
-    it('returns completed=true when admin exists, regardless of providers', async () => {
-      // Phase 1 of the onboarding redesign decoupled `completed` from
-      // provider configuration — `completed` now mirrors `hasAdmin`.
-      // Provider state stays in the response for informational use
-      // (the dashboard checklist + Settings can surface it) but no
-      // longer gates entry to the app.
+    it('returns only {completed, hasAdmin} to anonymous callers once an admin exists', async () => {
+      // The route stays auth-exempt forever (the wizard needs it pre-auth),
+      // so once the pre-auth window is over it must stop disclosing the
+      // instance's provider posture to anonymous callers.
       let call = 0
       mockDbSelect = mock(() => {
         call++
         if (call === 1) return makeChain({ userId: 'u1', role: 'admin' })
-        return makeChain([])
+        return makeChain([{ capabilities: '["llm"]' }])
       })
 
       const res = await app.request('/api/onboarding/status')
       const body = await res.json()
 
-      expect(body.hasAdmin).toBe(true)
-      expect(body.hasLlm).toBe(false)
-      expect(body.hasEmbedding).toBe(false)
-      expect(body.completed).toBe(true)
+      expect(body).toEqual({ completed: true, hasAdmin: true })
     })
 
     it('returns completed=true when admin + llm + embedding providers exist', async () => {
+      mockGetSession = mock(() => Promise.resolve({ user: { id: 'u1' } }))
       let call = 0
       mockDbSelect = mock(() => {
         call++
@@ -236,6 +232,7 @@ describe('onboarding routes', () => {
     })
 
     it('handles provider with multiple capabilities', async () => {
+      mockGetSession = mock(() => Promise.resolve({ user: { id: 'u1' } }))
       let call = 0
       mockDbSelect = mock(() => {
         call++
@@ -254,6 +251,7 @@ describe('onboarding routes', () => {
     })
 
     it('skips providers with invalid JSON capabilities', async () => {
+      mockGetSession = mock(() => Promise.resolve({ user: { id: 'u1' } }))
       let call = 0
       mockDbSelect = mock(() => {
         call++
@@ -544,7 +542,8 @@ describe('onboarding routes', () => {
       expect(res.status).toBe(201)
       const body = await res.json()
       expect(body.firstName).toBe('Jane')
-      expect(body.role).toBe('admin')
+      // An admin already exists, so the invited user joins as a member.
+      expect(body.role).toBe('member')
 
       // Verify invitation was marked as used
       expect(mockMarkInvitationUsed).toHaveBeenCalledWith('valid-token', 'user-1')

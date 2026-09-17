@@ -1,12 +1,12 @@
 export type SSEEventType =
   | 'chat:token'
+  | 'chat:token-retract'
   | 'chat:done'
   | 'chat:message'
   | 'chat:tool-call-start'
   | 'chat:tool-call'
   | 'chat:tool-result'
   | 'chat:reasoning-token'
-  | 'chat:reasoning-done'
   | 'chat:token-usage'
   | 'chat:cleared'
   | 'chat:messages-deleted'
@@ -71,6 +71,9 @@ export type SSEEventType =
   | 'memory:created'
   | 'memory:updated'
   | 'memory:deleted'
+  // Agent long-term memory profile document. Distinct from 'profile:updated',
+  // which carries the signed-in user's profile.
+  | 'agent-profile:updated'
   | 'custom-tool:created'
   | 'custom-tool:updated'
   | 'custom-tool:deleted'
@@ -114,19 +117,6 @@ export type SSEEventType =
   | 'terminal:sessions-changed'
   | 'terminal:presets-changed'
   | 'card:updated'
-  | 'agent:active-project'
-  | 'project:created'
-  | 'project:updated'
-  | 'project:deleted'
-  | 'project-tag:created'
-  | 'project-tag:updated'
-  | 'project-tag:deleted'
-  | 'ticket:created'
-  | 'ticket:updated'
-  | 'ticket:deleted'
-  | 'ticket:comment-added'
-  | 'ticket:comment-updated'
-  | 'ticket:comment-deleted'
   | 'connected'
 
 export interface SSEEvent {

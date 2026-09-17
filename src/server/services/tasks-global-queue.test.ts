@@ -119,7 +119,6 @@ beforeAll(() => {
       scout_provider_id TEXT,
       compacting_config TEXT,
       thinking_config TEXT,
-      active_project_id TEXT,
       created_by TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -149,8 +148,6 @@ beforeAll(() => {
       pending_child_task_id TEXT,
       channel_origin_id TEXT,
       webhook_id TEXT,
-      ticket_id TEXT,
-      ticket_assignment_snapshot TEXT,
       prompt_context_snapshot TEXT,
       allow_human_prompt INTEGER NOT NULL DEFAULT 1,
       thinking_config TEXT,

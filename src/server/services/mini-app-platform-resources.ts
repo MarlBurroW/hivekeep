@@ -60,60 +60,6 @@ const REGISTRY: Record<string, ResourceBinding> = {
     },
   },
 
-  projects: {
-    list: async () => {
-      const { listProjects } = await import('@/server/services/projects')
-      return { projects: await listProjects() }
-    },
-    get: async (id) => {
-      const { getProject } = await import('@/server/services/projects')
-      const project = await getProject(id)
-      if (!project) notFound('Project')
-      return { project }
-    },
-    create: async (body) => {
-      const { createProject } = await import('@/server/services/projects')
-      return { project: await createProject(body as never) }
-    },
-    update: async (id, body) => {
-      const { updateProject } = await import('@/server/services/projects')
-      const project = await updateProject(id, body as never)
-      if (!project) notFound('Project')
-      return { project }
-    },
-    remove: async (id) => {
-      const { deleteProject } = await import('@/server/services/projects')
-      return { success: await deleteProject(id) }
-    },
-  },
-
-  tickets: {
-    list: async (query) => {
-      const projectId = query.get('projectId')
-      if (!projectId) throw new Error('tickets: a "projectId" query parameter is required (e.g. /tickets?projectId=...)')
-      const { listTickets } = await import('@/server/services/tickets')
-      const status = query.get('status') ?? undefined
-      const result = await listTickets(projectId, status ? { status: status as never } : undefined)
-      return result
-    },
-    get: async (id) => {
-      const { getTicket } = await import('@/server/services/tickets')
-      const ticket = await getTicket(id)
-      if (!ticket) notFound('Ticket')
-      return { ticket }
-    },
-    create: async (body) => {
-      const { createTicket } = await import('@/server/services/tickets')
-      return { ticket: await createTicket(body as never) }
-    },
-    update: async (id, body) => {
-      const { updateTicket } = await import('@/server/services/tickets')
-      const ticket = await updateTicket(id, body as never)
-      if (!ticket) notFound('Ticket')
-      return { ticket }
-    },
-  },
-
   crons: {
     list: async () => {
       const { listCrons } = await import('@/server/services/crons')

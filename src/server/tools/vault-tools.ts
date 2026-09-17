@@ -254,7 +254,7 @@ export const getVaultEntryTool: ToolRegistration = {
   concurrencySafe: true,
   create: (ctx) =>
     tool({
-      description: 'Retrieve a typed vault entry by key. Never include sensitive values in responses.',
+      description: 'Retrieve a typed vault entry by key: entry type, field names, and the {{secret:KEY}} placeholder. Values are never returned — insert the placeholder verbatim in tool arguments to use the secret, or use reveal_secret (user approval) to show it to the user.',
       inputSchema: z.object({
         key: z.string(),
       }),
@@ -268,7 +268,17 @@ export const getVaultEntryTool: ToolRegistration = {
         if (!result) {
           return { error: 'Entry not found' }
         }
-        return { entryType: result.entryType, fields: result.value }
+        // Decrypted values never reach the model: only the shape is exposed.
+        // Anything else would bypass the reveal_secret approval flow.
+        const fields =
+          result.value !== null && typeof result.value === 'object'
+            ? Object.keys(result.value)
+            : null
+        return {
+          entryType: result.entryType,
+          fields,
+          placeholder: placeholderFor(key),
+        }
       },
     }),
 }
@@ -353,7 +363,7 @@ export const getVaultAttachmentTool: ToolRegistration = {
   concurrencySafe: true,
   create: (ctx) =>
     tool({
-      description: 'Download a vault attachment as base64.',
+      description: 'Look up a vault attachment (name, type, size). Attachment content is never returned — it stays in the vault, like secret values; point the user to Settings > Vault to view or download it.',
       inputSchema: z.object({
         attachment_id: z.string(),
       }),
@@ -363,12 +373,11 @@ export const getVaultAttachmentTool: ToolRegistration = {
         if (!result) {
           return { error: 'Attachment not found' }
         }
-        // Convert to base64 for safe transport in tool result
-        const base64 = btoa(String.fromCharCode(...result.data))
+        // Attachment bytes (private keys, ID scans) never reach the model:
+        // they would be persisted in tool_calls outside any redaction.
         return {
           name: result.name,
           mimeType: result.mimeType,
-          base64,
           size: result.data.byteLength,
         }
       },

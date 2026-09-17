@@ -29,10 +29,20 @@ import {
 import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
 import type { ChannelSummary } from '@/shared/types'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:channels')
 
 export const channelRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Channel configuration is admin-only. Reads stay member-accessible; the
+// inbound platform webhooks are exempt (no session — they are validated by
+// their own token/signature schemes, and the auth middleware skips them).
+channelRoutes.use('*', (c, next) => {
+  if (c.req.method === 'GET') return next()
+  if (c.req.path.includes('/webhook/')) return next()
+  return requireAdmin(c, next)
+})
 
 function agentAvatarUrl(agentId: string, avatarPath: string | null): string | null {
   if (!avatarPath) return null
@@ -280,7 +290,7 @@ channelRoutes.patch('/:id', async (c) => {
     return c.json(
       {
         error: {
-          code: 'KINID_NOT_PATCHABLE',
+          code: 'AGENT_ID_NOT_PATCHABLE',
           message: 'To change the bound Agent, use POST /api/channels/:id/transfer or the transfer_channel tool.',
         },
       },

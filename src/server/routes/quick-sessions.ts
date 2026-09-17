@@ -26,7 +26,7 @@ agentScopedRoutes.post('/', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const user = c.get('user') as { id: string; name: string }
@@ -94,7 +94,7 @@ agentScopedRoutes.get('/', async (c) => {
   const agentIdParam = c.req.param('agentId')
   const agentId = agentIdParam ? resolveAgentId(agentIdParam) : null
   if (!agentId) {
-    return c.json({ error: { code: 'KIN_NOT_FOUND', message: 'Agent not found' } }, 404)
+    return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
   }
 
   const user = c.get('user') as { id: string; name: string }
@@ -232,7 +232,6 @@ sessionRoutes.get('/:id', async (c) => {
         isRedacted: m.isRedacted,
         toolCalls: m.toolCalls ? JSON.parse(m.toolCalls as string) : null,
         resolvedTaskId: null,
-        injectedMemories: meta?.injectedMemories ?? null,
         stepLimitReached: meta?.stepLimitReached ?? false,
         emptyTurn: meta?.emptyTurn ?? false,
         finishReason: meta?.finishReason ?? null,

@@ -66,6 +66,8 @@ function makeCtx(): PluginContext<{ greeting?: string }> {
       update: mock(async () => {}),
     },
     oauth: { getAccessToken: async () => null },
+    agents: { enqueueMessage: async () => ({ queueItemId: 'q1' }) },
+    routes: { publicUrl: (path: string) => `http://test/api/plugin-hooks/test-plugin${path}` },
   }
 }
 

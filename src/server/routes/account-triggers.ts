@@ -14,10 +14,14 @@ import {
   setAgentTriggersRequireApproval,
 } from '@/server/services/app-settings'
 import type { ConditionNode, TriggerDispatchMode } from '@/shared/types'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:account-triggers')
 
 export const accountTriggerRoutes = new Hono<{ Variables: AppVariables }>()
+
+// Platform configuration: every route in this family is admin-only.
+accountTriggerRoutes.use('*', requireAdmin)
 
 function bad(message: string, code = 'VALIDATION_ERROR') {
   return { error: { code, message } } as const

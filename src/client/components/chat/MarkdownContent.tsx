@@ -7,22 +7,20 @@ import { useCopyToClipboard } from '@/client/hooks/useCopyToClipboard'
 import { cn } from '@/client/lib/utils'
 import { HighlightText } from '@/client/components/chat/HighlightText'
 import { ImageLightbox } from '@/client/components/chat/ImageLightbox'
-import { TicketMention } from '@/client/components/chat/TicketMention'
 import { WorkspacePathMention } from '@/client/components/chat/WorkspacePathMention'
-import { remarkTicketMentions } from '@/client/lib/remark-ticket-mentions'
 import { remarkWorkspacePaths, WORKSPACE_PATH_TEXT_REGEX } from '@/client/lib/remark-workspace-paths'
 
 interface MarkdownContentProps {
   content: string
   /** Whether the content lives inside a user bubble (primary bg) */
   isUser?: boolean
-  /** Drop the chat-scoped remark plugins (ticket mentions, …) — used when
+  /** Drop the chat-scoped remark plugins (workspace paths, …) — used when
    *  MarkdownContent renders outside a conversation (e.g. Files md preview). */
   disableChatPlugins?: boolean
   className?: string
 }
 
-const defaultRemarkPlugins = [remarkGfm, remarkTicketMentions, remarkWorkspacePaths]
+const defaultRemarkPlugins = [remarkGfm, remarkWorkspacePaths]
 
 // ─── Lazy-loaded plugins ──────────────────────────────────────────────────────
 // rehype-highlight (~170 KB), remark-math + rehype-katex (~260 KB) are loaded
@@ -447,21 +445,6 @@ function MarkdownImage({ src, alt, title }: ImgHTMLAttributes<HTMLImageElement>)
 }
 
 /**
- * Renderer for the synthetic `ticket-mention` element emitted by the
- * remarkTicketMentions plugin. The plugin attaches the original raw text as a
- * `data-raw` HTML attribute, which react-markdown forwards verbatim. We pull
- * it back out and hand it to the TicketMention component.
- *
- * Falls back to literal text if `data-raw` is missing (defensive — should
- * never happen in practice).
- */
-function MentionElement(props: HTMLAttributes<HTMLElement> & { 'data-raw'?: string }) {
-  const raw = props['data-raw']
-  if (!raw) return <>{props.children}</>
-  return <TicketMention raw={raw} />
-}
-
-/**
  * Wraps GFM tables in a horizontally-scrollable container so wide tables scroll
  * WITHIN the message bubble instead of forcing the whole page to overflow on
  * narrow viewports. `max-w-full` keeps the wrapper inside the bubble's bounds.
@@ -500,7 +483,6 @@ const markdownComponents: any = {
   h5: withHighlight('h5'),
   h6: withHighlight('h6'),
   blockquote: withHighlight('blockquote'),
-  'ticket-mention': MentionElement,
   'workspace-path': WorkspacePathElement,
 }
 
@@ -545,10 +527,6 @@ export const MarkdownContent = memo(function MarkdownContent({
   const trimmed = content.trimStart()
 
   // Skip markdown rendering for very short / plain messages.
-  //
-  // Note: `#` is part of the markdown-marker check, so any string containing a
-  // potential ticket mention (`#42` or `slug#42`) already takes the markdown
-  // path and runs through remarkTicketMentions — no extra branch needed here.
   const isPlainText = useMemo(() => {
     if (/[*_`#\[!\-|>~$\\]/.test(trimmed) || /^\d+\.\s/m.test(trimmed)) return false
     // Workspace path candidates (e.g. "voilà rapports/analyse.md") need the

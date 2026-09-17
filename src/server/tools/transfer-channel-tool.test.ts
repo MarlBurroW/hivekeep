@@ -56,6 +56,7 @@ mock.module('@/server/services/channels', () => ({
     return meta
   },
   setChannelOriginMeta: (id: string, meta: any) => { _originMeta.set(id, meta) },
+  reportUndeliveredChannelReply: async () => {},
   setChannelTransferHint: () => undefined,
   popChannelTransferHint: (id: string) => {
     const h = _transferHints.get(id)

@@ -976,7 +976,6 @@ export type BuiltinToolDomain =
   | 'database'
   | 'mini-apps'
   | 'plugins'
-  | 'projects'
 
 /**
  * A tool domain slug. Built-in domains are the well-known ones in
@@ -1114,283 +1113,6 @@ export interface UsageSummaryRow {
   count: number
 }
 
-// ─── Projects & tickets ────────────────────────────────────────────────────────
-
-export type TicketStatus = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done'
-
-export interface ProjectTag {
-  id: string
-  label: string
-  color: string
-}
-
-export interface ProjectSummary {
-  id: string
-  /** Stable, human-readable identifier used to qualify ticket numbers (e.g.
-   *  `hivekeep#42`). Empty string ('') for legacy rows pre-dating the backfill. */
-  slug: string
-  title: string
-  githubUrl: string | null
-  /** Surfaced in summaries so list views and the project header can show the
-   *  clone state badge without re-fetching the full Project. */
-  githubRepo: string | null
-  cloneStatus: CloneStatus
-  ticketCount: number
-  openTicketCount: number
-  createdAt: number
-  updatedAt: number
-}
-
-/** Lifecycle state of the per-project local git clone used by sub-task
- *  worktrees. `'none'` covers both "no repo configured" and "configured
- *  but clone not kicked off yet" — disambiguate via `githubRepo`. */
-export type CloneStatus = 'none' | 'cloning' | 'ready' | 'error'
-
-/** Subset of a GitHub repo returned by the repo-picker route. Mirrors the
- *  server's `GitHubRepoSummary` (kept in sync with `src/server/services/github.ts`). */
-export interface GitHubRepoSummary {
-  /** Canonical "owner/name" — the value we persist on `projects.githubRepo`. */
-  fullName: string
-  owner: string
-  name: string
-  private: boolean
-  defaultBranch: string
-  description: string | null
-  htmlUrl: string
-  /** Whether the PAT can push. `null` on `/search/repositories` results
-   *  (GitHub omits permissions there). */
-  canPush: boolean | null
-}
-
-export interface Project {
-  id: string
-  /** Human-readable identifier — see ProjectSummary.slug. */
-  slug: string
-  title: string
-  description: string
-  githubUrl: string | null
-  /** Vault key (not value) referencing the PAT used to clone + push for this
-   *  project. The PAT itself is resolved on demand via the vault service and
-   *  is never embedded in `Project` payloads. */
-  githubPatVaultKey: string | null
-  /** Canonical "owner/name" of the GitHub repo backing this project. Drives
-   *  the local clone path (`<repos>/<slug>/`) and the worktree branch base. */
-  githubRepo: string | null
-  /** Branch sub-task worktrees are created from. Defaults to 'main'. */
-  defaultBranch: string
-  cloneStatus: CloneStatus
-  /** Last clone failure message, surfaced in the project header so the user
-   *  can retry. Cleared on a successful clone. */
-  cloneError: string | null
-  /** Unix ms of the last successful clone, or null if never cloned. */
-  clonedAt: number | null
-  /** Optional default model for sub-Agent tasks spawned on tickets of this
-   *  project. Frozen into the task at spawn time; falls back to the Agent's
-   *  own model when null. An explicit model passed at spawn still wins. */
-  model: string | null
-  providerId: string | null
-  /** Optional default scout model for work in this project's context. One tier
-   *  of resolveScoutModel()'s chain, BETWEEN the per-call override and the
-   *  per-Agent scout (project beats Agent). Coupled with `scoutProviderId`.
-   *  Null falls through to the Agent scout → global default → Agent main model. */
-  scoutModel: string | null
-  scoutProviderId: string | null
-  /** Optional reasoning config for scouts dispatched in this project's context.
-   *  Same chain position as `scoutModel` (project beats Agent). Null = unset
-   *  tier (falls through to the Agent scout thinking → global default → the
-   *  calling Agent's own general config). */
-  scoutThinkingConfig: AgentThinkingConfig | null
-  /** Optional default thinking/reasoning config for sub-Agent tasks spawned on
-   *  tickets of this project. Same freeze-at-spawn semantics as `model`.
-   *  Null means "inherit from each Agent". */
-  thinkingConfig: AgentThinkingConfig | null
-  /** Optional default toolbox selection (toolbox ids) for sub-Agent tasks
-   *  spawned on tickets of this project. Frozen into the task at spawn when no
-   *  explicit toolbox selection is provided. Null means "inherit the runtime
-   *  default" ('code' for ticket tasks). An explicit selection at spawn wins. */
-  defaultToolboxIds: string[] | null
-  tags: ProjectTag[]
-  ticketCounts: Record<TicketStatus, number>
-  createdAt: number
-  updatedAt: number
-}
-
-/**
- * A curated piece of durable knowledge attached to a project (architectural
- * decisions, conventions, gotchas, domain facts). Shared across Agents acting
- * on the project.
- *
- * Every entry's `title` always lands in the system-prompt knowledge index.
- * When `pinned` is true, the full markdown `content` is also injected
- * inline — no tool call needed to read it. When false, the Agent reads
- * the content via `get_project_knowledge(id)`.
- */
-export interface ProjectKnowledge {
-  id: string
-  projectId: string
-  /** Short human-readable title (always shown in the prompt index). */
-  title: string
-  /** Markdown body. Inlined into the prompt only when `pinned` is true. */
-  content: string
-  /** Optional free-text bucket (e.g. 'arch', 'decision', 'gotcha'). */
-  category: string | null
-  pinned: boolean
-  /** Agent that created the entry, or null when created by the end-user via UI. */
-  authorAgentId: string | null
-  /** Resolved Agent name for display (null when authorAgentId is null = user). */
-  authorAgentName: string | null
-  createdAt: number
-  updatedAt: number
-}
-
-/** Lightweight projection used to render the system-prompt index without
- *  shipping the full markdown body for every entry. */
-export interface ProjectKnowledgeIndexEntry {
-  id: string
-  title: string
-  category: string | null
-  pinned: boolean
-  authorAgentName: string | null
-}
-
-/** A single hit returned by `searchProjectKnowledge`. */
-export interface ProjectKnowledgeSearchHit extends ProjectKnowledge {
-  score: number
-}
-
-export interface RunningAgentOnTicket {
-  agentId: string
-  agentName: string
-  agentSlug: string | null
-  avatarUrl: string | null
-  taskId: string
-}
-
-/** Whoever created a ticket — either a platform user (UI) or an Agent (tool). */
-export type TicketReporter =
-  | { type: 'user'; id: string; name: string; avatarUrl: string | null }
-  | { type: 'agent'; id: string; slug: string | null; name: string; avatarUrl: string | null }
-
-export interface TicketSummary {
-  id: string
-  projectId: string
-  /** Per-project monotonic ticket number (`#42`). Null for legacy rows still
-   *  awaiting the startup backfill — never null for tickets created via
-   *  createTicket() once the slug/number feature shipped. */
-  number: number | null
-  title: string
-  description: string
-  status: TicketStatus
-  position: number
-  tags: ProjectTag[]
-  taskCount: number
-  runningTaskCount: number
-  /** Number of tasks on this ticket currently in `awaiting_human_input` —
-   *  i.e. a sub-Agent is suspended on a prompt_human / request_input call and
-   *  needs the user to answer before resuming. */
-  awaitingHumanInputCount: number
-  /** Agents currently executing a task on this ticket (status queued/pending/in_progress).
-   *  One entry per running task — same Agent can appear twice if it has multiple in flight. */
-  runningAgents: RunningAgentOnTicket[]
-  /** Who created this ticket. Null for legacy rows. */
-  reporter: TicketReporter | null
-  /** Number of attachments on this ticket. Refreshes via SSE
-   *  `ticket:updated` after each attachment mutation. */
-  attachmentCount: number
-  /** Unix-ms when the ticket last entered the in_progress column. This tracks
-   *  the kanban *column* transition only (project-management state), NOT task
-   *  activity. Null when the ticket has never been moved to in_progress. */
-  inProgressAt: number | null
-  /** Unix-ms when the EARLIEST currently-running task on this ticket started
-   *  being processed (min over tasks in queued/pending/in_progress, using
-   *  startedAt → queuedAt → createdAt). This is decoupled from the kanban
-   *  column: it reflects whether the ticket has live task work, which is what
-   *  drives the "running" framing + live chrono on the card. Null when no task
-   *  is currently running. */
-  runningSince: number | null
-  createdAt: number
-  updatedAt: number
-}
-
-export interface TicketTaskSummary {
-  id: string
-  parentAgentId: string
-  parentAgentName: string
-  /** Avatar URL of the parent Agent (so the side panel can display the right
-   *  avatar when opened from a ticket). Null if the Agent has no avatar. */
-  parentAgentAvatarUrl: string | null
-  status: TaskStatus
-  mode: TaskMode
-  /** Task variant. 'execute' is a regular ticket task; 'enrich' is a
-   *  ticket-enrichment pass that rewrites title/description/tags. */
-  kind: 'execute' | 'enrich'
-  /** Unix-ms when the task first entered in_progress. Null while queued/pending.
-   *  Used (with endedAt / now) to show the run duration on the ticket panel. */
-  startedAt: number | null
-  /** Unix-ms when the task reached a terminal status. Null while still active. */
-  endedAt: number | null
-  createdAt: number
-  updatedAt: number
-}
-
-export interface Ticket extends Omit<TicketSummary, 'description'> {
-  description: string
-  tasks: TicketTaskSummary[]
-}
-
-// ─── Ticket comments ────────────────────────────────────────────────────────
-
-export interface TicketCommentAuthor {
-  type: 'user' | 'agent'
-  id: string
-  name: string
-  avatarUrl: string | null
-  /** Agent slug, only set when type === 'agent' */
-  slug?: string
-}
-
-export interface TicketCommentMetadata {
-  fromTaskId?: string
-  autoGenerated?: boolean
-}
-
-export interface TicketComment {
-  id: string
-  ticketId: string
-  author: TicketCommentAuthor
-  content: string
-  metadata: TicketCommentMetadata | null
-  createdAt: number
-  updatedAt: number
-}
-
-// ─── Ticket attachments ─────────────────────────────────────────────────────
-
-/** Who uploaded a ticket attachment. Mirrors TicketReporter but only carries the
- *  shape needed by the UI (no slug). */
-export type TicketAttachmentUploader =
-  | { type: 'user'; id: string; name: string; avatarUrl: string | null }
-  | { type: 'agent'; id: string; name: string; avatarUrl: string | null }
-  | null
-
-/** A single file attached to a ticket. The `url` field points at the
- *  ticket-attachment raw stream and is safe to embed in `<img>` / `<iframe>`.
- *  `storedPath` is the absolute on-disk path; only exposed to Agent tools, never
- *  to the UI (server stripes it before serializing for REST). */
-export interface TicketAttachment {
-  id: string
-  ticketId: string
-  name: string
-  mimeType: string
-  size: number
-  description: string | null
-  uploadedBy: TicketAttachmentUploader
-  /** Endpoint to fetch the raw bytes (relative to the API origin). */
-  url: string
-  createdAt: number
-  updatedAt: number
-}
-
 // ─── Workspace files (Files section, see files.md) ──────────────────────────
 
 /** How the server decided a workspace file should be presented. */
@@ -1422,34 +1144,21 @@ export interface WorkspaceFileInfo {
   content: string | null
 }
 
-// ─── Workspace sources (Files section selector — agent / project / folder) ──
+// ─── Workspace sources (Files section selector — agent / folder / mini-app) ──
 
-export type WorkspaceSourceType = 'agent' | 'project' | 'folder' | 'miniapp'
+export type WorkspaceSourceType = 'agent' | 'folder' | 'miniapp'
 
 /**
- * Identifies a browse source for the Files section. `agent` is the legacy
- * per-agent workspace; `project` browses a cloned repo (optionally a specific
- * git worktree); `folder` browses a user-added absolute FS path; `miniapp`
- * browses a mini-app's source directory (id = the mini-app id).
+ * Identifies a browse source for the Files section. `agent` is the per-agent
+ * workspace; `folder` browses a user-added absolute FS path; `miniapp` browses
+ * a mini-app's source directory (id = the mini-app id).
  */
 export interface WorkspaceSourceRef {
   type: WorkspaceSourceType
   id: string
-  /** Selected git worktree id (project sources only; absent = the base clone). */
-  worktree?: string
 }
 
-/** A worktree of a project repo, as listed for the worktree sub-selector. */
-export interface WorkspaceWorktreeDTO {
-  /** Stable id used in WorkspaceSourceRef.worktree (the worktree dir basename; '' = base clone). */
-  id: string
-  branch: string
-  isMain: boolean
-  /** Ticket number this worktree was created for, when derivable. */
-  ticketNumber?: number
-}
-
-/** Lightweight git status shown as a badge over a project/repo source. */
+/** Lightweight git status shown as a badge over a source that is a git repo. */
 export interface WorkspaceGitStatusDTO {
   branch: string
   /** Number of changed (dirty) entries from `git status --porcelain`. */

@@ -8,6 +8,9 @@ import {
   generateAndSaveAvatar,
 } from '@/server/services/agents'
 import { resolveAgentId } from '@/server/services/agent-resolver'
+import { db } from '@/server/db/index'
+import { agents } from '@/server/db/schema'
+import { eq } from 'drizzle-orm'
 import { createLogger } from '@/server/logger'
 import type { ToolRegistration } from '@/server/tools/types'
 
@@ -37,7 +40,7 @@ export const createAgentTool: ToolRegistration = {
           .array(z.string())
           .optional()
           .describe(
-            'Names of toolboxes granting this Agent its tools. An Agent with NO toolbox can only use the core floor (read/write files, shell, basic) — so give it the toolboxes it needs (don\'t be stingy). Built-ins: "all" (everything), "research" (web + memory), "ops" (memory + vault + http), "code" (projects/tickets), "scout", "email", "calendar", "address-book". Omit to default to "all". Use list_toolboxes to discover more.',
+            'Names of toolboxes granting this Agent its tools. An Agent with NO toolbox can only use the core floor (read/write files, shell, basic) — so give it the toolboxes it needs (don\'t be stingy). Built-ins: "all" (everything), "research" (web + memory), "ops" (memory + vault + http), "code" (task introspection + web docs + read-only memory), "scout", "email", "calendar", "address-book". Omit to default to "all". Use list_toolboxes to discover more.',
           ),
         generate_avatar: z
           .boolean()
@@ -257,6 +260,14 @@ export const deleteAgentTool: ToolRegistration = {
 
         if (targetAgentId === ctx.agentId) {
           return { error: 'You cannot delete yourself. Ask a user or another Agent to do this.' }
+        }
+
+        // The configurator (Queenie) can only be deleted by a human through
+        // the UI, where a dedicated warning explains the consequences. An
+        // Agent deleting it silently would erase the onboarding history.
+        const target = db.select({ kind: agents.kind }).from(agents).where(eq(agents.id, targetAgentId)).get()
+        if (target?.kind === 'configurator') {
+          return { error: 'The configurator assistant cannot be deleted by an Agent. Only a user can do this, from its settings.' }
         }
 
         log.warn({ agentId: ctx.agentId, targetAgentId, targetSlug: agent_id }, 'Agent deletion requested via tool')

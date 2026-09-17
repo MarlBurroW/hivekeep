@@ -2,7 +2,7 @@
  * Tests for the scout / sub-task suspend → resume primitive.
  *
  * Spins up a real in-memory SQLite DB with the production schema (the same
- * pattern as ticket-comments.test.ts) so we exercise the actual atomic
+ * pattern as the other DB-backed service tests) so we exercise the actual atomic
  * `sqlite.run` claims and drizzle queries end-to-end rather than the brittle
  * mock-drizzle plumbing.
  *
@@ -28,7 +28,7 @@ import { eq } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import * as schema from '@/server/db/schema'
 
-// ─── Mock pollution guard (matches ticket-comments.test.ts) ──────────────────
+// ─── Mock pollution guard (matches the other DB-backed service tests) ───────
 const schemaIsReal = !!(schema as any).tasks?.id
 
 mock.module('@/server/logger', () => ({
@@ -106,7 +106,6 @@ beforeAll(() => {
       scout_provider_id TEXT,
       compacting_config TEXT,
       thinking_config TEXT,
-      active_project_id TEXT,
       created_by TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -136,8 +135,6 @@ beforeAll(() => {
       pending_child_task_id TEXT,
       channel_origin_id TEXT,
       webhook_id TEXT,
-      ticket_id TEXT,
-      ticket_assignment_snapshot TEXT,
       prompt_context_snapshot TEXT,
       allow_human_prompt INTEGER NOT NULL DEFAULT 1,
       thinking_config TEXT,

@@ -290,11 +290,6 @@ const dict: typeof en = {
               blurb: 'Os agentes agendam o próprio trabalho futuro (<b>"me acorde em 2 horas"</b>) para que follow-ups e lembretes realmente aconteçam.',
               icon: 'alarm-clock',
             },
-            {
-              title: 'Kanban tocado por agentes',
-              blurb: 'Organize o trabalho em projetos e tickets, depois <b>atribua tickets a agentes</b> que os executam e reportam de volta em comentários.',
-              icon: 'kanban',
-            },
           ],
         },
         {
@@ -315,11 +310,6 @@ const dict: typeof en = {
               title: 'Bases de conhecimento',
               blurb: 'Envie documentos uma vez; os trechos relevantes <b>aparecem automaticamente</b> no contexto sempre que o assunto surgir.',
               icon: 'book-open',
-            },
-            {
-              title: 'Conhecimento de projeto',
-              blurb: 'Cada projeto guarda fatos, decisões e pegadinhas selecionados a dedo: as <b>entradas fixadas</b> acompanham cada turno do agente.',
-              icon: 'notebook-pen',
             },
             {
               title: 'Passado pesquisável',
@@ -444,7 +434,7 @@ const dict: typeof en = {
         'Um time de agentes que colaboram',
         'Web app polido (PWA)',
         'Chamadas de ferramenta renderizadas (UI, não JSON)',
-        'Mini-apps e projetos (Kanban)',
+        'Mini-apps criados pelos seus agentes',
         'Configuração por conversa (sem CLI)',
         'Segredos nunca enviados ao LLM',
         'Transparência de tokens e contexto',
@@ -468,7 +458,7 @@ const dict: typeof en = {
     tourTeaser: {
       kicker: 'Dentro do app',
       heading: 'Veja de verdade.',
-      p: 'Capturas reais de uma colmeia em atividade: conversas, chamadas de ferramentas, o cofre, mini-apps, o kanban e mais.',
+      p: 'Capturas reais de uma colmeia em atividade: conversas, chamadas de ferramentas, o cofre, mini-apps e mais.',
       cta: 'Fazer o tour',
     },
   },
@@ -477,7 +467,7 @@ const dict: typeof en = {
   tour: {
     meta: {
       title: 'Hivekeep em capturas',
-      description: 'Um tour guiado pelo Hivekeep em mais de 30 capturas reais: conversas de agentes, ferramentas, cofre criptografado, mini-apps, kanban, tarefas agendadas e mais.',
+      description: 'Um tour guiado pelo Hivekeep em mais de 30 capturas reais: conversas de agentes, ferramentas, cofre criptografado, mini-apps, tarefas agendadas e mais.',
     },
     kicker: 'O tour',
     heading: 'Veja dentro da colmeia.',
@@ -487,7 +477,7 @@ const dict: typeof en = {
       chat: { title: 'O dia a dia com seus agentes', sub: 'Uma conversa contínua por agente, com as ferramentas usadas à mostra, não escondidas.' },
       trust: { title: 'Segredos e transparência', sub: 'Agentes podem pedir credenciais sem nunca vê-las, e cada token gasto fica registrado.' },
       build: { title: 'Eles constroem para você', sub: 'Mini-apps, ferramentas próprias, um espaço de arquivos e um terminal de verdade: a plataforma cresce porque seus agentes a fazem crescer.' },
-      organize: { title: 'Organizar e automatizar', sub: 'Um kanban compartilhado, tarefas delegadas, jobs agendados e webhooks: várias coisas andam ao mesmo tempo.' },
+      organize: { title: 'Organizar e automatizar', sub: 'Tarefas delegadas, jobs agendados e webhooks: várias coisas andam ao mesmo tempo.' },
       control: { title: 'A sala de controle', sub: 'Provedores, modelos, canais, memórias, contatos: tudo inspecionável e do seu jeito.' },
       anywhere: { title: 'Em qualquer lugar, com qualquer visual', sub: 'Um app de verdade no seu celular, e 18 paletas em claro e escuro.' },
     },
@@ -514,9 +504,6 @@ const dict: typeof en = {
       'files': { t: 'Um workspace de verdade', d: 'Navegue e edite os arquivos de cada agente com um editor decente.' },
       'terminal': { t: 'Um terminal de verdade', d: 'Entre no shell do workspace de qualquer agente, do navegador.' },
       'toolboxes': { t: 'Capacidades delimitadas', d: 'Toolboxes decidem quais ferramentas cada agente vê. Agentes focados, modelos leves.' },
-      'kanban': { t: 'Um kanban compartilhado', d: 'Projetos e tickets em que você e os agentes trabalham juntos.' },
-      'ticket': { t: 'Agentes prestam contas', d: 'Forge comparou três orçamentos e postou o veredito como comentário.' },
-      'knowledge': { t: 'Conhecimento do projeto', d: 'Decisões e fatos fixados ao projeto, injetados em cada turno.' },
       'tasks': { t: 'Controle de missão', d: 'Cada trabalho delegado e sub-agente, ao vivo, com status e resultado.' },
       'crons': { t: 'Jobs agendados', d: 'Agentes no relógio: briefings, checagens, resumos, com diário.' },
       'webhooks': { t: 'Acordar por webhook', d: 'Qualquer evento HTTP pode acordar um agente, com filtros e despacho.' },

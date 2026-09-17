@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, afterEach } from 'bun:test'
+import { describe, it, expect, mock, afterEach, afterAll } from 'bun:test'
 import { fullMockConfig } from '../../test-helpers'
 
 // Mock config before importing the module
@@ -28,6 +28,14 @@ mock.module('@/server/logger', () => ({
 import { isBlockedUrl, extractContent, extractLinksFromHtml } from './web-browse'
 import type { ExtractMode } from '@/server/services/web-browse'
 
+// The guard now fails CLOSED on DNS errors/timeouts, so tests stub the
+// resolver to a public address for determinism (no network in CI).
+const originalDnsLookup = Bun.dns.lookup
+;(Bun.dns as { lookup: unknown }).lookup = async () => [{ address: '93.184.216.34', family: 4 }]
+afterAll(() => {
+  ;(Bun.dns as { lookup: unknown }).lookup = originalDnsLookup
+})
+
 // ─── isBlockedUrl ───────────────────────────────────────────────────────────
 
 describe('isBlockedUrl', () => {
@@ -50,10 +58,11 @@ describe('isBlockedUrl', () => {
   })
 
   it('blocks localhost variants', async () => {
-    for (const host of ['localhost', '127.0.0.1', '[::1]']) {
+    // 'localhost' is blocked by name; IP-literal loopback forms (including
+    // decimal and hex encodings) are normalized and blocked by range.
+    for (const host of ['localhost', '127.0.0.1', '[::1]', '127.1', '2130706433', '0x7f000001', '[::ffff:127.0.0.1]']) {
       const result = await isBlockedUrl(`http://${host}/path`)
       expect(result.blocked).toBe(true)
-      expect(result.reason).toContain('localhost')
     }
   })
 
@@ -66,7 +75,7 @@ describe('isBlockedUrl', () => {
   it('blocks cloud metadata endpoints', async () => {
     const aws = await isBlockedUrl('http://169.254.169.254/latest/meta-data/')
     expect(aws.blocked).toBe(true)
-    expect(aws.reason).toContain('metadata')
+    expect(aws.reason).toContain('link-local')
 
     const gcp = await isBlockedUrl('http://metadata.google.internal/computeMetadata/v1/')
     expect(gcp.blocked).toBe(true)

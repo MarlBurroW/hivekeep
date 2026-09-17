@@ -18,7 +18,7 @@
  *   summary row is deleted.
  */
 import { eq, and, isNull, lte, desc, inArray } from 'drizzle-orm'
-import { db } from '@/server/db/index'
+import { db, sqlite } from '@/server/db/index'
 import {
   messages,
   files,
@@ -36,8 +36,10 @@ export async function deleteMessagesCascade(agentId: string, allIds: string[]): 
   const chunks: string[][] = []
   for (let i = 0; i < allIds.length; i += 500) chunks.push(allIds.slice(i, i + 500))
 
-  // 1. Repair summary boundaries FIRST, across the FULL id set — repairing
-  //    per-chunk could repoint a boundary onto a message a later chunk deletes.
+  // 1. Compute summary-boundary repairs FIRST, across the FULL id set —
+  //    repairing per-chunk could repoint a boundary onto a message a later
+  //    chunk deletes. Reads only; the writes land in the transaction below.
+  const repairs: Array<{ summaryId: string; replacement: string | null }> = []
   const boundary: Array<{ id: string; lastMessageAt: Date }> = []
   for (const ids of chunks) {
     const rows = await db
@@ -68,36 +70,54 @@ export async function deleteMessagesCascade(agentId: string, allIds: string[]): 
       if (candidates.length === 0) break
       replacement = candidates.find((m) => !idSet.has(m.id))?.id ?? null
     }
-    if (replacement) {
-      await db.update(compactingSummaries).set({ lastMessageId: replacement }).where(eq(compactingSummaries.id, s.id))
-    } else {
-      await db.delete(compactingSummaries).where(eq(compactingSummaries.id, s.id))
-    }
+    repairs.push({ summaryId: s.id, replacement })
   }
 
-  // 2. Per-chunk reference cleanup + row deletion.
+  // 2. Gather the attached files (rows + disk paths) before any write.
+  const attached: Array<{ id: string; storedPath: string }> = []
   for (const ids of chunks) {
-    // Files attached to the deleted messages — disk first, then rows.
-    const attached = await db
+    const rows = await db
       .select({ id: files.id, storedPath: files.storedPath })
       .from(files)
       .where(and(eq(files.agentId, agentId), inArray(files.messageId, ids)))
-    if (attached.length > 0) {
-      const { unlink } = await import('fs/promises')
-      for (const f of attached) {
-        try { await unlink(f.storedPath) } catch { /* already gone */ }
+    attached.push(...rows)
+  }
+
+  // 3. Every row mutation in ONE transaction. A crash mid-cascade used to
+  //    produce a timeline that never existed (later chunks deleted, earlier
+  //    ones kept) or a destroyed summary whose messages survived.
+  const txn = sqlite.transaction(() => {
+    for (const r of repairs) {
+      if (r.replacement) {
+        db.update(compactingSummaries).set({ lastMessageId: r.replacement }).where(eq(compactingSummaries.id, r.summaryId)).run()
+      } else {
+        db.delete(compactingSummaries).where(eq(compactingSummaries.id, r.summaryId)).run()
       }
-      await db.delete(files).where(inArray(files.id, attached.map((f) => f.id)))
     }
+    if (attached.length > 0) {
+      for (let i = 0; i < attached.length; i += 500) {
+        db.delete(files).where(inArray(files.id, attached.slice(i, i + 500).map((f) => f.id))).run()
+      }
+    }
+    for (const ids of chunks) {
+      db.update(humanPrompts).set({ messageId: null }).where(inArray(humanPrompts.messageId, ids)).run()
+      db.update(agentMemories).set({ sourceMessageId: null }).where(inArray(agentMemories.sourceMessageId, ids)).run()
+      db.delete(compactingSnapshots).where(inArray(compactingSnapshots.messagesUpToId, ids)).run()
+      db.update(compactingSummaries)
+        .set({ firstMessageId: null })
+        .where(and(eq(compactingSummaries.agentId, agentId), inArray(compactingSummaries.firstMessageId, ids)))
+        .run()
+      db.delete(messages).where(and(eq(messages.agentId, agentId), inArray(messages.id, ids))).run()
+    }
+  })
+  txn()
 
-    await db.update(humanPrompts).set({ messageId: null }).where(inArray(humanPrompts.messageId, ids))
-    await db.update(agentMemories).set({ sourceMessageId: null }).where(inArray(agentMemories.sourceMessageId, ids))
-    await db.delete(compactingSnapshots).where(inArray(compactingSnapshots.messagesUpToId, ids))
-    await db
-      .update(compactingSummaries)
-      .set({ firstMessageId: null })
-      .where(and(eq(compactingSummaries.agentId, agentId), inArray(compactingSummaries.firstMessageId, ids)))
-
-    await db.delete(messages).where(and(eq(messages.agentId, agentId), inArray(messages.id, ids)))
+  // 4. Disk cleanup after commit — an orphan file on disk beats a dangling
+  //    DB row pointing at a deleted file.
+  if (attached.length > 0) {
+    const { unlink } = await import('fs/promises')
+    for (const f of attached) {
+      try { await unlink(f.storedPath) } catch { /* already gone */ }
+    }
   }
 }

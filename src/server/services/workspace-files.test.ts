@@ -302,10 +302,10 @@ describe('mutations (mkdir / move / copy / delete / upload)', () => {
   })
 })
 
-describe('target-based ops on a non-agent root (project/folder sources)', () => {
+describe('target-based ops on a non-agent root (folder / mini-app sources)', () => {
   // Confinement and mutations must work identically for an arbitrary root, not
   // just `data/workspaces/<agentId>` — that is the whole point of generalizing
-  // the service for project repos and FS folders.
+  // the service for mini-app dirs and FS folders.
   const folderTarget = (): WorkspaceTarget => ({ root, source: { type: 'folder', id: 'f1' } })
 
   test('write + list + delete on an arbitrary folder root', async () => {

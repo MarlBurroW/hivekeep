@@ -25,6 +25,11 @@ export function GeneralSettings() {
   const [isLoading, setIsLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
+  // Queenie recovery: seeding only ever happened from the onboarding wizard,
+  // so an install that lost (or never got) the configurator had no way back.
+  const [configuratorMissing, setConfiguratorMissing] = useState(false)
+  const [isReseeding, setIsReseeding] = useState(false)
+
   // Configured public URL (best-effort, for the misconfiguration warning).
   const [publicUrl, setPublicUrl] = useState<string | null>(null)
 
@@ -63,6 +68,33 @@ export function GeneralSettings() {
       .then((info) => setPublicUrl(info.publicUrl ?? null))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (user?.role !== 'admin') return
+    api
+      .get<{ agents: Array<{ kind: string }> }>('/agents')
+      .then((data) => setConfiguratorMissing(!data.agents.some((a) => a.kind === 'configurator')))
+      .catch(() => {})
+  }, [user?.role])
+
+  const handleReseedConfigurator = async () => {
+    setIsReseeding(true)
+    try {
+      const { providers } = await api.get<{ providers: Array<{ id: string; isValid: boolean; capabilities: string[] }> }>('/providers')
+      const llm = providers.find((p) => p.isValid && p.capabilities.includes('llm'))
+      if (!llm) {
+        toast.error(t('settings.general.queenie.noProvider'))
+        return
+      }
+      await api.post('/onboarding/configurator', { providerId: llm.id })
+      setConfiguratorMissing(false)
+      toast.success(t('settings.general.queenie.recreated'))
+    } catch (err: unknown) {
+      toastError(err)
+    } finally {
+      setIsReseeding(false)
+    }
+  }
 
   const fetchSettings = async () => {
     try {
@@ -203,6 +235,18 @@ export function GeneralSettings() {
       <p className="text-sm text-muted-foreground">
         {t('settings.general.description')}
       </p>
+
+      {isAdmin && configuratorMissing && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border px-4 py-3">
+          <div className="space-y-1 text-sm">
+            <p className="font-medium">{t('settings.general.queenie.missingTitle')}</p>
+            <p className="text-muted-foreground">{t('settings.general.queenie.missingBody')}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleReseedConfigurator} disabled={isReseeding}>
+            {t('settings.general.queenie.recreate')}
+          </Button>
+        </div>
+      )}
 
       {/* Global prompt */}
       <div className="space-y-2">

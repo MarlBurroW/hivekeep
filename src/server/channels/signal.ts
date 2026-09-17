@@ -3,6 +3,7 @@ import { readAttachmentBlob, attachmentFileName } from '@/server/channels/adapte
 import type { ChannelAdapterMeta } from '@/server/channels/adapter'
 import { getSecretValue } from '@/server/services/vault'
 import { config } from '@/server/config'
+import { channelWebhookToken } from '@/server/channels/webhook-token'
 import { createLogger } from '@/server/logger'
 
 const log = createLogger('channel:signal')
@@ -134,7 +135,7 @@ export class SignalAdapter implements ChannelAdapter {
     this.handlers.set(channelId, { onMessage, cfg: signalCfg })
 
     // Register webhook with signal-cli REST API
-    const webhookUrl = `${config.publicUrl}/api/channels/signal/webhook/${channelId}`
+    const webhookUrl = `${config.publicUrl}/api/channels/signal/webhook/${channelId}?token=${channelWebhookToken('signal', channelId)}`
     try {
       await signalApi(apiUrl, 'PUT', `/v1/accounts/${encodeURIComponent(phone)}/settings`, {
         webhook: webhookUrl,

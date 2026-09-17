@@ -44,6 +44,7 @@ import { augmentedPath, killProcessTree } from '@/server/lib/process'
 import { z } from 'zod'
 import type { Tool } from '@/server/tools/tool-helper'
 import type { CustomTool, CustomToolTranslations } from '@/shared/types'
+import { subprocessEnv } from '@/server/services/subprocess-env'
 
 const log = createLogger('custom-tools')
 
@@ -420,7 +421,7 @@ async function runInDir(
     cwd: dir,
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { ...process.env, PATH: augmentedPath },
+    env: { ...subprocessEnv(), PATH: augmentedPath },
   })
   const stdoutP = new Response(proc.stdout).text()
   const stderrP = new Response(proc.stderr).text()
@@ -549,7 +550,7 @@ export async function executeCustomTool(
       stdout: 'pipe',
       stderr: 'pipe',
       env: {
-        ...process.env,
+        ...subprocessEnv(),
         PATH: augmentedPath,
         CUSTOM_TOOL_ARGS: JSON.stringify(args),
         HIVEKEEP_CUSTOM_TOOL_DIR: dir,

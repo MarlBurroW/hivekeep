@@ -1,9 +1,9 @@
 import { serveStatic } from 'hono/bun'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
 import { app } from '@/server/app'
-import { db, initVirtualTables } from '@/server/db/index'
+import { db, sqlite, initVirtualTables } from '@/server/db/index'
+import { runMigrations } from '@/server/db/run-migrations'
 import { startQueueWorker } from '@/server/services/agent-engine'
 import { registerAllTools } from '@/server/tools/register'
 import { seedBuiltinToolboxes } from '@/server/services/toolboxes'
@@ -23,7 +23,6 @@ import { startEmailTriggerPoller } from '@/server/services/email-trigger-poller'
 import { Cron } from 'croner'
 import { cleanExpiredFiles } from '@/server/services/file-storage'
 import { startQuickSessionCleanup } from '@/server/services/quick-session-cleanup'
-import { startStaleWorktreeCleanup } from '@/server/services/worktree-cleanup'
 import { playwrightManager } from '@/server/services/playwright-manager'
 import { channelAdapters } from '@/server/channels/index'
 import { TelegramAdapter } from '@/server/channels/telegram'
@@ -69,13 +68,18 @@ preloadTokenizer().catch((err) => log.warn({ err }, 'Tokenizer preload failed; e
 
 // Run Drizzle migrations (creates tables if DB is fresh)
 log.info('Running database migrations...')
-migrate(db, { migrationsFolder: './src/server/db/migrations' })
+runMigrations(sqlite, db, './src/server/db/migrations')
 log.info('Database migrations complete')
 
 // Initialize FTS5 and sqlite-vec virtual tables
 log.info('Initializing virtual tables (FTS5, sqlite-vec)...')
 initVirtualTables()
 log.info('Virtual tables initialized')
+
+// Remove orphaned vector rows (deletion paths that missed the vec tables
+// leave orphans that occupy KNN slots and blind memory dedup).
+import { reconcileVectorTables } from '@/server/services/vector-maintenance'
+reconcileVectorTables()
 
 // One-time migration: backfill missing providerIds on agents/tasks/crons
 import { migrateModelProviders } from '@/server/services/migrate-model-providers'
@@ -173,10 +177,6 @@ if (config.terminal.enabled) {
   }
 }
 
-// Start the stale-worktree sweeper (reclaims sub-task worktrees that
-// outlived their TTL — see config.repos.worktreeKeepFailedSec).
-startStaleWorktreeCleanup()
-
 // Ensure all users have a linked contact
 ensureUserContactsExist().catch((err) => log.error({ err }, 'Failed to backfill user contacts'))
 
@@ -207,13 +207,21 @@ new Cron('0 * * * *', async () => {
 import { startChannelFileCleanup } from '@/server/services/files'
 startChannelFileCleanup()
 
+// Stuck-Agent watch (warn, then requeue an Agent wedged in 'processing')
+import { startStuckAgentWatch } from '@/server/services/stuck-agent-watch'
+startStuckAgentWatch()
+
+// Channel origin cleanup (prune origins past the delivery freshness window)
+import { startChannelOriginCleanup } from '@/server/services/channels'
+startChannelOriginCleanup()
+
 // Webhook log cleanup (prune old/excess logs)
 import { startWebhookLogCleanup } from '@/server/services/webhooks'
 startWebhookLogCleanup()
 
-// Trigger log cleanup (prune old trigger evaluation logs)
-import { startTriggerLogCleanup } from '@/server/services/account-triggers'
-startTriggerLogCleanup()
+// Trigger cleanup (prune old evaluation logs + dead one-shot reply watches)
+import { startTriggerCleanup } from '@/server/services/account-triggers'
+startTriggerCleanup()
 
 // External API request GC (prune resolved api_requests past retention)
 import { startExternalApiCleanup } from '@/server/services/external-api'
@@ -225,10 +233,15 @@ startVersionCheckCron()
 
 // Notification cleanup cron (daily)
 import { cleanupOldNotifications } from '@/server/services/notifications'
+import { purgeDoneQueueItems } from '@/server/services/queue'
 new Cron('0 3 * * *', async () => {
   const count = await cleanupOldNotifications()
   if (count > 0) log.info({ count }, 'Notification cleanup completed')
+  const purged = purgeDoneQueueItems(7 * 24 * 60 * 60 * 1000)
+  if (purged > 0) log.info({ purged }, 'Processed queue items purged')
 })
+// One-shot at boot too: installed instances carry months of done rows.
+purgeDoneQueueItems(7 * 24 * 60 * 60 * 1000)
 
 // Install a previously-refreshed models.dev snapshot (data-dir override) over
 // the bundled one, before any reconcile reads it.
@@ -248,6 +261,14 @@ import { backfillUsageCosts, setUsageCostHooks } from '@/server/services/token-u
 import { getModelPricing, listModelsWithPricing } from '@/server/services/model-registry'
 setUsageCostHooks({ getPricing: getModelPricing, listPricedModels: listModelsWithPricing })
 setTimeout(() => backfillUsageCosts(), 5000)
+
+// One-shot, idempotent migration to memory v2: compile each Agent's existing
+// memory archive into an initial profile document. Deferred and fire-and-forget
+// — it makes LLM calls per Agent and must never hold up boot.
+import { bootstrapProfiles } from '@/server/services/agent-profile-bootstrap'
+setTimeout(() => {
+  bootstrapProfiles().catch((err) => log.error({ err }, 'Memory profile bootstrap failed'))
+}, 10_000)
 
 // Serve uploaded files
 app.use('/api/uploads/*', serveStatic({ root: config.upload.dir, rewriteRequestPath: (path) => path.replace('/api/uploads', '') }))

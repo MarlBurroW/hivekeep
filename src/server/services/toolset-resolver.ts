@@ -73,10 +73,7 @@ export async function getAgentExtraToolNames(agentId: string): Promise<string[]>
  * so their behavior is preserved. Callers that create Agents (configurator,
  * AgentFormModal) assign explicit toolboxes.
  */
-export function resolveAgentToolboxIds(
-  raw: string[] | string | null | undefined,
-  _opts?: { ticketId?: string | null },
-): string[] {
+export function resolveAgentToolboxIds(raw: string[] | string | null | undefined): string[] {
   let ids: string[] = []
 
   if (Array.isArray(raw)) {
@@ -104,14 +101,9 @@ export interface ResolveToolsetOptions {
   isSubAgent: boolean
   taskId?: string
   taskDepth?: number
-  ticketId?: string
   channelOriginId?: string
   cronId?: string
   userId?: string
-  workspaceOverride?: {
-    path: string
-    env?: Record<string, string>
-  }
   /** Reserved for quick-session callers (Stage 3 applies
    *  QUICK_SESSION_EXCLUDED_TOOLS at the call site, not here). */
   quick?: boolean
@@ -131,11 +123,9 @@ export async function resolveToolset(
     isSubAgent,
     taskId,
     taskDepth,
-    ticketId,
     channelOriginId,
     cronId,
     userId,
-    workspaceOverride,
   } = opts
 
   // ── Universe ──────────────────────────────────────────────────────────────
@@ -148,8 +138,6 @@ export async function resolveToolset(
     taskDepth,
     channelOriginId,
     cronId,
-    ticketId,
-    workspaceOverride,
   })
 
   // ALL global active MCP tools + ALL enabled GLOBAL custom tools (both
@@ -169,7 +157,7 @@ export async function resolveToolset(
   // requests). "*" → all native + all enabled custom. Extras are fetched here
   // (not threaded by callers) so every resolution path honours them; the
   // sub-Agent hard floor below still subtracts as usual.
-  const resolvedIds = resolveAgentToolboxIds(toolboxIds, { ticketId: ticketId ?? null })
+  const resolvedIds = resolveAgentToolboxIds(toolboxIds)
   const allowed = new Set<string>([...CORE_TOOLS, ...resolveToolboxNames(resolvedIds)])
   for (const name of await getAgentExtraToolNames(agentId)) allowed.add(name)
 

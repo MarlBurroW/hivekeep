@@ -29,7 +29,7 @@ interface OrphanTaskDialogProps {
 const TITLE_MAX = 120
 
 /**
- * Launch a standalone (orphan) task on an Agent — no project/ticket binding.
+ * Launch a standalone (orphan) task on an Agent.
  * The user picks a prompt and, optionally, overrides for model, reasoning
  * effort, and toolboxes. Posts to `POST /api/agents/:id/tasks`; the result is
  * deposited back into the Agent's main session (async mode).

@@ -15,6 +15,7 @@ Read these files **before starting any phase**. They are the source of truth.
 | `structure.md` | Project file tree, naming conventions, imports, i18n, error format |
 | `prompt-system.md` | How the Agent system prompt is assembled (blocks 1-12) |
 | `compacting.md` | Compacting algorithm + memory extraction pipeline |
+| `memory.md` | **Memory v2** design — always-injected per-Agent profile document + episodic archive searched via `recall`; replaces per-message retrieval injection and the scoring heuristics |
 | `queenie.md` | **Conversational onboarding** spec — the `Queenie` configurator Agent, vault-centralized secrets, secure-input tools, avatar-style customization (Phase 27) |
 | `files.md` | **Files section** spec — workspace file browser/editor (tree + tabs + CodeMirror), workspace REST API + `workspace:changed` SSE, share-to-file-storage, chat integrations (`@` file palette, clickable paths) |
 | `interactive-setup.md` | **Interactive setup cards** spec — generic, declarative in-chat OAuth sign-in + QR pairing (setup *methods* `secret`/`oauth`/`qr`), extending the `secret_prompts` card machinery without a DB migration |
@@ -103,7 +104,7 @@ All API routes return JSON. Errors follow this format:
 8. **Always design for mobile, not just desktop.** Every new page/feature must be BOTH reachable and usable on a phone:
    - *Reachable*: the left `ActivityBar` rail is hidden below `md` — mobile section nav lives in `AppTopBar` (a single dropdown cluster below `sm`, an icon segmented control between `sm` and `md`). A new section page must be added there too, and the top bar must never overflow (cluster into a dropdown rather than cramming icons).
    - *Usable*: dense tables become stacked cards below `sm` (`hidden sm:block` table + `sm:hidden` card list); fixed-width filters go `w-full sm:w-*`; verify at 360–400px.
-9. **Consistency between pages.** Routed section pages (Projects, Tasks, Crons, Mini-Apps, Models…) all use the canonical `PageHeader` (icon + title + right-aligned `actions` slot). Page-level actions (sync/refresh buttons, etc.) belong in that `actions` slot, not in the page body.
+9. **Consistency between pages.** Routed section pages (Tasks, Crons, Mini-Apps, Models…) all use the canonical `PageHeader` (icon + title + right-aligned `actions` slot). Page-level actions (sync/refresh buttons, etc.) belong in that `actions` slot, not in the page body.
 10. **No misleading affordances.** A read-only listing must not render disabled interactive controls (switches, toggles) — they read as broken UI. Give the shared component a display-only mode instead.
 11. **Discoverability.** Never ship an action that exists ONLY in a right-click context menu — it's invisible. Always provide a visible entry point too (hover "⋯" menu, header button).
 12. **Docs ship with the feature.** A user-facing feature isn't done until `docs-site/` is updated (and `api.md` for new REST routes / SSE events). Stale docs (e.g. a providers table missing newly built-in providers) are bugs.
@@ -148,6 +149,25 @@ Verified end-to-end (the DeepSeek provider followed exactly these steps). `PROVI
 2. **All frontend work MUST follow the existing design system AND the UI workflow rules** (see the Design system section — reuse-first, mobile, page consistency, no dead affordances) — it is already built; never ship UI that ignores it
 3. Run `bun run dev` frequently, and `bun run typecheck` + `bun run test` before committing (the pre-commit hook runs both)
 4. **User-facing features ship with their docs**: update `docs-site/` (Starlight) and `api.md` (new routes / SSE events) in the same change, not "later"
+
+### Live instance on the dev machine
+
+A production instance runs on this machine, and it is **not** this checkout. Getting
+this wrong sends you chasing "prod runs old code" theories that are simply false.
+
+| | |
+|---|---|
+| Code | `~/kinbot`, a separate checkout kept current by the edge auto-update, not `~/projects/hivekeep` |
+| Deploy | push to `main`, then run the edge update — no manual pull, no manual migration |
+| Database | `~/.local/share/kinbot/kinbot.db` (WAL: copy `-wal` and `-shm` too, or use `VACUUM INTO`) |
+| Service | systemd user unit `kinbot.service`, logs via `journalctl --user -u kinbot.service` |
+| Port | 3000 |
+
+Never stop it by port or process pattern, and never point a script at the live DB
+in write mode without a `VACUUM INTO` backup first. To verify a change against
+real data, copy the DB and set `DB_PATH` to the copy. Note that stack traces in
+the logs are rooted at `~/kinbot`, which is the quickest way to tell which
+checkout produced them.
 
 ## Commands
 

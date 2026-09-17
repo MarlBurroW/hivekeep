@@ -27,7 +27,7 @@ const log = createLogger('tools:tasks')
  * single-element list (mapping to the built-in toolbox of the same name).
  *
  * Unknown names are skipped with a warning. Returns `undefined` when nothing
- * resolves, so `spawnTask` falls back to its own default (ticket → 'code',
+ * resolves, so `spawnTask` falls back to its own default ('all',
  * else 'all') at execution time.
  */
 async function resolveToolboxNamesToIds(
@@ -81,7 +81,7 @@ export const spawnSelfTool: ToolRegistration = {
         thinking: z.boolean().optional()
           .describe('Enable extended thinking/reasoning for this task. Omit to inherit from parent Agent config.'),
         toolboxes: z.array(z.string()).optional()
-          .describe('Names of the toolboxes whose tools the sub-Agent may use. The sub-Agent\'s native toolset is the mandatory core floor unioned with every chosen toolbox\'s tools. Built-ins: "code", "research", "ops", "scout" (read-only), "all" (full surface). Use list_toolboxes to discover available toolboxes. Omit to default (ticket → "code", else "all").'),
+          .describe('Names of the toolboxes whose tools the sub-Agent may use. The sub-Agent\'s native toolset is the mandatory core floor unioned with every chosen toolbox\'s tools. Built-ins: "code", "research", "ops", "scout" (read-only), "all" (full surface). Use list_toolboxes to discover available toolboxes. Omit to default to "all".'),
         tool_preset: z.enum(['code', 'research', 'ops', 'all']).optional()
           .describe('DEPRECATED — use `toolboxes` instead. When set and `toolboxes` is absent, it maps to the built-in toolbox of the same name.'),
       }),
@@ -150,7 +150,7 @@ export const spawnAgentTool: ToolRegistration = {
         thinking: z.boolean().optional()
           .describe('Enable extended thinking/reasoning for this task. Omit to inherit from parent Agent config.'),
         toolboxes: z.array(z.string()).optional()
-          .describe('Names of the toolboxes whose tools the sub-Agent may use. The sub-Agent\'s native toolset is the mandatory core floor unioned with every chosen toolbox\'s tools. Use list_toolboxes to discover available toolboxes. Omit to default (ticket → "code", else "all"). See spawn_self for built-in descriptions.'),
+          .describe('Names of the toolboxes whose tools the sub-Agent may use. The sub-Agent\'s native toolset is the mandatory core floor unioned with every chosen toolbox\'s tools. Use list_toolboxes to discover available toolboxes. Omit to default to "all". See spawn_self for built-in descriptions.'),
         tool_preset: z.enum(['code', 'research', 'ops', 'all']).optional()
           .describe('DEPRECATED — use `toolboxes` instead. When set and `toolboxes` is absent, it maps to the built-in toolbox of the same name.'),
       }),

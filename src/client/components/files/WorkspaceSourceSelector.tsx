@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderGit2, FolderInput, Plus, ChevronsUpDown, AppWindow } from 'lucide-react'
+import { FolderInput, Plus, ChevronsUpDown, AppWindow } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/client/components/ui/popover'
 import {
   Command,
@@ -15,12 +15,6 @@ import { AgentSelectItem, type AgentOption } from '@/client/components/common/Ag
 import { cn } from '@/client/lib/utils'
 import type { WorkspaceSourceRef } from '@/shared/types'
 
-/** A project repo offered as a browse source (only `ready` clones are listed). */
-export interface WorkspaceProjectOption {
-  id: string
-  title: string
-}
-
 /** A mini-app offered as a browse source (its source directory). */
 export interface WorkspaceMiniAppOption {
   id: string
@@ -33,28 +27,25 @@ interface WorkspaceSourceSelectorProps {
   onChange: (source: WorkspaceSourceRef) => void
   agents: AgentOption[]
   folders: Array<{ id: string; label: string; path: string }>
-  projects?: WorkspaceProjectOption[]
   miniapps?: WorkspaceMiniAppOption[]
   onAddFolder: () => void
   placeholder?: string
 }
 
-type Category = 'all' | 'agent' | 'project' | 'folder' | 'miniapp'
+type Category = 'all' | 'agent' | 'folder' | 'miniapp'
 
 /**
- * Files-section source picker: agents, project repos and user-added folders in
- * one searchable popover with category segments, so a workspace stays one or
- * two keystrokes away even with many sources (no long scroll). Reuses cmdk
+ * Files-section source picker: agents, mini-apps and user-added folders in one
+ * searchable popover with category segments, so a workspace stays one or two
+ * keystrokes away even with many sources (no long scroll). Reuses cmdk
  * (Command) + AgentSelectItem so an agent row looks identical to every other
- * agent picker. The project worktree sub-selector and git badge live in
- * FilesPage, next to this.
+ * agent picker. The git badge lives in FilesPage, next to this.
  */
 export function WorkspaceSourceSelector({
   value,
   onChange,
   agents,
   folders,
-  projects = [],
   miniapps = [],
   onAddFolder,
   placeholder,
@@ -78,7 +69,6 @@ export function WorkspaceSourceSelector({
   }
 
   const showAgents = (category === 'all' || category === 'agent') && agents.length > 0
-  const showProjects = (category === 'all' || category === 'project') && projects.length > 0
   const showMiniApps = (category === 'all' || category === 'miniapp') && miniapps.length > 0
   const showFolders = category === 'all' || category === 'folder'
 
@@ -87,10 +77,6 @@ export function WorkspaceSourceSelector({
     if (value.type === 'agent') {
       const agent = agents.find((a) => a.id === value.id)
       return agent ? <AgentSelectItem agent={agent} /> : null
-    }
-    if (value.type === 'project') {
-      const project = projects.find((p) => p.id === value.id)
-      return <SourceRow icon={FolderGit2} label={project?.title ?? value.id} />
     }
     if (value.type === 'miniapp') {
       const app = miniapps.find((a) => a.id === value.id)
@@ -126,7 +112,6 @@ export function WorkspaceSourceSelector({
             >
               <CategoryTab value="all" label={t('files.sources.all')} />
               {agents.length > 0 && <CategoryTab value="agent" label={t('files.sources.agents')} />}
-              {projects.length > 0 && <CategoryTab value="project" label={t('files.sources.projects')} />}
               {miniapps.length > 0 && <CategoryTab value="miniapp" label={t('files.sources.miniapps')} />}
               <CategoryTab value="folder" label={t('files.sources.folders')} />
             </ToggleGroup>
@@ -148,20 +133,6 @@ export function WorkspaceSourceSelector({
                     className="py-2"
                   >
                     <AgentSelectItem agent={agent} />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {showProjects && (
-              <CommandGroup heading={t('files.sources.projects')}>
-                {projects.map((project) => (
-                  <CommandItem
-                    key={`project:${project.id}`}
-                    value={`${project.title} ${project.id}`}
-                    onSelect={() => select({ type: 'project', id: project.id })}
-                    className="py-2"
-                  >
-                    <SourceRow icon={FolderGit2} label={project.title} />
                   </CommandItem>
                 ))}
               </CommandGroup>

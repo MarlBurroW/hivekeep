@@ -61,7 +61,7 @@ export const requestToolAccessTool: ToolRegistration = {
         const agentRow = await db.select().from(agents).where(eq(agents.id, ctx.agentId)).get()
         const boxNames = new Set([
           ...CORE_TOOLS,
-          ...resolveToolboxNames(resolveAgentToolboxIds(agentRow?.toolboxIds, { ticketId: null })),
+          ...resolveToolboxNames(resolveAgentToolboxIds(agentRow?.toolboxIds)),
           ...(await getAgentExtraToolNames(ctx.agentId)),
         ])
         const missing = tool_names.filter((n) => !boxNames.has(n))

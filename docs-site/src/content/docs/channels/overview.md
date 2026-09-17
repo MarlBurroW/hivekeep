@@ -113,7 +113,14 @@ The Agent also receives a prompt block informing it that delivery is automatic a
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `CHANNEL_PENDING_ORIGIN_TTL` | 300000 (5min) | How long channel origin metadata is kept in memory |
+| `CHANNEL_ORIGIN_TTL` | 86400000 (24h) | How long after the inbound message a reply is still auto-delivered back to the channel |
+
+The origin of a channel turn is stored in the database, so a reply still reaches
+the right conversation after a long sub-Agent run or a server restart. If no
+destination can be resolved (the origin is older than `CHANNEL_ORIGIN_TTL`, or
+the channel was deleted), the reply is not sent and the Agent gets a system note
+in its conversation telling it to resend explicitly with `send_to_contact` or
+`send_channel_message`.
 
 ## Plugin Channels
 

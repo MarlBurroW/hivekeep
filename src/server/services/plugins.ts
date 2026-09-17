@@ -3,7 +3,9 @@ import { readdir, readFile, access, rm, mkdir } from 'fs/promises'
 import { watch, type FSWatcher } from 'fs'
 import { eq, and, like } from 'drizzle-orm'
 import { db } from '@/server/db/index'
-import { pluginStates, pluginStorage, providers, channels, vaultSecrets } from '@/server/db/schema'
+import { pluginStates, pluginStorage, providers, channels, vaultSecrets, agents as agentsTable } from '@/server/db/schema'
+import { enqueueMessage } from '@/server/services/queue'
+import { config as appConfig } from '@/server/config'
 import { encrypt, decrypt } from '@/server/services/encryption'
 import {
   getSecretValue as vaultGetSecretValue,
@@ -44,6 +46,9 @@ import type {
   PluginHTTPClient,
   PluginVaultAPI,
   PluginOAuthAPI,
+  PluginAgentsAPI,
+  PluginRoutesAPI,
+  PluginRoute,
 } from '@hivekeep/sdk'
 
 // Re-export the plugin-facing surface so other internal modules keep their
@@ -649,8 +654,33 @@ export function validatePluginExports(
     errors.push('"onCardAction" must be a function or undefined')
   }
 
+  // Validate routes
+  if (ex.routes !== undefined) {
+    if (!Array.isArray(ex.routes)) {
+      errors.push('"routes" must be an array of PluginRoute')
+    } else {
+      const methods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+      for (const [i, route] of (ex.routes as unknown[]).entries()) {
+        if (!route || typeof route !== 'object') {
+          errors.push(`routes[${i}]: must be an object { method, path, handler }`)
+          continue
+        }
+        const r = route as Record<string, unknown>
+        if (!methods.has(String(r.method))) {
+          errors.push(`routes[${i}]: invalid method "${String(r.method)}"`)
+        }
+        if (typeof r.path !== 'string' || !r.path.startsWith('/') || r.path.includes('..')) {
+          errors.push(`routes[${i}]: "path" must be a string starting with "/" and without ".."`)
+        }
+        if (typeof r.handler !== 'function') {
+          errors.push(`routes[${i}]: "handler" must be a function`)
+        }
+      }
+    }
+  }
+
   // Warn about unknown top-level keys
-  const knownKeys = new Set(['tools', 'hooks', 'providers', 'channels', 'activate', 'deactivate', 'onCardAction'])
+  const knownKeys = new Set(['tools', 'hooks', 'providers', 'channels', 'routes', 'activate', 'deactivate', 'onCardAction'])
   for (const key of Object.keys(ex)) {
     if (!knownKeys.has(key)) {
       warnings.push(`Unknown export key "${key}" — will be ignored`)
@@ -1301,6 +1331,42 @@ class PluginManager {
       },
     }
 
+    // Reaching an Agent is gated by the `agents` manifest permission: a plugin
+    // that can inject arbitrary messages into an Agent's queue effectively
+    // steers that Agent, so the capability must be declared and reviewable.
+    // The message lands in the MAIN conversation queue, like a native incoming
+    // webhook — it wakes the principal Agent, never a sub-Agent or a task lane.
+    const agents: PluginAgentsAPI = {
+      enqueueMessage: async (params) => {
+        if (!permissions.includes('agents')) {
+          throw new Error(
+            `Plugin "${manifest.name}" tried to enqueue an Agent message without the "agents" permission`,
+          )
+        }
+        const agent = await db.select({ id: agentsTable.id }).from(agentsTable)
+          .where(eq(agentsTable.id, params.agentId)).get()
+        if (!agent) {
+          throw new Error(`Unknown agent "${params.agentId}"`)
+        }
+        const label = params.sourceLabel ?? manifest.name
+        const { id: queueItemId } = await enqueueMessage({
+          agentId: params.agentId,
+          messageType: 'webhook',
+          content: `[${label}]\n${params.content}`,
+          sourceType: 'plugin',
+          sourceId: manifest.name,
+          priority: appConfig.queue.agentPriority,
+        })
+        pluginLog.info({ agentId: params.agentId, queueItemId }, 'Plugin enqueued Agent message')
+        return { queueItemId }
+      },
+    }
+
+    const routes: PluginRoutesAPI = {
+      publicUrl: (path: string) =>
+        `${appConfig.publicUrl.replace(/\/+$/, '')}/api/plugin-hooks/${manifest.name}${path.startsWith('/') ? path : `/${path}`}`,
+    }
+
     return {
       config,
       log: pluginLog as unknown as PluginLogger,
@@ -1310,6 +1376,8 @@ class PluginManager {
       manifest,
       cards,
       oauth,
+      agents,
+      routes,
     }
   }
 

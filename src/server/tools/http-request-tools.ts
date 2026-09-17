@@ -2,6 +2,7 @@ import { tool } from '@/server/tools/tool-helper'
 import { redactKnownSecrets } from '@/server/services/secret-substitution'
 import { z } from 'zod'
 import { createLogger } from '@/server/logger'
+import { normalizeIpLiteral, isLoopbackOrUnspecified, isLinkLocal } from '@/server/services/ip-guard'
 import type { ToolExecutionContext, ToolRegistration } from '@/server/tools/types'
 
 const log = createLogger('tools:http-request')
@@ -24,7 +25,7 @@ type UrlSafety =
  * addresses, the link-local cloud-metadata endpoint, non-HTTP(S) schemes, and
  * invalid URLs. These protect the host process itself and are never toggleable.
  */
-function checkUrlSafety(urlStr: string): UrlSafety {
+async function checkUrlSafety(urlStr: string): Promise<UrlSafety> {
   let url: URL
   try {
     url = new URL(urlStr)
@@ -37,18 +38,42 @@ function checkUrlSafety(urlStr: string): UrlSafety {
   }
 
   const host = url.hostname.toLowerCase()
-  if (
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host === '::1' ||
-    host === '[::1]' ||
-    host === '0.0.0.0'
-  ) {
+  if (host === 'localhost') {
     return { allowed: false, reason: 'Requests to loopback or unspecified addresses are not allowed' }
   }
 
-  if (host === '169.254.169.254') {
-    return { allowed: false, reason: 'Requests to link-local metadata endpoints are not allowed' }
+  // IP literals in any form (dotted, decimal `2130706433`, hex, bracketed
+  // v6, v4-mapped v6) are normalized before the range checks — string
+  // comparison alone does not "protect the host process".
+  const literal = normalizeIpLiteral(host)
+  if (literal) {
+    if (isLoopbackOrUnspecified(literal)) {
+      return { allowed: false, reason: 'Requests to loopback or unspecified addresses are not allowed' }
+    }
+    if (isLinkLocal(literal)) {
+      return { allowed: false, reason: 'Requests to link-local metadata endpoints are not allowed' }
+    }
+    return { allowed: true }
+  }
+
+  // DNS names: resolve and apply the same loopback/link-local blocks (private
+  // LAN stays allowed by design — the toolbox grant is the gate). Fails
+  // closed on resolver error/timeout: failing open would let a slow or
+  // attacker-controlled resolver route the request to the loopback.
+  try {
+    const lookupPromise = Bun.dns.lookup(host, { family: 0 })
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
+    const results = await Promise.race([lookupPromise, timeoutPromise])
+    if (!results) {
+      return { allowed: false, reason: `DNS lookup for "${host}" timed out` }
+    }
+    for (const record of results) {
+      if (isLoopbackOrUnspecified(record.address) || isLinkLocal(record.address)) {
+        return { allowed: false, reason: `Host "${host}" resolves to blocked address ${record.address}` }
+      }
+    }
+  } catch {
+    return { allowed: false, reason: `DNS lookup for "${host}" failed` }
   }
 
   return { allowed: true }
@@ -88,7 +113,7 @@ export const httpRequestTool: ToolRegistration = {
       }),
       execute: async ({ method, url, headers, body, timeout_seconds }) => {
         // SSRF guard — loopback / metadata / non-HTTP(S) are always blocked.
-        const urlSafety = checkUrlSafety(url)
+        const urlSafety = await checkUrlSafety(url)
         if (!urlSafety.allowed) {
           return { error: urlSafety.reason }
         }
@@ -116,13 +141,31 @@ export const httpRequestTool: ToolRegistration = {
           // — scrub known values before it lands in the server logs.
           log.debug({ method, url: redactKnownSecrets(url) }, 'HTTP request')
 
-          const response = await fetch(url, {
-            method,
-            headers: fetchHeaders,
-            body: fetchBody,
-            signal: controller.signal,
-            redirect: 'follow',
-          })
+          // Redirects re-pass the safety check per hop: an allowed public
+          // URL can otherwise 302 into the loopback or a metadata endpoint.
+          let currentUrl = url
+          let response: Response
+          for (let hop = 0; ; hop++) {
+            response = await fetch(currentUrl, {
+              method,
+              headers: fetchHeaders,
+              body: fetchBody,
+              signal: controller.signal,
+              redirect: 'manual',
+            })
+            if (response.status < 300 || response.status >= 400) break
+            const location = response.headers.get('location')
+            if (!location) break
+            if (hop >= 5) {
+              return { error: 'Too many redirects (more than 5)' }
+            }
+            const nextUrl = new URL(location, currentUrl).toString()
+            const hopSafety = await checkUrlSafety(nextUrl)
+            if (!hopSafety.allowed) {
+              return { error: `Redirect target blocked: ${hopSafety.reason}` }
+            }
+            currentUrl = nextUrl
+          }
 
           // Read response body with size limit
           const contentType = response.headers.get('content-type') ?? ''

@@ -3,9 +3,9 @@ title: Toolboxes
 description: "Toolboxes scope which native tools an Agent can use. Pick the right set so each Agent has exactly the capabilities its job needs."
 ---
 
-A **toolbox** is a named set of tools. It is how you decide what an Agent (and the sub-Agents it spawns) is allowed to do. Give an Agent the `research` toolbox and it can browse the web and write memories; give it the `email` toolbox and it can read and send mail; give it nothing and it can still read and write files but has no web, no memory, no projects, and no admin powers.
+A **toolbox** is a named set of tools. It is how you decide what an Agent (and the sub-Agents it spawns) is allowed to do. Give an Agent the `research` toolbox and it can browse the web and write memories; give it the `email` toolbox and it can read and send mail; give it nothing and it can still read and write files but has no web, no memory, and no admin powers.
 
-This matters because Hivekeep ships with a large catalogue of native tools. Handing every Agent everything is both confusing for the model and risky. Toolboxes let you build focused specialists: a researcher with web and memory, an ops Agent with the vault and HTTP, a coding Agent bound to projects and tickets.
+This matters because Hivekeep ships with a large catalogue of native tools. Handing every Agent everything is both confusing for the model and risky. Toolboxes let you build focused specialists: a researcher with web and memory, an ops Agent with the vault and HTTP, a coding Agent with the filesystem and shell.
 
 ## What a toolbox actually is
 
@@ -28,7 +28,7 @@ CORE_TOOLS  UNION  (every tool listed across all its toolboxes)
 - Secure secret entry: `prompt_secret` (the value goes to the vault, never to the model)
 - Attachments and reasoning aids: `attach_file`, `think`, `task_todos`
 
-The floor deliberately does **not** include web, memory, projects, channels, contacts, images, or any provider/admin tools. Those only arrive through a toolbox.
+The floor deliberately does **not** include web, memory, channels, contacts, images, or any provider/admin tools. Those only arrive through a toolbox.
 
 :::caution
 An Agent with an **empty** toolbox list is stripped to the core floor only. It will correctly tell you it lacks web search, memory, and so on. Do not "leave it empty for everything": empty means floor only. The `create_agent` tool defaults an *omitted* toolbox argument to the `all` toolbox for convenience, but an explicit empty list is honored as floor-only.
@@ -43,7 +43,7 @@ Hivekeep seeds these built-in toolboxes idempotently at startup. They are kept i
 | `all` | Every native tool plus every enabled custom tool. MCP and plugin tools still need to be listed by name. |
 | `research` | Web browsing and history, summaries, and full read/write memory (`web_search`, `browse_url`, `extract_links`, `screenshot_url`, `search_history`, `recall`, `memorize`, `update_memory`, `forget`, ... and `scout`). |
 | `ops` | Operations and integrations: memory, vault secrets, redaction, `http_request`, `get_system_info`, and `scout`. |
-| `code` | Ticket-bound implementation work: project and ticket tools, web docs lookup, **read-only** memory, project knowledge, and `scout`. |
+| `code` | Implementation work: task introspection, web docs lookup, **read-only** memory, and `scout`. |
 | `scout` | Read-only exploration only: `grep`, `read_file`, `list_directory`, `web_search`, `browse_url`, `extract_links`. No writes, no memory. This is the toolbox a delegated scout runs with. |
 | `email` | Email account access: list, read, search, send, and download attachments through connected accounts. |
 | `calendar` | Calendar access (Google, Outlook, CalDAV): list and search events, create, update, delete. |
@@ -105,7 +105,7 @@ Within one LLM step, the tool executor partitions calls into batches: consecutiv
 
 ## The plugins tool domain
 
-Native tools are organized into internal domains (memory, web, projects, channels, and so on) for registration and discovery. Plugins extend this: an installed plugin can register **additional** tools that join the same registry, namespaced with a `plugin_` prefix.
+Native tools are organized into internal domains (memory, web, channels, and so on) for registration and discovery. Plugins extend this: an installed plugin can register **additional** tools that join the same registry, namespaced with a `plugin_` prefix.
 
 Plugin tools (and MCP tools, prefixed `mcp_`) behave differently from native and custom tools when it comes to the wildcard. The `"*"` value in a toolbox expands to native tools plus enabled custom tools only. It deliberately **excludes** `plugin_*` and `mcp_*` tools. To grant a plugin or MCP tool to an Agent, a toolbox must list it by its explicit name. Custom tools (the user's own scripts, exposed as `custom_<slug>`) are first-class extensions and *do* ride the wildcard once enabled.
 

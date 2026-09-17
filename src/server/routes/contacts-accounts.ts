@@ -7,9 +7,13 @@ import {
   deleteContactsAccount,
   setAllowList,
 } from '@/server/services/contacts-accounts'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:contacts-accounts')
 const contactsAccountRoutes = new Hono()
+
+// Platform configuration: every route in this family is admin-only.
+contactsAccountRoutes.use('*', requireAdmin)
 
 // GET /api/contacts-accounts — list connected contacts accounts.
 contactsAccountRoutes.get('/', async (c) => {

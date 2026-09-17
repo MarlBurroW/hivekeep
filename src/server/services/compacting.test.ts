@@ -72,64 +72,6 @@ describe('keep-window walk under the absolute cap', () => {
   })
 })
 
-// ─── Memory extraction JSON parsing ─────────────────────────────────────────
-
-// The module extracts JSON from LLM response: result.text.match(/\[[\s\S]*\]/)
-
-function parseExtractedMemories(text: string): Array<{ content: string; category: string; subject: string }> | null {
-  const jsonMatch = text.match(/\[[\s\S]*\]/)
-  if (!jsonMatch) return null
-  try {
-    return JSON.parse(jsonMatch[0])
-  } catch {
-    return null
-  }
-}
-
-describe('memory extraction JSON parsing', () => {
-  it('parses a clean JSON array', () => {
-    const input = '[{"content":"Nicolas likes coffee","category":"preference","subject":"Nicolas"}]'
-    const result = parseExtractedMemories(input)
-    expect(result).toHaveLength(1)
-    expect(result![0]!.content).toBe('Nicolas likes coffee')
-  })
-
-  it('extracts JSON from surrounding text', () => {
-    const input = 'Here are the memories:\n[{"content":"test","category":"fact","subject":"general"}]\nDone!'
-    const result = parseExtractedMemories(input)
-    expect(result).toHaveLength(1)
-    expect(result![0]!.category).toBe('fact')
-  })
-
-  it('handles empty array', () => {
-    const result = parseExtractedMemories('Nothing to remember: []')
-    expect(result).toEqual([])
-  })
-
-  it('returns null when no JSON array present', () => {
-    expect(parseExtractedMemories('No memories found.')).toBeNull()
-    expect(parseExtractedMemories('{"not": "an array"}')).toBeNull()
-  })
-
-  it('returns null for malformed JSON', () => {
-    expect(parseExtractedMemories('[{broken json')).toBeNull()
-  })
-
-  it('handles multi-line JSON', () => {
-    const input = `[\n  {\n    "content": "fact one",\n    "category": "fact",\n    "subject": "general"\n  },\n  {\n    "content": "fact two",\n    "category": "decision",\n    "subject": "Nicolas"\n  }\n]`
-    const result = parseExtractedMemories(input)
-    expect(result).toHaveLength(2)
-  })
-
-  it('handles nested arrays in content (greedy match)', () => {
-    // The regex is greedy, so nested brackets should work
-    const input = '[{"content":"list: [a, b, c]","category":"fact","subject":"general"}]'
-    const result = parseExtractedMemories(input)
-    expect(result).toHaveLength(1)
-    expect(result![0]!.content).toBe('list: [a, b, c]')
-  })
-})
-
 // ─── Summary cleanup logic ──────────────────────────────────────────────────
 
 // The module keeps maxSummariesPerAgent summaries, deletes oldest archived ones.

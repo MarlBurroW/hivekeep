@@ -37,7 +37,7 @@ Queenie's job is to set Hivekeep up through conversation, one thing at a time, e
 - **A global prompt**: house rules every Agent should follow.
 - **Channels**: connect Discord, Telegram, and the rest so you can talk to your Agents from your phone.
 - **Your first real Agent**: and a clear explanation of which toolboxes it received and why.
-- **A tour of the rest**: custom tools, mini-apps, projects, crons, sub-Agents.
+- **A tour of the rest**: custom tools, mini-apps, crons, sub-Agents.
 
 She reuses keys across capabilities where she can. If you connect an OpenAI provider for chat, she can enable embeddings, images, and voice on the **same** key instead of asking again.
 

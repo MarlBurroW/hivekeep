@@ -340,57 +340,31 @@ export const config = {
   memory: (() => {
     const extraction = parseModelEnv(process.env.MEMORY_EXTRACTION_MODEL)
     const embedding = parseModelEnv(process.env.MEMORY_EMBEDDING_MODEL || 'text-embedding-3-small')
-    const consolidation = parseModelEnv(process.env.MEMORY_CONSOLIDATION_MODEL)
-    const multiQuery = parseModelEnv(process.env.MEMORY_MULTI_QUERY_MODEL)
-    const hyde = parseModelEnv(process.env.MEMORY_HYDE_MODEL)
-    const rerank = parseModelEnv(process.env.MEMORY_RERANK_MODEL)
-    const contextualRewrite = parseModelEnv(process.env.MEMORY_CONTEXTUAL_REWRITE_MODEL)
     return {
+      // Model for the compaction-time maintenance call (archive extraction +
+      // profile rewrite). App-setting `extraction_model` overrides this.
       extractionModel: extraction.model,
       extractionProviderId: extraction.providerId,
+      /** Default number of results returned by a `recall` search. */
       maxRelevantMemories: Number(process.env.MEMORY_MAX_RELEVANT ?? 10),
-      // Cosine similarity floor for vector search candidates.
-      // Lowered from 0.7 → 0.5: at 0.7, only memories near-identical to the
-      // query made it past the filter, so the vector arm of hybrid search
-      // returned almost nothing and the FTS5 arm (lexical) had to carry the
-      // whole load. The downstream adaptive-K + reranker already prune
-      // weak matches; the threshold only needs to be a spam filter, not a
-      // relevance gate.
+      // Cosine similarity floor for vector search candidates. This is a spam
+      // filter, not a relevance gate: at 0.7, only memories near-identical to
+      // the query survived and the FTS5 arm had to carry the whole search.
       similarityThreshold: Number(process.env.MEMORY_SIMILARITY_THRESHOLD ?? 0.5),
       embeddingModel: embedding.model ?? 'text-embedding-3-small',
       embeddingProviderId: embedding.providerId,
+      // Embedding calls run under the compacting lock; unbounded, a silent
+      // endpoint pins the Agent with no recovery path. 0 disables.
+      embeddingTimeoutMs: Number(process.env.MEMORY_EMBEDDING_TIMEOUT ?? 60_000),
       embeddingDimension: Number(process.env.MEMORY_EMBEDDING_DIMENSION ?? 1536),
-      temporalDecayLambda: Number(process.env.MEMORY_TEMPORAL_DECAY_LAMBDA ?? 0.01),
-      temporalDecayFloor: Number(process.env.MEMORY_TEMPORAL_DECAY_FLOOR ?? 0.7),
-      consolidationSimilarityThreshold: Number(process.env.MEMORY_CONSOLIDATION_SIMILARITY ?? 0.85),
-      consolidationMaxGeneration: Number(process.env.MEMORY_CONSOLIDATION_MAX_GEN ?? 5),
-      consolidationModel: consolidation.model,
-      consolidationProviderId: consolidation.providerId,
-      multiQueryModel: multiQuery.model,
-      multiQueryProviderId: multiQuery.providerId,
-      hydeModel: hyde.model,
-      hydeProviderId: hyde.providerId,
-      rerankModel: rerank.model,
-      rerankProviderId: rerank.providerId,
-      adaptiveK: process.env.MEMORY_ADAPTIVE_K !== 'false',
-      // Lowered from 0.3 → 0.15: with the previous threshold, a single memory
-      // boosted by importance × retrieval feedback could be 3x its peers,
-      // putting them all under the cutoff and producing a winner-take-all
-      // effect (one memory recalled forever, rest invisible).
-      adaptiveKMinScoreRatio: Number(process.env.MEMORY_ADAPTIVE_K_MIN_SCORE_RATIO ?? 0.15),
-      // Largest-gap heuristic: only truncate when a single drop accounts for
-      // more than this fraction of the top-to-current range. Raised from the
-      // hardcoded 0.4 to be less eager to truncate after the first result.
-      adaptiveKLargestGapRatio: Number(process.env.MEMORY_ADAPTIVE_K_LARGEST_GAP_RATIO ?? 0.6),
+      // Reciprocal rank fusion constant, and the weight given to the FTS arm
+      // relative to the vector arm at the same rank.
       rrfK: Number(process.env.MEMORY_RRF_K ?? 60),
       ftsBoost: Number(process.env.MEMORY_FTS_BOOST ?? 0.5),
-      subjectBoost: Number(process.env.MEMORY_SUBJECT_BOOST ?? 1.3),
-      categoryBoost: Number(process.env.MEMORY_CATEGORY_BOOST ?? 1.25),
-      contextualRewriteModel: contextualRewrite.model,
-      contextualRewriteProviderId: contextualRewrite.providerId,
-      contextualRewriteThreshold: Number(process.env.MEMORY_CONTEXTUAL_REWRITE_THRESHOLD ?? 80),
-      tokenBudget: Number(process.env.MEMORY_TOKEN_BUDGET || 0), // 0 = unlimited (no budget enforcement)
-      recencyBoostEnabled: process.env.MEMORY_RECENCY_BOOST !== 'false', // Boost very recent memories (default: true)
+      // Budget for the always-injected profile document (see memory.md).
+      // It sits in the cached stable prompt segment, so every line costs on
+      // every turn — the maintenance rewrite is told to stay under this.
+      profileMaxTokens: Number(process.env.MEMORY_PROFILE_MAX_TOKENS ?? 1500),
     }
   })(),
 
@@ -404,27 +378,19 @@ export const config = {
     speakerMaxNoteChars: Number(process.env.CONTACTS_SPEAKER_MAX_NOTE_CHARS ?? 500), // 0 = no truncation
   },
 
-  projectKnowledge: {
-    /** Max number of entries that can be pinned per project. Pinned entries
-     *  have their full markdown content injected into the system prompt
-     *  (inline, no tool call needed). The cap keeps prompt token cost
-     *  bounded — unpinned entries are still reachable via the title index
-     *  and get_project_knowledge(id). */
-    pinCap: Number(process.env.PROJECT_KNOWLEDGE_PIN_CAP ?? 10),
-    /** Max titles shipped in the prompt's project-knowledge index. Above
-     *  this, the index renders an "... and N more" footer and the Agent must
-     *  use search_project_knowledge to surface the rest. */
-    maxIndexEntries: Number(process.env.PROJECT_KNOWLEDGE_MAX_INDEX_ENTRIES ?? 100),
-    /** Max results returned by search_project_knowledge (used both for the
-     *  Agent tool and the REST endpoint). */
-    maxSearchResults: Number(process.env.PROJECT_KNOWLEDGE_MAX_SEARCH_RESULTS ?? 10),
-  },
-
   queue: {
     userPriority: 100,
     agentPriority: 50,
     taskPriority: 50,
     pollIntervalMs: Number(process.env.QUEUE_POLL_INTERVAL ?? 500),
+    // Stuck-Agent detection. Recovery used to run only at boot, so a wedged
+    // Agent could stay mute for hours with nobody informed.
+    stuckSweepIntervalMs: Number(process.env.QUEUE_STUCK_SWEEP_INTERVAL ?? 300_000),
+    // Notify a human but leave the turn alone: it may still be legitimate.
+    stuckWarnMs: Number(process.env.QUEUE_STUCK_WARN ?? 900_000),
+    // Past any plausible turn duration (turnTimeoutMs plus a wide margin),
+    // requeue so the Agent starts answering again. 0 disables.
+    stuckRecoverMs: Number(process.env.QUEUE_STUCK_RECOVER ?? 3_600_000),
   },
 
   tasks: {
@@ -440,16 +406,6 @@ export const config = {
     maxConcurrentExecutions: Number(process.env.CRONS_MAX_CONCURRENT_EXEC ?? 5),
   },
 
-  projects: {
-    /** Hard cap on the active project's description injected into the [7.8] prompt block.
-     *  Beyond this, the first half is kept and a truncation note replaces the rest. */
-    maxDescriptionPromptTokens: Number(process.env.PROJECTS_MAX_DESCRIPTION_PROMPT_TOKENS ?? 8000),
-    /** Max non-`done` tickets injected in the [7.8] prompt block, sorted by updated_at DESC. */
-    maxTicketsInPrompt: Number(process.env.PROJECTS_MAX_TICKETS_IN_PROMPT ?? 50),
-    /** Gap between consecutive ticket positions when inserting at top of a kanban column. */
-    kanbanPositionStep: Number(process.env.PROJECTS_KANBAN_POSITION_STEP ?? 1024),
-  },
-
   llm: {
     // Anthropic adaptive thinking: the modern effort API
     // (`thinking:{type:'adaptive'}` + `output_config.effort` + beta
@@ -461,10 +417,24 @@ export const config = {
     // favor of `adaptive`. Default on; set HIVEKEEP_ADAPTIVE_THINKING=false to
     // revert to fixed budgets.
     adaptiveThinking: process.env.HIVEKEEP_ADAPTIVE_THINKING !== 'false',
+    // Inactivity ceiling while reading a provider's response stream, reset on
+    // every chunk (so a slow-but-alive generation is never cut). Provider SDKs
+    // clear their own request timeout once response HEADERS arrive, leaving the
+    // whole streamed body unbounded: a frozen connection would otherwise pin
+    // the Agent in "processing" until the process restarts. 0 disables.
+    streamIdleTimeoutMs: Number(process.env.LLM_STREAM_IDLE_TIMEOUT ?? 120_000),
   },
 
   tools: {
-    maxSteps: Number(process.env.TOOLS_MAX_STEPS ?? 0), // 0 (default) = truly unlimited (no cap); > 0 = hard cap at this value
+    // Hard cap on tool-call steps in one turn. Was 0 (unlimited): a model that
+    // loops on tool calls then runs until the process restarts. The ceiling is
+    // deliberately high — it is a runaway guard, not a budget.
+    maxSteps: Number(process.env.TOOLS_MAX_STEPS ?? 100), // 0 = truly unlimited (no cap)
+    // Wall-clock ceiling for a single turn, measured from dequeue. Aborts the
+    // turn through its own AbortController so the normal error path runs and
+    // the failure is reported (including back to the originating channel).
+    // Queue waiting time is NOT counted. 0 disables.
+    turnTimeoutMs: Number(process.env.TOOLS_TURN_TIMEOUT ?? 1_800_000),
     // Temperature for tool-enabled turns. Local/self-hosted backends default to
     // ~0.7-0.8, which makes structured tool-call JSON unreliable on small models;
     // a low value steadies it. Reasoning models are exempted in code (they reject
@@ -496,11 +466,36 @@ export const config = {
   toolOutputs: {
     spillThreshold: Number(process.env.TOOL_OUTPUT_SPILL_THRESHOLD ?? 10000), // bytes before spilling to file
     previewLines: Number(process.env.TOOL_OUTPUT_PREVIEW_LINES ?? 200),       // lines to include in preview
+    // Hard size bound on the preview. The line count alone is not a bound:
+    // JSON.stringify escapes newlines, so a single-string result (an email
+    // body, a grep hit list, shell stdout) serializes to a handful of very
+    // long lines and "200 lines" keeps the ENTIRE payload. Spilled outputs
+    // then cost as much context as if nothing had been spilled.
+    // Must stay below spillThreshold, otherwise spilling saves nothing.
+    previewMaxChars: Number(process.env.TOOL_OUTPUT_PREVIEW_MAX_CHARS ?? 4000),
     ttlHours: Number(process.env.TOOL_OUTPUT_TTL_HOURS ?? 24),                // cleanup after N hours
   },
 
   humanPrompts: {
     maxPendingPerAgent: Number(process.env.HUMAN_PROMPTS_MAX_PENDING ?? 5),
+  },
+
+  search: {
+    // Ceiling for one web_search round-trip. Runs on the turn path.
+    requestTimeoutMs: Number(process.env.SEARCH_REQUEST_TIMEOUT ?? 30_000),
+  },
+
+  email: {
+    // Ceiling for one Gmail / Microsoft Graph API call. IMAP has its own
+    // socket-level timeouts already.
+    requestTimeoutMs: Number(process.env.EMAIL_REQUEST_TIMEOUT ?? 60_000),
+  },
+
+  hooks: {
+    // Ceiling for one plugin hook handler. Handlers run in-process on the
+    // Agent's turn path, so one that never settles would pin the turn (and the
+    // Agent) forever. 0 disables the bound.
+    handlerTimeoutMs: Number(process.env.HOOK_HANDLER_TIMEOUT ?? 30_000),
   },
 
   interAgent: {
@@ -534,24 +529,6 @@ export const config = {
 
   workspace: {
     baseDir: process.env.WORKSPACE_BASE_DIR ?? `${dataDir}/workspaces`,
-  },
-
-  repos: {
-    /** Local git clones used by sub-task worktrees, one subdir per project
-     *  slug (`<baseDir>/<slug>/`) and a shared `<baseDir>/worktrees/` tree
-     *  for ephemeral sub-task worktrees. */
-    baseDir: process.env.HIVEKEEP_REPOS_DIR ?? `${dataDir}/repos`,
-    /** Max time we let `git clone` run before aborting (seconds). Default
-     *  10min covers most repos; large monorepos may need to bump this. */
-    cloneTimeoutSec: Number(process.env.HIVEKEEP_CLONE_TIMEOUT_SEC ?? 600),
-    /** How long worktrees from failed/conflicted sub-tasks are kept on
-     *  disk before the cleanup sweep removes them (seconds). Default 1h.
-     *  Sub-tasks that succeed and merge cleanly are removed immediately
-     *  — this TTL only protects "needs human review" cases. */
-    worktreeKeepFailedSec: Number(process.env.HIVEKEEP_WORKTREE_KEEP_FAILED_SEC ?? 3600),
-    /** How often the stale-worktree sweeper runs (minutes). Default 5.
-     *  Lower bound: 1min (anything faster is wasted IO). */
-    worktreeSweepIntervalMin: Number(process.env.HIVEKEEP_WORKTREE_SWEEP_INTERVAL_MIN ?? 5),
   },
 
   upload: {
@@ -619,6 +596,9 @@ export const config = {
     maxPerCycle: Number(process.env.EMAIL_TRIGGER_MAX_PER_CYCLE ?? 50),
     logRetentionDays: Number(process.env.EMAIL_TRIGGER_LOG_RETENTION_DAYS ?? 30),
     maxLogsPerTrigger: Number(process.env.EMAIL_TRIGGER_MAX_LOGS_PER_TRIGGER ?? 500),
+    // One-shot (reply-watch) triggers are deleted as soon as they fire. This TTL
+    // collects the ones whose reply never came, so they stop holding quota.
+    oneShotTtlDays: Number(process.env.EMAIL_TRIGGER_ONE_SHOT_TTL_DAYS ?? 30),
     // Ring buffer of recently-seen message ids per (account, folder), to drop
     // boundary duplicates (provider `after` filters are second-granular/inclusive).
     seenIdsRing: Number(process.env.EMAIL_TRIGGER_SEEN_IDS_RING ?? 200),
@@ -627,7 +607,21 @@ export const config = {
   channels: {
     maxPerAgent: Number(process.env.CHANNELS_MAX_PER_KIN ?? 5),
     telegramWebhookPath: '/api/channels/telegram',
-    pendingOriginTtlMs: Number(process.env.CHANNEL_PENDING_ORIGIN_TTL ?? 300_000),
+    // Freshness guard on the persisted channel origin (`channel_origins`): how
+    // long after the inbound message an Agent reply is still auto-delivered
+    // back to the channel. Sub-Agent chains routinely run for many minutes, so
+    // this is deliberately generous; it only exists to stop a reply from
+    // landing on a conversation nobody remembers.
+    originTtlMs: Number(process.env.CHANNEL_ORIGIN_TTL ?? 86_400_000),
+    // How often the "typing" hint is refreshed while a turn runs. Platforms
+    // expire it in seconds, so without a refresh a long turn is silent and
+    // indistinguishable from a dead one.
+    typingRefreshMs: Number(process.env.CHANNEL_TYPING_REFRESH ?? 5_000),
+    // Attempts for one outbound send (1 = no retry). A transient 429 or 5xx
+    // used to drop the Agent's reply silently.
+    sendRetries: Number(process.env.CHANNEL_SEND_RETRIES ?? 3),
+    // Upper bound on a backoff wait, including a platform-provided retry_after.
+    maxRetryDelayMs: Number(process.env.CHANNEL_MAX_RETRY_DELAY ?? 60_000),
     // Max messages buffered per pending contact while they await approval. On
     // approval the buffer is replayed as a single Agent turn; only the most
     // recent N are kept (older ones are dropped).

@@ -63,7 +63,7 @@ export function timeAgo(timestamp: number): string {
 }
 
 /**
- * Compute a task / ticket run duration in milliseconds from a start timestamp.
+ * Compute a task run duration in milliseconds from a start timestamp.
  *
  * - `start` null → returns null (work hasn't begun: queued / pending / never
  *   moved to in_progress).

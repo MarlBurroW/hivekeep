@@ -21,7 +21,6 @@ import {
 } from '@/client/components/ui/alert-dialog'
 import { useAgentList } from '@/client/hooks/useAgentList'
 import { useWorkspaceFolders } from '@/client/hooks/useWorkspaceFolders'
-import { useProjects } from '@/client/hooks/useProjects'
 import { useMiniApps } from '@/client/hooks/useMiniApps'
 import { useWorkspaceGit } from '@/client/hooks/useWorkspaceGit'
 import { appendToDraft } from '@/client/hooks/useDraftMessage'
@@ -34,7 +33,7 @@ import {
 import { useWorkspaceTabs } from '@/client/hooks/useWorkspaceTabs'
 import { WorkspaceTree, type WorkspaceTreeActions } from '@/client/components/files/WorkspaceTree'
 import { WorkspaceSourceSelector } from '@/client/components/files/WorkspaceSourceSelector'
-import { WorkspaceProjectBar } from '@/client/components/files/WorkspaceProjectBar'
+import { WorkspaceGitBar } from '@/client/components/files/WorkspaceGitBar'
 import { AddFolderDialog } from '@/client/components/files/AddFolderDialog'
 import { FileStorageFormDialog } from '@/client/components/file-storage/FileStorageFormDialog'
 import { WorkspaceEditor, workspaceRawUrl } from '@/client/components/files/WorkspaceEditor'
@@ -57,9 +56,9 @@ function readLastSource(): WorkspaceSourceRef | null {
 
 /**
  * Files section (files.md § 3-4): VSCode-like browser/editor over a workspace
- * SOURCE — an agent workspace, a project repo (optionally a git worktree) or a
- * user-added FS folder. Deep-linkable as /files/:agentId, /files/folder/:id or
- * /files/project/:id (with ?path= and ?worktree=).
+ * SOURCE — an agent workspace, a mini-app source dir or a user-added FS folder.
+ * Deep-linkable as /files/:agentId, /files/folder/:id or /files/miniapp/:id
+ * (with ?path=).
  */
 export function FilesPage() {
   const { t } = useTranslation()
@@ -67,40 +66,32 @@ export function FilesPage() {
   const params = useParams<{ agentId?: string; sourceType?: string; sourceId?: string }>()
   const [searchParams] = useSearchParams()
   const requestedPath = searchParams.get('path')
-  const requestedWorktree = searchParams.get('worktree') ?? undefined
 
   const { agents, isLoading: agentsLoading } = useAgentList()
   const foldersApi = useWorkspaceFolders()
-  const { projects } = useProjects()
   const { apps: miniApps } = useMiniApps(null, 'all')
   const [addFolderOpen, setAddFolderOpen] = useState(false)
-
-  // Only repos that finished cloning can be browsed.
-  const readyProjects = useMemo(
-    () => projects.filter((p) => p.cloneStatus === 'ready').map((p) => ({ id: p.id, title: p.title })),
-    [projects],
-  )
 
   const miniAppOptions = useMemo(
     () => miniApps.map((a) => ({ id: a.id, title: a.name, sub: a.maintainerAgentName })),
     [miniApps],
   )
 
-  // Source from the route: explicit project/folder, or legacy agent id/slug.
+  // Source from the route: explicit folder/mini-app, or legacy agent id/slug.
   const routeSource = useMemo<WorkspaceSourceRef | null>(() => {
     if (
       params.sourceType &&
       params.sourceId &&
-      (params.sourceType === 'project' || params.sourceType === 'folder' || params.sourceType === 'miniapp')
+      (params.sourceType === 'folder' || params.sourceType === 'miniapp')
     ) {
-      return { type: params.sourceType, id: params.sourceId, worktree: requestedWorktree }
+      return { type: params.sourceType, id: params.sourceId }
     }
     if (params.agentId) {
       const agent = agents.find((a) => a.id === params.agentId || a.slug === params.agentId)
       if (agent) return { type: 'agent', id: agent.id }
     }
     return null
-  }, [params.sourceType, params.sourceId, params.agentId, requestedWorktree, agents])
+  }, [params.sourceType, params.sourceId, params.agentId, agents])
 
   // Fallback when no route source: last-used (if still valid) else first agent.
   const fallbackSource = useMemo<WorkspaceSourceRef | null>(() => {
@@ -108,7 +99,6 @@ export function FilesPage() {
     if (last) {
       if (last.type === 'agent' && agents.some((a) => a.id === last.id)) return last
       if (last.type === 'folder' && foldersApi.folders.some((f) => f.id === last.id)) return last
-      if (last.type === 'project') return last // validity re-checked server-side (P4)
       if (last.type === 'miniapp') return last // validity re-checked server-side
     }
     return agents[0] ? { type: 'agent', id: agents[0].id } : null
@@ -125,12 +115,7 @@ export function FilesPage() {
     navigate(next.type === 'agent' ? `/files/${next.id}` : `/files/${next.type}/${next.id}`)
   }
 
-  const handleSelectWorktree = (worktreeId: string) => {
-    if (source?.type !== 'project') return
-    navigate(`/files/project/${source.id}${worktreeId ? `?worktree=${encodeURIComponent(worktreeId)}` : ''}`)
-  }
-
-  const { gitStatus, worktrees } = useWorkspaceGit(source)
+  const { gitStatus } = useWorkspaceGit(source)
 
   const workspace = useWorkspaceFiles(source)
   const tabsApi = useWorkspaceTabs(source)
@@ -255,7 +240,7 @@ export function FilesPage() {
         toastError(err)
       }
     },
-    // Share + insert-in-chat are agent-only: a folder/project repo has no
+    // Share + insert-in-chat are agent-only: a folder or mini-app dir has no
     // associated conversation. Omitting the handler hides the menu item (no
     // dead affordance). Share is generalized to every source in P6.
     share: activeAgentId ? (entry) => setShareTarget(entry) : undefined,
@@ -371,20 +356,13 @@ export function FilesPage() {
           onChange={handleSourceChange}
           agents={agents.map((a) => ({ id: a.id, name: a.name, role: a.role, avatarUrl: a.avatarUrl }))}
           folders={foldersApi.folders}
-          projects={readyProjects}
           miniapps={miniAppOptions}
           onAddFolder={() => setAddFolderOpen(true)}
           placeholder={t('files.selectWorkspace')}
         />
       </div>
       {source && (
-        <WorkspaceProjectBar
-          source={source}
-          gitStatus={gitStatus}
-          worktrees={worktrees}
-          onSelectWorktree={handleSelectWorktree}
-          onOpenFile={openPath}
-        />
+        <WorkspaceGitBar source={source} gitStatus={gitStatus} onOpenFile={openPath} />
       )}
       <WorkspaceTree
         dirs={workspace.dirs}

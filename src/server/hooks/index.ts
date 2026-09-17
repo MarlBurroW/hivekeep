@@ -1,5 +1,7 @@
 import type { HookName, HookHandler, HookPayloadMap } from '@/server/hooks/types'
 import { createLogger } from '@/server/logger'
+import { config } from '@/server/config'
+import { withTimeout } from '@/server/utils/with-timeout'
 
 const log = createLogger('hooks')
 
@@ -49,11 +51,24 @@ class HookRegistry {
     let currentContext: HookPayloadMap[H] = context
 
     for (const handler of handlers) {
-      // Isolate each handler: a throwing (or rejecting) plugin hook must not
-      // break the chain for other handlers, nor propagate up to the caller.
-      // The context is passed through unchanged when a handler fails.
+      // Isolate each handler on BOTH failure axes.
+      //
+      // Throwing is handled by the catch: a broken plugin must not break the
+      // chain nor propagate to the caller.
+      //
+      // Never settling needs the race. Hooks run in-process on the Agent's
+      // turn path (`afterChat` is awaited after the abort controller has
+      // already been released), so a handler that never resolves freezes the
+      // turn's `finally`, keeps the Agent's lock held forever, and leaves no
+      // way to recover short of restarting the server. Bounding it turns a
+      // dead Agent into one slow turn and a named culprit in the logs.
       try {
-        const result = await (handler as unknown as HookHandler<H>)(currentContext)
+        const result = await withTimeout(
+          // A handler may be sync; normalize so the race always gets a promise.
+          Promise.resolve((handler as unknown as HookHandler<H>)(currentContext)),
+          config.hooks.handlerTimeoutMs,
+          () => log.error({ hookName: name, timeoutMs: config.hooks.handlerTimeoutMs }, 'Hook handler timed out — skipping'),
+        )
         if (result) {
           currentContext = result
         }

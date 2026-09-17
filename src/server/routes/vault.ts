@@ -26,9 +26,13 @@ import {
 import { createLogger } from '@/server/logger'
 import { VAULT_BUILTIN_TYPES } from '@/shared/constants'
 import type { VaultFieldType, VaultTypeField } from '@/shared/types'
+import { requireAdmin } from '@/server/auth/require-admin'
 
 const log = createLogger('routes:vault')
 const vaultRoutes = new Hono()
+
+// Platform configuration: every route in this family is admin-only.
+vaultRoutes.use('*', requireAdmin)
 
 // GET /api/vault — list all secrets (keys only, never values)
 vaultRoutes.get('/', async (c) => {

@@ -95,19 +95,6 @@ Memories can be accessed via Agent-scoped routes or global maintenance routes.
 | `POST` | `/api/memories/consolidate` | Run memory consolidation |
 | `POST` | `/api/memories/reembed` | Re-embed all memories |
 
-## Knowledge
-
-Agent-scoped knowledge base (RAG document sources).
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/agents/:agentId/knowledge` | List knowledge sources |
-| `POST` | `/api/agents/:agentId/knowledge` | Add a knowledge source |
-| `GET` | `/api/agents/:agentId/knowledge/search` | Search knowledge |
-| `GET` | `/api/agents/:agentId/knowledge/:sourceId` | Get source details |
-| `DELETE` | `/api/agents/:agentId/knowledge/:sourceId` | Delete a source |
-| `POST` | `/api/agents/:agentId/knowledge/:sourceId/reprocess` | Reprocess a source |
-
 ## Channels
 
 Channels are managed globally (not scoped to an Agent).
