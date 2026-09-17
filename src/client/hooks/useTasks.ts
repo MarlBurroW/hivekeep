@@ -22,6 +22,8 @@ export function useTasks() {
   const [historyTasks, setHistoryTasks] = useState<TaskSummary[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [activeError, setActiveError] = useState(false)
+  const [activeLoading, setActiveLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -53,8 +55,11 @@ export function useTasks() {
       setActiveTasks(all)
       // Reverse to oldest-first (API returns createdAt DESC, queue position is FIFO)
       setQueuedTasks([...queued.tasks].reverse())
+      setActiveError(false)
     } catch {
-      // Silently fail — tasks are non-critical
+      setActiveError(true)
+    } finally {
+      setActiveLoading(false)
     }
   }, [])
 
@@ -324,6 +329,9 @@ export function useTasks() {
 
   return {
     activeTasks,
+    activeError,
+    activeLoading,
+    refetchActive: fetchActiveTasks,
     queuedTasks,
     historyTasks,
     hasMore,

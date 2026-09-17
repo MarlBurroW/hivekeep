@@ -4606,3 +4606,11 @@ body {
   display: block !important;
 }
 
+
+/* Touch targets keep their compact appearance on a pointer-driven desktop. */
+@media (pointer: coarse) {
+  [data-slot="button"], [data-slot="select-trigger"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

@@ -29,6 +29,10 @@ import {
   Moon,
   Palette,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/client/hooks/useAuth'
+import { primaryNavigation, visibleSettingsGroups } from '@/client/lib/navigation'
+import { api } from '@/client/lib/api'
 import { useTheme } from '@/client/components/theme-provider'
 
 interface AgentSummary {
@@ -46,20 +50,6 @@ interface CommandPaletteProps {
   onOpenSettings: (section?: string) => void
 }
 
-const SETTINGS_SECTIONS = [
-  { id: 'general', icon: Settings2, labelKey: 'settings.general.title' },
-  { id: 'providers', icon: BrainCircuit, labelKey: 'settings.providers.title' },
-  { id: 'search', icon: Search, labelKey: 'settings.searchProviders.title' },
-  { id: 'mcp', icon: Puzzle, labelKey: 'settings.mcp.title' },
-  { id: 'vault', icon: Lock, labelKey: 'settings.vault.title' },
-  { id: 'memories', icon: Brain, labelKey: 'settings.memories.title' },
-  { id: 'contacts', icon: Users, labelKey: 'settings.contacts.title' },
-  { id: 'users', icon: UserPlus, labelKey: 'settings.users.title' },
-  { id: 'files', icon: FolderOpen, labelKey: 'settings.files.title' },
-  { id: 'webhooks', icon: Webhook, labelKey: 'settings.webhooks.title' },
-  { id: 'channels', icon: Radio, labelKey: 'settings.channels.title' },
-  { id: 'notifications', icon: Bell, labelKey: 'settings.notifications.title' },
-] as const
 
 export function CommandPalette({
   agents,
@@ -67,8 +57,19 @@ export function CommandPalette({
   onCreateAgent,
   onOpenSettings,
 }: CommandPaletteProps) {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const sections = visibleSettingsGroups(user?.role === 'admin').flatMap(group => group.items)
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
+  const [loadedAgents, setLoadedAgents] = useState<AgentSummary[]>([])
+  useEffect(() => {
+    if (!open || agents.length > 0) return
+    let active = true
+    api.get<{ agents: AgentSummary[] }>('/agents').then(data => { if (active) setLoadedAgents(data.agents) }).catch(() => {})
+    return () => { active = false }
+  }, [open, agents.length])
+  const availableAgents = agents.length ? agents : loadedAgents
   const { theme, setTheme } = useTheme()
 
   // Global Cmd+K / Ctrl+K listener
@@ -94,10 +95,11 @@ export function CommandPalette({
       <CommandList>
         <CommandEmpty>{t('commandPalette.empty')}</CommandEmpty>
 
+        <CommandGroup heading={t('workspace.navigation')}>{primaryNavigation.map(item => <CommandItem key={item.id} value={t(item.labelKey)} onSelect={() => runAndClose(() => navigate(item.to))}><item.icon className="size-4" />{t(item.labelKey)}</CommandItem>)}</CommandGroup>
         {/* Agents */}
-        {agents.length > 0 && (
+        {availableAgents.length > 0 && (
           <CommandGroup heading={t('commandPalette.agents')}>
-            {agents.map((agent) => (
+            {availableAgents.map((agent) => (
               <CommandItem
                 key={agent.id}
                 value={`agent ${agent.name} ${agent.role}`}
@@ -123,13 +125,13 @@ export function CommandPalette({
 
         {/* Actions */}
         <CommandGroup heading={t('commandPalette.actions')}>
-          <CommandItem
+          {user?.role === 'admin' && <CommandItem
             value="create new agent"
             onSelect={() => runAndClose(onCreateAgent)}
           >
             <MessageSquarePlus className="size-4" />
             <span>{t('commandPalette.createAgent')}</span>
-          </CommandItem>
+          </CommandItem>}
           <CommandItem
             value="toggle theme dark light"
             onSelect={() => runAndClose(() => setTheme(theme === 'dark' ? 'light' : 'dark'))}
@@ -143,7 +145,7 @@ export function CommandPalette({
 
         {/* Settings */}
         <CommandGroup heading={t('commandPalette.settings')}>
-          {SETTINGS_SECTIONS.map(({ id, icon: Icon, labelKey }) => (
+          {sections.map(({ id, icon: Icon, labelKey }) => (
             <CommandItem
               key={id}
               value={`settings ${t(labelKey)}`}

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { api } from '@/client/lib/api'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { api, getErrorMessage } from '@/client/lib/api'
 import { sourceApiBase } from '@/client/lib/workspace-source'
 import type { WorkspaceSourceRef } from '@/shared/types'
 
@@ -41,9 +41,14 @@ export function useWorkspaceFileSearch({
 }: UseWorkspaceFileSearchOptions) {
   const [hits, setHits] = useState<WorkspaceFileHit[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
+  const refresh = useCallback(() => setRevision((value) => value + 1), [])
   const requestSeqRef = useRef(0)
 
   useEffect(() => {
+    const seq = ++requestSeqRef.current
+    setError(null)
     if (!enabled || !source) {
       // Reset to empty WITHOUT allocating a fresh array when already empty: a
       // brand-new `[]` is a new reference each time, so an unstable `source`
@@ -57,22 +62,26 @@ export function useWorkspaceFileSearch({
     }
     const url = buildWorkspaceSearchUrl({ source, query, limit })
     if (!url) return
-    const seq = ++requestSeqRef.current
     setIsLoading(true)
+    setHits((prev) => prev.length ? [] : prev)
     const handle = setTimeout(async () => {
       try {
         const data = await api.get<{ hits: WorkspaceFileHit[] }>(url)
         if (seq !== requestSeqRef.current) return // superseded — drop silently
         setHits(data.hits)
         setIsLoading(false)
-      } catch {
+      } catch (err) {
         if (seq !== requestSeqRef.current) return
         setHits([])
+        setError(getErrorMessage(err))
         setIsLoading(false)
       }
     }, debounceMs)
-    return () => clearTimeout(handle)
-  }, [query, source, enabled, debounceMs, limit])
+    return () => {
+      clearTimeout(handle)
+      requestSeqRef.current++
+    }
+  }, [query, source, enabled, debounceMs, limit, revision])
 
-  return { hits, isLoading }
+  return { hits, isLoading, error, refresh }
 }

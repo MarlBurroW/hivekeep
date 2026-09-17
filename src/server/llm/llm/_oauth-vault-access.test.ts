@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'bun:test'
-import { getVaultOAuthToken } from './_oauth-vault-access'
+import { describe, expect, it, mock } from 'bun:test'
+mock.module('@/server/services/vault', () => ({
+  createSecret: mock(async () => null),
+  getSecretByKey: mock(async () => null),
+  getSecretValue: mock(async () => null),
+  updateSecretValueByKey: mock(async () => null),
+  deleteSecret: mock(async () => false),
+}))
+const { getVaultOAuthToken } = await import('./_oauth-vault-access')
 import { PROVIDER_ID_KEY, PROVIDER_TYPE_KEY } from './_oauth-token-store'
 
 describe('getVaultOAuthToken (generic vault accessor)', () => {

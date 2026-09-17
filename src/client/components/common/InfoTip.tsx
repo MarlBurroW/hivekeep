@@ -24,7 +24,7 @@ export function InfoTip({ content, className, side = 'top' }: InfoTipProps) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          tabIndex={-1}
+          aria-label={content}
           className={cn(
             'inline-flex items-center justify-center text-muted-foreground/60 transition-colors hover:text-muted-foreground',
             className,

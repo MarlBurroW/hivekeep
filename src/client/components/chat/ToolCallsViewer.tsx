@@ -24,7 +24,7 @@ export const ToolCallsViewer = React.memo(function ToolCallsViewer({ toolCalls, 
       <div className="flex items-center justify-between border-b px-3 py-2">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold truncate">{t('tools.viewer.title')}</h3>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {t('tools.viewer.description', { count: toolCallCount })}
           </p>
         </div>
@@ -32,14 +32,14 @@ export const ToolCallsViewer = React.memo(function ToolCallsViewer({ toolCalls, 
           {onShowAvailableTools && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-xs" onClick={onShowAvailableTools}>
+                <Button aria-label={t('tools.viewer.showAvailable', 'View available tools')} variant="ghost" size="icon-xs" onClick={onShowAvailableTools}>
                   <Wrench className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">{t('tools.viewer.showAvailable', 'View available tools')}</TooltipContent>
             </Tooltip>
           )}
-          <Button variant="ghost" size="icon-xs" onClick={onClose}>
+          <Button aria-label={t('common.close')} variant="ghost" size="icon-xs" onClick={onClose}>
             <X className="size-3.5" />
           </Button>
         </div>

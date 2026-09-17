@@ -113,6 +113,8 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   const { pendingFiles, addFiles, removeFile, clearFiles, isUploading } = useFileUpload(agent.id)
   const { activeSession, isOpen: isQuickOpen, setIsOpen: setQuickOpen, createSession, closeSession } = useQuickSession(agent.id)
   const [showQuickHistory, setShowQuickHistory] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const sendLock = useRef(false)
   const { exportAsMarkdown, exportAsJSON } = useExportConversation(messages, agent.name)
   const { users: mentionableUsers, agents: mentionableAgents } = useMentionables()
   const { toggleReaction } = useReactions(agent.id)
@@ -290,26 +292,74 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   // Track whether user has scrolled away from bottom
   const isNearBottomRef = useRef(true)
 
-  // On mount (fresh for each agent thanks to key=agent.id), scroll to bottom
-  // instantly once messages are loaded — runs before paint so the user
-  // never sees the conversation at the wrong scroll position.
+  const readPositionKey = `hivekeep:read-position:${user?.id ?? 'anonymous'}:${agent.id}`
+  const savedPosition = useRef<{ id?: string; timestamp?: string; offset: number; bottom: boolean } | null>(null)
+  const positionLoaded = useRef(false)
+  if (!positionLoaded.current) {
+    positionLoaded.current = true
+    try { savedPosition.current = JSON.parse(sessionStorage.getItem(readPositionKey) ?? 'null') } catch { /* optional */ }
+  }
+  const restoreCursor = useRef<string | null>(null)
   const needsInstantScrollRef = useRef(true)
   const justDidInstantScrollRef = useRef(false)
 
   useLayoutEffect(() => {
-    if (needsInstantScrollRef.current && messages.length > 0) {
-      const scrollArea = scrollAreaRef.current
-      if (scrollArea) {
-        const viewport = scrollArea.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement | null
-        if (viewport) {
-          viewport.scrollTop = viewport.scrollHeight
-        }
+    if (!needsInstantScrollRef.current || !messages.length) return
+    const viewport = getScrollViewport(scrollAreaRef.current)
+    if (!viewport) return
+    const saved = savedPosition.current
+    const anchor = saved?.id
+      ? Array.from(viewport.querySelectorAll<HTMLElement>('[data-message-id]')).find((element) => element.dataset.messageId === saved.id)
+      : null
+    if (saved && !saved.bottom && !anchor && hasMore && saved.timestamp &&
+        new Date(messages[0]!.createdAt).getTime() > new Date(saved.timestamp).getTime()) {
+      // Fetch contiguous, fresh pages until the previously-read anchor is in
+      // view. Never restore cached message text that may have been deleted.
+      if (isLoadingMore) return
+      const oldest = messages[0]!.id
+      if (restoreCursor.current !== oldest) {
+        restoreCursor.current = oldest
+        void fetchOlderMessages()
+        return
       }
-      isNearBottomRef.current = true
-      needsInstantScrollRef.current = false
-      justDidInstantScrollRef.current = true
+      // Failed/empty page: fall back once instead of retrying indefinitely.
     }
-  }, [messages])
+    if (anchor && saved && !saved.bottom) {
+      viewport.scrollTop += anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top - saved.offset
+      isNearBottomRef.current = false
+      setShowScrollBottom(true)
+    } else {
+      viewport.scrollTop = viewport.scrollHeight
+      isNearBottomRef.current = true
+    }
+    needsInstantScrollRef.current = false
+    justDidInstantScrollRef.current = true
+  }, [messages, hasMore, isLoadingMore, fetchOlderMessages])
+
+  useEffect(() => {
+    const viewport = getScrollViewport(scrollAreaRef.current)
+    if (!viewport) return
+    const save = () => {
+      if (needsInstantScrollRef.current) return
+      const top = viewport.getBoundingClientRect().top
+      const anchor = Array.from(viewport.querySelectorAll<HTMLElement>('[data-message-id]'))
+        .find((element) => element.getBoundingClientRect().bottom > top)
+      const message = messages.find((item) => item.id === anchor?.dataset.messageId)
+      const position = { id: message?.id, timestamp: message?.createdAt,
+        offset: anchor ? anchor.getBoundingClientRect().top - top : 0,
+        bottom: viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 100 }
+      try { sessionStorage.setItem(readPositionKey, JSON.stringify(position)) } catch { /* optional */ }
+    }
+    // Save during scroll as well as cleanup: React may detach the DOM before
+    // passive cleanup runs when changing pages.
+    viewport.addEventListener('scroll', save, { passive: true })
+    window.addEventListener('pagehide', save)
+    return () => {
+      save()
+      viewport.removeEventListener('scroll', save)
+      window.removeEventListener('pagehide', save)
+    }
+  }, [readPositionKey, messages])
 
   const checkNearBottom = useCallback(() => {
     const scrollArea = scrollAreaRef.current
@@ -380,7 +430,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
   const requestOlderPage = useCallback((viewport: HTMLElement) => {
     // fetchOlderMessages bails on an empty list without ever toggling
     // isLoadingMore, which would leave the guard ref latched true forever.
-    if (messageCountRef.current === 0) return
+    if (messageCountRef.current === 0 || needsInstantScrollRef.current) return
     pendingPageCountRef.current = messageCountRef.current
     prevScrollHeightRef.current = viewport.scrollHeight
     isLoadingMoreRef.current = true
@@ -618,6 +668,9 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
 
   const handleSend = useCallback(
     async (content: string, fileIds?: string[]) => {
+      if (sendLock.current) return
+      sendLock.current = true
+      setIsSending(true)
       // Build optimistic MessageFile[] from pending files so images show immediately
       // Use serverUrl (already uploaded) — previewUrl (blob:) gets revoked by clearFiles
       const optimisticFiles = pendingFiles
@@ -631,6 +684,8 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         }))
 
       const success = await sendMessage(content, fileIds, optimisticFiles.length > 0 ? optimisticFiles : undefined)
+      sendLock.current = false
+      setIsSending(false)
       if (success) {
         clearDraft()
         clearFiles()
@@ -1119,7 +1174,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         thinkingEffort={thinkingEffort}
         onChangeThinking={updateThinking}
         onViewUsage={onOpenSettings ? () => onOpenSettings('tokenUsage', { agentId: agent.id }) : undefined}
-        leading={<SidebarTrigger className="-ml-1 shrink-0 md:hidden" />}
+        leading={<SidebarTrigger className="-ml-1 size-11 shrink-0" />}
       />
       )}
 
@@ -1127,6 +1182,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
       {isSearchOpen && (
         <Suspense fallback={null}>
           <ConversationSearch
+            agentId={agent.id}
             onClose={toggleSearch}
             onSearchChange={handleSearchChange}
             messages={displayMessages}
@@ -1251,11 +1307,13 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
           <button
             onClick={toggleAutoScroll}
             className={cn(
-              'absolute bottom-4 right-4 z-10 flex items-center justify-center size-8 rounded-full shadow-lg transition-colors',
+              'absolute bottom-4 right-4 z-10 flex size-10 items-center justify-center rounded-full border bg-background/95 shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring',
               autoScroll
-                ? 'bg-primary text-primary-foreground hover:opacity-90'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                ? 'border-primary/25 text-primary hover:bg-primary/10'
+                : 'border-border text-muted-foreground hover:bg-muted',
             )}
+            aria-pressed={autoScroll}
+            aria-label={autoScroll ? t('chat.autoScroll.on') : t('chat.autoScroll.off')}
             title={autoScroll ? t('chat.autoScroll.on') : t('chat.autoScroll.off')}
           >
             {autoScroll ? <Pin className="size-3.5" /> : <PinOff className="size-3.5" />}
@@ -1263,7 +1321,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         </div>
 
         {/* Tool calls side panel — animated width wrapper */}
-        <div
+        <div inert={!isToolCallsOpen} aria-hidden={!isToolCallsOpen}
           className={`shrink-0 overflow-hidden transition-[width] duration-300 ease-out ${
             isToolCallsOpen ? 'w-80 lg:w-96' : 'w-0'
           }`}
@@ -1324,7 +1382,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         onCommand={handleCommand}
         isStreaming={isStreaming}
         isProcessing={isProcessing}
-        disabled={modelUnavailable || isCompacting}
+        disabled={modelUnavailable || isCompacting || isSending}
         disabledReason={isCompacting ? t('chat.compacting.inputDisabled') : modelUnavailable ? t('agent.modelUnavailableInput') : undefined}
         pendingFiles={pendingFiles}
         isUploading={isUploading}
@@ -1332,6 +1390,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
         onRemoveFile={removeFile}
         agentId={agent.id}
         mentionableUsers={mentionableUsers}
+        agentName={agent.name}
         mentionableAgents={mentionableAgents}
         llmModels={llmModels}
         model={agent.model}
@@ -1411,6 +1470,7 @@ export function ChatPanel({ agent, llmModels, modelUnavailable = false, queueSta
                 count: rewindTarget ? Math.max(0, messages.length - 1 - messages.findIndex((m) => m.id === rewindTarget)) : 0,
                 defaultValue: 'This message becomes the most recent one — about {{count}} later message(s) will be permanently deleted from the conversation and its context. This cannot be undone.',
               })}
+              <span className="mt-2 block">{t('experience.chat.clearEffects', 'This affects the shared conversation and its attached files. Existing memories are kept; manage them separately in the Agent’s memory settings.')}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

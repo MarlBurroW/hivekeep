@@ -10,17 +10,19 @@
  *   mock.module('@/server/db/index', () => ({ ...fullMockDbIndex }))
  */
 
+const testDataDir = process.env.HIVEKEEP_TEST_DATA_DIR ?? `/tmp/hivekeep-test-${process.pid}`
+
 /** Complete config object matching src/server/config.ts shape */
 export const fullMockConfig = {
   version: '0.0.0-test',
   port: 3000,
-  dataDir: '/tmp/hivekeep-test',
+  dataDir: `${testDataDir}`,
   encryptionKey: 'test-key-0000000000000000000000000000000000000000000000000000000000000000',
   logLevel: 'error' as const,
   isDocker: false,
   publicUrl: 'http://localhost:3000',
 
-  db: { path: '/tmp/hivekeep-test/hivekeep.db' },
+  db: { path: `${testDataDir}/hivekeep.db` },
 
   compacting: {
     model: undefined,
@@ -72,12 +74,12 @@ export const fullMockConfig = {
 
   vault: {
     algorithm: 'aes-256-gcm' as const,
-    attachmentDir: '/tmp/hivekeep-test/vault',
+    attachmentDir: `${testDataDir}/vault`,
     maxAttachmentSizeMb: 50,
     maxAttachmentsPerEntry: 10,
   },
 
-  workspace: { baseDir: '/tmp/hivekeep-test/workspaces' },
+  workspace: { baseDir: `${testDataDir}/workspaces` },
   workspaceFiles: {
     maxEditableSizeMb: 5,
     maxUploadSizeMb: 100,
@@ -88,14 +90,14 @@ export const fullMockConfig = {
   },
 
   upload: {
-    dir: '/tmp/hivekeep-test/uploads',
+    dir: `${testDataDir}/uploads`,
     maxFileSizeMb: 50,
     channelFileRetentionDays: 30,
     channelFileCleanupIntervalMin: 60,
   },
 
   fileStorage: {
-    dir: '/tmp/hivekeep-test/storage',
+    dir: `${testDataDir}/storage`,
     maxFileSizeMb: 100,
     cleanupIntervalMin: 60,
   },
@@ -158,7 +160,7 @@ export const fullMockConfig = {
   },
 
   miniApps: {
-    dir: '/tmp/hivekeep-test/mini-apps',
+    dir: `${testDataDir}/mini-apps`,
     maxAppsPerAgent: 20,
     maxFileSizeMb: 5,
     maxTotalSizeMbPerApp: 50,
@@ -175,7 +177,7 @@ export const fullMockConfig = {
     installationType: 'manual' as const,
     envFilePath: null,
     serviceFilePath: null,
-    workingDir: '/tmp/hivekeep-test',
+    workingDir: `${testDataDir}`,
     user: 'test-user',
   },
 } as const

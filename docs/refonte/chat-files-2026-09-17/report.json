@@ -1,0 +1,11 @@
+{
+  "results": [
+    "keyboard browsing, empty folder, multi-selection across search, exact accented/backtick paths, persistent draft",
+    "nested upload, collision preservation, partial failure/retry, drag/drop, download and exact references in the sent message",
+    "search failure/retry, discarded stale response and closing without changing the draft",
+    "workspace and draft follow the active agent",
+    "private references stay in the private draft; private upload is absent from workspace and unreadable by another member",
+    "320×640 touch layouts in French/English and light/dark, with the add action visible"
+  ],
+  "errors": []
+}

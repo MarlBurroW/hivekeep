@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { db } from '@/server/db/index'
-import { userProfiles, providers, user } from '@/server/db/schema'
+import { userProfiles, providers, user, appSettings } from '@/server/db/schema'
 import { eq } from 'drizzle-orm'
 import { auth } from '@/server/auth/index'
 import { createLogger } from '@/server/logger'
@@ -37,11 +37,13 @@ onboardingRoutes.get('/status', async (c) => {
   // Once an admin exists, the unauthenticated pre-auth window is over: this
   // route stays reachable forever (the auth middleware exempts it), so stop
   // disclosing the instance's configuration posture to anonymous callers.
+  let onboardingUserId: string | null = null
   if (hasAdmin) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers })
     if (!session) {
       return c.json({ completed: true, hasAdmin: true })
     }
+    onboardingUserId = session.user.id
   }
 
   const allProviders = await db.select().from(providers).all()
@@ -59,7 +61,11 @@ onboardingRoutes.get('/status', async (c) => {
     }
   }
 
-  return c.json({ completed: hasAdmin, hasAdmin, hasLlm, hasEmbedding })
+  // Only newly-created administrators have this marker. Existing instances
+  // never re-enter onboarding merely because a provider was removed.
+  const pending = db.select().from(appSettings).where(eq(appSettings.key, 'onboarding_bootstrap_pending_user')).get()
+  const bootstrapPending = !!onboardingUserId && pending?.value === onboardingUserId
+  return c.json({ completed: hasAdmin && !bootstrapPending, hasAdmin, hasLlm, hasEmbedding, bootstrapPending })
 })
 
 // POST /api/onboarding/profile — create user profile during onboarding
@@ -149,7 +155,11 @@ onboardingRoutes.post('/profile', async (c) => {
   // First user becomes admin; everyone joining via invitation is a member.
   const role = adminExists ? 'member' : 'admin'
 
-  await db.insert(userProfiles).values({
+  db.transaction((tx) => {
+    if (role === 'admin') {
+      tx.insert(appSettings).values({ key: 'onboarding_bootstrap_pending_user', value: userId, updatedAt: Date.now() }).onConflictDoNothing().run()
+    }
+    tx.insert(userProfiles).values({
     userId,
     firstName: trimmedFirstName,
     lastName: trimmedLastName,
@@ -157,6 +167,7 @@ onboardingRoutes.post('/profile', async (c) => {
     language: language || 'en',
     agentLanguage: agentLanguage ?? null,
     role,
+    }).run()
   })
 
   // Update name in Better Auth user table
@@ -232,6 +243,7 @@ onboardingRoutes.post('/configurator', async (c) => {
   try {
     const { seedConfiguratorAgent } = await import('@/server/services/configurator')
     const agent = await seedConfiguratorAgent(session.user.id, providerId)
+    await db.delete(appSettings).where(eq(appSettings.key, 'onboarding_bootstrap_pending_user'))
     return c.json({
       agent: agent
         ? { id: agent.id, slug: agent.slug, name: agent.name, kind: agent.kind }

@@ -9,9 +9,10 @@ import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from '@/server/db/schema'
 
 // Schema-pollution guard (same pattern as model-registry.test.ts): some test
-// files stub @/server/db/schema globally; skip cleanly when that happened.
+// files stub @/server/db/schema globally; fail if isolation is missing.
 const schemaIsReal = !!(schema as { messages?: { id?: unknown } }).messages?.id
-const d = schemaIsReal ? describe : describe.skip
+if (!schemaIsReal) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const d = describe
 
 mock.module('@/server/logger', () => ({
   createLogger: () => ({ info: () => {}, warn: () => {}, debug: () => {}, error: () => {} }),

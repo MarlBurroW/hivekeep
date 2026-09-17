@@ -7,7 +7,7 @@ import {
   isBlockedUrl,
 } from '@/server/services/web-browse'
 import { playwrightManager } from '@/server/services/playwright-manager'
-import { createFileFromContent } from '@/server/services/file-storage'
+import { storeBrowserScreenshot } from '@/server/services/browser-screenshots'
 import { createLogger } from '@/server/logger'
 import { config } from '@/server/config'
 import type { ToolRegistration } from '@/server/tools/types'
@@ -146,7 +146,7 @@ export const screenshotUrlTool: ToolRegistration = {
           .describe('Capture full scrollable page. Default: false'),
       }),
       execute: async ({ url, viewport_width, viewport_height, full_page }) => {
-        log.debug({ url, agentId: ctx.agentId }, 'screenshot_url invoked')
+        log.debug({ url, agentId: ctx.agentId, sessionId: ctx.sessionId }, 'screenshot_url invoked')
 
         try {
           const blocked = await isBlockedUrl(url)
@@ -163,14 +163,7 @@ export const screenshotUrlTool: ToolRegistration = {
           // Store the screenshot as a file
           const hostname = new URL(url).hostname.replace(/[^a-z0-9.-]/gi, '_')
           const name = `screenshot-${hostname}-${Date.now()}`
-          const base64 = result.buffer.toString('base64')
-
-          const file = await createFileFromContent(ctx.agentId, name, base64, 'image/png', {
-            isBase64: true,
-            description: `Screenshot of ${url}`,
-            isPublic: true,
-            createdByAgentId: ctx.agentId,
-          })
+          const file = await storeBrowserScreenshot(ctx, name, result.buffer, url)
 
           return {
             url,
@@ -181,7 +174,7 @@ export const screenshotUrlTool: ToolRegistration = {
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
-          log.warn({ url, error: message }, 'screenshot_url failed')
+          log.warn({ url, error: message, sessionId: ctx.sessionId }, 'screenshot_url failed')
           return { error: message }
         }
       },

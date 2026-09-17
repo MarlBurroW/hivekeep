@@ -24,6 +24,7 @@ import { eq } from 'drizzle-orm'
 const log = createLogger('stuck-agent-watch')
 
 let timer: ReturnType<typeof setInterval> | null = null
+let initialTimer: ReturnType<typeof setTimeout> | null = null
 /** Agents already reported, so one wedged Agent does not notify every cycle. */
 const warned = new Set<string>()
 
@@ -94,10 +95,17 @@ export function startStuckAgentWatch(): void {
   const run = () => {
     sweepStuckAgents().catch((err) => log.error({ err }, 'Stuck-agent sweep failed'))
   }
-  setTimeout(run, 60_000)
+  initialTimer = setTimeout(run, 60_000)
   timer = setInterval(run, config.queue.stuckSweepIntervalMs)
   log.info(
     { warnMs: config.queue.stuckWarnMs, recoverMs: config.queue.stuckRecoverMs },
     'Stuck-agent watch scheduled',
   )
+}
+
+export function stopStuckAgentWatch(): void {
+  if (timer) clearInterval(timer)
+  if (initialTimer) clearTimeout(initialTimer)
+  timer = null
+  initialTimer = null
 }

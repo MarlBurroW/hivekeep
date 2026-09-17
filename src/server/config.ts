@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join, resolve } from 'path'
 import os from 'os'
 import { parseModelEnv } from '@/shared/model-ref'
+import { envNumber } from './config-number'
 
 const dataDir = process.env.HIVEKEEP_DATA_DIR ?? './data'
 
@@ -164,15 +165,14 @@ function resolveServerTimezone(): string {
 
 export const config = {
   version: appVersion,
-  port: Number(process.env.PORT ?? 3000),
-  /** Max HTTP request body size (bytes) accepted by Bun.serve. Bun's own
-   *  default is ~128 MB, which silently caps large file-storage uploads.
-   *  Set MAX_REQUEST_BODY_MB to a positive value to enforce a cap; 0 (default)
-   *  = effectively unlimited (Number.MAX_SAFE_INTEGER). */
-  maxRequestBodyBytes: (() => {
-    const mb = Number(process.env.MAX_REQUEST_BODY_MB ?? 0)
-    return mb > 0 ? mb * 1024 * 1024 : Number.MAX_SAFE_INTEGER
-  })(),
+  port: envNumber('PORT', 3000, { min: 1, max: 65535 }),
+  /** Finite HTTP envelope limit; legacy 0 uses this default with a warning. */
+  maxRequestBodyBytes: envNumber('MAX_REQUEST_BODY_MB', 256, { max: 1024, legacyZeroDefault: true }) * 1024 * 1024,
+  /** Maximum time for active work to finish, then for abort/cleanup. */
+  shutdown: {
+    drainTimeoutMs: envNumber('SHUTDOWN_DRAIN_TIMEOUT_MS', 20_000, { max: 120_000 }),
+    cleanupTimeoutMs: envNumber('SHUTDOWN_CLEANUP_TIMEOUT_MS', 5_000, { min: 100, max: 30_000 }),
+  },
   dataDir,
   encryptionKey: resolveEncryptionKey(),
   logLevel: (process.env.LOG_LEVEL ?? 'info') as 'debug' | 'info' | 'warn' | 'error',
@@ -205,18 +205,18 @@ export const config = {
       'https://hivekeep-feedback.hivekeep.workers.dev/feedback',
     githubRepoUrl: process.env.HIVEKEEP_GITHUB_REPO_URL ?? 'https://github.com/MarlBurroW/hivekeep',
     /** Max characters accepted in a single feedback message. */
-    maxMessageLength: Number(process.env.HIVEKEEP_FEEDBACK_MAX_LENGTH ?? 5000),
+    maxMessageLength: envNumber('HIVEKEEP_FEEDBACK_MAX_LENGTH', 5000),
     /** Usage thresholds before the proactive banner may appear (either suffices). */
-    promptAfterDays: Number(process.env.HIVEKEEP_FEEDBACK_PROMPT_AFTER_DAYS ?? 7),
-    promptMinMessages: Number(process.env.HIVEKEEP_FEEDBACK_PROMPT_MIN_MESSAGES ?? 30),
+    promptAfterDays: envNumber('HIVEKEEP_FEEDBACK_PROMPT_AFTER_DAYS', 7),
+    promptMinMessages: envNumber('HIVEKEEP_FEEDBACK_PROMPT_MIN_MESSAGES', 30),
     /** Days before the banner reappears after the user clicks "later". */
-    snoozeDays: Number(process.env.HIVEKEEP_FEEDBACK_SNOOZE_DAYS ?? 14),
+    snoozeDays: envNumber('HIVEKEEP_FEEDBACK_SNOOZE_DAYS', 14),
   },
 
   compacting: {
     ...parseModelEnv(process.env.COMPACTING_MODEL) as { model?: string; providerId?: string },
     /** Trigger compaction when total context tokens exceed this % of the model's context window. */
-    thresholdPercent: Number(process.env.COMPACTING_THRESHOLD_PERCENT ?? 75),
+    thresholdPercent: envNumber('COMPACTING_THRESHOLD_PERCENT', 75, { max: 100, integer: false }),
     /** Keep the most recent messages fitting within this % of the context window as raw context. */
     // Lowered from 40 → 25: with 40% on a 1M context, the keep-window was
     // 400k tokens — and on tool-heavy Agents (kubectl/browser/file ops), that
@@ -225,13 +225,13 @@ export const config = {
     // even after force-compacting. 25% gives a 250k keep-window which fits
     // ~1-2 large outputs + many small messages, more representative of
     // "recent context" than "everything that happened lately".
-    keepPercent: Number(process.env.COMPACTING_KEEP_PERCENT ?? 25),
+    keepPercent: envNumber('COMPACTING_KEEP_PERCENT', 25, { max: 100, integer: false }),
     /** Max % of context window that summaries may occupy before triggering telescopic merge. */
-    summaryBudgetPercent: Number(process.env.COMPACTING_SUMMARY_BUDGET_PERCENT ?? 20),
+    summaryBudgetPercent: envNumber('COMPACTING_SUMMARY_BUDGET_PERCENT', 20, { max: 100, integer: false }),
     /** Max number of active summaries in context before forcing merge. */
-    maxSummaries: Number(process.env.COMPACTING_MAX_SUMMARIES ?? 10),
+    maxSummaries: envNumber('COMPACTING_MAX_SUMMARIES', 10),
     /** Max summaries to retain in DB (old archived summaries beyond this are deleted). */
-    maxSummariesPerAgent: Number(process.env.COMPACTING_MAX_SUMMARIES_PER_KIN ?? 50),
+    maxSummariesPerAgent: envNumber('COMPACTING_MAX_SUMMARIES_PER_KIN', 50),
     // ── Absolute token ceilings (model-agnostic) ──────────────────────────────
     // The percentage knobs above scale with the context window, so on a 1M-token
     // model even a "small" 25% keep-window is 250k tokens. These absolute caps
@@ -239,18 +239,18 @@ export const config = {
     // On a 200k model the % still dominates (50k < 100k), so they only bite on
     // large-window models. See compacting.md for the resulting envelope.
     /** Hard ceiling on the raw-message keep-window (real tokens). Caps `keepPercent`. */
-    keepMaxTokens: Number(process.env.COMPACTING_KEEP_MAX_TOKENS ?? 100_000),
+    keepMaxTokens: envNumber('COMPACTING_KEEP_MAX_TOKENS', 100_000),
     /** Hard ceiling on context size before compaction triggers (real tokens). Caps `thresholdPercent`. */
-    triggerMaxTokens: Number(process.env.COMPACTING_TRIGGER_MAX_TOKENS ?? 300_000),
+    triggerMaxTokens: envNumber('COMPACTING_TRIGGER_MAX_TOKENS', 300_000),
     /** Hard ceiling on total active-summary tokens before telescopic merge (real tokens). Caps `summaryBudgetPercent`. */
-    summaryMaxTokens: Number(process.env.COMPACTING_SUMMARY_MAX_TOKENS ?? 48_000),
+    summaryMaxTokens: envNumber('COMPACTING_SUMMARY_MAX_TOKENS', 48_000),
   },
 
   /** Max estimated tokens for conversation history injected into the LLM context.
    *  Messages are trimmed from the oldest end when this budget is exceeded.
    *  Acts as an emergency safety net — compacting + tool masking are the primary mechanisms.
    *  Set to 0 to disable (default). */
-  historyTokenBudget: Number(process.env.HISTORY_TOKEN_BUDGET ?? 0),
+  historyTokenBudget: envNumber('HISTORY_TOKEN_BUDGET', 0),
 
   /** Max number of recent messages fetched from the DB when assembling the
    *  conversation history. Acts as an upper bound on memory usage; the
@@ -261,7 +261,7 @@ export const config = {
    *  set, shifting the prefix and invalidating Anthropic's prompt cache. With
    *  1000 the window only slides on conversations with 1000+ raw messages
    *  (which the compacting service should have summarised long before). */
-  historyMaxMessages: Number(process.env.HISTORY_MAX_MESSAGES ?? 1000),
+  historyMaxMessages: envNumber('HISTORY_MAX_MESSAGES', 1000),
 
   // Cron schedule for refreshing the model-info cache (context windows,
   // max output tokens) by re-listing models from every configured provider.
@@ -288,17 +288,17 @@ export const config = {
   /** Number of recent tool call groups to keep fully intact in context.
    *  Older tool results are collapsed to one-line summaries to save tokens.
    *  Only applied when `progressiveCompactionEnabled` is true. */
-  toolResultMaskKeepLast: Number(process.env.TOOL_RESULT_MASK_KEEP_LAST ?? 2),
+  toolResultMaskKeepLast: envNumber('TOOL_RESULT_MASK_KEEP_LAST', 2),
 
   /** Number of recent turns to keep at full resolution.
    *  Older turns have tool results truncated to observationMaxChars, and
    *  long assistant/user text is trimmed. 0 = disabled.
    *  Only applied when `progressiveCompactionEnabled` is true. */
-  observationCompactionWindow: Number(process.env.OBSERVATION_COMPACTION_WINDOW ?? 10),
+  observationCompactionWindow: envNumber('OBSERVATION_COMPACTION_WINDOW', 10),
 
   /** Max characters for truncated tool results in the observation compaction zone.
    *  Only applied when `progressiveCompactionEnabled` is true. */
-  observationMaxChars: Number(process.env.OBSERVATION_MAX_CHARS ?? 200),
+  observationMaxChars: envNumber('OBSERVATION_MAX_CHARS', 200),
 
   /** Per-message size cap for tool-result content sent to the LLM (tokens).
    *  When a tool-result exceeds this cap, it's replaced by a small placeholder
@@ -307,7 +307,7 @@ export const config = {
    *  Cache-safe because the criterion is stable per message: a 80k-token
    *  result always trims to the same placeholder; a 5k-token result is never
    *  trimmed. Default 30000 tokens. Set 0 to disable. */
-  toolResultSizeCapTokens: Number(process.env.TOOL_RESULT_SIZE_CAP_TOKENS ?? 30000),
+  toolResultSizeCapTokens: envNumber('TOOL_RESULT_SIZE_CAP_TOKENS', 30000),
 
   /** Per-tool-call args size cap (per string field) when sending old assistant
    *  messages to the LLM. Symmetric to toolResultSizeCapTokens — write_file /
@@ -318,7 +318,7 @@ export const config = {
    *  toolCallId and toolName are preserved so subsequent tool-result blocks
    *  still match. DB content unchanged. Default 8000 tokens (~32k chars,
    *  ~600 lines of code). Set 0 to disable. */
-  toolCallArgsSizeCapTokens: Number(process.env.TOOL_CALL_ARGS_SIZE_CAP_TOKENS ?? 8000),
+  toolCallArgsSizeCapTokens: envNumber('TOOL_CALL_ARGS_SIZE_CAP_TOKENS', 8000),
 
   /** Per-assistant-message TEXT content size cap when sending old assistant
    *  messages to the LLM. Third companion to toolResultSizeCapTokens and
@@ -327,7 +327,7 @@ export const config = {
    *  Trimming preserves head + tail (~400 chars each), middle bulk replaced
    *  by a placeholder mentioning the original size. DB content unchanged.
    *  Default 12000 tokens (~48k chars, ~900 lines of prose). Set 0 to disable. */
-  assistantContentSizeCapTokens: Number(process.env.ASSISTANT_CONTENT_SIZE_CAP_TOKENS ?? 12000),
+  assistantContentSizeCapTokens: envNumber('ASSISTANT_CONTENT_SIZE_CAP_TOKENS', 12000),
 
   /** Per-user-message TEXT content size cap. 4th companion to the other
    *  three caps. User pastes (CSV dumps, file contents, log spam) can hit
@@ -335,7 +335,7 @@ export const config = {
    *  content. Default 16000 tokens (~64k chars), slightly higher than
    *  assistant cap because user pastes often carry the actual data the
    *  request is about. Set 0 to disable. */
-  userContentSizeCapTokens: Number(process.env.USER_CONTENT_SIZE_CAP_TOKENS ?? 16000),
+  userContentSizeCapTokens: envNumber('USER_CONTENT_SIZE_CAP_TOKENS', 16000),
 
   memory: (() => {
     const extraction = parseModelEnv(process.env.MEMORY_EXTRACTION_MODEL)
@@ -346,25 +346,25 @@ export const config = {
       extractionModel: extraction.model,
       extractionProviderId: extraction.providerId,
       /** Default number of results returned by a `recall` search. */
-      maxRelevantMemories: Number(process.env.MEMORY_MAX_RELEVANT ?? 10),
+      maxRelevantMemories: envNumber('MEMORY_MAX_RELEVANT', 10),
       // Cosine similarity floor for vector search candidates. This is a spam
       // filter, not a relevance gate: at 0.7, only memories near-identical to
       // the query survived and the FTS5 arm had to carry the whole search.
-      similarityThreshold: Number(process.env.MEMORY_SIMILARITY_THRESHOLD ?? 0.5),
+      similarityThreshold: envNumber('MEMORY_SIMILARITY_THRESHOLD', 0.5, { max: 1, integer: false }),
       embeddingModel: embedding.model ?? 'text-embedding-3-small',
       embeddingProviderId: embedding.providerId,
       // Embedding calls run under the compacting lock; unbounded, a silent
       // endpoint pins the Agent with no recovery path. 0 disables.
-      embeddingTimeoutMs: Number(process.env.MEMORY_EMBEDDING_TIMEOUT ?? 60_000),
-      embeddingDimension: Number(process.env.MEMORY_EMBEDDING_DIMENSION ?? 1536),
+      embeddingTimeoutMs: envNumber('MEMORY_EMBEDDING_TIMEOUT', 60_000),
+      embeddingDimension: envNumber('MEMORY_EMBEDDING_DIMENSION', 1536, { min: 1, max: 65536 }),
       // Reciprocal rank fusion constant, and the weight given to the FTS arm
       // relative to the vector arm at the same rank.
-      rrfK: Number(process.env.MEMORY_RRF_K ?? 60),
-      ftsBoost: Number(process.env.MEMORY_FTS_BOOST ?? 0.5),
+      rrfK: envNumber('MEMORY_RRF_K', 60),
+      ftsBoost: envNumber('MEMORY_FTS_BOOST', 0.5, { integer: false }),
       // Budget for the always-injected profile document (see memory.md).
       // It sits in the cached stable prompt segment, so every line costs on
       // every turn — the maintenance rewrite is told to stay under this.
-      profileMaxTokens: Number(process.env.MEMORY_PROFILE_MAX_TOKENS ?? 1500),
+      profileMaxTokens: envNumber('MEMORY_PROFILE_MAX_TOKENS', 1500),
     }
   })(),
 
@@ -374,36 +374,36 @@ export const config = {
      *  one global note per authoring Agent, plus each note growing as the model
      *  rewrites it — would inflate every prompt unbounded. We keep the most
      *  recently-updated notes per scope and truncate each one. */
-    speakerMaxNotesPerScope: Number(process.env.CONTACTS_SPEAKER_MAX_NOTES_PER_SCOPE ?? 12), // 0 = unlimited
-    speakerMaxNoteChars: Number(process.env.CONTACTS_SPEAKER_MAX_NOTE_CHARS ?? 500), // 0 = no truncation
+    speakerMaxNotesPerScope: envNumber('CONTACTS_SPEAKER_MAX_NOTES_PER_SCOPE', 12), // 0 = unlimited
+    speakerMaxNoteChars: envNumber('CONTACTS_SPEAKER_MAX_NOTE_CHARS', 500), // 0 = no truncation
   },
 
   queue: {
     userPriority: 100,
     agentPriority: 50,
     taskPriority: 50,
-    pollIntervalMs: Number(process.env.QUEUE_POLL_INTERVAL ?? 500),
+    pollIntervalMs: envNumber('QUEUE_POLL_INTERVAL', 500, { min: 10, max: 86_400_000 }),
     // Stuck-Agent detection. Recovery used to run only at boot, so a wedged
     // Agent could stay mute for hours with nobody informed.
-    stuckSweepIntervalMs: Number(process.env.QUEUE_STUCK_SWEEP_INTERVAL ?? 300_000),
+    stuckSweepIntervalMs: envNumber('QUEUE_STUCK_SWEEP_INTERVAL', 300_000),
     // Notify a human but leave the turn alone: it may still be legitimate.
-    stuckWarnMs: Number(process.env.QUEUE_STUCK_WARN ?? 900_000),
+    stuckWarnMs: envNumber('QUEUE_STUCK_WARN', 900_000),
     // Past any plausible turn duration (turnTimeoutMs plus a wide margin),
     // requeue so the Agent starts answering again. 0 disables.
-    stuckRecoverMs: Number(process.env.QUEUE_STUCK_RECOVER ?? 3_600_000),
+    stuckRecoverMs: envNumber('QUEUE_STUCK_RECOVER', 3_600_000),
   },
 
   tasks: {
-    maxDepth: Number(process.env.TASKS_MAX_DEPTH ?? 3),
-    maxRequestInput: Number(process.env.TASKS_MAX_REQUEST_INPUT ?? 3),
-    maxInterAgentRequests: Number(process.env.TASKS_MAX_INTER_KIN_REQUESTS ?? 3),
-    interAgentResponseTimeoutMs: Number(process.env.TASKS_INTER_KIN_RESPONSE_TIMEOUT_MS ?? 300000), // 5min
-    maxConcurrent: Number(process.env.TASKS_MAX_CONCURRENT ?? 10),
+    maxDepth: envNumber('TASKS_MAX_DEPTH', 3, { min: 1, max: 65536 }),
+    maxRequestInput: envNumber('TASKS_MAX_REQUEST_INPUT', 3),
+    maxInterAgentRequests: envNumber('TASKS_MAX_INTER_KIN_REQUESTS', 3),
+    interAgentResponseTimeoutMs: envNumber('TASKS_INTER_KIN_RESPONSE_TIMEOUT_MS', 300000), // 5min
+    maxConcurrent: envNumber('TASKS_MAX_CONCURRENT', 10, { min: 1, max: 65536 }),
   },
 
   crons: {
-    maxActive: Number(process.env.CRONS_MAX_ACTIVE ?? 50),
-    maxConcurrentExecutions: Number(process.env.CRONS_MAX_CONCURRENT_EXEC ?? 5),
+    maxActive: envNumber('CRONS_MAX_ACTIVE', 50),
+    maxConcurrentExecutions: envNumber('CRONS_MAX_CONCURRENT_EXEC', 5, { min: 1, max: 65536 }),
   },
 
   llm: {
@@ -422,19 +422,19 @@ export const config = {
     // clear their own request timeout once response HEADERS arrive, leaving the
     // whole streamed body unbounded: a frozen connection would otherwise pin
     // the Agent in "processing" until the process restarts. 0 disables.
-    streamIdleTimeoutMs: Number(process.env.LLM_STREAM_IDLE_TIMEOUT ?? 120_000),
+    streamIdleTimeoutMs: envNumber('LLM_STREAM_IDLE_TIMEOUT', 120_000),
   },
 
   tools: {
     // Hard cap on tool-call steps in one turn. Was 0 (unlimited): a model that
     // loops on tool calls then runs until the process restarts. The ceiling is
     // deliberately high — it is a runaway guard, not a budget.
-    maxSteps: Number(process.env.TOOLS_MAX_STEPS ?? 100), // 0 = truly unlimited (no cap)
+    maxSteps: envNumber('TOOLS_MAX_STEPS', 100), // 0 = truly unlimited (no cap)
     // Wall-clock ceiling for a single turn, measured from dequeue. Aborts the
     // turn through its own AbortController so the normal error path runs and
     // the failure is reported (including back to the originating channel).
     // Queue waiting time is NOT counted. 0 disables.
-    turnTimeoutMs: Number(process.env.TOOLS_TURN_TIMEOUT ?? 1_800_000),
+    turnTimeoutMs: envNumber('TOOLS_TURN_TIMEOUT', 1_800_000),
     // Temperature for tool-enabled turns. Local/self-hosted backends default to
     // ~0.7-0.8, which makes structured tool-call JSON unreliable on small models;
     // a low value steadies it. Reasoning models are exempted in code (they reject
@@ -442,15 +442,15 @@ export const config = {
     temperature:
       process.env.TOOLS_TEMPERATURE === 'off'
         ? null
-        : Number(process.env.TOOLS_TEMPERATURE ?? 0),
+        : envNumber('TOOLS_TEMPERATURE', 0, { max: 2, integer: false }),
     // Max parallel concurrency-safe tool calls within a single batch.
     // HIVEKEEP_MAX_TOOL_USE_CONCURRENCY is the canonical name (aligned with
     // Claude Code's CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY). TOOLS_CONCURRENCY_CAP
     // is kept as a fallback for existing deployments.
-    concurrencyCap: Number(
-      process.env.HIVEKEEP_MAX_TOOL_USE_CONCURRENCY
-        ?? process.env.TOOLS_CONCURRENCY_CAP
-        ?? 10,
+    concurrencyCap: envNumber(
+      process.env.HIVEKEEP_MAX_TOOL_USE_CONCURRENCY !== undefined
+        ? 'HIVEKEEP_MAX_TOOL_USE_CONCURRENCY' : 'TOOLS_CONCURRENCY_CAP',
+      10, { min: 1, max: 1024 },
     ),
   },
 
@@ -459,61 +459,61 @@ export const config = {
   // → defaultTimeoutMs. Raise maxTimeoutMs via env when tasks legitimately need
   // commands longer than the 10-minute default ceiling.
   shell: {
-    defaultTimeoutMs: Number(process.env.HIVEKEEP_SHELL_TIMEOUT ?? 30_000),
-    maxTimeoutMs: Number(process.env.HIVEKEEP_SHELL_MAX_TIMEOUT ?? 600_000),
+    defaultTimeoutMs: envNumber('HIVEKEEP_SHELL_TIMEOUT', 30_000),
+    maxTimeoutMs: envNumber('HIVEKEEP_SHELL_MAX_TIMEOUT', 600_000),
   },
 
   toolOutputs: {
-    spillThreshold: Number(process.env.TOOL_OUTPUT_SPILL_THRESHOLD ?? 10000), // bytes before spilling to file
-    previewLines: Number(process.env.TOOL_OUTPUT_PREVIEW_LINES ?? 200),       // lines to include in preview
+    spillThreshold: envNumber('TOOL_OUTPUT_SPILL_THRESHOLD', 10000), // bytes before spilling to file
+    previewLines: envNumber('TOOL_OUTPUT_PREVIEW_LINES', 200),       // lines to include in preview
     // Hard size bound on the preview. The line count alone is not a bound:
     // JSON.stringify escapes newlines, so a single-string result (an email
     // body, a grep hit list, shell stdout) serializes to a handful of very
     // long lines and "200 lines" keeps the ENTIRE payload. Spilled outputs
     // then cost as much context as if nothing had been spilled.
     // Must stay below spillThreshold, otherwise spilling saves nothing.
-    previewMaxChars: Number(process.env.TOOL_OUTPUT_PREVIEW_MAX_CHARS ?? 4000),
-    ttlHours: Number(process.env.TOOL_OUTPUT_TTL_HOURS ?? 24),                // cleanup after N hours
+    previewMaxChars: envNumber('TOOL_OUTPUT_PREVIEW_MAX_CHARS', 4000),
+    ttlHours: envNumber('TOOL_OUTPUT_TTL_HOURS', 24),                // cleanup after N hours
   },
 
   humanPrompts: {
-    maxPendingPerAgent: Number(process.env.HUMAN_PROMPTS_MAX_PENDING ?? 5),
+    maxPendingPerAgent: envNumber('HUMAN_PROMPTS_MAX_PENDING', 5),
   },
 
   search: {
     // Ceiling for one web_search round-trip. Runs on the turn path.
-    requestTimeoutMs: Number(process.env.SEARCH_REQUEST_TIMEOUT ?? 30_000),
+    requestTimeoutMs: envNumber('SEARCH_REQUEST_TIMEOUT', 30_000),
   },
 
   email: {
     // Ceiling for one Gmail / Microsoft Graph API call. IMAP has its own
     // socket-level timeouts already.
-    requestTimeoutMs: Number(process.env.EMAIL_REQUEST_TIMEOUT ?? 60_000),
+    requestTimeoutMs: envNumber('EMAIL_REQUEST_TIMEOUT', 60_000),
   },
 
   hooks: {
     // Ceiling for one plugin hook handler. Handlers run in-process on the
     // Agent's turn path, so one that never settles would pin the turn (and the
     // Agent) forever. 0 disables the bound.
-    handlerTimeoutMs: Number(process.env.HOOK_HANDLER_TIMEOUT ?? 30_000),
+    handlerTimeoutMs: envNumber('HOOK_HANDLER_TIMEOUT', 30_000),
   },
 
   interAgent: {
-    maxChainDepth: Number(process.env.INTER_KIN_MAX_CHAIN_DEPTH ?? 5),
-    rateLimitPerMinute: Number(process.env.INTER_KIN_RATE_LIMIT ?? 20),
+    maxChainDepth: envNumber('INTER_KIN_MAX_CHAIN_DEPTH', 5),
+    rateLimitPerMinute: envNumber('INTER_KIN_RATE_LIMIT', 20),
   },
 
   // External machine-to-machine conversational API (see external-api.md).
   externalApi: {
     enabled: process.env.HIVEKEEP_EXTERNAL_API_ENABLED !== 'false', // default: true
-    defaultRateLimitPerMinute: Number(process.env.HIVEKEEP_EXTERNAL_API_RATE_LIMIT ?? 60),
-    waitTimeoutMsDefault: Number(process.env.HIVEKEEP_EXTERNAL_API_WAIT_DEFAULT_MS ?? 60_000),
-    waitTimeoutMsMax: Number(process.env.HIVEKEEP_EXTERNAL_API_WAIT_MAX_MS ?? 120_000),
+    defaultRateLimitPerMinute: envNumber('HIVEKEEP_EXTERNAL_API_RATE_LIMIT', 60),
+    waitTimeoutMsDefault: envNumber('HIVEKEEP_EXTERNAL_API_WAIT_DEFAULT_MS', 60_000),
+    waitTimeoutMsMax: envNumber('HIVEKEEP_EXTERNAL_API_WAIT_MAX_MS', 120_000),
     // Sliding TTL for isolated conversations (P2). Default 30 days.
-    conversationIdleTtlHours: Number(process.env.HIVEKEEP_EXTERNAL_API_CONV_TTL_HOURS ?? 720),
-    maxActiveConversationsPerClient: Number(process.env.HIVEKEEP_EXTERNAL_API_MAX_CONV ?? 200),
+    conversationIdleTtlHours: envNumber('HIVEKEEP_EXTERNAL_API_CONV_TTL_HOURS', 720),
+    maxActiveConversationsPerClient: envNumber('HIVEKEEP_EXTERNAL_API_MAX_CONV', 200),
     // How long resolved api_requests rows are retained before GC. Default 7 days.
-    replyRetentionHours: Number(process.env.HIVEKEEP_EXTERNAL_API_REPLY_RETENTION_HOURS ?? 168),
+    replyRetentionHours: envNumber('HIVEKEEP_EXTERNAL_API_REPLY_RETENTION_HOURS', 168),
   },
 
   mcp: {
@@ -523,8 +523,8 @@ export const config = {
   vault: {
     algorithm: 'aes-256-gcm' as const,
     attachmentDir: process.env.VAULT_ATTACHMENT_DIR ?? `${dataDir}/vault`,
-    maxAttachmentSizeMb: Number(process.env.VAULT_MAX_ATTACHMENT_SIZE ?? 50),
-    maxAttachmentsPerEntry: Number(process.env.VAULT_MAX_ATTACHMENTS_PER_ENTRY ?? 10),
+    maxAttachmentSizeMb: envNumber('VAULT_MAX_ATTACHMENT_SIZE', 50),
+    maxAttachmentsPerEntry: envNumber('VAULT_MAX_ATTACHMENTS_PER_ENTRY', 10),
   },
 
   workspace: {
@@ -533,34 +533,34 @@ export const config = {
 
   upload: {
     dir: process.env.UPLOAD_DIR ?? `${dataDir}/uploads`,
-    maxFileSizeMb: Number(process.env.UPLOAD_MAX_FILE_SIZE ?? 50),
+    maxFileSizeMb: envNumber('UPLOAD_MAX_FILE_SIZE', 50),
     /** Retention period for channel-downloaded files (days). 0 = keep forever. */
-    channelFileRetentionDays: Number(process.env.UPLOAD_CHANNEL_RETENTION_DAYS ?? 30),
+    channelFileRetentionDays: envNumber('UPLOAD_CHANNEL_RETENTION_DAYS', 30),
     /** How often to run the channel file cleanup (minutes). */
-    channelFileCleanupIntervalMin: Number(process.env.UPLOAD_CHANNEL_CLEANUP_INTERVAL ?? 60),
+    channelFileCleanupIntervalMin: envNumber('UPLOAD_CHANNEL_CLEANUP_INTERVAL', 60),
   },
 
   fileStorage: {
     dir: process.env.FILE_STORAGE_DIR ?? `${dataDir}/storage`,
-    /** Max size (MB) of a single stored file. 0 (or negative) = unlimited. */
-    maxFileSizeMb: Number(process.env.FILE_STORAGE_MAX_SIZE ?? 0),
-    cleanupIntervalMin: Number(process.env.FILE_STORAGE_CLEANUP_INTERVAL ?? 60),
+    /** Max size (MB) of a single stored file; legacy 0 uses the finite default. */
+    maxFileSizeMb: envNumber('FILE_STORAGE_MAX_SIZE', 128, { max: 1024, legacyZeroDefault: true }),
+    cleanupIntervalMin: envNumber('FILE_STORAGE_CLEANUP_INTERVAL', 60, { min: 1, max: 60 }),
   },
 
   /** Files section — user-facing workspace browser/editor (see files.md). */
   workspaceFiles: {
     /** Above this size a text file is served as `too-large` (download only). */
-    maxEditableSizeMb: Number(process.env.WORKSPACE_FILES_MAX_EDITABLE_SIZE ?? 5),
-    /** Max size of a file uploaded to a workspace. 0 = unlimited (still capped by MAX_REQUEST_BODY_MB). */
-    maxUploadSizeMb: Number(process.env.WORKSPACE_FILES_MAX_UPLOAD_SIZE ?? 100),
+    maxEditableSizeMb: envNumber('WORKSPACE_FILES_MAX_EDITABLE_SIZE', 5),
+    /** Max size of one workspace upload. Legacy 0 uses the finite default. */
+    maxUploadSizeMb: envNumber('WORKSPACE_FILES_MAX_UPLOAD_SIZE', 100, { max: 1024, legacyZeroDefault: true }),
     /** Byte budget of a recursive folder copy (aborts mid-copy when exceeded). */
-    maxCopySizeMb: Number(process.env.WORKSPACE_FILES_MAX_COPY_SIZE ?? 500),
+    maxCopySizeMb: envNumber('WORKSPACE_FILES_MAX_COPY_SIZE', 500),
     /** Entry-count budget of a recursive folder copy. */
-    maxCopyEntries: Number(process.env.WORKSPACE_FILES_COPY_MAX_ENTRIES ?? 5000),
+    maxCopyEntries: envNumber('WORKSPACE_FILES_COPY_MAX_ENTRIES', 5000),
     /** Hard cap of the `limit` param of /workspace/search. */
-    searchMaxResults: Number(process.env.WORKSPACE_FILES_SEARCH_MAX_RESULTS ?? 50),
+    searchMaxResults: envNumber('WORKSPACE_FILES_SEARCH_MAX_RESULTS', 50),
     /** Budget of files walked per search request (giant workspaces). */
-    searchMaxEntries: Number(process.env.WORKSPACE_FILES_SEARCH_MAX_ENTRIES ?? 20000),
+    searchMaxEntries: envNumber('WORKSPACE_FILES_SEARCH_MAX_ENTRIES', 20000),
   },
 
   /** Terminal section — admin-only web terminal on the host (see api.md). */
@@ -570,79 +570,79 @@ export const config = {
     /** Shell binary spawned for each session. Defaults to $SHELL, then /bin/bash. */
     shell: process.env.HIVEKEEP_TERMINAL_SHELL ?? process.env.SHELL ?? '/bin/bash',
     /** Scrollback kept server-side per session, replayed on reattach (KB). */
-    scrollbackKb: Number(process.env.HIVEKEEP_TERMINAL_SCROLLBACK_KB ?? 256),
+    scrollbackKb: envNumber('HIVEKEEP_TERMINAL_SCROLLBACK_KB', 256),
     /** How long a detached session (no client connected) survives before the
      *  shell is killed (seconds). 0 (default) = sessions persist until closed
      *  from the sidebar or the shell exits (tmux-like; they still die with the
      *  server process). Set > 0 to auto-reap idle detached sessions. */
-    detachedTtlSec: Number(process.env.HIVEKEEP_TERMINAL_DETACHED_TTL_SEC ?? 0),
+    detachedTtlSec: envNumber('HIVEKEEP_TERMINAL_DETACHED_TTL_SEC', 0),
     /** Hard cap of concurrently running PTY sessions across all users. */
-    maxSessions: Number(process.env.HIVEKEEP_TERMINAL_MAX_SESSIONS ?? 10),
+    maxSessions: envNumber('HIVEKEEP_TERMINAL_MAX_SESSIONS', 10),
   },
 
   webhooks: {
-    maxPerAgent: Number(process.env.WEBHOOKS_MAX_PER_KIN ?? 20),
-    maxPayloadBytes: Number(process.env.WEBHOOKS_MAX_PAYLOAD_BYTES ?? 1_048_576), // 1MB
-    logRetentionDays: Number(process.env.WEBHOOKS_LOG_RETENTION_DAYS ?? 30),
-    maxLogsPerWebhook: Number(process.env.WEBHOOKS_MAX_LOGS_PER_WEBHOOK ?? 500),
-    rateLimitPerMinute: Number(process.env.WEBHOOKS_RATE_LIMIT_PER_MINUTE ?? 60),
+    maxPerAgent: envNumber('WEBHOOKS_MAX_PER_KIN', 20),
+    maxPayloadBytes: envNumber('WEBHOOKS_MAX_PAYLOAD_BYTES', 1_048_576), // 1MB
+    logRetentionDays: envNumber('WEBHOOKS_LOG_RETENTION_DAYS', 30),
+    maxLogsPerWebhook: envNumber('WEBHOOKS_MAX_LOGS_PER_WEBHOOK', 500),
+    rateLimitPerMinute: envNumber('WEBHOOKS_RATE_LIMIT_PER_MINUTE', 60),
   },
 
   // Email account triggers: condition-matched email → conversation/task dispatch.
   emailTriggers: {
-    maxPerAccount: Number(process.env.EMAIL_TRIGGERS_MAX_PER_ACCOUNT ?? 20),
-    pollIntervalMs: Number(process.env.EMAIL_TRIGGER_POLL_INTERVAL ?? 120_000),
+    maxPerAccount: envNumber('EMAIL_TRIGGERS_MAX_PER_ACCOUNT', 20),
+    pollIntervalMs: envNumber('EMAIL_TRIGGER_POLL_INTERVAL', 120_000),
     // Anti-flood: cap messages processed per (account, folder) per poll cycle.
-    maxPerCycle: Number(process.env.EMAIL_TRIGGER_MAX_PER_CYCLE ?? 50),
-    logRetentionDays: Number(process.env.EMAIL_TRIGGER_LOG_RETENTION_DAYS ?? 30),
-    maxLogsPerTrigger: Number(process.env.EMAIL_TRIGGER_MAX_LOGS_PER_TRIGGER ?? 500),
+    maxPerCycle: envNumber('EMAIL_TRIGGER_MAX_PER_CYCLE', 50),
+    logRetentionDays: envNumber('EMAIL_TRIGGER_LOG_RETENTION_DAYS', 30),
+    maxLogsPerTrigger: envNumber('EMAIL_TRIGGER_MAX_LOGS_PER_TRIGGER', 500),
     // One-shot (reply-watch) triggers are deleted as soon as they fire. This TTL
     // collects the ones whose reply never came, so they stop holding quota.
-    oneShotTtlDays: Number(process.env.EMAIL_TRIGGER_ONE_SHOT_TTL_DAYS ?? 30),
+    oneShotTtlDays: envNumber('EMAIL_TRIGGER_ONE_SHOT_TTL_DAYS', 30),
     // Ring buffer of recently-seen message ids per (account, folder), to drop
     // boundary duplicates (provider `after` filters are second-granular/inclusive).
-    seenIdsRing: Number(process.env.EMAIL_TRIGGER_SEEN_IDS_RING ?? 200),
+    seenIdsRing: envNumber('EMAIL_TRIGGER_SEEN_IDS_RING', 200),
   },
 
   channels: {
-    maxPerAgent: Number(process.env.CHANNELS_MAX_PER_KIN ?? 5),
+    maxPerAgent: envNumber('CHANNELS_MAX_PER_KIN', 5),
     telegramWebhookPath: '/api/channels/telegram',
     // Freshness guard on the persisted channel origin (`channel_origins`): how
     // long after the inbound message an Agent reply is still auto-delivered
     // back to the channel. Sub-Agent chains routinely run for many minutes, so
     // this is deliberately generous; it only exists to stop a reply from
     // landing on a conversation nobody remembers.
-    originTtlMs: Number(process.env.CHANNEL_ORIGIN_TTL ?? 86_400_000),
+    originTtlMs: envNumber('CHANNEL_ORIGIN_TTL', 86_400_000),
     // How often the "typing" hint is refreshed while a turn runs. Platforms
     // expire it in seconds, so without a refresh a long turn is silent and
     // indistinguishable from a dead one.
-    typingRefreshMs: Number(process.env.CHANNEL_TYPING_REFRESH ?? 5_000),
+    typingRefreshMs: envNumber('CHANNEL_TYPING_REFRESH', 5_000),
     // Attempts for one outbound send (1 = no retry). A transient 429 or 5xx
     // used to drop the Agent's reply silently.
-    sendRetries: Number(process.env.CHANNEL_SEND_RETRIES ?? 3),
+    sendRetries: envNumber('CHANNEL_SEND_RETRIES', 3),
     // Upper bound on a backoff wait, including a platform-provided retry_after.
-    maxRetryDelayMs: Number(process.env.CHANNEL_MAX_RETRY_DELAY ?? 60_000),
+    maxRetryDelayMs: envNumber('CHANNEL_MAX_RETRY_DELAY', 60_000),
     // Max messages buffered per pending contact while they await approval. On
     // approval the buffer is replayed as a single Agent turn; only the most
     // recent N are kept (older ones are dropped).
-    maxPendingBufferedMessages: Number(process.env.CHANNEL_MAX_PENDING_BUFFERED ?? 10),
+    maxPendingBufferedMessages: envNumber('CHANNEL_MAX_PENDING_BUFFERED', 10),
     // Per-channel WhatsApp-Web (Baileys) multi-file auth state. One subfolder
     // per channel id; survives restarts so a paired session reconnects.
     whatsappWebDir: process.env.WHATSAPP_WEB_DIR ?? `${dataDir}/whatsapp-web`,
   },
 
   quickSessions: {
-    defaultExpirationHours: Number(process.env.QUICK_SESSION_EXPIRATION_HOURS ?? 24),
-    maxActivePerUserPerAgent: Number(process.env.QUICK_SESSION_MAX_PER_USER_KIN ?? 1),
-    retentionDays: Number(process.env.QUICK_SESSION_RETENTION_DAYS ?? 7),
-    cleanupIntervalMinutes: Number(process.env.QUICK_SESSION_CLEANUP_INTERVAL ?? 60),
+    defaultExpirationHours: envNumber('QUICK_SESSION_EXPIRATION_HOURS', 24),
+    maxActivePerUserPerAgent: envNumber('QUICK_SESSION_MAX_PER_USER_KIN', 1),
+    retentionDays: envNumber('QUICK_SESSION_RETENTION_DAYS', 7),
+    cleanupIntervalMinutes: envNumber('QUICK_SESSION_CLEANUP_INTERVAL', 60),
   },
 
   webBrowsing: {
     // Tier 1 (lightweight fetch)
-    pageTimeout: Number(process.env.WEB_BROWSING_PAGE_TIMEOUT ?? 30000),
-    maxContentLength: Number(process.env.WEB_BROWSING_MAX_CONTENT_LENGTH ?? 100000),
-    maxConcurrentFetches: Number(process.env.WEB_BROWSING_MAX_CONCURRENT ?? 5),
+    pageTimeout: envNumber('WEB_BROWSING_PAGE_TIMEOUT', 30000),
+    maxContentLength: envNumber('WEB_BROWSING_MAX_CONTENT_LENGTH', 100000),
+    maxConcurrentFetches: envNumber('WEB_BROWSING_MAX_CONCURRENT', 5, { min: 1, max: 65536 }),
     userAgent:
       process.env.WEB_BROWSING_USER_AGENT ??
       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -655,8 +655,8 @@ export const config = {
       enabled: process.env.WEB_BROWSING_HEADLESS_ENABLED !== 'false',
       // PUPPETEER_EXECUTABLE_PATH kept for backwards-compat after Playwright migration.
       executablePath: process.env.BROWSER_EXECUTABLE_PATH ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
-      maxBrowsers: Number(process.env.WEB_BROWSING_MAX_BROWSERS ?? 2),
-      idleTimeoutMs: Number(process.env.WEB_BROWSING_BROWSER_IDLE_TIMEOUT ?? 60000),
+      maxBrowsers: envNumber('WEB_BROWSING_MAX_BROWSERS', 2),
+      idleTimeoutMs: envNumber('WEB_BROWSING_BROWSER_IDLE_TIMEOUT', 60000),
     },
   },
 
@@ -667,16 +667,16 @@ export const config = {
   browserSessions: {
     enabled: process.env.BROWSER_SESSIONS_ENABLED !== 'false',
     /** Hard TTL for any session, regardless of activity. */
-    ttlMs: Number(process.env.BROWSER_SESSION_TTL_MS ?? 3_600_000),
+    ttlMs: envNumber('BROWSER_SESSION_TTL_MS', 3_600_000),
     /** Auto-close after N ms without any tool call on the session. */
-    idleTimeoutMs: Number(process.env.BROWSER_SESSION_IDLE_TIMEOUT_MS ?? 600_000),
+    idleTimeoutMs: envNumber('BROWSER_SESSION_IDLE_TIMEOUT_MS', 600_000),
     /** Global cap on concurrent sessions across all Agents. */
-    maxTotal: Number(process.env.BROWSER_MAX_TOTAL_SESSIONS ?? 5),
+    maxTotal: envNumber('BROWSER_MAX_TOTAL_SESSIONS', 5),
     /** Cap on concurrent sessions per Agent. */
-    maxPerAgent: Number(process.env.BROWSER_MAX_SESSIONS_PER_KIN ?? 1),
+    maxPerAgent: envNumber('BROWSER_MAX_SESSIONS_PER_KIN', 1),
     defaultViewport: {
-      width: Number(process.env.BROWSER_DEFAULT_VIEWPORT_WIDTH ?? 1280),
-      height: Number(process.env.BROWSER_DEFAULT_VIEWPORT_HEIGHT ?? 720),
+      width: envNumber('BROWSER_DEFAULT_VIEWPORT_WIDTH', 1280),
+      height: envNumber('BROWSER_DEFAULT_VIEWPORT_HEIGHT', 720),
     },
     /** Directory where saved browser states live (cookies + localStorage). One
      *  subdir per Agent, one JSON file per named state. Stored OUTSIDE the
@@ -684,38 +684,38 @@ export const config = {
      *  auth tokens — access goes exclusively through browser_*_state tools. */
     statesDir: process.env.BROWSER_STATES_DIR ?? `${dataDir}/browser-states`,
     /** Cap on number of saved states per Agent. */
-    maxStatesPerAgent: Number(process.env.BROWSER_MAX_STATES_PER_KIN ?? 20),
+    maxStatesPerAgent: envNumber('BROWSER_MAX_STATES_PER_KIN', 20),
     /** Max size (bytes) of a single saved state file. localStorage from heavy
      *  SPAs can balloon — this prevents disk fills. */
-    maxStateSizeBytes: Number(process.env.BROWSER_MAX_STATE_SIZE_BYTES ?? 5 * 1024 * 1024),
+    maxStateSizeBytes: envNumber('BROWSER_MAX_STATE_SIZE_BYTES', 5 * 1024 * 1024),
   },
 
   invitations: {
-    defaultExpiryDays: Number(process.env.INVITATION_DEFAULT_EXPIRY_DAYS ?? 7),
-    maxActive: Number(process.env.INVITATION_MAX_ACTIVE ?? 50),
+    defaultExpiryDays: envNumber('INVITATION_DEFAULT_EXPIRY_DAYS', 7),
+    maxActive: envNumber('INVITATION_MAX_ACTIVE', 50),
   },
 
   notifications: {
-    retentionDays: Number(process.env.NOTIFICATIONS_RETENTION_DAYS ?? 30),
-    maxPerUser: Number(process.env.NOTIFICATIONS_MAX_PER_USER ?? 500),
+    retentionDays: envNumber('NOTIFICATIONS_RETENTION_DAYS', 30),
+    maxPerUser: envNumber('NOTIFICATIONS_MAX_PER_USER', 500),
     externalDelivery: {
-      maxPerUser: Number(process.env.NOTIFICATIONS_EXT_MAX_PER_USER ?? 5),
-      rateLimitPerMinute: Number(process.env.NOTIFICATIONS_EXT_RATE_LIMIT ?? 5),
-      maxConsecutiveErrors: Number(process.env.NOTIFICATIONS_EXT_MAX_ERRORS ?? 5),
+      maxPerUser: envNumber('NOTIFICATIONS_EXT_MAX_PER_USER', 5),
+      rateLimitPerMinute: envNumber('NOTIFICATIONS_EXT_RATE_LIMIT', 5),
+      maxConsecutiveErrors: envNumber('NOTIFICATIONS_EXT_MAX_ERRORS', 5),
     },
   },
 
   wakeups: {
-    maxPendingPerAgent: Number(process.env.WAKEUPS_MAX_PENDING_PER_KIN ?? 20),
+    maxPendingPerAgent: envNumber('WAKEUPS_MAX_PENDING_PER_KIN', 20),
     minDelaySeconds: 10,
     maxDelaySeconds: 2_592_000, // 30 days
   },
 
   miniApps: {
     dir: process.env.MINI_APPS_DIR ?? `${dataDir}/mini-apps`,
-    maxAppsPerAgent: Number(process.env.MINI_APPS_MAX_PER_KIN ?? 20),
-    maxFileSizeMb: Number(process.env.MINI_APPS_MAX_FILE_SIZE ?? 5),
-    maxTotalSizeMbPerApp: Number(process.env.MINI_APPS_MAX_TOTAL_SIZE ?? 50),
+    maxAppsPerAgent: envNumber('MINI_APPS_MAX_PER_KIN', 20),
+    maxFileSizeMb: envNumber('MINI_APPS_MAX_FILE_SIZE', 5),
+    maxTotalSizeMbPerApp: envNumber('MINI_APPS_MAX_TOTAL_SIZE', 50),
     backendEnabled: process.env.MINI_APPS_BACKEND_ENABLED !== 'false', // default: true
   },
 
@@ -725,12 +725,12 @@ export const config = {
   // HIVEKEEP_CUSTOM_TOOL_TIMEOUT / _MAX_TIMEOUT env vars are kept for back-compat.
   customTools: {
     baseDir: process.env.HIVEKEEP_CUSTOM_TOOLS_DIR ?? `${dataDir}/custom-tools`,
-    defaultTimeoutMs: Number(process.env.HIVEKEEP_CUSTOM_TOOL_TIMEOUT ?? 30_000),
-    maxTimeoutMs: Number(process.env.HIVEKEEP_CUSTOM_TOOL_MAX_TIMEOUT ?? 300_000),
+    defaultTimeoutMs: envNumber('HIVEKEEP_CUSTOM_TOOL_TIMEOUT', 30_000),
+    maxTimeoutMs: envNumber('HIVEKEEP_CUSTOM_TOOL_MAX_TIMEOUT', 300_000),
     // Cap captured stdout+stderr to protect the context window / server memory.
-    maxOutputBytes: Number(process.env.HIVEKEEP_CUSTOM_TOOL_MAX_OUTPUT_BYTES ?? 256 * 1024),
+    maxOutputBytes: envNumber('HIVEKEEP_CUSTOM_TOOL_MAX_OUTPUT_BYTES', 256 * 1024),
     // Longer budget for dependency installs (pip/npm/bun install).
-    setupTimeoutMs: Number(process.env.HIVEKEEP_CUSTOM_TOOL_SETUP_TIMEOUT ?? 600_000),
+    setupTimeoutMs: envNumber('HIVEKEEP_CUSTOM_TOOL_SETUP_TIMEOUT', 600_000),
   },
 
   versionCheck: {
@@ -738,7 +738,7 @@ export const config = {
     repo: process.env.VERSION_CHECK_REPO ?? 'MarlBurroW/hivekeep',
     /** Branch tracked by the edge update channel */
     branch: process.env.VERSION_CHECK_BRANCH ?? 'main',
-    intervalHours: Number(process.env.VERSION_CHECK_INTERVAL_HOURS ?? 1),
+    intervalHours: envNumber('VERSION_CHECK_INTERVAL_HOURS', 1, { min: 1, max: 24 }),
   },
 
   publicUrl: process.env.PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 3000}`,

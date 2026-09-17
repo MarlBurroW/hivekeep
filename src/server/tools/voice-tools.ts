@@ -348,6 +348,7 @@ export const textToSpeechTool: ToolRegistration = {
         await db.insert(files).values({
           id: fileId,
           agentId: ctx.agentId,
+          sessionId: ctx.sessionId ?? null,
           originalName: storedName,
           storedPath,
           mimeType: result.mediaType,

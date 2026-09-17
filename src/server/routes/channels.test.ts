@@ -130,7 +130,8 @@ try {
   _mocksWorking = false
 }
 
-const itMocked = _mocksWorking ? it : it.skip
+if (!_mocksWorking) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itMocked = it
 
 // Channel mutations sit behind requireAdmin, which reads c.get('user') plus
 // the profile role from the db chain above. Mount the routes behind a stub

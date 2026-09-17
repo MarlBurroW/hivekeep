@@ -45,6 +45,7 @@ function formatTimestamp(ts: number): string {
 }
 
 function LogEntryRow({ entry }: { entry: LogEntry }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const hasData = entry.data && Object.keys(entry.data).length > 0
 
@@ -67,6 +68,8 @@ function LogEntryRow({ entry }: { entry: LogEntry }) {
         {hasData && (
           <button
             onClick={() => setExpanded(!expanded)}
+            aria-label={t(expanded ? 'common.hideDetails' : 'common.showDetails')}
+            aria-expanded={expanded}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}

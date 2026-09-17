@@ -5,14 +5,13 @@ import { useTranslation } from 'react-i18next'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/client/components/ui/sidebar'
 import { AppSidebar } from '@/client/components/sidebar/AppSidebar'
 import { ChatPanel } from '@/client/components/chat/ChatPanel'
-import { OnboardingChatModal } from '@/client/components/chat/OnboardingChatModal'
+import { isUserAgent } from '@/shared/agent-kind'
+import { appendToDraft } from '@/client/hooks/useDraftMessage'
 
 // Lazy-load modals — not needed on initial render
 const AgentFormModal = lazy(() => import('@/client/components/agent/AgentFormModal').then(m => ({ default: m.AgentFormModal })))
 const MiniAppViewer = lazy(() => import('@/client/components/mini-app/MiniAppViewer').then(m => ({ default: m.MiniAppViewer })))
 import { useAgents } from '@/client/hooks/useAgents'
-import { ConnectionBanner } from '@/client/components/common/ConnectionBanner'
-import { CommandPalette } from '@/client/components/common/CommandPalette'
 import { KeyboardShortcutsDialog } from '@/client/components/common/KeyboardShortcutsDialog'
 import { StatusNotifications } from '@/client/components/common/StatusNotifications'
 import { Button } from '@/client/components/ui/button'
@@ -25,6 +24,7 @@ import { useUnreadPerAgent } from '@/client/hooks/useUnreadPerAgent'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/client/components/ui/tooltip'
 import { api } from '@/client/lib/api'
 import { useAuth } from '@/client/hooks/useAuth'
+import { useSidePanel } from '@/client/contexts/SidePanelContext'
 
 interface ChatPageProps {
   /** Open the global settings modal (mounted at App.tsx root). */
@@ -37,6 +37,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
+  const { panelOpen } = useSidePanel()
   const {
     agents,
     llmModels,
@@ -72,7 +73,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
 
   useEffect(() => {
     if (selectedAgentSlug || agentsLoading || agents.length === 0) return
-    if (location.pathname !== '/') return
+    if (location.pathname !== '/agents' || location.search) return
     let stored: string | null = null
     try { stored = localStorage.getItem('hivekeep:lastSelectedAgentSlug') } catch { /* ignore */ }
     if (!stored) return
@@ -80,10 +81,8 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
     navigate(`/agent/${stored}`, { replace: true })
   }, [selectedAgentSlug, agentsLoading, agents, location.pathname, navigate])
 
-  // First-run onboarding modal: a distraction-less Dialog wrapping the chat
-  // with the configurator Agent (Queenie), shown until the user creates their
-  // first real Agent or dismisses it. The conversation IS Queenie's main thread,
-  // so it persists in the Agent list afterward.
+  // Optional first-run guidance points to the normal Queenie conversation.
+  // It never blocks navigation or asks for a second onboarding interaction.
   const configuratorAgent = agents.find((k) => k.kind === 'configurator')
   // Dismissal is DB-backed (user_profiles.onboarding_modal_dismissed) so a fresh
   // DB re-shows the modal and it persists across devices. Optimistic local flag
@@ -100,7 +99,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
     !onboardingModalDismissed &&
     !agentsLoading &&
     // Only while it's the user's sole Agent (i.e. they haven't created a real one yet).
-    !agents.some((k) => k.kind !== 'configurator')
+    !agents.some(isUserAgent)
 
   // Detect agents whose model is no longer served by any provider
   const unavailableAgentIds = useMemo(() => {
@@ -128,16 +127,34 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
   }
 
   const handleOpenCreateModal = () => {
+    if (user?.role !== 'admin') return
     refetchModels()
     setShowCreateModal(true)
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('create') === '1' && user?.role === 'admin') {
+      setShowCreateModal(true)
+      refetchModels()
+      params.delete('create')
+      navigate({ pathname: location.pathname, search: params.toString() }, { replace: true })
+    }
+    if (params.get('draft') === 'build-app' && selectedAgentSlug) {
+      const agent = agents.find((item) => item.slug === selectedAgentSlug)
+      if (!agent || !user) return
+      appendToDraft(agent.id, t('experience.buildAppDraft', 'Help me build an app. First, let us define what it should do.'), user.id)
+      params.delete('draft')
+      navigate({ pathname: location.pathname, search: params.toString() }, { replace: true })
+    }
+  }, [location.pathname, location.search, user?.id, user?.role, selectedAgentSlug, agents, navigate, refetchModels, t])
 
   // Onboarding is complete when at least one LLM is configured AND at least
   // one Agent exists. The Hub Agent distinction was retired — every Agent is a
   // first-class citizen now that channels bind directly to any of them.
   // The seeded configurator Agent (Queenie) doesn't count as the user's "first
   // Agent" — onboarding is only "done" once they've created a real one.
-  const onboardingComplete = llmModels.length > 0 && agents.some((k) => k.kind !== 'configurator')
+  const onboardingComplete = llmModels.length > 0 && agents.some(isUserAgent)
 
   // Suppress the onboarding checklist while initial data is still loading.
   // Without this, the chat momentarily renders the checklist when arriving
@@ -167,7 +184,7 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
   const handleDeleteAgent = async (id: string) => {
     await deleteAgent(id)
     setEditingAgent(null)
-    if (selectedAgent?.id === id) navigate('/')
+    if (selectedAgent?.id === id) navigate('/agents')
   }
 
   const handleModelChange = useCallback(async (agentId: string, modelId: string, providerId: string) => {
@@ -270,24 +287,26 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
             inline fixed-width column only participates at >= 768px. */}
         <div className="flex h-full min-h-0 overflow-x-hidden">
         <div className="flex h-full min-w-0 min-h-0 flex-1 flex-col">
-          {/* Thin local bar — only hosts the SidebarTrigger which depends on
-              SidebarProvider context (scoped to this page). Global actions
-              (brand, SSE, palette, theme, notifications, user menu) live in
-              <AppTopBar /> at App.tsx root.
-              Desktop only: on mobile the trigger is folded into the
-              ConversationHeader (and the placeholder below) so we don't burn a
-              whole 40px row of chrome above the chat. */}
-          <div className="hidden h-10 shrink-0 items-center border-b px-2 md:flex">
+          {/* An open conversation hosts the sidebar toggle in its own header. */}
+          {!selectedAgent && <div className="hidden h-10 shrink-0 items-center border-b px-2 md:flex">
             <SidebarTrigger />
-          </div>
+          </div>}
 
           {/* Connection lost banner */}
-          <ConnectionBanner />
 
           {/* Onboarding progress banner removed alongside the Hub Agent
               concept — the per-step banner mapped 1:1 to 'create hub'
               / 'create specialist' which are no longer distinct. The
               full setup checklist below replaces the per-step nudge. */}
+
+          {showOnboardingModal && configuratorAgent && user?.role === 'admin' && (
+            <div className="flex flex-wrap items-center gap-3 border-b bg-primary/5 px-4 py-3">
+              <Sparkles className="size-4 text-primary" />
+              <p className="min-w-0 flex-1 text-sm">{t('experience.onboarding.guidance', 'Queenie can help you create your first Agent. Continue in her conversation whenever you are ready.')}</p>
+              <Button size="sm" onClick={() => navigate(`/agent/${configuratorAgent.slug}`)}>{t('experience.onboarding.openQueenie', 'Talk to Queenie')}</Button>
+              <Button size="sm" variant="ghost" onClick={dismissOnboardingModal}>{t('experience.onboarding.dismiss', 'I will explore on my own')}</Button>
+            </div>
+          )}
 
           {/* Page content */}
           <Routes>
@@ -374,22 +393,26 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
         {/* Side panel (task / mini-app) — mounted at page level so
             it works even when no Agent is selected (selecting a task from the
             sidebar still opens its detail view). */}
-        <Suspense fallback={null}>
+        {panelOpen && <Suspense fallback={null}>
           <MiniAppViewer />
-        </Suspense>
+        </Suspense>}
         </div>
       </SidebarInset>
 
       {/* Lazy-loaded modals */}
       <Suspense fallback={null}>
         {/* Create Agent modal */}
-        {showCreateModal && (
+        {showCreateModal && user?.role === 'admin' && (
           <AgentFormModal
             open={showCreateModal}
             onOpenChange={setShowCreateModal}
             llmModels={llmModels}
             imageModels={imageModels}
-            onCreateAgent={createAgent}
+            onCreateAgent={async (data) => {
+              const created = await createAgent(data)
+              navigate(`/agent/${created.slug}`)
+              return created
+            }}
             onUpdateAgent={updateAgent}
             onUploadAvatar={uploadAvatar}
             onGenerateAvatarPreview={generateAvatarPreview}
@@ -421,41 +444,11 @@ export function ChatPage({ onOpenSettings, onOpenAccount }: ChatPageProps) {
         {/* Account + Settings modals are now mounted at App.tsx root (AuthenticatedShell) */}
       </Suspense>
 
-      {/* Command palette (Cmd+K) */}
-      <CommandPalette
-        agents={agents}
-        onSelectAgent={handleSelectAgent}
-        onCreateAgent={handleOpenCreateModal}
-        onOpenSettings={handleOpenSettings}
-      />
-
       {/* Keyboard shortcuts help (?) */}
       <KeyboardShortcutsDialog />
 
       {/* Real-time status change notifications */}
       <StatusNotifications />
-
-      {/* First-run conversational onboarding (distraction-less chat with Queenie) */}
-      {showOnboardingModal && configuratorAgent && (
-        <OnboardingChatModal
-          open={showOnboardingModal}
-          onDismiss={dismissOnboardingModal}
-          agent={{
-            id: configuratorAgent.id,
-            name: configuratorAgent.name,
-            role: configuratorAgent.role,
-            model: configuratorAgent.model,
-            providerId: configuratorAgent.providerId ?? null,
-            avatarUrl: configuratorAgent.avatarUrl,
-            thinkingEnabled: configuratorAgent.thinkingEnabled,
-            thinkingEffort: configuratorAgent.thinkingEffort,
-          }}
-          llmModels={llmModels}
-          queueState={agentQueueState.get(configuratorAgent.id)}
-          onModelChange={(modelId, providerId) => handleModelChange(configuratorAgent.id, modelId, providerId)}
-          onOpenSettings={handleOpenSettings}
-        />
-      )}
     </SidebarProvider>
     </div>
   )

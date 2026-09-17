@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, mock, spyOn } from 'bun:test'
-import { fullMockConfig } from '../../test-helpers'
+import { fullMockConfig, fullMockSchema } from '../../test-helpers'
 import type { ToolExecutionContext } from '@/server/tools/types'
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -45,6 +45,7 @@ mock.module('@/server/db/index', () => ({
 }))
 
 mock.module('@/server/db/schema', () => ({
+  ...fullMockSchema,
   files: {},
   providers: {},
 }))

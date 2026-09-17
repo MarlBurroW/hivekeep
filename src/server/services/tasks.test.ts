@@ -181,24 +181,8 @@ mock.module('drizzle-orm', () => ({
 ;(fakeMessages as any).__t = 'messages'
 ;(fakeAgents as any).__t = 'agents'
 
-// Import after mocks. Bun's mock.module() leaks across test files, so a sibling
-// test that stubbed @/server/services/tasks may have replaced this module
-// before we get here. Detect that by checking for our real exports and skip
-// rather than failing the whole file (matches the pattern in task-tools.test.ts).
-let svc: typeof import('@/server/services/tasks')
-let _loaded = false
-try {
-  // Use a relative path so sibling test files that mock '@/server/services/tasks'
-  // via the alias don't intercept this import.
-  svc = (await import('./tasks')) as typeof import('@/server/services/tasks')
-  _loaded =
-    typeof (svc as any).computeTaskKind === 'function' &&
-    typeof (svc as any).listTasksFiltered === 'function' &&
-    typeof (svc as any).getTaskMessages === 'function'
-} catch {
-  _loaded = false
-}
-const itLoaded = _loaded ? it : it.skip
+// Import failures must fail the isolated suite rather than hide coverage.
+const svc = await import('./tasks')
 
 // Replace tableName detection: schema mock returns Proxies, not fakeTasks.
 // Reroute db chain to look at schema proxies by reading any column's __table.
@@ -312,7 +296,7 @@ describe('tasks service: pure helpers (inline duplicates)', () => {
 })
 
 describe('tasks service: pure helpers', () => {
-  itLoaded('computeTaskKind maps cron > webhook > spawnType', () => {
+  it('computeTaskKind maps cron > webhook > spawnType', () => {
     expect(svc.computeTaskKind({ spawnType: 'self', webhookId: null, cronId: 'c1' })).toBe('cron')
     expect(svc.computeTaskKind({ spawnType: 'self', webhookId: 'w1', cronId: null })).toBe('webhook')
     expect(svc.computeTaskKind({ spawnType: 'self', webhookId: null, cronId: null })).toBe('spawn_self')
@@ -320,7 +304,7 @@ describe('tasks service: pure helpers', () => {
     expect(svc.computeTaskKind({ spawnType: 'weird', webhookId: null, cronId: null })).toBe('unknown')
   })
 
-  itLoaded('computeTaskDurationMs returns null for non-terminal status', () => {
+  it('computeTaskDurationMs returns null for non-terminal status', () => {
     const t0 = new Date(1000)
     const t1 = new Date(5000)
     expect(svc.computeTaskDurationMs({ status: 'pending', createdAt: t0, updatedAt: t1 })).toBeNull()
@@ -330,7 +314,7 @@ describe('tasks service: pure helpers', () => {
     expect(svc.computeTaskDurationMs({ status: 'cancelled', createdAt: t0, updatedAt: t1 })).toBe(4000)
   })
 
-  itLoaded('computeTaskDurationMs prefers the started/ended window over created/updated', () => {
+  it('computeTaskDurationMs prefers the started/ended window over created/updated', () => {
     const created = new Date(1000)
     const started = new Date(3000)
     const ended = new Date(9000)
@@ -345,7 +329,7 @@ describe('tasks service: pure helpers', () => {
     ).toBe(9000)
   })
 
-  itLoaded('buildMessagePreview truncates and appends ellipsis', () => {
+  it('buildMessagePreview truncates and appends ellipsis', () => {
     expect(svc.buildMessagePreview(null)).toEqual({ preview: '', length: 0 })
     expect(svc.buildMessagePreview('short')).toEqual({ preview: 'short', length: 5 })
     const long = 'x'.repeat(250)
@@ -359,7 +343,7 @@ describe('tasks service: pure helpers', () => {
 describe('tasks service: listTasksFiltered', () => {
   beforeEach(reset)
 
-  itLoaded('filters by status', async () => {
+  it('filters by status', async () => {
     state.taskRows = [
       makeTask({ id: 't1', status: 'completed' }),
       makeTask({ id: 't2', status: 'pending' }),
@@ -370,7 +354,7 @@ describe('tasks service: listTasksFiltered', () => {
     expect(res.tasks.map((t) => t.id).sort()).toEqual(['t1', 't3'])
   })
 
-  itLoaded('filters by kind=spawn_self (excludes webhook and cron tasks)', async () => {
+  it('filters by kind=spawn_self (excludes webhook and cron tasks)', async () => {
     state.taskRows = [
       makeTask({ id: 's1', spawnType: 'self', webhookId: null, cronId: null }),
       makeTask({ id: 's2', spawnType: 'self', webhookId: 'w1', cronId: null }),
@@ -383,7 +367,7 @@ describe('tasks service: listTasksFiltered', () => {
     expect(res.tasks[0]!.kind).toBe('spawn_self')
   })
 
-  itLoaded('pagination returns correct slice + total', async () => {
+  it('pagination returns correct slice + total', async () => {
     state.taskRows = Array.from({ length: 25 }, (_, i) =>
       makeTask({ id: `p${i}`, createdAt: new Date(2_000_000 + i * 1000), updatedAt: new Date(2_000_000 + i * 1000 + 500), status: 'completed' }),
     )
@@ -395,7 +379,7 @@ describe('tasks service: listTasksFiltered', () => {
     expect(page3.tasks.length).toBe(5)
   })
 
-  itLoaded('limit is capped at 100 and defaults to 20', async () => {
+  it('limit is capped at 100 and defaults to 20', async () => {
     state.taskRows = Array.from({ length: 150 }, (_, i) => makeTask({ id: `b${i}`, status: 'completed' }))
     const capped = await svc.listTasksFiltered({ limit: 9999 })
     expect(capped.tasks.length).toBe(100)
@@ -407,12 +391,12 @@ describe('tasks service: listTasksFiltered', () => {
 describe('tasks service: getTaskMessages', () => {
   beforeEach(reset)
 
-  itLoaded('throws TaskNotFoundError when task missing', async () => {
+  it('throws TaskNotFoundError when task missing', async () => {
     state.taskRows = []
     await expect(svc.getTaskMessages('missing', 20, 0, 'desc')).rejects.toThrow('Task not found')
   })
 
-  itLoaded('returns empty list when task has no messages', async () => {
+  it('returns empty list when task has no messages', async () => {
     state.taskRows = [makeTask({ id: 'tA' })]
     state.messageRows = []
     const res = await svc.getTaskMessages('tA', 20, 0, 'desc')
@@ -421,7 +405,7 @@ describe('tasks service: getTaskMessages', () => {
     expect(res.taskId).toBe('tA')
   })
 
-  itLoaded('negative offset returns the most recent N messages', async () => {
+  it('negative offset returns the most recent N messages', async () => {
     state.taskRows = [makeTask({ id: 'tB', title: 'X' })]
     state.messageRows = Array.from({ length: 30 }, (_, i) => ({
       id: `m${i}`,
@@ -440,7 +424,7 @@ describe('tasks service: getTaskMessages', () => {
     expect(res.messages[9]!.id).toBe('m20')
   })
 
-  itLoaded('negative offset with asc order returns last N in chronological order', async () => {
+  it('negative offset with asc order returns last N in chronological order', async () => {
     state.taskRows = [makeTask({ id: 'tC' })]
     state.messageRows = Array.from({ length: 10 }, (_, i) => ({
       id: `n${i}`,
@@ -457,7 +441,7 @@ describe('tasks service: getTaskMessages', () => {
     expect(res.messages[2]!.id).toBe('n9')
   })
 
-  itLoaded('builds previews and counts tool calls', async () => {
+  it('builds previews and counts tool calls', async () => {
     state.taskRows = [makeTask({ id: 'tD' })]
     state.messageRows = [
       {

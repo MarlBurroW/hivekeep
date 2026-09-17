@@ -12,9 +12,10 @@ import { __setSnapshotForTests } from '@/server/llm/metadata/models-dev'
 // Some earlier test files stub `@/server/db/schema` via mock.module (every table
 // becomes `{}`). When this file runs after one of those, the static
 // `import { modelRegistry } from schema` inside the SUT throws. Detect pollution
-// and skip cleanly — same pattern as the other DB-backed service tests.
+// and fail explicitly: the isolated test runner must load the real schema.
 const schemaIsReal = !!(schema as { modelRegistry?: { id?: unknown } }).modelRegistry?.id
-const d = schemaIsReal ? describe : describe.skip
+if (!schemaIsReal) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const d = describe
 
 mock.module('@/server/logger', () => ({
   createLogger: () => ({ info: () => {}, warn: () => {}, debug: () => {}, error: () => {} }),

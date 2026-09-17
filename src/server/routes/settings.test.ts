@@ -83,7 +83,8 @@ try {
   _mocksWorking = false
 }
 
-const itMocked = _mocksWorking ? it : it.skip
+if (!_mocksWorking) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itMocked = it
 
 // ─── Test app with auth middleware simulation ───────────────────────────────
 
@@ -115,6 +116,17 @@ function json(body: unknown) {
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe('settings routes', () => {
+  it('exposes only backup dates to administrators', async () => {
+    const response = await createApp().request('/api/settings/backup-status')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ lastVerifiedAt: null, backupCreatedAt: null })
+  })
+
+  it('does not expose backup status to members', async () => {
+    const response = await createApp('member').request('/api/settings/backup-status')
+    expect(response.status).toBe(403)
+  })
+
   beforeEach(() => {
     mockDbSelectResult = { role: 'admin' }
     mockGetGlobalPrompt.mockReset()

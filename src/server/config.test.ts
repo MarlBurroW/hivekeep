@@ -1,4 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'bun:test'
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const cacheDir = mkdtempSync(join(tmpdir(), 'hivekeep-config-cache-'))
+afterAll(() => rmSync(cacheDir, { recursive: true, force: true }))
 
 /**
  * Tests for src/server/config.ts
@@ -40,11 +46,15 @@ async function loadConfigWithEnv(env: Record<string, string | undefined>): Promi
   const overrideEnv = Object.fromEntries(
     Object.entries(env).filter(([, v]) => v !== undefined),
   ) as Record<string, string>
-  const proc = Bun.spawn([process.execPath, '-e', script, serialized], {
+  const proc = Bun.spawn([process.execPath, '--no-env-file', '-e', script, serialized], {
     cwd: process.cwd(),
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', ...overrideEnv },
+    env: {
+      PATH: process.env.PATH ?? '', ENCRYPTION_KEY: '00'.repeat(32),
+      BUN_INSTALL_CACHE_DIR: join(cacheDir, 'install'), BUN_RUNTIME_TRANSPILER_CACHE_PATH: join(cacheDir, 'runtime'),
+      ...overrideEnv,
+    },
   })
   const stdout = await new Response(proc.stdout).text()
   const stderr = await new Response(proc.stderr).text()
@@ -154,13 +164,13 @@ describe('config', () => {
     })
 
     it('fileStorage defaults', () => {
-      // 0 = unlimited file size by default
-      expect(config.fileStorage.maxFileSizeMb).toBe(0)
+      // Stored files always have a finite cap.
+      expect(config.fileStorage.maxFileSizeMb).toBe(128)
       expect(config.fileStorage.cleanupIntervalMin).toBe(60)
     })
 
-    it('maxRequestBodyBytes defaults to effectively unlimited', () => {
-      expect(config.maxRequestBodyBytes).toBe(Number.MAX_SAFE_INTEGER)
+    it('maxRequestBodyBytes has a finite default', () => {
+      expect(config.maxRequestBodyBytes).toBe(256 * 1024 * 1024)
     })
 
     it('webhooks defaults', () => {
@@ -278,14 +288,33 @@ describe('config', () => {
   })
 
   describe('edge cases', () => {
+    it('rejects non-finite values, invalid counts, percentages and busy-loop intervals', async () => {
+      for (const [name, value] of [
+        ['MEMORY_MAX_RELEVANT', 'Infinity'], ['TASKS_MAX_CONCURRENT', '0'],
+        ['TASKS_MAX_DEPTH', '1.5'], ['COMPACTING_THRESHOLD_PERCENT', '101'],
+        ['QUEUE_POLL_INTERVAL', '0'], ['UPLOAD_MAX_FILE_SIZE', '-1'],
+        ['MAX_REQUEST_BODY_MB', '2048'], ['SHUTDOWN_DRAIN_TIMEOUT_MS', '-1'],
+      ]) {
+        await expect(loadConfigWithEnv({ [name!]: value! })).rejects.toThrow(`Invalid configuration: ${name}`)
+      }
+    })
+
+    it('maps legacy unlimited upload limits to finite defaults', async () => {
+      const c = await loadConfigWithEnv({ FILE_STORAGE_MAX_SIZE: '0', WORKSPACE_FILES_MAX_UPLOAD_SIZE: '0' })
+      expect(c.fileStorage.maxFileSizeMb).toBe(128)
+      expect(c.workspaceFiles.maxUploadSizeMb).toBe(100)
+    })
+
     it('empty WEB_BROWSING_BLOCKED_DOMAINS yields empty array', async () => {
       const c = await loadConfigWithEnv({ WEB_BROWSING_BLOCKED_DOMAINS: '' })
       expect(c.webBrowsing.blockedDomains).toEqual([])
     })
 
-    it('non-numeric PORT becomes NaN (no validation in config)', async () => {
-      const c = await loadConfigWithEnv({ PORT: 'not-a-number' })
-      expect(c.port).toBe('__NaN__')
+    it('rejects invalid PORT without echoing its value', async () => {
+      await expect(loadConfigWithEnv({ PORT: 'invalid-secret-value' })).rejects.toThrow('Invalid configuration: PORT')
+      try { await loadConfigWithEnv({ PORT: 'invalid-secret-value' }) } catch (error) {
+        expect(String(error)).not.toContain('invalid-secret-value')
+      }
     })
 
     it('publicUrl defaults to localhost with custom PORT', async () => {
@@ -441,9 +470,9 @@ describe('config', () => {
       expect(c.maxRequestBodyBytes).toBe(256 * 1024 * 1024)
     })
 
-    it('MAX_REQUEST_BODY_MB=0 means unlimited', async () => {
+    it('legacy MAX_REQUEST_BODY_MB=0 uses the finite default', async () => {
       const c = await loadConfigWithEnv({ MAX_REQUEST_BODY_MB: '0' })
-      expect(c.maxRequestBodyBytes).toBe(Number.MAX_SAFE_INTEGER)
+      expect(c.maxRequestBodyBytes).toBe(256 * 1024 * 1024)
     })
 
     it('UPLOAD_CHANNEL_RETENTION_DAYS override', async () => {

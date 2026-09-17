@@ -20,7 +20,7 @@ const optionSchema = z.object({
 
 /**
  * prompt_human — present a structured interactive question to the human user.
- * Available in main conversation and sub-Agent tasks (but NOT cron-spawned tasks).
+ * Available in shared conversation and sub-Agent tasks (not private sessions or cron tasks).
  */
 export const promptHumanTool: ToolRegistration = {
   availability: ['main', 'sub-agent'],
@@ -46,6 +46,11 @@ export const promptHumanTool: ToolRegistration = {
           .describe('Required for confirm/select/multi_select (min 2). Omit for text.'),
       }),
       execute: async ({ prompt_type, question, description, options }) => {
+        // The prompt table, inbox and notifications are shared. Keep this guard
+        // even though private sessions also exclude the tool from their catalog.
+        if (ctx.sessionId) {
+          return { error: 'prompt_human is not available in private sessions. Ask the user in the private conversation text instead.' }
+        }
         log.debug({ agentId: ctx.agentId, taskId: ctx.taskId, promptType: prompt_type }, 'prompt_human invoked')
 
         // Limit to 1 prompt_human call per LLM turn

@@ -3,9 +3,10 @@ import { THINKING_EFFORTS } from '@/shared/constants'
 import { eq, and, asc, desc, inArray, sql } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db } from '@/server/db/index'
-import { quickSessions, messages, agents, memories } from '@/server/db/schema'
+import { quickSessions, messages, agents, memories, queueItems } from '@/server/db/schema'
+import { canAttachFiles } from '@/server/services/file-attachments'
 import { enqueueMessage } from '@/server/services/queue'
-import { abortQuickSessionStream } from '@/server/services/agent-engine'
+import { abortQuickSessionStream, getActiveQuickStreamSnapshot } from '@/server/services/agent-engine'
 import { resolveAgentId } from '@/server/services/agent-resolver'
 import { getFilesForMessages, serializeFile } from '@/server/services/files'
 import { createMemory } from '@/server/services/memory'
@@ -185,6 +186,11 @@ sessionRoutes.get('/:id', async (c) => {
     return c.json({ error: { code: 'FORBIDDEN', message: 'You do not own this session' } }, 403)
   }
 
+  const stream = getActiveQuickStreamSnapshot(session!.id)
+  const pending = db.select({ id: queueItems.id }).from(queueItems).where(and(
+    eq(queueItems.sessionId, session!.id), inArray(queueItems.status, ['pending', 'processing']),
+  )).get()
+
   // Fetch messages for this session
   const sessionMessages = await db
     .select()
@@ -203,8 +209,15 @@ sessionRoutes.get('/:id', async (c) => {
     : null
 
   return c.json({
+    isProcessing: !!pending,
+    streamingMessage: stream ? {
+      messageId: stream.messageId, content: stream.content + stream.provisional,
+      reasoning: stream.reasoning, outputTokens: stream.outputTokens,
+      sourceName: stream.sourceName, sourceAvatarUrl: stream.sourceAvatarUrl,
+    } : null,
     session: {
       id: session!.id,
+      retentionDays: config.quickSessions.retentionDays,
       agentId: session!.agentId,
       title: session!.title,
       status: session!.status as QuickSessionStatus,
@@ -306,6 +319,7 @@ sessionRoutes.patch('/:id', async (c) => {
   return c.json({
     session: {
       id: updated!.id,
+      retentionDays: config.quickSessions.retentionDays,
       agentId: updated!.agentId,
       title: updated!.title,
       status: updated!.status as QuickSessionStatus,
@@ -339,8 +353,12 @@ sessionRoutes.post('/:id/messages', async (c) => {
   }
 
   const body = await c.req.json()
-  const { content, fileIds } = body as { content: string; fileIds?: string[] }
+  const { content, fileIds, clientMessageId } = body as { content: string; fileIds?: string[]; clientMessageId?: string }
   const hasFiles = fileIds && fileIds.length > 0
+
+  if (clientMessageId !== undefined && (typeof clientMessageId !== 'string' || clientMessageId.length > 100)) {
+    return c.json({ error: { code: 'INVALID_CLIENT_MESSAGE_ID', message: 'Invalid client message ID' } }, 400)
+  }
 
   if (!content?.trim() && !hasFiles) {
     return c.json({ error: { code: 'EMPTY_MESSAGE', message: 'Message content or files required' } }, 400)
@@ -351,6 +369,7 @@ sessionRoutes.post('/:id/messages', async (c) => {
   }
 
   if (fileIds) {
+    if (!Array.isArray(fileIds)) return c.json({ error: { code: 'INVALID_FILES', message: 'fileIds must be an array' } }, 400)
     if (fileIds.length > 10) {
       return c.json({ error: { code: 'TOO_MANY_FILES', message: 'Maximum 10 files per message' } }, 400)
     }
@@ -358,6 +377,10 @@ sessionRoutes.post('/:id/messages', async (c) => {
     if (fileIds.some((id: string) => typeof id !== 'string' || !uuidRegex.test(id))) {
       return c.json({ error: { code: 'INVALID_FILE_ID', message: 'Each fileId must be a valid UUID' } }, 400)
     }
+  }
+
+  if (fileIds && !canAttachFiles(fileIds, user.id, session!.agentId, session!.id)) {
+    return c.json({ error: { code: 'INVALID_FILE_ACCESS', message: 'Only your unsent files from this conversation can be attached' } }, 403)
   }
 
   const { id, queuePosition } = await enqueueMessage({
@@ -368,6 +391,7 @@ sessionRoutes.post('/:id/messages', async (c) => {
     sourceId: user.id,
     sessionId: session!.id,
     fileIds: hasFiles ? fileIds : undefined,
+    clientMessageId,
   })
 
   log.debug({ sessionId: session!.id, agentId: session!.agentId, messageId: id }, 'Quick session message enqueued')

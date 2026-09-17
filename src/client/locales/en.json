@@ -103,7 +103,9 @@
     "clearFilters": "Clear",
     "perPage": "Per page",
     "listRange": "{{from}}-{{to}} of {{total}}",
-    "clear": "Clear"
+    "clear": "Clear",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details"
   },
   "errors": {
     "backendUnavailable": "Unable to reach the server. Please check that the backend is running and try again.",
@@ -695,6 +697,37 @@
     }
   },
   "chat": {
+    "workspaceFiles": {
+      "open": "Workspace files",
+      "title": "Files · {{name}}",
+      "scope": "Shared workspace",
+      "description": "The selected files’ paths will be added to your message.",
+      "upload": "Upload files",
+      "uploading": "Uploading…",
+      "destination": "Upload to: {{directory}}",
+      "uploaded_one": "{{count}} file uploaded and selected.",
+      "uploaded_other": "{{count}} files uploaded and selected.",
+      "uploadErrors": "Could not upload: {{names}}. You can retry; successful uploads remain selected.",
+      "privateHint": "This workspace is shared. For a new file that stays in this conversation, use a private attachment.",
+      "attachPrivate": "Attach a private file",
+      "search": "Search the whole workspace…",
+      "clearSearch": "Clear search",
+      "location": "Workspace folder",
+      "root": "Root",
+      "up": "Previous folder",
+      "allFiles": "All files",
+      "empty": "This folder is empty",
+      "emptyHint": "Upload files or drop them here.",
+      "drop": "Drop into {{directory}}",
+      "download": "Download {{name}}",
+      "selected_zero": "Select files to add to your message.",
+      "selected_one": "{{count}} file selected",
+      "selected_other": "{{count}} files selected",
+      "clearSelection": "Clear selection",
+      "insert": "Add to message",
+      "remove": "Remove {{path}} from selection",
+      "refine": "Showing the first 50 results. Refine your search."
+    },
     "placeholder": "How can I help you?",
     "attachmentUnsupported": "{{model}} can't read these, skipped: {{files}}",
     "send": "Send",
@@ -942,7 +975,12 @@
       "previous": "Previous match",
       "next": "Next match",
       "close": "Close search",
-      "partialScope": "Only searching {{count}} loaded messages"
+      "partialScope": "Only searching {{count}} loaded messages",
+      "history": "Search the entire history",
+      "total": "{{count}} results",
+      "more": "Load more",
+      "context": "Message context",
+      "contextDescription": "An excerpt around the result. Your current conversation remains open."
     },
     "collapse": {
       "showMore": "Show more",
@@ -1360,6 +1398,13 @@
         "recreate": "Recreate Queenie",
         "recreated": "Queenie has been recreated",
         "noProvider": "No valid LLM provider available. Connect one first."
+      },
+      "backup": {
+        "title": "Data backup",
+        "verified": "Last successful verification: {{date}}",
+        "unknown": "No verified backup for this installation.",
+        "description": "Run a full backup manually with the server stopped. Verification checks files and the database; it does not certify a production restore.",
+        "command": "Server command:"
       }
     },
     "avatars": {
@@ -2400,7 +2445,8 @@
       "sourceLocal": "Local",
       "resetHealth": "Reset health stats",
       "healthReset": "Health stats reset",
-      "search": "Search plugins..."
+      "search": "Search plugins...",
+      "runtimeAccess": "Extensions run with the server’s permissions and can access its files, network and secrets. Declared permissions describe SDK usage; they are not a sandbox."
     },
     "marketplace": {
       "title": "Browse Plugins",
@@ -2583,6 +2629,8 @@
     }
   },
   "modelPicker": {
+    "label": "Model",
+    "change": "Change model, current model: {{model}}",
     "placeholder": "Select a model",
     "search": "Search models...",
     "noResults": "No models found",
@@ -3608,6 +3656,123 @@
       "bug": "Bug",
       "suggestion": "Suggestion",
       "experience": "Experience"
+    }
+  },
+  "workspace": {
+    "home": "Home",
+    "agents": "Agents",
+    "productions": "Productions",
+    "automations": "Automations",
+    "navigation": "Main navigation",
+    "yourWorkspace": "Your workspace",
+    "search": "Search and navigate",
+    "preferences": "Personal preferences",
+    "ai": "AI and models",
+    "connections": "Connections",
+    "extensions": "Extensions and advanced tools",
+    "data": "Data and access",
+    "system": "System",
+    "appearance": "Appearance",
+    "back": "Back to your conversation",
+    "unavailable": "Page unavailable",
+    "unavailableDescription": "This page does not exist or is not available with your access.",
+    "greeting": "Hello {{name}}",
+    "homeDescription": "Pick up a conversation, respond to your Agents, and find their latest work.",
+    "startConversation": "Start a conversation",
+    "needsYou": "Needs your attention",
+    "running": "Running",
+    "unread": "Unread messages",
+    "reply": "Reply",
+    "open": "Open",
+    "executions": "All executions",
+    "pendingApprovals": "Automations awaiting approval: {{count}}",
+    "unreadMessages": "{{count}} unread messages",
+    "allClear": "You are all caught up",
+    "allClearDescription": "Requests from your Agents will appear here.",
+    "recentResults": "Recent results",
+    "seeAll": "See all",
+    "noResults": "Your completed work and any errors will appear here.",
+    "yourAgents": "Your Agents",
+    "create": "Create",
+    "allAgents": "Explore your Agents",
+    "productionsDescription": "The apps and files created with your Agents, in one place.",
+    "apps": "Apps",
+    "plans": "Schedules",
+    "accountTriggers": "Account triggers",
+    "accounts": "Accounts",
+    "automationsDescription": "Choose what starts the work. Review executions from Home.",
+    "buildApp": "Build an app",
+    "buildAppPrompt": "Help me design and build an app. First, ask me what it should do and who it is for.",
+    "chooseAgent": "Choose an Agent to start with",
+    "draftOnly": "A draft will open in the conversation. Review it before sending.",
+    "loadError": "Some activity could not be loaded. Retry to see the current status.",
+    "loadMore": "Show more requests",
+    "automationsFlow": {
+      "description": "Automation flow",
+      "trigger": "Trigger",
+      "agent": "Agent",
+      "action": "Action",
+      "destination": "Destination",
+      "last": "Last event",
+      "next": "Next",
+      "never": "None",
+      "createTask": "Create a task",
+      "sendMessage": "Forward the message",
+      "reportTo": "Report to {{name}}",
+      "conversationOf": "Conversation with {{name}}",
+      "incomingRequest": "Incoming webhook request",
+      "filteredRequest": "Webhook request matching the filters",
+      "nextRequest": "On the next matching request",
+      "nextEmail": "On the next matching email",
+      "paused": "Paused",
+      "unknownSchedule": "Schedule unavailable",
+      "reorder": "Move {{name}}",
+      "toggle": "Enable or pause {{name}}"
+    }
+  },
+  "experience": {
+    "onboarding": {
+      "resume": "Continue with the connected provider",
+      "guidance": "Queenie can help you create your first Agent. Continue in her conversation whenever you are ready.",
+      "openQueenie": "Talk to Queenie",
+      "dismiss": "I will explore on my own"
+    },
+    "changeAvatar": "Change avatar",
+    "buildAppDraft": "Help me build an app. First, let us define what it should do.",
+    "setup": {
+      "hideOptional": "Hide optional capabilities",
+      "showOptional": "Explore optional capabilities"
+    },
+    "chat": {
+      "private": "Private session",
+      "privateScope": "Only you can view this session. Closing it keeps it in your history; memories are shared only if you choose to save a summary.",
+      "retention": "History is deleted {{count}} days after the session closes.",
+      "memoryDestination": "A saved summary becomes part of this Agent’s shared memory, available in other conversations. The rest of the private conversation is not transferred.",
+      "uploadRetry": "Upload failed. Remove and attach again.",
+      "shared": "Shared conversation",
+      "details": "Details",
+      "openPrivate": "Open a private session",
+      "clearEffects": "This affects the shared conversation and its attached files. Existing memories are kept; manage them separately in the Agent’s memory settings.",
+      "sharedActions": "Messages and attachments stay private. Actions performed by tools in shared spaces remain visible to others."
+    },
+    "agent": {
+      "effectiveCapabilities": "{{count}} available capabilities",
+      "grantHint": "Choose only what this Agent needs. All native tools includes enabled custom tools; MCP and plugins remain explicit choices.",
+      "minimal": "Minimal",
+      "allNative": "Add all native tools",
+      "minimalHint": "No toolbox selected: only core capabilities are available. Plugins and MCP tools always require an explicit grant.",
+      "generationOptions": "Generation options",
+      "identity": "Identity",
+      "capabilities": "Capabilities",
+      "advanced": "Advanced settings",
+      "linkOptions": "Conversation link",
+      "advancedModels": "Advanced model settings",
+      "templateResearch": "A research assistant who compares sources and prepares concise summaries.",
+      "templatePlanning": "An assistant who helps me plan my projects and follow up on next steps.",
+      "templateWriting": "A writing partner who helps me draft, revise and translate clear texts.",
+      "research": "Research",
+      "planning": "Planning",
+      "writing": "Writing"
     }
   }
 }

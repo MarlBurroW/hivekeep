@@ -210,6 +210,7 @@ export const generateImageTool: ToolRegistration = {
           await db.insert(files).values({
             id: fileId,
             agentId: ctx.agentId,
+            sessionId: ctx.sessionId ?? null,
             originalName: filename ?? `generated.${ext}`,
             storedPath,
             mimeType: result.mediaType,

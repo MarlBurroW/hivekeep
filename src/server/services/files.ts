@@ -17,6 +17,7 @@ const MAX_FILE_SIZE = config.upload.maxFileSizeMb * 1024 * 1024
 interface UploadParams {
   agentId: string
   uploadedBy: string
+  sessionId?: string
   file: File
 }
 
@@ -25,7 +26,7 @@ export async function uploadFile(params: UploadParams) {
 
   // Validate size
   if (file.size > MAX_FILE_SIZE) {
-    log.warn({ fileName: file.name, size: file.size }, 'File upload rejected: too large')
+    log.warn({ sessionId: params.sessionId, fileName: file.name, size: file.size }, 'File upload rejected: too large')
     throw new Error(`File too large: max ${config.upload.maxFileSizeMb} MB`)
   }
 
@@ -51,6 +52,7 @@ export async function uploadFile(params: UploadParams) {
     id,
     agentId,
     uploadedBy,
+    sessionId: params.sessionId ?? null,
     originalName: file.name,
     storedPath,
     mimeType: file.type || 'application/octet-stream',
@@ -58,7 +60,7 @@ export async function uploadFile(params: UploadParams) {
     createdAt: new Date(),
   })
 
-  log.info({ agentId, fileId: id, fileName: file.name, size: file.size, mimeType: file.type }, 'File uploaded')
+  log.info({ agentId, sessionId: params.sessionId, fileId: id, fileName: file.name, size: file.size, mimeType: file.type }, 'File uploaded')
 
   return {
     id,
@@ -316,16 +318,27 @@ export async function pruneOldChannelFiles(): Promise<number> {
   return oldFiles.length
 }
 
+let cleanupInterval: ReturnType<typeof setInterval> | null = null
+let cleanupStartup: ReturnType<typeof setTimeout> | null = null
+
+export function stopChannelFileCleanup(): void {
+  if (cleanupInterval) clearInterval(cleanupInterval)
+  if (cleanupStartup) clearTimeout(cleanupStartup)
+  cleanupInterval = null
+  cleanupStartup = null
+}
+
 /** Start periodic cleanup of old channel files. */
 export function startChannelFileCleanup(): void {
+  stopChannelFileCleanup()
   const intervalMin = config.upload.channelFileCleanupIntervalMin
   if (intervalMin <= 0 || config.upload.channelFileRetentionDays <= 0) return
 
   // Run once on startup (delayed 30s)
-  setTimeout(() => pruneOldChannelFiles().catch((e) => log.error(e, 'Channel file cleanup failed')), 30_000)
+  cleanupStartup = setTimeout(() => pruneOldChannelFiles().catch((e) => log.error(e, 'Channel file cleanup failed')), 30_000)
 
   // Then at configured interval
-  setInterval(
+  cleanupInterval = setInterval(
     () => pruneOldChannelFiles().catch((e) => log.error(e, 'Channel file cleanup failed')),
     intervalMin * 60 * 1000,
   )

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { api } from '@/client/lib/api'
-import { useSSE } from '@/client/hooks/useSSE'
-import { useChatStreaming } from '@/client/hooks/useChatStreaming'
+import { mergeIncomingMessage } from '@/client/lib/reconcile-messages'
+import { useSSE, useSSEResync } from '@/client/hooks/useSSE'
+import { useChatStreaming, type StreamingSnapshot } from '@/client/hooks/useChatStreaming'
 import type { ChatMessage } from '@/client/hooks/useChat'
 import type { AgentThinkingEffort, MessageFile, QuickSessionSummary } from '@/shared/types'
 
@@ -13,43 +14,66 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
   const [session, setSession] = useState<QuickSessionSummary | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const currentSession = useRef(sessionId)
+  currentSession.current = sessionId
+  const requestSerial = useRef(0)
+  const eventSerial = useRef(0)
+  const sending = useRef(false)
 
   const {
     streamingMessage, isStreaming,
-    handleToken, handleTokenRetract, handleDone, resetStreaming, cleanup,
+    handleToken, handleTokenRetract, handleDone, seedStreaming, resetStreaming, cleanup,
   } = useChatStreaming()
 
-  // Fetch messages for this session
   const fetchMessages = useCallback(async () => {
-    if (!sessionId) {
-      setMessages([])
-      return
-    }
+    if (!sessionId) return
+    const serial = ++requestSerial.current
+    const eventsAtStart = eventSerial.current
     setIsLoading(true)
     try {
-      const data = await api.get<{ session: QuickSessionSummary; messages: ChatMessage[] }>(
-        `/quick-sessions/${sessionId}`,
-      )
+      const data = await api.get<{
+        session: QuickSessionSummary; messages: ChatMessage[]
+        isProcessing?: boolean; streamingMessage?: StreamingSnapshot | null
+      }>(`/quick-sessions/${sessionId}`)
+      if (currentSession.current !== sessionId || serial !== requestSerial.current) return
       setMessages(data.messages)
       setSession(data.session)
+      if (data.streamingMessage && !data.messages.some((message) => message.id === data.streamingMessage!.messageId)) {
+        seedStreaming(data.streamingMessage)
+      } else if (eventSerial.current === eventsAtStart) resetStreaming()
+      if (eventSerial.current === eventsAtStart) setIsProcessing(!!data.isProcessing)
     } catch {
-      toast.error(t('quickSession.errors.fetchMessagesFailed', 'Failed to load messages'))
+      if (currentSession.current === sessionId) toast.error(t('quickSession.errors.fetchMessagesFailed', 'Failed to load messages'))
     } finally {
-      setIsLoading(false)
+      if (currentSession.current === sessionId && serial === requestSerial.current) setIsLoading(false)
     }
-  }, [sessionId])
+  }, [sessionId, t, seedStreaming, resetStreaming])
 
   useEffect(() => {
-    fetchMessages()
+    setMessages([])
+    setSession(null)
+    setIsProcessing(false)
     resetStreaming()
-  }, [fetchMessages])
+    void fetchMessages()
+    return () => { requestSerial.current++ }
+  }, [fetchMessages, resetStreaming])
+
+  useSSEResync(() => { void fetchMessages() })
 
   // SSE handlers — filtered by sessionId
   useSSE({
+    'queue:update': (data) => {
+      if (data.agentId !== agentId || data.sessionId !== sessionId) return
+      eventSerial.current++
+      setIsProcessing(Boolean(data.isProcessing) || Number(data.queueSize) > 0)
+    },
     'chat:token': (data) => {
       if (data.agentId !== agentId) return
       if (data.sessionId !== sessionId) return
 
+      eventSerial.current++
+      setIsProcessing(true)
       handleToken({
         messageId: data.messageId as string,
         token: data.token as string,
@@ -71,12 +95,14 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
       if (data.agentId !== agentId) return
       if (data.sessionId !== sessionId) return
 
+      eventSerial.current++
       const promoted = handleDone({
+        content: data.content as string | undefined,
         tokenUsage: (data.tokenUsage as ChatMessage['tokenUsage']) ?? undefined,
       })
 
       if (promoted) {
-        setMessages((prev) => [...prev, promoted])
+        setMessages((prev) => mergeIncomingMessage(prev, promoted))
       }
 
       setIsProcessing(false)
@@ -85,10 +111,19 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
       fetchMessages()
     },
 
+    'agent:error': (data) => {
+      if (data.agentId !== agentId || data.sessionId !== sessionId) return
+      eventSerial.current++
+      setIsProcessing(false)
+      resetStreaming()
+      void fetchMessages()
+    },
+
     'chat:message': (data) => {
       if (data.agentId !== agentId) return
       if (data.sessionId !== sessionId) return
 
+      eventSerial.current++
       const message: ChatMessage = {
         id: data.id as string,
         role: data.role as ChatMessage['role'],
@@ -112,18 +147,20 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
         systemEvent: null,
         createdAt: new Date(data.createdAt as number).toISOString(),
       }
-      setMessages((prev) => [...prev, message])
+      setMessages((prev) => mergeIncomingMessage(prev, message, data.reconcileId as string | undefined))
     },
   })
 
   // Send a message
   const sendMessage = useCallback(
-    async (content: string, fileIds?: string[], optimisticFiles?: MessageFile[]) => {
+    async (content: string, fileIds?: string[], optimisticFiles?: MessageFile[]): Promise<boolean> => {
       const hasFiles = fileIds && fileIds.length > 0
-      if (!sessionId || (!content.trim() && !hasFiles)) return
+      if (!sessionId || sending.current || (!content.trim() && !hasFiles)) return false
+      sending.current = true
+      setIsSending(true)
 
       // Optimistic update
-      const tempId = `temp-${Date.now()}`
+      const tempId = crypto.randomUUID()
       const userMessage: ChatMessage = {
         id: tempId,
         role: 'user',
@@ -155,19 +192,27 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
         await api.post(`/quick-sessions/${sessionId}/messages`, {
           content,
           fileIds,
+          clientMessageId: tempId,
         })
+        return true
       } catch (err: unknown) {
-        setMessages((prev) => prev.filter((m) => m.id !== tempId))
-        setIsProcessing(false)
+        if (currentSession.current === sessionId) {
+          setMessages((prev) => prev.filter((m) => m.id !== tempId))
+          setIsProcessing(false)
+        }
         const apiErr = err as { code?: string; status?: number } | undefined
         if (apiErr?.code === 'SESSION_EXPIRED' || apiErr?.status === 409) {
           toast.error(t('quickSession.errors.sessionExpired', 'Session expired. Please start a new one.'))
         } else {
           toast.error(t('quickSession.errors.sendFailed', 'Failed to send message'))
         }
+        return false
+      } finally {
+        sending.current = false
+        if (currentSession.current === sessionId) setIsSending(false)
       }
     },
-    [sessionId],
+    [sessionId, t],
   )
 
   // Stop streaming
@@ -206,6 +251,7 @@ export function useQuickChat(sessionId: string | null, agentId: string | null) {
     streamingMessage,
     isLoading,
     isProcessing,
+    isSending,
     isStreaming,
     sendMessage,
     stopStreaming,

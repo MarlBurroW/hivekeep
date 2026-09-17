@@ -70,12 +70,9 @@ export function useListControls<T>(
     }
     if (sort) out = out.sort(sort)
     return out
-    // `filter`/`sort` are typically inline closures (unstable identity); depending
-    // on them would recompute every render anyway, so we key on the stable inputs
-    // and read the latest closures. The page is clamped by `safePage` below, so a
-    // shrinking filter never lands on an empty page.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, query])
+    // These callbacks can capture a changed select value or sorting preference
+    // even when items and query stay unchanged.
+  }, [items, query, filter, sort, searchText])
 
   const paging = perPage > 0
   const pageCount = paging ? Math.max(1, Math.ceil(filtered.length / perPage)) : 1

@@ -3,6 +3,11 @@ import { fullMockConfig } from '../../test-helpers'
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
+// delete_agent protects Queenie by reading its kind directly.
+mock.module('@/server/db/index', () => ({ db: {
+  select: () => ({ from: () => ({ where: () => ({ get: () => ({ kind: 'default' }) }) }) }),
+} }))
+
 mock.module('@/server/config', () => ({ config: { ...fullMockConfig } }))
 
 const mockCreateAgent = mock(() => Promise.resolve({
@@ -86,10 +91,7 @@ mock.module('@/server/logger', () => ({
   }),
 }))
 
-// Import after mocks. Wrapped in try/catch to degrade gracefully if
-// Bun mock.module() poisoned exports of @/server/services/custom-tools (or
-// any transitive dep) from a previous test file in the same process,
-// see known issue #325. Tests fall back to it.skip on failure.
+// Import after mocks. Missing exports fail the suite instead of hiding coverage.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let createAgentTool: any, updateAgentTool: any, deleteAgentTool: any, getAgentDetailsTool: any
 let _mocksWorking = false
@@ -104,7 +106,8 @@ try {
   _mocksWorking = false
 }
 
-const itMocked = _mocksWorking ? it : it.skip
+if (!_mocksWorking) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itMocked = it
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

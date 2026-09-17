@@ -23,6 +23,7 @@ import { useAgentList } from '@/client/hooks/useAgentList'
 import { useWorkspaceFolders } from '@/client/hooks/useWorkspaceFolders'
 import { useMiniApps } from '@/client/hooks/useMiniApps'
 import { useWorkspaceGit } from '@/client/hooks/useWorkspaceGit'
+import { useAuth } from '@/client/hooks/useAuth'
 import { appendToDraft } from '@/client/hooks/useDraftMessage'
 import {
   useWorkspaceFiles,
@@ -61,6 +62,7 @@ function readLastSource(): WorkspaceSourceRef | null {
  * (with ?path=).
  */
 export function FilesPage() {
+  const { user } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const params = useParams<{ agentId?: string; sourceType?: string; sourceId?: string }>()
@@ -248,7 +250,7 @@ export function FilesPage() {
       ? (entry) => {
           // Write the draft BEFORE navigating (no composer mount race) — the
           // path goes in backticks, same convention as the @ palette (§ 5.3).
-          appendToDraft(activeAgentId, `\`${entry.path}\``)
+          appendToDraft(activeAgentId, `\`${entry.path}\``, user?.id)
           const agent = agents.find((a) => a.id === activeAgentId)
           navigate(`/agent/${agent?.slug ?? activeAgentId}`)
         }

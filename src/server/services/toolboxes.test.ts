@@ -48,7 +48,8 @@ const svc = schemaIsReal
 const { resolveToolboxNames, createToolbox } =
   svc as typeof import('@/server/services/toolboxes')
 
-const itReal = schemaIsReal ? it : it.skip
+if (!schemaIsReal) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itReal = it
 
 // Throwaway tools registered into the REAL registry for the duration of this
 // suite. One native, one plugin (the plugin MUST be excluded from "*").

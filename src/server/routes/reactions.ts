@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db } from '@/server/db/index'
-import { messageReactions, messages } from '@/server/db/schema'
+import { messageReactions, messages, quickSessions } from '@/server/db/schema'
 import { sseManager } from '@/server/sse/index'
 import { resolveAgentId } from '@/server/services/agent-resolver'
 import type { AppVariables } from '@/server/app'
@@ -15,9 +15,25 @@ export const PRESET_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉']
 
 const reactionRoutes = new Hono<{ Variables: AppVariables }>()
 
+function readableMessage(messageId: string, agentId: string, userId: string) {
+  const message = db.select({ id: messages.id, sessionId: messages.sessionId })
+    .from(messages).where(and(eq(messages.id, messageId), eq(messages.agentId, agentId))).get()
+  if (!message) return null
+  if (message.sessionId) {
+    const session = db.select({ createdBy: quickSessions.createdBy }).from(quickSessions)
+      .where(eq(quickSessions.id, message.sessionId)).get()
+    if (session?.createdBy !== userId) return null
+  }
+  return message
+}
+
 // GET /api/agents/:agentId/messages/:messageId/reactions
 reactionRoutes.get('/', async (c) => {
   const messageId = c.req.param('messageId')!
+  const agentId = resolveAgentId(c.req.param('agentId') ?? '')
+  if (!agentId || !readableMessage(messageId, agentId, c.get('user').id)) {
+    return c.json({ error: { code: 'MESSAGE_NOT_FOUND', message: 'Message not found' } }, 404)
+  }
 
   const reactions = await db
     .select()
@@ -46,7 +62,7 @@ reactionRoutes.post('/', async (c) => {
   }
 
   // Check message exists
-  const msg = await db.select({ id: messages.id }).from(messages).where(eq(messages.id, messageId)).get()
+  const msg = readableMessage(messageId, agentId, user.id)
   if (!msg) {
     return c.json({ error: { code: 'MESSAGE_NOT_FOUND', message: 'Message not found' } }, 404)
   }
@@ -73,6 +89,7 @@ reactionRoutes.post('/', async (c) => {
       agentId,
       data: {
         messageId,
+        ...(msg.sessionId ? { sessionId: msg.sessionId } : {}),
         userId: user.id,
         userName: user.name,
         emoji,
@@ -101,6 +118,7 @@ reactionRoutes.post('/', async (c) => {
     agentId,
     data: {
       messageId,
+      ...(msg.sessionId ? { sessionId: msg.sessionId } : {}),
       userId: user.id,
       userName: user.name,
       emoji,

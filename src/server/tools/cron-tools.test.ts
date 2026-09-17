@@ -63,7 +63,7 @@ mock.module('@/server/logger', () => ({
 
 // (Wrapped in try/catch to degrade gracefully if Bun mock.module() poisoned
 //  exports of @/server/services/tasks from a previous test file in the same
-//  process, see known issue #325. Tests fall back to it.skip on failure.)
+// Missing mock exports now fail the isolated suite instead of skipping tests.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let createCronTool: any, updateCronTool: any, deleteCronTool: any,
   listCronsTool: any, getCronJournalTool: any, triggerCronTool: any
@@ -81,7 +81,8 @@ try {
   _mocksWorking = false
 }
 
-const itMocked = _mocksWorking ? it : it.skip
+if (!_mocksWorking) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itMocked = it
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

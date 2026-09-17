@@ -1,4 +1,7 @@
 import { Hono } from 'hono'
+import { db } from '@/server/db'
+import { eq } from 'drizzle-orm'
+import { quickSessions } from '@/server/db/schema'
 import { uploadFile } from '@/server/services/files'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
@@ -14,6 +17,12 @@ fileRoutes.post('/upload', async (c) => {
   const formData = await c.req.formData()
   const file = formData.get('file') as File | null
   const agentId = formData.get('agentId') as string | null
+  const sessionId = formData.get('sessionId')
+  if (sessionId) {
+    if (typeof sessionId !== 'string') return c.notFound()
+    const session = db.select().from(quickSessions).where(eq(quickSessions.id, sessionId)).get()
+    if (!session || session.createdBy !== user.id || session.agentId !== agentId || session.status !== 'active') return c.notFound()
+  }
 
   if (!file || !(file instanceof File)) {
     return c.json(
@@ -33,6 +42,7 @@ fileRoutes.post('/upload', async (c) => {
     const result = await uploadFile({
       agentId,
       uploadedBy: user.id,
+      sessionId: typeof sessionId === 'string' ? sessionId : undefined,
       file,
     })
 

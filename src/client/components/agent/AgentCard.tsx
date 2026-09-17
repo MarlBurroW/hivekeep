@@ -103,8 +103,18 @@ export const AgentCard = forwardRef<HTMLDivElement, AgentCardProps>(function Age
       ref={ref}
       style={style}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-label={name}
+      aria-current={isSelected ? 'page' : undefined}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          event.currentTarget.click()
+        }
+      }}
       className={cn(
-        'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 w-full text-left cursor-pointer',
+        'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 w-full text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-ring',
         isDragging ? 'z-50 shadow-lg opacity-90 scale-[1.02]' : 'transition-all duration-150',
         isSelected
           ? 'bg-primary/10 shadow-sm'
@@ -196,7 +206,7 @@ export const AgentCard = forwardRef<HTMLDivElement, AgentCardProps>(function Age
           )}
         </div>
         {modelDisplayName && (
-          <p className="truncate text-[10px] text-muted-foreground/50 mt-0.5">{modelDisplayName}</p>
+          <p className="mt-1 truncate text-[11px] text-muted-foreground">{modelDisplayName}</p>
         )}
         {channels && channels.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mt-1" aria-label={t('sidebar.agents.boundChannelsLabel', 'Bound channels')}>

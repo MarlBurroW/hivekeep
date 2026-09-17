@@ -17,6 +17,19 @@ describe('LogStore', () => {
   })
 
   describe('pushRaw', () => {
+    it('omits private-session payloads from the shared ring and subscriber callback', () => {
+      const marker = `private-sentinel-${Date.now()}`
+      let captured: unknown
+      logStore.setOnEntry((entry) => { captured = entry })
+      logStore.pushRaw(JSON.stringify({
+        level: 50, msg: marker, module: 'private-test', sessionId: 'private-session', agentId: 'agent',
+        preview: marker, err: { message: marker },
+      }))
+      expect(logStore.query({ search: marker })).toHaveLength(0)
+      expect(JSON.stringify(captured)).not.toContain(marker)
+      expect(JSON.stringify(captured)).not.toContain('private-session')
+      logStore.setOnEntry(() => {})
+    })
     it('parses a valid Pino JSON log line', () => {
       const line = JSON.stringify({
         level: 30,

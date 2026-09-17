@@ -201,6 +201,7 @@ export function getChannelOriginMeta(originId: string): ChannelOriginMeta | unde
 }
 
 let originPruneInterval: ReturnType<typeof setInterval> | null = null
+let originPruneInitialTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Drop origin rows past the freshness window. Lazy deletion on read only
  *  covers origins somebody still asks about; this collects the rest. */
@@ -221,7 +222,7 @@ export function startChannelOriginCleanup(): void {
       log.error({ err }, 'Channel origin cleanup failed')
     }
   }
-  setTimeout(run, 60_000)
+  originPruneInitialTimer = setTimeout(run, 60_000)
   originPruneInterval = setInterval(run, 6 * 60 * 60 * 1000)
 }
 
@@ -2132,4 +2133,11 @@ export async function restoreActiveChannels() {
       log.error({ channelId: channel.id, err: errMsg }, 'Failed to restore channel')
     }
   }
+}
+
+export function stopChannelOriginCleanup(): void {
+  if (originPruneInterval) clearInterval(originPruneInterval)
+  if (originPruneInitialTimer) clearTimeout(originPruneInitialTimer)
+  originPruneInterval = null
+  originPruneInitialTimer = null
 }

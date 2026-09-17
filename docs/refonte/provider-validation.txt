@@ -1,0 +1,4 @@
+PASS simulated tool call executes read_file, persists its real result and finishes with a response
+PASS simulated provider error is persisted, visible in the conversation and releases the queue
+PASS a subsequent normal message completes and appears after the provider error
+Provider scenarios: 3 passed; 6 local inference requests; no paid provider

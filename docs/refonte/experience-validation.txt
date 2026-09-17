@@ -1,0 +1,4 @@
+PASS draft + attachment after immediate route change
+PASS reading anchor restored after navigation, including older pages
+PASS selected private session, open panel, draft and files restored
+PASS private stream resumed once; other member cannot read session, SSE or attachment

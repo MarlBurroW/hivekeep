@@ -42,6 +42,10 @@ export const requestToolAccessTool: ToolRegistration = {
           .describe('Why you need these tools — shown verbatim to the user on the approval card.'),
       }),
       execute: async ({ tool_names, reason }) => {
+        // Approval cards and grants are shared Agent state, never private chat.
+        if (ctx.sessionId) {
+          return { error: 'request_tool_access is not available in private sessions. Ask the user in private text to configure capabilities from the Agent settings or shared conversation.' }
+        }
         if (requestedThisTurn) {
           return { error: 'You already requested tool access this turn. Wait for the user to respond before requesting again.' }
         }

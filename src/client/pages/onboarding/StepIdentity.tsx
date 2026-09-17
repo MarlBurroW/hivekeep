@@ -275,6 +275,7 @@ export function StepIdentity({ onComplete }: StepIdentityProps) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
+          aria-label={t('experience.changeAvatar', 'Change avatar')}
           className="group relative"
         >
           <Avatar className="size-20 ring-2 ring-border transition-all group-hover:ring-primary">
@@ -300,7 +301,7 @@ export function StepIdentity({ onComplete }: StepIdentityProps) {
       </div>
 
       {/* Name fields */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="firstName">{t('onboarding.identity.firstName')}</Label>
           <Input
@@ -372,7 +373,7 @@ export function StepIdentity({ onComplete }: StepIdentityProps) {
       </div>
 
       {/* Password */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="password">{t('onboarding.identity.password')}</Label>
           <PasswordInput

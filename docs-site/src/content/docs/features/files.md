@@ -7,7 +7,15 @@ Every Agent has a **workspace**: a directory on your server where it reads and w
 
 The typical moment: an Agent says "I saved the report in `reports/q2.md`" and you want to tweak it yourself, right now. Open Files (or click the path in the chat), edit, save. None of this triggers an LLM turn. It is a direct view of the disk.
 
-Files is available to all authenticated users, from the activity bar (folder icon) or at `/files`. Beyond Agent workspaces, the same browser also opens **mini-app source directories** and **arbitrary server folders** you add (see [Browse sources](#browse-sources)).
+Files is available to all authenticated users under **Productions → Files** or at `/files`. Beyond Agent workspaces, the same browser also opens **mini-app source directories** and **arbitrary server folders** you add (see [Browse sources](#browse-sources)).
+
+## From a conversation
+
+Click **Files** beside the message field to open the current Agent's workspace without leaving the chat. Browse folders, search filenames and paths across the workspace, select multiple files, or download a file directly.
+
+Use **Upload files** or drop files into the panel to import them into the displayed folder. Successful uploads are selected automatically. Existing files are preserved: name collisions receive a distinct name. Click **Add to message** to insert the exact paths into your draft, then send when ready. Selecting files does not send a message, and your existing draft is preserved.
+
+The workspace is shared. In a private session, the panel still lets you select existing workspace files, while **Attach a private file** stores new uploads as private conversation attachments. These uploads are not placed in the shared workspace.
 
 ## The layout
 
@@ -109,7 +117,7 @@ The Files section has a few server-side limits, all overridable by environment v
 | Variable | Default | What it bounds |
 |---|---|---|
 | `WORKSPACE_FILES_MAX_EDITABLE_SIZE` | `5` MB | Above this, a text file is download-only |
-| `WORKSPACE_FILES_MAX_UPLOAD_SIZE` | `100` MB | Per-file upload size (`0` = unlimited) |
+| `WORKSPACE_FILES_MAX_UPLOAD_SIZE` | `100` MB | Per-file upload size; legacy `0` uses the finite default |
 | `WORKSPACE_FILES_MAX_COPY_SIZE` | `500` MB | Byte budget of a recursive folder copy |
 | `WORKSPACE_FILES_COPY_MAX_ENTRIES` | `5000` | Entry budget of a recursive folder copy |
 | `WORKSPACE_FILES_SEARCH_MAX_RESULTS` | `50` | Hard cap on search results |

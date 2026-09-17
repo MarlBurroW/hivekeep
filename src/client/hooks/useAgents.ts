@@ -86,6 +86,7 @@ export function useAgents() {
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const { models, llmModels, imageModels, refetch: fetchModels } = useModels()
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   const [agentOrder, setAgentOrder] = useState<string[]>([])
   const hasImageCapability = imageModels.length > 0
 
@@ -93,6 +94,7 @@ export function useAgents() {
     try {
       const data = await api.get<{ agents: (AgentSummary & { isProcessing?: boolean; queueSize?: number; processingStartedAt?: number })[] }>('/agents')
       setAgents(data.agents)
+      setFetchError(false)
       // Hydrate queue state from initial fetch so we don't miss processing state
       setAgentQueueState((prev) => {
         const next = new Map(prev)
@@ -110,7 +112,7 @@ export function useAgents() {
         return next
       })
     } catch {
-      // Ignore errors
+      setFetchError(true)
     } finally {
       setIsLoading(false)
     }
@@ -421,6 +423,7 @@ export function useAgents() {
 
   return {
     agents: sortedAgents,
+    fetchError,
     llmModels,
     imageModels,
     isLoading,

@@ -465,7 +465,9 @@ async function purgeDeadOneShotTriggers(ttlDays: number): Promise<void> {
   log.info({ count: dead.length }, 'Purged dead one-shot triggers')
 }
 
+let triggerCleanupTimer: ReturnType<typeof setInterval> | null = null
 export function startTriggerCleanup(): void {
+  if (triggerCleanupTimer) return
   const { logRetentionDays, oneShotTtlDays } = config.emailTriggers
   const run = async () => {
     try {
@@ -477,5 +479,10 @@ export function startTriggerCleanup(): void {
     }
   }
   void run()
-  setInterval(run, DAY_MS)
+  triggerCleanupTimer = setInterval(run, DAY_MS)
+}
+
+export function stopTriggerCleanup(): void {
+  if (triggerCleanupTimer) clearInterval(triggerCleanupTimer)
+  triggerCleanupTimer = null
 }

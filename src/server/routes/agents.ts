@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { eq, and, desc, isNull, ne, inArray, sql } from 'drizzle-orm'
 import { mkdirSync, existsSync } from 'fs'
 import { db } from '@/server/db/index'
-import { agents, agentMcpServers, mcpServers, queueItems, compactingSummaries, memories, messages, providers, tasks } from '@/server/db/schema'
+import { agents, agentMcpServers, mcpServers, queueItems, compactingSummaries, memories, messages, providers, tasks, quickSessions } from '@/server/db/schema'
 import { config } from '@/server/config'
 import {
   generateAvatarImage,
@@ -52,6 +52,10 @@ const agentRoutes = new Hono<{ Variables: AppVariables }>()
 // (separate routers), launching standalone tasks, and marking read.
 agentRoutes.use('*', (c, next) => {
   if (c.req.method === 'GET') return next()
+  // These sibling routers enforce their own message/session permissions. Hono
+  // also runs this prefix middleware for them, so do not turn member sends into
+  // admin-only operations merely because the Agent router was mounted first.
+  if (/^\/api\/agents\/[^/]+\/(messages|quick-sessions)(\/|$)/.test(c.req.path)) return next()
   if (/^\/api\/agents\/[^/]+\/(tasks|mark-read)$/.test(c.req.path)) return next()
   return requireAdmin(c, next)
 })
@@ -94,7 +98,7 @@ agentRoutes.get('/', async (c) => {
     db.select().from(agents).all(),
     db.select({ agentId: queueItems.agentId, status: queueItems.status, createdAt: queueItems.createdAt, processingStartedAt: queueItems.processingStartedAt })
       .from(queueItems)
-      .where(inArray(queueItems.status, ['pending', 'processing']))
+      .where(and(inArray(queueItems.status, ['pending', 'processing']), isNull(queueItems.sessionId)))
       .all(),
   ])
 
@@ -514,13 +518,16 @@ agentRoutes.get('/:id/context-preview', async (c) => {
   const sessionId = c.req.query('sessionId')
 
   if (taskId) {
+    const taskRow = db.select({ lastApiContextTokens: tasks.lastApiContextTokens, parentAgentId: tasks.parentAgentId })
+      .from(tasks).where(eq(tasks.id, taskId)).get()
+    if (!taskRow || taskRow.parentAgentId !== agent.id) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Task not found' } }, 404)
+    }
     const { buildTaskContextPreview } = await import('@/server/services/context-preview')
     const preview = await buildTaskContextPreview(taskId)
     // Attach the provider-reported peak input from the most recent turn so
     // the task panel can render the green "✓ real" bar alongside the local
     // BPE estimate. Mirrors what we do for the main-Agent path below.
-    const taskRow = db.select({ lastApiContextTokens: tasks.lastApiContextTokens })
-      .from(tasks).where(eq(tasks.id, taskId)).get()
     return c.json({
       ...preview,
       apiContextTokens: taskRow?.lastApiContextTokens ?? null,
@@ -528,6 +535,12 @@ agentRoutes.get('/:id/context-preview', async (c) => {
   }
 
   if (sessionId) {
+    const user = c.get('user')
+    const session = db.select({ agentId: quickSessions.agentId, createdBy: quickSessions.createdBy })
+      .from(quickSessions).where(eq(quickSessions.id, sessionId)).get()
+    if (!session || session.agentId !== agent.id || session.createdBy !== user.id) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Session not found' } }, 404)
+    }
     const { buildQuickSessionContextPreview } = await import('@/server/services/context-preview')
     const preview = await buildQuickSessionContextPreview(agent.id, sessionId)
     return c.json(preview)

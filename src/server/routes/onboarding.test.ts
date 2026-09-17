@@ -55,6 +55,7 @@ mock.module('@/server/db/index', () => {
       select: (...args: unknown[]) => mockDbSelect(...args),
       insert: (...args: unknown[]) => mockDbInsert(...args),
       update: (...args: unknown[]) => mockDbUpdate(...args),
+      transaction: (fn: (tx: unknown) => unknown) => fn({ insert: (...args: unknown[]) => mockDbInsert(...args) }),
     },
     sqlite: {},
     initVirtualTables: () => {},
@@ -115,6 +116,8 @@ function makeChain(result: unknown) {
   chain.where = mock(() => chain)
   chain.set = mock(() => chain)
   chain.values = mock(() => chain)
+  chain.run = mock(() => result)
+  chain.onConflictDoNothing = mock(() => chain)
   chain.get = mock(() => result)
   chain.all = mock(() => (Array.isArray(result) ? result : []))
   return chain
@@ -188,6 +191,7 @@ describe('onboarding routes', () => {
         hasAdmin: false,
         hasLlm: false,
         hasEmbedding: false,
+        bootstrapPending: false,
       })
     })
 
@@ -228,7 +232,36 @@ describe('onboarding routes', () => {
         hasAdmin: true,
         hasLlm: true,
         hasEmbedding: true,
+        bootstrapPending: false,
       })
+    })
+
+    it('resumes provider setup only for the newly-created administrator', async () => {
+      mockGetSession = mock(() => Promise.resolve(fakeSession))
+      let calls = 0
+      mockDbSelect = mock(() => {
+        calls++
+        if (calls === 1) return makeChain({ userId: 'user-1', role: 'admin' })
+        if (calls === 2) return makeChain([])
+        return makeChain({ value: 'user-1' })
+      })
+      const response = await app.request('/api/onboarding/status')
+      expect(await response.json()).toEqual({ completed: false, hasAdmin: true, hasLlm: false, hasEmbedding: false, bootstrapPending: true })
+    })
+
+    it('does not send another account through a pending administrator setup', async () => {
+      mockGetSession = mock(() => Promise.resolve({ user: { id: 'another-user' } }))
+      let calls = 0
+      mockDbSelect = mock(() => {
+        calls++
+        if (calls === 1) return makeChain({ userId: 'user-1', role: 'admin' })
+        if (calls === 2) return makeChain([])
+        return makeChain({ value: 'user-1' })
+      })
+      const response = await app.request('/api/onboarding/status')
+      const status = await response.json()
+      expect(status.completed).toBe(true)
+      expect(status.bootstrapPending).toBe(false)
     })
 
     it('handles provider with multiple capabilities', async () => {

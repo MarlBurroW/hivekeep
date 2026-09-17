@@ -57,7 +57,7 @@ export function ThinkingEffortPicker({ enabled, effort, onChange, reasoning, com
             <button
               type="button"
               className={cn(
-                'flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium transition-colors',
+                'flex min-h-10 min-w-8 items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8',
                 active
                   ? 'bg-chart-4/15 text-chart-4 hover:bg-chart-4/25'
                   : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50',

@@ -50,6 +50,8 @@ interface ModelPickerProps {
   placeholder?: string
   disabled?: boolean
   className?: string
+  /** Visible label for standalone controls, such as the conversation composer. */
+  triggerLabel?: string
   /** Trigger button variant. Defaults to 'outline' (bordered). Pass 'ghost'
    *  for a borderless inline trigger that blends into its surroundings
    *  (e.g. the composer toolbar). */
@@ -78,6 +80,7 @@ export function ModelPicker({
   placeholder,
   disabled = false,
   className,
+  triggerLabel,
   variant = 'outline',
   allowClear = false,
   clearLabel,
@@ -130,8 +133,10 @@ export function ModelPicker({
     >
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant={variant}
           role="combobox"
+          aria-label={triggerLabel ? t('modelPicker.change', { model: selectedModel?.name ?? placeholder ?? t('modelPicker.placeholder') }) : undefined}
           aria-expanded={open}
           disabled={disabled}
           className={cn(
@@ -140,12 +145,13 @@ export function ModelPicker({
             className,
           )}
         >
+          {triggerLabel && <span className="shrink-0 font-medium">{triggerLabel}</span>}
           {selectedModel ? (
-            <span className="flex items-center gap-2 truncate">
-              <ProviderIcon
+            <span className="flex min-w-0 items-center gap-2 truncate">
+              {!triggerLabel && <ProviderIcon
                 providerType={selectedModel.providerType}
                 className="size-4 shrink-0"
-              />
+              />}
               <span className="truncate">{selectedModel.name}</span>
             </span>
           ) : isLoading && models.length === 0 ? (
@@ -160,13 +166,18 @@ export function ModelPicker({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent
+        className="max-w-[calc(100vw-1rem)] p-0"
+        style={{ width: 'max(18rem, var(--radix-popover-trigger-width))' }}
+        align="start"
+        collisionPadding={8}
+      >
         <Command>
           <CommandInput placeholder={t('modelPicker.search')} />
 
           {/* Provider filter tabs */}
           {showFilters && (
-            <div className="flex gap-1 border-b px-2 py-1.5">
+            <div className="flex flex-wrap gap-1 border-b px-2 py-1.5">
               <button
                 type="button"
                 onClick={() => setProviderFilter(null)}

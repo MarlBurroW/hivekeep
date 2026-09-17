@@ -3,45 +3,29 @@ import { useTranslation } from 'react-i18next'
 import { Progress } from '@/client/components/ui/progress'
 import { HivekeepLogo } from '@/client/components/common/HivekeepLogo'
 import { StepIdentity } from '@/client/pages/onboarding/StepIdentity'
-import { StepPreferences } from '@/client/pages/onboarding/StepPreferences'
 import { StepBootstrapProvider } from '@/client/pages/onboarding/StepBootstrapProvider'
 
-/**
- * First-run onboarding — minimal by design.
- *
- * The flow used to be 4 steps (Identity → Preferences → Providers →
- * Default Models). Providers + default models were moved to the
- * in-app setup checklist on the dashboard (Phase 1 of the onboarding
- * redesign) so users land on a working app immediately. What stays
- * here is the bare minimum that has to happen before there's even an
- * authenticated session:
- *   1. Identity   — creates the user profile (admin role for the
- *                   first user) so subsequent API calls have a
- *                   profile row to attach to.
- *   2. Preferences — language + theme + palette. Lightweight; takes
- *                    ~5 seconds. Sets the cosmetic frame before the
- *                    user sees the dashboard.
- */
-const TOTAL_STEPS = 3
+/** Account and provider are the only required first-run decisions. */
+const TOTAL_STEPS = 2
 
 interface OnboardingPageProps {
   onComplete: () => void
+  initialStep?: 1 | 2
 }
 
-export function OnboardingPage({ onComplete }: OnboardingPageProps) {
+export function OnboardingPage({ onComplete, initialStep = 1 }: OnboardingPageProps) {
   const { t } = useTranslation()
-  const [currentStep, setCurrentStep] = useState(1)
+  const [currentStep, setCurrentStep] = useState(initialStep)
 
   const progressValue = ((currentStep - 1) / (TOTAL_STEPS - 1)) * 100
   const stepTitleKeys = [
     'onboarding.steps.identity',
-    'onboarding.steps.preferences',
     'onboarding.steps.provider',
   ] as const
   const currentStepTitle = t(stepTitleKeys[currentStep - 1] ?? stepTitleKeys[0])
 
   return (
-    <div className="surface-base h-screen overflow-y-auto">
+    <div className="surface-base h-dvh overflow-x-hidden overflow-y-auto">
       {/* Decorative orbs */}
       <div className="theme-orb theme-orb-1 fixed left-1/4 top-1/4 h-64 w-64 aurora-drift" />
       <div className="theme-orb theme-orb-2 fixed right-1/4 bottom-1/4 h-48 w-48 aurora-drift delay-3" />
@@ -70,14 +54,11 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
         </div>
 
         {/* Step card */}
-        <div className="glass-strong rounded-2xl p-8 shadow-lg">
+        <div className="glass-strong min-w-0 rounded-2xl p-4 shadow-lg sm:p-8">
           {currentStep === 1 && (
             <StepIdentity onComplete={() => setCurrentStep(2)} />
           )}
           {currentStep === 2 && (
-            <StepPreferences onComplete={() => setCurrentStep(3)} onBack={() => setCurrentStep(1)} />
-          )}
-          {currentStep === 3 && (
             <StepBootstrapProvider onComplete={onComplete} />
           )}
         </div>

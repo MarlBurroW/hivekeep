@@ -278,7 +278,7 @@ export function ModelRegistryTable({ reloadKey = 0 }: { reloadKey?: number } = {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="inline-flex">
-                        <Switch checked={m.enabled} onCheckedChange={(v) => toggleEnabled(m, v)} />
+                        <Switch aria-label={`${t('settings.modelRegistry.enabledLabel', 'Enabled')} ${m.modelId}`} checked={m.enabled} onCheckedChange={(v) => toggleEnabled(m, v)} />
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className="text-xs">
@@ -358,7 +358,7 @@ export function ModelRegistryTable({ reloadKey = 0 }: { reloadKey?: number } = {
                 <Button variant="ghost" size="icon-xs" onClick={() => setEditing(m)} aria-label={t('common.edit', 'Edit')}>
                   <Pencil className="size-3.5" />
                 </Button>
-                <Switch checked={m.enabled} onCheckedChange={(v) => toggleEnabled(m, v)} />
+                <Switch aria-label={`${t('settings.modelRegistry.enabledLabel', 'Enabled')} ${m.modelId}`} checked={m.enabled} onCheckedChange={(v) => toggleEnabled(m, v)} />
               </div>
             </div>
 
@@ -537,7 +537,7 @@ function EditModelDialog({ model, onClose, onSaved }: {
           <p className="text-sm font-medium">{t('settings.modelRegistry.enabledLabel', 'Enabled')}</p>
           <p className="text-[11px] text-muted-foreground">{t('settings.modelRegistry.enabledDialogHint', 'Off = hidden from model pickers (the chat path still works if an Agent already uses it).')}</p>
         </div>
-        <Switch checked={enabled} onCheckedChange={setEnabled} />
+        <Switch aria-label={t('settings.modelRegistry.enabledLabel', 'Enabled')} checked={enabled} onCheckedChange={setEnabled} />
       </div>
 
       {model.needsReview && (
@@ -640,7 +640,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   return (
     <div className="flex items-center justify-between">
       <Label className="text-sm font-normal">{label}</Label>
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch aria-label={label} checked={checked} onCheckedChange={onChange} />
     </div>
   )
 }

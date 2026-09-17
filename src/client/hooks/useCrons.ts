@@ -34,14 +34,16 @@ type UpdateCronData = Partial<{
 export function useCrons() {
   const [crons, setCrons] = useState<CronSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   const [cronOrder, setCronOrder] = useState<string[]>([])
 
   const fetchCrons = useCallback(async () => {
     try {
       const data = await api.get<CronsResponse>('/crons')
       setCrons(data.crons)
+      setFetchError(false)
     } catch {
-      // Silently fail
+      setFetchError(true)
     } finally {
       setIsLoading(false)
     }
@@ -178,6 +180,7 @@ export function useCrons() {
 
   return {
     crons: sortedCrons,
+    fetchError,
     pendingApprovalCount,
     isLoading,
     createCron,

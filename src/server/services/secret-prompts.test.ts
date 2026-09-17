@@ -19,8 +19,8 @@ import { eq } from 'drizzle-orm'
 import * as schema from '@/server/db/schema'
 import * as realEncryption from '@/server/services/encryption'
 
-const schemaIsReal = !!(schema as { secretPrompts?: { id?: unknown } }).secretPrompts?.id
-const d = schemaIsReal ? describe : describe.skip
+if (!schema.secretPrompts?.id) throw new Error("This suite requires isolated module mocks")
+const d = describe
 
 const sqlite = new Database(':memory:')
 sqlite.run('PRAGMA foreign_keys = OFF')
@@ -41,7 +41,8 @@ sqlite.run(`CREATE TABLE queue_items (
   content text NOT NULL, source_type text NOT NULL, source_id text,
   priority integer NOT NULL DEFAULT 0, request_id text, in_reply_to text, task_id text,
   session_id text, channel_origin_id text, status text NOT NULL DEFAULT 'pending',
-  created_message_id text, created_at integer NOT NULL, processed_at integer
+  created_message_id text, processing_started_at integer, file_ids text, client_message_id text,
+  message_metadata text, created_at integer NOT NULL, processed_at integer
 )`)
 const testDb = drizzle(sqlite, { schema })
 

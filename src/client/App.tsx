@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { lazyWithRetry as lazy } from '@/client/lib/lazy-with-retry'
 import { useAuth } from '@/client/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/client/lib/api'
 import { SidePanelProvider } from '@/client/contexts/SidePanelContext'
@@ -14,6 +14,9 @@ import { UpdateOverlay } from '@/client/components/common/UpdateOverlay'
 import { GlobalUpdateDialog } from '@/client/components/common/GlobalUpdateDialog'
 import { ActivityBar } from '@/client/components/layout/ActivityBar'
 import { AppTopBar } from '@/client/components/layout/AppTopBar'
+import { ErrorBoundary } from '@/client/components/common/ErrorBoundary'
+import { ConnectionBanner } from '@/client/components/common/ConnectionBanner'
+import { settingsUrl } from '@/client/lib/navigation'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 
 // Lazy-loaded pages for code splitting
@@ -30,14 +33,18 @@ const DesignSystemPage = lazy(() => import('@/client/pages/design-system/DesignS
 const InvitePage = lazy(() => import('@/client/pages/invite/InvitePage').then(m => ({ default: m.InvitePage })))
 
 // Global modals rendered at App root so they survive navigation between Agents.
-const SettingsModal = lazy(() => import('@/client/pages/settings/SettingsPage').then(m => ({ default: m.SettingsModal })))
+const SettingsPage = lazy(() => import('@/client/pages/settings/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const HomePage = lazy(() => import('@/client/pages/home/HomePage').then(m => ({ default: m.HomePage })))
+const ProductionsPage = lazy(() => import('@/client/pages/workspace/WorkspacePages').then(m => ({ default: m.ProductionsPage })))
+const AutomationsPage = lazy(() => import('@/client/pages/workspace/WorkspacePages').then(m => ({ default: m.AutomationsPage })))
+const CommandPalette = lazy(() => import('@/client/components/common/CommandPalette').then(m => ({ default: m.CommandPalette })))
 const AccountDialog = lazy(() => import('@/client/pages/account/AccountPage').then(m => ({ default: m.AccountDialog })))
 
 const isDev = import.meta.env.DEV
 
 function PageFallback() {
   return (
-    <div className="surface-base flex min-h-screen items-center justify-center">
+    <div className="surface-base flex h-full min-h-48 items-center justify-center">
       <div className="text-center animate-fade-in">
         <h1 className="gradient-primary-text text-4xl font-bold tracking-tight">Hivekeep</h1>
       </div>
@@ -50,6 +57,7 @@ interface OnboardingStatus {
   hasAdmin: boolean
   hasLlm: boolean
   hasEmbedding: boolean
+  bootstrapPending?: boolean
 }
 
 function AppRoot() {
@@ -73,7 +81,7 @@ function AppRoot() {
 
   useEffect(() => {
     checkOnboarding()
-  }, [checkOnboarding])
+  }, [checkOnboarding, isAuthenticated])
 
   // Warm the registry's name→domain map once. The lib falls back to 'mcp'
   // while this is in-flight; first paint may briefly show generic badges
@@ -128,10 +136,11 @@ function AppRoot() {
   // The provider/default-model questionnaire that used to live here moved
   // to the dashboard's setup checklist; first-time users land on a usable
   // app immediately and configure capabilities at their own pace.
-  if (onboardingStatus && !onboardingStatus.hasAdmin) {
+  if (onboardingStatus && (!onboardingStatus.hasAdmin || (isAuthenticated && onboardingStatus.bootstrapPending))) {
     return (
       <Suspense fallback={<PageFallback />}>
         <OnboardingPage
+          initialStep={onboardingStatus.hasAdmin ? 2 : 1}
           onComplete={async () => {
             await refetch()
             await checkOnboarding()
@@ -168,16 +177,14 @@ function AppRoot() {
 // this div into the containing block for @dnd-kit's DragOverlay (also
 // position: fixed), offsetting drag ghosts.
 function AuthenticatedShell() {
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsInitialSection, setSettingsInitialSection] = useState<string | undefined>()
-  const [settingsFilters, setSettingsFilters] = useState<{ agentId?: string } | undefined>()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user } = useAuth()
   const [accountOpen, setAccountOpen] = useState(false)
-
   const handleOpenSettings = useCallback((section?: string, filters?: { agentId?: string }) => {
-    setSettingsInitialSection(section)
-    setSettingsFilters(filters)
-    setSettingsOpen(true)
-  }, [])
+    const current = window.location.pathname + window.location.search
+    navigate(settingsUrl(section, filters), { state: { returnTo: current.startsWith('/settings') ? '/agents' : current } })
+  }, [navigate])
 
   const handleOpenAccount = useCallback(() => setAccountOpen(true), [])
 
@@ -190,13 +197,13 @@ function AuthenticatedShell() {
     const connected = params.get('email_connected')
     const error = params.get('email_error')
     if (!connected && !error) return
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash)
     if (connected) {
       toast.success(t('settings.emailAccounts.connectedToast', { email: connected }))
       handleOpenSettings('emailAccounts')
     } else if (error) {
       toast.error(decodeURIComponent(error))
     }
-    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash)
   }, [t, handleOpenSettings])
 
   return (
@@ -213,46 +220,49 @@ function AuthenticatedShell() {
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <ActivityBar />
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <ConnectionBanner />
+            <div className="min-h-0 flex-1">
+            <ErrorBoundary key={location.pathname} compact>
             <Suspense fallback={<PageFallback />}>
               <Routes>
+                <Route path="/" element={<HomePage onOpenSettings={handleOpenSettings} />} />
+                <Route path="/agents" element={<ChatPage onOpenSettings={handleOpenSettings} onOpenAccount={handleOpenAccount} />} />
+                <Route path="/agent/:slug/*" element={<ChatPage onOpenSettings={handleOpenSettings} onOpenAccount={handleOpenAccount} />} />
                 <Route path="/tasks" element={<TasksPage />} />
-                <Route path="/crons" element={<CronsPage />} />
-                <Route path="/files" element={<FilesPage />} />
-                <Route path="/files/:agentId" element={<FilesPage />} />
-                <Route path="/files/:sourceType/:sourceId" element={<FilesPage />} />
-                <Route path="/mini-apps" element={<MiniAppsPage />} />
-                <Route path="/models" element={<ModelRegistryPage />} />
-                <Route path="/terminal" element={<TerminalPage />} />
-                <Route
-                  path="*"
-                  element={
-                    <ChatPage
-                      onOpenSettings={handleOpenSettings}
-                      onOpenAccount={handleOpenAccount}
-                    />
-                  }
-                />
+                <Route path="/crons" element={<Navigate to="/automations/plans" replace />} />
+                <Route path="/automations" element={<Navigate to="/automations/plans" replace />} />
+                <Route path="/automations/plans" element={<AutomationsPage />} />
+                <Route path="/automations/webhooks" element={<AutomationsPage section="webhooks" />} />
+                <Route path="/automations/emailAccounts" element={<AutomationsPage section="emailAccounts" />} />
+                <Route path="/files" element={<ProductionsPage><FilesPage /></ProductionsPage>} />
+                <Route path="/files/:agentId" element={<ProductionsPage><FilesPage /></ProductionsPage>} />
+                <Route path="/files/:sourceType/:sourceId" element={<ProductionsPage><FilesPage /></ProductionsPage>} />
+                <Route path="/productions" element={<Navigate to="/productions/apps" replace />} />
+                <Route path="/productions/apps" element={<ProductionsPage />} />
+                <Route path="/mini-apps" element={<Navigate to="/productions/apps" replace />} />
+                <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
+                <Route path="/settings/:section" element={<SettingsPage />} />
+                <Route path="/models" element={user?.role === 'admin' ? <ModelRegistryPage /> : <UnavailablePage />} />
+                <Route path="/terminal" element={user?.role === 'admin' ? <TerminalPage /> : <UnavailablePage />} />
+                <Route path="*" element={<UnavailablePage />} />
               </Routes>
             </Suspense>
+            </ErrorBoundary>
+            </div>
           </div>
         </div>
-
-        {/* Global modals — rendered once, survive navigation */}
+        <ActivityBar mobile />
         <Suspense fallback={null}>
-          <SettingsModal
-            open={settingsOpen}
-            onOpenChange={setSettingsOpen}
-            initialSection={settingsInitialSection}
-            initialFilters={settingsFilters}
-          />
+          <CommandPalette agents={[]} onSelectAgent={slug => navigate(`/agent/${slug}`)} onCreateAgent={() => navigate('/agents?create=1')} onOpenSettings={handleOpenSettings} />
         </Suspense>
-        <Suspense fallback={null}>
+
+        {accountOpen && <Suspense fallback={null}>
           <AccountDialog
             open={accountOpen}
             onOpenChange={setAccountOpen}
           />
-        </Suspense>
+        </Suspense>}
 
         {/* Shared update dialog + full-screen self-update overlay (global) */}
         <GlobalUpdateDialog />
@@ -265,6 +275,12 @@ function AuthenticatedShell() {
     </SidePanelProvider>
     </TooltipProvider>
   )
+}
+
+function UnavailablePage() {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  return <main className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center"><h1 className="text-2xl font-semibold">{t('workspace.unavailable')}</h1><p className="text-muted-foreground">{t('workspace.unavailableDescription')}</p><button onClick={() => navigate('/')} className="mt-3 min-h-11 rounded-xl bg-primary px-5 text-primary-foreground">{t('workspace.home')}</button></main>
 }
 
 export function App() {

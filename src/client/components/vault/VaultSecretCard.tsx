@@ -98,12 +98,12 @@ export function VaultSecretCard({ secret, agentName, agentAvatarUrl, onEdit, onD
         </div>
         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           {onToggleFavorite && (
-            <Button variant="ghost" size="icon-xs" onClick={onToggleFavorite}>
+            <Button variant="ghost" size="icon-xs" onClick={onToggleFavorite} aria-label={t('settings.vault.tabFavorites')} aria-pressed={secret.isFavorite}>
               <Star className={`size-3.5 ${secret.isFavorite ? 'fill-warning text-warning' : ''}`} />
             </Button>
           )}
           {onEdit && (
-            <Button variant="ghost" size="icon-xs" onClick={onEdit}>
+            <Button variant="ghost" size="icon-xs" onClick={onEdit} aria-label={t('common.edit')}>
               <Pencil className="size-3.5" />
             </Button>
           )}

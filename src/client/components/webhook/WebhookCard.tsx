@@ -3,9 +3,10 @@ import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
 import { Switch } from '@/client/components/ui/switch'
 import { AgentBadge } from '@/client/components/common/AgentBadge'
+import { AutomationFlow } from '@/client/components/common/AutomationFlow'
 import { ConfirmDeleteButton } from '@/client/components/common/ConfirmDeleteButton'
 import { Badge } from '@/client/components/ui/badge'
-import { Pencil, Trash2, Webhook, Copy, RefreshCw, History, Filter, ListTodo } from 'lucide-react'
+import { Pencil, Webhook, Copy, RefreshCw, History, Filter, ListTodo } from 'lucide-react'
 import { cn } from '@/client/lib/utils'
 import { useCopyToClipboard } from '@/client/hooks/useCopyToClipboard'
 import type { WebhookSummary } from '@/shared/types'
@@ -23,14 +24,10 @@ export function WebhookCard({ webhook, onEdit, onDelete, onToggle, onRegenerateT
   const { t } = useTranslation()
   const { copy } = useCopyToClipboard()
 
-  const formattedLastTriggered = webhook.lastTriggeredAt
-    ? new Date(webhook.lastTriggeredAt).toLocaleString()
-    : t('settings.webhooks.never')
-
   return (
     <Card className={cn("surface-card transition-opacity", !webhook.isActive && "opacity-60")}>
-      <CardContent className="flex items-center justify-between py-3 px-4">
-        <div className="flex items-center gap-3 min-w-0">
+      <CardContent className="flex flex-col items-stretch gap-3 py-3 px-4 sm:flex-row sm:items-start">
+        <div className="flex flex-1 items-start gap-3 min-w-0">
           <div className="shrink-0">
             <Webhook className={cn("size-5", webhook.isActive ? "text-info" : "text-muted-foreground")} />
           </div>
@@ -55,7 +52,17 @@ export function WebhookCard({ webhook, onEdit, onDelete, onToggle, onRegenerateT
             {webhook.description && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">{webhook.description}</p>
             )}
-            <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
+            <AutomationFlow
+              className="mt-2"
+              trigger={t(webhook.filterMode ? 'workspace.automationsFlow.filteredRequest' : 'workspace.automationsFlow.incomingRequest')}
+              agent={webhook.agentName}
+              action={t(webhook.dispatchMode === 'task' ? 'workspace.automationsFlow.createTask' : 'workspace.automationsFlow.sendMessage')}
+              actionDetail={webhook.dispatchMode === 'task' ? webhook.taskTitleTemplate : null}
+              destination={t(webhook.dispatchMode === 'task' ? 'workspace.automationsFlow.reportTo' : 'workspace.automationsFlow.conversationOf', { name: webhook.agentName })}
+              lastTriggeredAt={webhook.lastTriggeredAt}
+              next={t(webhook.isActive ? 'workspace.automationsFlow.nextRequest' : 'workspace.automationsFlow.paused')}
+            />
+            <div className="flex flex-wrap items-center gap-3 mt-1 text-[11px] text-muted-foreground">
               {webhook.filteredCount > 0 ? (
                 <>
                   <span>{t('settings.webhooks.statsReceived', { count: webhook.triggerCount })}</span>
@@ -65,15 +72,15 @@ export function WebhookCard({ webhook, onEdit, onDelete, onToggle, onRegenerateT
               ) : (
                 <span>{t('settings.webhooks.triggerCount', { count: webhook.triggerCount })}</span>
               )}
-              <span>{t('settings.webhooks.lastTriggered')}: {formattedLastTriggered}</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center justify-end gap-1 shrink-0">
           {onToggle && (
             <Switch
               size="sm"
               checked={webhook.isActive}
+              aria-label={t('workspace.automationsFlow.toggle', { name: webhook.name })}
               onCheckedChange={(checked) => onToggle(checked)}
             />
           )}
@@ -91,7 +98,7 @@ export function WebhookCard({ webhook, onEdit, onDelete, onToggle, onRegenerateT
             </Button>
           )}
           {onEdit && (
-            <Button variant="ghost" size="icon-xs" onClick={onEdit}>
+            <Button variant="ghost" size="icon-xs" onClick={onEdit} aria-label={t('common.edit')}>
               <Pencil className="size-3.5" />
             </Button>
           )}

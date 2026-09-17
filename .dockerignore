@@ -33,7 +33,8 @@ test-results/
 docker/docker-compose.yml
 
 # Misc
-scripts/
+scripts/*
+!scripts/backup.ts
 
 # Local-only secrets / tokens / exported context (never belong in any layer)
 npm_token

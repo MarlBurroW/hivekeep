@@ -549,6 +549,7 @@ function DetailTable({ rows, loading, page, totalCount, onPageChange, agentMap, 
             className="h-7 w-7 p-0"
             disabled={page === 0}
             onClick={() => onPageChange(page - 1)}
+            aria-label={t('common.previous')}
           >
             <ChevronLeft className="size-4" />
           </Button>
@@ -559,6 +560,7 @@ function DetailTable({ rows, loading, page, totalCount, onPageChange, agentMap, 
             className="h-7 w-7 p-0"
             disabled={page >= totalPages - 1}
             onClick={() => onPageChange(page + 1)}
+            aria-label={t('common.next')}
           >
             <ChevronRight className="size-4" />
           </Button>

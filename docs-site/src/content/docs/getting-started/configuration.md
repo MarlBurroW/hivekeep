@@ -36,7 +36,7 @@ When using Docker, mount a volume to `/app/data` to persist data across containe
 
 | Variable | Default | Description |
 |---|---|---|
-| `HISTORY_TOKEN_BUDGET` | `40000` | Max tokens for conversation history in context |
+| `HISTORY_TOKEN_BUDGET` | `0` | Emergency history token cap; `0` disables this cap (compaction still applies) |
 
 ## Custom tools
 
@@ -57,8 +57,25 @@ When using Docker, mount a volume to `/app/data` to persist data across containe
 
 | Variable | Default | Description |
 |---|---|---|
+| `MAX_REQUEST_BODY_MB` | `256` | HTTP request envelope in MB, including multipart overhead (maximum 1024) |
+| `FILE_STORAGE_MAX_SIZE` | `128` | Maximum MB per stored file (maximum 1024) |
 | `UPLOAD_CHANNEL_RETENTION_DAYS` | `30` | Channel file retention period in days |
 | `UPLOAD_CHANNEL_CLEANUP_INTERVAL` | `60` | Channel file cleanup interval in minutes |
+
+Legacy `0` values for HTTP, stored-file and workspace-upload size limits now use
+their finite defaults and emit a startup warning. Increase the HTTP envelope
+limit as well as the file limit when allowing larger uploads.
+
+## Graceful shutdown
+
+| Variable | Default | Description |
+|---|---|---|
+| `SHUTDOWN_DRAIN_TIMEOUT_MS` | `20000` | Time allowed for active work after stopping new admissions |
+| `SHUTDOWN_CLEANUP_TIMEOUT_MS` | `5000` | Deadline for abort settling and resource cleanup |
+
+SIGTERM and SIGINT stop schedulers and new work before draining existing turns.
+Pending inputs survive restart. Work still running after the deadline is
+interrupted; external actions are not guaranteed to execute exactly once.
 
 ## Workspace files (Files section)
 
@@ -67,7 +84,7 @@ Limits of the [Files workspace browser](/docs/features/files/).
 | Variable | Default | Description |
 |---|---|---|
 | `WORKSPACE_FILES_MAX_EDITABLE_SIZE` | `5` | Max size (MB) of a text file editable in the browser; above this it becomes download-only |
-| `WORKSPACE_FILES_MAX_UPLOAD_SIZE` | `100` | Max size (MB) per file uploaded to a workspace (`0` = unlimited) |
+| `WORKSPACE_FILES_MAX_UPLOAD_SIZE` | `100` | Max size (MB) per workspace upload; legacy `0` uses the finite default |
 | `WORKSPACE_FILES_MAX_COPY_SIZE` | `500` | Byte budget (MB) of a recursive folder copy |
 | `WORKSPACE_FILES_COPY_MAX_ENTRIES` | `5000` | Entry-count budget of a recursive folder copy |
 | `WORKSPACE_FILES_SEARCH_MAX_RESULTS` | `50` | Hard cap on file-search results |
@@ -78,9 +95,9 @@ Limits of the [Files workspace browser](/docs/features/files/).
 | Variable | Default | Description |
 |---|---|---|
 | `HIVEKEEP_VERSION` | *(auto-detected)* | Explicit version override. Read from `package.json` by default. In Docker, automatically set by the entrypoint. Only needed if version detection fails. |
-| `VERSION_CHECK_ENABLED` | `false` | Enable automatic version checking against GitHub releases |
+| `VERSION_CHECK_ENABLED` | `true` | Enable automatic version checking against GitHub releases |
 | `VERSION_CHECK_REPO` | `MarlBurroW/hivekeep` | GitHub repo to check for new releases |
-| `VERSION_CHECK_INTERVAL_HOURS` | `12` | Hours between version checks |
+| `VERSION_CHECK_INTERVAL_HOURS` | `1` | Hours between version checks |
 
 ## Advanced options
 

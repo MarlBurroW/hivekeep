@@ -85,7 +85,7 @@ await ctx.storage.clear()
 
 ### `ctx.http`
 
-A sandboxed HTTP client. Only URLs matching declared `permissions` (`http:*.example.com`) are allowed. Attempts to access undeclared hosts throw a `PluginPermissionError` (its `code` is `PLUGIN_PERMISSION_DENIED`). Note that only `ctx.http.fetch` is gated; a raw `globalThis.fetch` from plugin code is not sandboxed.
+An HTTP client that checks declared `permissions` (`http:*.example.com`). Attempts to access undeclared hosts throw a `PluginPermissionError` (its `code` is `PLUGIN_PERMISSION_DENIED`). Only `ctx.http.fetch` is gated; raw `globalThis.fetch` and filesystem access from plugin code are not sandboxed.
 
 ```typescript
 interface PluginHTTPClient {

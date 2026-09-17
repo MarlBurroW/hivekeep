@@ -270,10 +270,14 @@ export function AgentFormModal({
 
   // Form state
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'general')
+  const [showAdvanced, setShowAdvanced] = useState(initialTab === 'thinking' || initialTab === 'compaction')
 
   // Land on the requested tab each time the modal opens.
   useEffect(() => {
-    if (open) setActiveTab(initialTab ?? 'general')
+    if (open) {
+      setActiveTab(initialTab ?? 'general')
+      setShowAdvanced(initialTab === 'thinking' || initialTab === 'compaction')
+    }
   }, [open, initialTab])
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -643,7 +647,9 @@ export function AgentFormModal({
     try {
       const { scoutModel: effectiveScoutModel, scoutProviderId: effectiveScoutProviderId } = normalizeScoutPair(scoutModel, scoutProviderId)
       const created = await onCreateAgent({ name, slug: slug || undefined, role, character, expertise, model, providerId, scoutModel: effectiveScoutModel, scoutProviderId: effectiveScoutProviderId, scoutThinkingConfig: choiceToConfig(scoutThinking), toolboxIds })
-      if (avatarFile) await onUploadAvatar(created.id, avatarFile)
+      if (avatarFile) {
+        try { await onUploadAvatar(created.id, avatarFile) } catch (error) { toastError(error) }
+      }
       resetDirty()
       onOpenChange(false)
     } catch (err: unknown) {
@@ -790,7 +796,20 @@ export function AgentFormModal({
                     {t('agent.wizard.subtitle')}
                   </p>
 
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {([
+                      ['experience.agent.templateResearch', 'A research assistant who compares sources and prepares concise summaries.'],
+                      ['experience.agent.templatePlanning', 'An assistant who helps me plan my projects and follow up on next steps.'],
+                      ['experience.agent.templateWriting', 'A writing partner who helps me draft, revise and translate clear texts.'],
+                    ] as const).map(([key, fallback], index) => (
+                      <Button key={key} type="button" variant="outline" size="sm" disabled={isGenerating} onClick={() => setWizardDescription(t(key, fallback))}>
+                        {t(['experience.agent.research', 'experience.agent.planning', 'experience.agent.writing'][index]!, ['Research', 'Planning', 'Writing'][index]!)}
+                      </Button>
+                    ))}
+                  </div>
+
                   <Textarea
+                    aria-label={t('agent.wizard.subtitle')}
                     value={wizardDescription}
                     onChange={(e) => setWizardDescription(e.target.value)}
                     placeholder={t('agent.wizard.placeholder')}
@@ -808,7 +827,8 @@ export function AgentFormModal({
                   />
 
                   {hasLlm && (
-                    <div className="space-y-1.5">
+                    <details className="space-y-1.5">
+                      <summary className="cursor-pointer text-sm text-muted-foreground">{t('experience.agent.generationOptions', 'Generation options')}</summary>
                       <label className="text-xs font-medium text-muted-foreground">
                         {t('agent.wizard.genModelLabel')}
                       </label>
@@ -820,7 +840,7 @@ export function AgentFormModal({
                         disabled={isGenerating}
                         isLoading={llmModels.length === 0}
                       />
-                    </div>
+                    </details>
                   )}
 
                   <FormErrorAlert error={error} animate />
@@ -925,14 +945,15 @@ export function AgentFormModal({
                   {/* Left sidebar navigation */}
                   <nav className="shrink-0 border-b surface-sidebar overflow-x-auto px-3 py-2 sm:w-40 sm:border-b-0 sm:border-r sm:overflow-y-auto sm:py-4 md:w-48">
                     <ul className="flex w-full min-w-0 flex-row gap-1 sm:flex-col">
-                      {TABS.map(({ id, icon: Icon, labelKey }) => (
+                      {TABS.filter(({ id }) => showAdvanced || (id !== 'compaction' && id !== 'thinking')).map(({ id, icon: Icon, labelKey }) => (
                         <li key={id} className="shrink-0 sm:shrink">
                           <button
                             type="button"
                             onClick={() => setActiveTab(id)}
                             data-active={activeTab === id}
+                            aria-current={activeTab === id ? 'page' : undefined}
                             className={cn(
-                              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors',
+                              'flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-2 text-sm outline-none transition-colors',
                               'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                               activeTab === id
                                 ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
@@ -940,10 +961,16 @@ export function AgentFormModal({
                             )}
                           >
                             <Icon className="size-4 shrink-0" />
-                            <span className="truncate">{t(labelKey)}</span>
+                            <span className="truncate">{id === 'general' ? t('experience.agent.identity', 'Identity') : id === 'tools' ? t('experience.agent.capabilities', 'Capabilities') : t(labelKey)}</span>
                           </button>
                         </li>
                       ))}
+                      <li className="shrink-0">
+                        <Button variant="ghost" type="button" className="min-h-11 w-full justify-start" aria-expanded={showAdvanced} onClick={() => {
+                          if (showAdvanced && (activeTab === 'thinking' || activeTab === 'compaction')) setActiveTab('general')
+                          setShowAdvanced((value) => !value)
+                        }}>{t('experience.agent.advanced', 'Advanced settings')}</Button>
+                      </li>
                     </ul>
                   </nav>
 
@@ -1031,6 +1058,7 @@ export function AgentFormModal({
                             <button
                               type="button"
                               onClick={() => setShowAvatarPicker(true)}
+                              aria-label={t('experience.changeAvatar', 'Change avatar')}
                               className="group relative shrink-0"
                             >
                               <Avatar className="size-20 ring-2 ring-border transition-all group-hover:ring-primary">
@@ -1053,7 +1081,7 @@ export function AgentFormModal({
 
                             {/* Name, Role & Model */}
                             <div className="w-full flex-1 space-y-4">
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <FormField
                                   label={t('agent.create.name')}
                                   htmlFor="agentFormName"
@@ -1082,19 +1110,10 @@ export function AgentFormModal({
                                     required
                                   />
                                 </FormField>
-                                <FormField
-                                  label={t('agent.create.model')}
-                                  tip={t('agent.create.modelTip')}
-                                  required={!isEdit}
-                                >
-                                  <ModelPicker
-                                    models={llmModels}
-                                    value={modelPickerValue(model, providerId ?? '')}
-                                    onValueChange={(modelId, pid) => { setModel(modelId); setProviderId(pid || null); markDirty() }}
-                                    placeholder={t('agent.create.modelPlaceholder')}
-                                  />
-                                </FormField>
+
                               </div>
+                              <details className="space-y-3">
+                                <summary className="cursor-pointer text-sm text-muted-foreground">{t('experience.agent.linkOptions', 'Conversation link')}</summary>
                               <FormField
                                 label={t('agent.edit.slug')}
                                 htmlFor="agentFormSlug"
@@ -1107,6 +1126,7 @@ export function AgentFormModal({
                                   placeholder={t('agent.create.slugPlaceholder')}
                                 />
                               </FormField>
+                              </details>
                             </div>
                           </div>
 
@@ -1138,11 +1158,25 @@ export function AgentFormModal({
 
                           {/* Total system prompt token estimate */}
                           {(character.length > 0 || expertise.length > 0) && (
-                            <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground/70 pt-1 border-t border-border/40">
+                            <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground pt-1 border-t border-border/40">
                               <span>{t('agent.create.totalPromptTokens', { tokens: Math.ceil((character.length + expertise.length) / 4) })}</span>
                             </div>
                           )}
 
+                          <details className="space-y-4 rounded-lg border p-3" open={!model ? true : undefined}>
+                            <summary className="cursor-pointer text-sm font-medium">{t('experience.agent.advancedModels', 'Advanced model settings')}</summary>
+                                <FormField
+                                  label={t('agent.create.model')}
+                                  tip={t('agent.create.modelTip')}
+                                  required={!isEdit}
+                                >
+                                  <ModelPicker
+                                    models={llmModels}
+                                    value={modelPickerValue(model, providerId ?? '')}
+                                    onValueChange={(modelId, pid) => { setModel(modelId); setProviderId(pid || null); markDirty() }}
+                                    placeholder={t('agent.create.modelPlaceholder')}
+                                  />
+                                </FormField>
                           {/* Scout model — cheap, fast model the `scout` tool
                               delegates heavy read-only exploration to. Clearing
                               it (the "inherit" option) falls back to the
@@ -1183,6 +1217,8 @@ export function AgentFormModal({
                                 : undefined}
                             />
                           </FormField>
+
+                          </details>
 
                           {/* Per-tab Save (edit mode only) */}
                           {isEdit && (

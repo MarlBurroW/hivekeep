@@ -6,7 +6,8 @@ import * as schema from '@/server/db/schema'
 // Skip when another suite has globally mocked the schema to stubs (mock.module
 // is process-global): real columns are required for the in-memory CRUD here.
 const schemaIsReal = !!(schema as { apiClients?: { id?: unknown } }).apiClients?.id
-const d = schemaIsReal ? describe : describe.skip
+if (!schemaIsReal) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const d = describe
 
 const sqlite = new Database(':memory:')
 sqlite.run(`CREATE TABLE api_clients (

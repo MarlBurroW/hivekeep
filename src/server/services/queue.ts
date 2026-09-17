@@ -1,38 +1,19 @@
-import { eq, and, desc, asc } from 'drizzle-orm'
+import { eq, and, desc, asc, isNull, inArray } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db, sqlite } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
-import { queueItems } from '@/server/db/schema'
+import { queueItems, files } from '@/server/db/schema'
 import { config } from '@/server/config'
 import { sseManager } from '@/server/sse/index'
+import { QueueAttachmentConflictError } from './queue-errors'
 
 const log = createLogger('queue')
 
-/** In-memory sideband for file IDs attached to queue items (single-process, lost on restart — files stay orphaned but harmless) */
-const queueFileIds = new Map<string, string[]>()
-
-/**
- * In-memory sideband for the client-generated reconciliation token attached to
- * a queue item. Echoed back over SSE (chat:message) when the user message is
- * persisted, so the originating web client can match the broadcast to its own
- * optimistic bubble (and other devices simply append it). This is NOT the
- * message primary key. Single-process, lost on restart (harmless — on a
- * restart the originating optimistic bubble is gone anyway).
- */
-const queueClientMessageId = new Map<string, string>()
-
-/**
- * In-memory sideband for free-form structured metadata attached to queue items
- * (e.g. channel adapter context like modality, presence, channel info).
- * Read once by the agent-engine when persisting the user message and merged
- * into messages.metadata. Single-process, lost on restart.
- */
-const queueMessageMetadata = new Map<string, Record<string, unknown>>()
-
+/** Kept for existing callers; metadata is durable and intentionally not consumed.
+ * A crash after reading it must leave the same envelope for the next attempt. */
 export function popQueueMessageMetadata(itemId: string): Record<string, unknown> | undefined {
-  const meta = queueMessageMetadata.get(itemId)
-  if (meta) queueMessageMetadata.delete(itemId)
-  return meta
+  return db.select({ metadata: queueItems.messageMetadata }).from(queueItems)
+    .where(eq(queueItems.id, itemId)).get()?.metadata ?? undefined
 }
 
 export interface EnqueueParams {
@@ -74,28 +55,54 @@ export async function enqueueMessage(params: EnqueueParams) {
   const id = params.id ?? uuid()
   const priority = params.priority ?? (params.sourceType === 'user' ? config.queue.userPriority : config.queue.agentPriority)
 
-  await db.insert(queueItems).values({
-    id,
-    agentId: params.agentId,
-    messageType: params.messageType,
-    content: params.content,
-    sourceType: params.sourceType,
-    sourceId: params.sourceId,
-    priority,
-    requestId: params.requestId,
-    inReplyTo: params.inReplyTo,
-    taskId: params.taskId,
-    sessionId: params.sessionId,
-    channelOriginId: params.channelOriginId ?? null,
-    status: 'pending',
-    createdAt: new Date(),
-  })
+  // Claim uploads and publish the envelope together. Route checks alone race:
+  // two sends can both see an unsent file before either worker links it.
+  sqlite.transaction(() => {
+    if (params.sourceType === 'user' && params.fileIds?.length) {
+      const ids = params.fileIds
+      if (new Set(ids).size !== ids.length || ids.length > 10) throw new QueueAttachmentConflictError()
+      const attachments = db.select().from(files).where(inArray(files.id, ids)).all()
+      if (attachments.length !== ids.length || attachments.some((file) =>
+        file.agentId !== params.agentId || file.uploadedBy !== params.sourceId || file.messageId
+        || (file.sessionId && file.sessionId !== params.sessionId))) {
+        throw new QueueAttachmentConflictError()
+      }
+      for (const fileId of ids) {
+        const reserved = sqlite.query<{ id: string }, [string]>(`
+          SELECT q.id FROM queue_items q, json_each(q.file_ids) f
+          WHERE q.status IN ('pending', 'processing') AND f.value = ? LIMIT 1
+        `).get(fileId)
+        if (reserved) throw new QueueAttachmentConflictError()
+      }
+      db.update(files).set({ sessionId: params.sessionId ?? null }).where(inArray(files.id, ids)).run()
+    }
+    db.insert(queueItems).values({
+      id,
+      agentId: params.agentId,
+      messageType: params.messageType,
+      content: params.content,
+      sourceType: params.sourceType,
+      sourceId: params.sourceId,
+      priority,
+      requestId: params.requestId,
+      inReplyTo: params.inReplyTo,
+      taskId: params.taskId,
+      sessionId: params.sessionId,
+      channelOriginId: params.channelOriginId ?? null,
+      fileIds: params.fileIds?.length ? params.fileIds : null,
+      clientMessageId: params.clientMessageId ?? null,
+      messageMetadata: params.messageMetadata ?? null,
+      status: 'pending',
+      createdAt: new Date(),
+    }).run()
+  }).immediate()
 
   // Compute queue position
   const pending = await db
     .select()
     .from(queueItems)
-    .where(and(eq(queueItems.agentId, params.agentId), eq(queueItems.status, 'pending')))
+    .where(and(eq(queueItems.agentId, params.agentId), eq(queueItems.status, 'pending'),
+      params.sessionId ? eq(queueItems.sessionId, params.sessionId) : isNull(queueItems.sessionId)))
     .all()
 
   const queuePosition = pending.length
@@ -109,23 +116,9 @@ export async function enqueueMessage(params: EnqueueParams) {
   sseManager.sendToAgent(params.agentId, {
     type: 'queue:update',
     agentId: params.agentId,
-    data: { agentId: params.agentId, queueSize: queuePosition, isProcessing: processing },
+    data: { agentId: params.agentId, queueSize: queuePosition, isProcessing: processing,
+      ...(params.sessionId ? { sessionId: params.sessionId } : {}) },
   })
-
-  // Store file IDs in sideband map for later retrieval by agent-engine
-  if (params.fileIds && params.fileIds.length > 0) {
-    queueFileIds.set(id, params.fileIds)
-  }
-
-  // Store the client reconciliation token in sideband for later echo over SSE
-  if (params.clientMessageId) {
-    queueClientMessageId.set(id, params.clientMessageId)
-  }
-
-  // Store free-form message metadata in sideband for later retrieval by agent-engine
-  if (params.messageMetadata && Object.keys(params.messageMetadata).length > 0) {
-    queueMessageMetadata.set(id, params.messageMetadata)
-  }
 
   log.debug({ agentId: params.agentId, itemId: id, messageType: params.messageType, sourceType: params.sourceType, queuePosition }, 'Message enqueued')
 
@@ -162,6 +155,9 @@ export async function dequeueMessage(agentId: string, mode: 'main' | 'quick' = '
     channel_origin_id: string | null
     status: string
     created_message_id: string | null
+    file_ids: string | null
+    client_message_id: string | null
+    message_metadata: string | null
     created_at: number
     processed_at: number | null
   }, [number, string]>(`
@@ -177,14 +173,6 @@ export async function dequeueMessage(agentId: string, mode: 'main' | 'quick' = '
   `).get(Date.now(), agentId)
 
   if (!row) return null
-
-  // Pop file IDs from sideband map (one-shot — consumed on dequeue)
-  const fileIds = queueFileIds.get(row.id)
-  if (fileIds) queueFileIds.delete(row.id)
-
-  // Pop client reconciliation token from sideband (one-shot — consumed on dequeue)
-  const clientMessageId = queueClientMessageId.get(row.id)
-  if (clientMessageId) queueClientMessageId.delete(row.id)
 
   return {
     id: row.id,
@@ -203,8 +191,8 @@ export async function dequeueMessage(agentId: string, mode: 'main' | 'quick' = '
     createdMessageId: row.created_message_id,
     createdAt: new Date(row.created_at),
     processedAt: row.processed_at ? new Date(row.processed_at) : null,
-    fileIds: fileIds ?? null,
-    clientMessageId: clientMessageId ?? null,
+    fileIds: row.file_ids ? JSON.parse(row.file_ids) as string[] : null,
+    clientMessageId: row.client_message_id,
   }
 }
 
@@ -246,26 +234,26 @@ export async function isAgentProcessing(agentId: string, mode: 'main' | 'quick' 
 }
 
 /**
- * Get the queue size for an Agent.
+ * Get the shared conversation queue size (private sessions have their own lane).
  */
 export async function getQueueSize(agentId: string): Promise<number> {
   const pending = await db
     .select()
     .from(queueItems)
-    .where(and(eq(queueItems.agentId, agentId), eq(queueItems.status, 'pending')))
+    .where(and(eq(queueItems.agentId, agentId), eq(queueItems.status, 'pending'), isNull(queueItems.sessionId)))
     .all()
 
   return pending.length
 }
 
 /**
- * List pending queue items for an Agent (ordered by priority DESC, creation time ASC).
+ * List shared pending items only; session ownership is enforced by session APIs.
  */
 export async function getPendingQueueItems(agentId: string) {
   const rows = await db
     .select()
     .from(queueItems)
-    .where(and(eq(queueItems.agentId, agentId), eq(queueItems.status, 'pending')))
+    .where(and(eq(queueItems.agentId, agentId), eq(queueItems.status, 'pending'), isNull(queueItems.sessionId)))
     .orderBy(desc(queueItems.priority), asc(queueItems.createdAt))
     .all()
 
@@ -286,17 +274,11 @@ export async function getPendingQueueItems(agentId: string) {
  */
 export async function removeQueueItem(agentId: string, itemId: string): Promise<boolean> {
   const result = sqlite.run(
-    `DELETE FROM queue_items WHERE id = ? AND agent_id = ? AND status = 'pending'`,
+    `DELETE FROM queue_items WHERE id = ? AND agent_id = ? AND status = 'pending' AND session_id IS NULL`,
     [itemId, agentId],
   )
 
   if (result.changes > 0) {
-    // Clean up ALL sideband maps — leaving the other two behind leaked one
-    // entry per removed item for the life of the process.
-    queueFileIds.delete(itemId)
-    queueClientMessageId.delete(itemId)
-    queueMessageMetadata.delete(itemId)
-
     // Emit updated queue state
     const size = await getQueueSize(agentId)
     const processing = await isAgentProcessing(agentId)

@@ -68,14 +68,16 @@ export const HumanPromptCard = memo(function HumanPromptCard({
   const [textValue, setTextValue] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const handleConfirm = async (value: string) => {
+  const submitResponse = useCallback(async (value: unknown) => {
     setSubmitted(true)
-    await onRespond(prompt.id, value)
-  }
+    try { await onRespond(prompt.id, value) }
+    catch { setSubmitted(false) } // The caller reports the error; keep the answer retryable.
+  }, [onRespond, prompt.id])
+
+  const handleConfirm = submitResponse
 
   const handleSelect = async (value: string) => {
-    setSubmitted(true)
-    await onRespond(prompt.id, value)
+    await submitResponse(value)
   }
 
   const toggleMultiSelect = (value: string) => {
@@ -89,22 +91,19 @@ export const HumanPromptCard = memo(function HumanPromptCard({
 
   const handleMultiSelectSubmit = async () => {
     if (selectedValues.size === 0) return
-    setSubmitted(true)
-    await onRespond(prompt.id, Array.from(selectedValues))
+    await submitResponse(Array.from(selectedValues))
   }
 
   /** tool_access submit — an EMPTY array is valid and means "deny all". */
   const handleToolAccessSubmit = async (values: string[]) => {
-    setSubmitted(true)
-    await onRespond(prompt.id, values)
+    await submitResponse(values)
   }
 
   const handleTextSubmit = useCallback(async () => {
     const trimmed = textValue.trim()
     if (!trimmed) return
-    setSubmitted(true)
-    await onRespond(prompt.id, trimmed)
-  }, [textValue, onRespond, prompt.id])
+    await submitResponse(trimmed)
+  }, [textValue, submitResponse])
 
   const disabled = submitted || isResponding
 

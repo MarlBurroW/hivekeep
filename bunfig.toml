@@ -1,5 +1,5 @@
 [test]
-# Default `bun test` discovers under src/ (Hivekeep core). Workspace + plugin
-# tests are run by the `test` npm script — see `package.json` — which passes
-# explicit paths so ad-hoc `bun test` invocations stay snappy.
+# Use `bun run test` for the complete suite: scripts/test.ts isolates every file
+# (including workspaces) in its own process, environment and data directory.
+# `bun test path/to/file.test.ts` remains useful for a single-file check.
 root = "./src"

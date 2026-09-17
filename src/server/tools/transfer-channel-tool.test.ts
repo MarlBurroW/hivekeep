@@ -99,6 +99,11 @@ mock.module('@/server/services/agent-resolver', () => ({
   resolveAgentByIdOrSlug: mock(() => null),
 }))
 
+mock.module('@/server/services/contacts', () => ({
+  searchContacts: mock(async () => []),
+  getContactWithDetails: mock(async () => null),
+}))
+
 mock.module('@/server/db/index', () => ({ db: {} }))
 
 mock.module('@/server/db/schema', () => ({
@@ -140,9 +145,7 @@ mock.module('drizzle-orm', () => ({
   eq: (...args: unknown[]) => args,
 }))
 
-// Import after mocks (Bun mock.module() is process-global and other test files
-// may have poisoned exports; fall back to it.skip if so, mirroring the pattern
-// used by task-tools.test.ts).
+// Import after mocks. A broken mock must fail this isolated suite, never skip it.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let transferChannelTool: any
 let _mocksWorking = false
@@ -154,7 +157,8 @@ try {
   _mocksWorking = false
 }
 
-const itMocked = _mocksWorking ? it : it.skip
+if (!_mocksWorking) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itMocked = it
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

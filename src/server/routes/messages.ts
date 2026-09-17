@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
+import { searchConversation, conversationContext } from '@/server/services/message-search'
 import { eq, and, isNull, gt, desc, inArray, sql } from 'drizzle-orm'
 import { db, sqlite } from '@/server/db/index'
 import { messages, agents, channels, channelMessageLinks, compactingSnapshots, compactingSummaries, memories as agentMemories, files, humanPrompts, messageReactions } from '@/server/db/schema'
+import { canAttachFiles } from '@/server/services/file-attachments'
 import { enqueueMessage, getPendingQueueItems, removeQueueItem, isAgentProcessing } from '@/server/services/queue'
 import { deleteMessagesCascade } from '@/server/services/message-deletion'
 import { abortAgentStream, getActiveAgentStreamSnapshot } from '@/server/services/agent-engine'
@@ -42,6 +44,10 @@ messageRoutes.post('/', async (c) => {
     return c.json({ error: { code: 'MESSAGE_TOO_LONG', message: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` } }, 400)
   }
 
+  if (fileIds && (!Array.isArray(fileIds) || !canAttachFiles(fileIds, user.id, agentId))) {
+    return c.json({ error: { code: 'INVALID_FILE_ACCESS', message: 'Only your unsent files from this conversation can be attached' } }, 403)
+  }
+
   // Enqueue the message (clean content — pseudonym prefix is added by agent-engine for LLM context)
   // fileIds are passed through the queue and linked to the actual message in agent-engine
   const { id, queuePosition } = await enqueueMessage({
@@ -80,6 +86,24 @@ messageRoutes.post('/', async (c) => {
  */
 export const VISIBLE_MESSAGE_PREDICATE =
   "(metadata IS NULL OR json_valid(metadata) = 0 OR json_extract(metadata, '$.hidden') IS NOT 1)"
+
+// Search the entire shared history without loading it into the browser.
+messageRoutes.get('/search', (c) => {
+  const agentId = resolveAgentId(c.req.param('agentId') ?? '')
+  if (!agentId) return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  const query = (c.req.query('q') ?? '').trim()
+  if (query.length < 2 || query.length > 200) return c.json({ error: { code: 'INVALID_QUERY', message: 'Use 2 to 200 characters' } }, 400)
+  const rawOffset = Number(c.req.query('offset') ?? 0)
+  if (!Number.isSafeInteger(rawOffset) || rawOffset < 0) return c.json({ error: { code: 'INVALID_CURSOR', message: 'Invalid offset' } }, 400)
+  return c.json(searchConversation(sqlite, agentId, query, 20, rawOffset))
+})
+messageRoutes.get('/context/:messageId', (c) => {
+  const agentId = resolveAgentId(c.req.param('agentId') ?? '')
+  if (!agentId) return c.json({ error: { code: 'AGENT_NOT_FOUND', message: 'Agent not found' } }, 404)
+  const rows = conversationContext(sqlite, agentId, c.req.param('messageId'))
+  if (!rows) return c.json({ error: { code: 'NOT_FOUND', message: 'Message not found' } }, 404)
+  return c.json({ messages: rows })
+})
 
 // GET /api/agents/:agentId/messages — get message history (accepts UUID or slug)
 messageRoutes.get('/', async (c) => {

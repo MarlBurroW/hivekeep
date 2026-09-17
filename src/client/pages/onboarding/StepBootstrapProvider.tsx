@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
@@ -18,6 +18,14 @@ export function StepBootstrapProvider({ onComplete }: { onComplete: () => void }
   const [dialogOpen, setDialogOpen] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState('')
+  const [existingProvider, setExistingProvider] = useState(false)
+  useEffect(() => {
+    let active = true
+    api.get<{ providers: Array<{ capabilities: string[]; isValid: boolean }> }>('/providers')
+      .then(({ providers }) => { if (active) setExistingProvider(providers.some((p) => p.isValid && p.capabilities.includes('llm'))) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   // Native LLM provider types only (a fresh install has no plugins anyway).
   const llmTypes = useMemo(
@@ -31,14 +39,13 @@ export function StepBootstrapProvider({ onComplete }: { onComplete: () => void }
     setError('')
     try {
       const { providers } = await api.get<{ providers: Array<{ id: string; capabilities: string[]; isValid: boolean }> }>('/providers')
-      const llm =
-        providers.find((p) => p.isValid && p.capabilities.includes('llm')) ??
-        providers.find((p) => p.capabilities.includes('llm'))
+      const llm = providers.find((p) => p.isValid && p.capabilities.includes('llm'))
       if (!llm) {
         setError(t('onboarding.bootstrap.noLlm', 'No LLM provider found — please connect one.'))
         setSeeding(false)
         return
       }
+      setExistingProvider(true)
       await api.post('/onboarding/configurator', { providerId: llm.id })
       onComplete()
     } catch (err) {
@@ -75,7 +82,10 @@ export function StepBootstrapProvider({ onComplete }: { onComplete: () => void }
         {t('onboarding.connectAi.why')}
       </div>
       {error && <p className="text-center text-sm text-destructive">{error}</p>}
-      <Button className="btn-shine w-full" onClick={() => setDialogOpen(true)}>
+      {existingProvider && (
+        <Button className="w-full" onClick={handleSaved}>{t('experience.onboarding.resume', 'Continue with the connected provider')}</Button>
+      )}
+      <Button variant={existingProvider ? 'outline' : 'default'} className="btn-shine w-full" onClick={() => setDialogOpen(true)}>
         {t('onboarding.bootstrap.connect', 'Connect a provider')}
       </Button>
       <ProviderFormDialog

@@ -47,6 +47,7 @@ mock.module('@/server/services/queue', () => ({
   getPendingQueueItems: async () => [],
   removeQueueItem: async () => false,
   recoverStaleProcessingItems: () => {},
+  requeueProcessingItems: () => 0,
 }))
 
 mock.module('@/server/sse/index', () => ({
@@ -70,6 +71,8 @@ mock.module('@/server/config', () => ({
     },
   },
 }))
+
+mock.module('@/server/services/tasks', () => ({ spawnTask: mock(async () => ({ id: 'task-1' })) }))
 
 const { validateToken, buildWebhookUrl } = await import('./webhooks')
 

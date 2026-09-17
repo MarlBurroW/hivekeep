@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronRight, X, RotateCcw, Sparkles, AlertCircle } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
@@ -36,6 +37,7 @@ export function SetupChecklist({
   onAction,
 }: SetupChecklistProps) {
   const { t } = useTranslation()
+  const [showOptional, setShowOptional] = useState(false)
   const { items, isLoading, isComplete, dismissItem, restoreItem } = useSetupChecklist()
 
   if (isLoading) return null
@@ -66,7 +68,7 @@ export function SetupChecklist({
       )}
 
       <div className={cn(isCompact ? 'space-y-1' : 'space-y-2')}>
-        {items.map((item) => (
+        {items.filter((item) => showOptional || item.severity !== 'optional').map((item) => (
           <SetupItemRow
             key={item.id}
             item={item}
@@ -77,6 +79,10 @@ export function SetupChecklist({
           />
         ))}
       </div>
+
+      <Button variant="ghost" size="sm" onClick={() => setShowOptional((value) => !value)} aria-expanded={showOptional}>
+        {showOptional ? t('experience.setup.hideOptional', 'Hide optional capabilities') : t('experience.setup.showOptional', 'Explore optional capabilities')}
+      </Button>
 
       {isComplete && (
         <p className={cn(

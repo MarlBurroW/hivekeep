@@ -304,7 +304,7 @@ function MessageMoreMenu({ messageId, onDeleteMessage, onRewindHere }: {
         <button
           type="button"
           className={cn(
-            'opacity-0 group-hover/msg:opacity-100 transition-opacity',
+            'opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity',
             'rounded-md p-1 hover:bg-muted/80 active:scale-95',
             'text-muted-foreground hover:text-foreground',
             'data-[state=open]:opacity-100',
@@ -348,7 +348,7 @@ function CopyMessageButton({ content, isUser }: { content: string; isUser: boole
       type="button"
       onClick={handleCopy}
       className={cn(
-        'absolute opacity-0 group-hover/msg:opacity-100 transition-opacity',
+        'absolute opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity',
         'rounded-md p-1 hover:bg-muted/80 active:scale-95',
         'text-muted-foreground hover:text-foreground',
         isUser ? '-left-8 top-1' : '-right-8 top-1',
@@ -432,7 +432,7 @@ function ReadAloudButton({ content }: { content: string }) {
       type="button"
       onClick={handleToggle}
       className={cn(
-        'opacity-0 group-hover/msg:opacity-100 transition-opacity',
+        'opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity',
         'rounded-md p-1 hover:bg-muted/80 active:scale-95',
         'text-muted-foreground hover:text-foreground',
         isSpeaking && 'opacity-100 text-primary',
@@ -459,7 +459,7 @@ function EditResendButton({ content, onEditResend }: { content: string; onEditRe
       type="button"
       onClick={handleClick}
       className={cn(
-        'absolute opacity-0 group-hover/msg:opacity-100 transition-opacity',
+        'absolute opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity',
         'rounded-md p-1 hover:bg-muted/80 active:scale-95',
         'text-muted-foreground hover:text-foreground',
         '-left-8 top-7',
@@ -482,7 +482,7 @@ function RegenerateButton({ onRegenerate }: { onRegenerate: () => void }) {
       type="button"
       onClick={onRegenerate}
       className={cn(
-        'opacity-0 group-hover/msg:opacity-100 transition-opacity',
+        'opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity',
         'rounded-md p-1 hover:bg-muted/80 active:scale-95',
         'text-muted-foreground hover:text-foreground',
       )}
@@ -552,7 +552,7 @@ function ReactionPicker({ onSelect, isUser }: { onSelect: (emoji: string) => voi
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'opacity-0 group-hover/msg:opacity-100 transition-opacity',
+          'opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity',
           'rounded-md p-1 hover:bg-muted/80 active:scale-95',
           'text-muted-foreground hover:text-foreground',
         )}
@@ -889,7 +889,7 @@ function ChannelTransferCard({
           )}
 
           {!event.at && timestamp && (
-            <RelativeTimestamp timestamp={timestamp} className="text-[10px] text-muted-foreground/70" />
+            <RelativeTimestamp timestamp={timestamp} className="text-[11px] text-muted-foreground" />
           )}
         </div>
       </div>
@@ -1063,9 +1063,9 @@ export const MessageBubble = memo(function MessageBubble({
       <MessageContextMenu content={content} isUser={false} onRegenerate={onRegenerate} onQuoteReply={onQuoteReply} onEditResend={onEditResend} messageId={messageId} onDeleteMessage={onDeleteMessage} onRewindHere={onRewindHere}>
       <div className={cn('flex gap-2 px-2.5 sm:gap-3 sm:px-4', isNew && 'animate-fade-in-up', isGrouped ? 'py-0.5' : 'py-2')}>
         {isGrouped ? (
-          <div className="size-8 shrink-0 sm:size-10 lg:size-20" />
+          <div className="size-8 shrink-0 sm:size-9" />
         ) : (
-          <ChatAvatar avatarUrl={avatarUrl} name={senderName} className="size-8 sm:size-10 lg:size-20" />
+          <ChatAvatar avatarUrl={avatarUrl} name={senderName} className="size-8 sm:size-9" />
         )}
 
         <div className="group/msg relative min-w-0 max-w-[94%] sm:max-w-[88%] md:max-w-[80%] space-y-1.5">
@@ -1144,7 +1144,7 @@ export const MessageBubble = memo(function MessageBubble({
 
               <div className="flex items-center gap-1.5">
                 {timestamp && (
-                  <RelativeTimestamp timestamp={timestamp} className="text-[10px] text-muted-foreground/70" />
+                  <RelativeTimestamp timestamp={timestamp} className="text-[11px] text-muted-foreground" />
                 )}
                 <ReadingTime content={content} />
                 {tokenUsage && <TokenUsageIndicator tokenUsage={tokenUsage} />}
@@ -1176,9 +1176,9 @@ export const MessageBubble = memo(function MessageBubble({
     >
       {isGrouped ? (
         /* Invisible spacer preserving alignment with the avatar column */
-        <div className="size-8 shrink-0 sm:size-10 lg:size-20" />
+        <div className="size-8 shrink-0 sm:size-9" />
       ) : (
-        <ChatAvatar avatarUrl={avatarUrl} name={senderName} className="size-8 sm:size-10 lg:size-20" />
+        <ChatAvatar avatarUrl={avatarUrl} name={senderName} className="size-8 sm:size-9" />
       )}
 
       <div
@@ -1231,7 +1231,7 @@ export const MessageBubble = memo(function MessageBubble({
               timestamp={timestamp}
               className={cn(
                 'text-[10px]',
-                isUser ? 'text-primary-foreground/50' : 'text-muted-foreground/70',
+                isUser ? 'text-primary-foreground/75' : 'text-muted-foreground',
               )}
             />
           )}

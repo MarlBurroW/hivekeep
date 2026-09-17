@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { count } from 'drizzle-orm'
 import { config } from '@/server/config'
+import { QueueAttachmentConflictError } from '@/server/services/queue-errors'
 import { createLogger } from '@/server/logger'
 import { db } from '@/server/db/index'
 import { agents, providers, channels, crons, memories, mcpServers, contacts, user } from '@/server/db/schema'
@@ -104,6 +105,9 @@ app.use('*', async (c, next) => {
 
 // Global error handler — ensures all unhandled exceptions return JSON, not plain text
 app.onError((err, c) => {
+  if (err instanceof QueueAttachmentConflictError) {
+    return c.json({ error: { code: 'ATTACHMENTS_UNAVAILABLE', message: err.message } }, 409)
+  }
   // A malformed request body is the CALLER's error, not a server fault: most
   // handlers call c.req.json() unguarded, and the SyntaxError it throws used
   // to surface as 500 INTERNAL_ERROR (and pollute the error logs).

@@ -1,3 +1,4 @@
+import { isShuttingDown } from '@/server/services/shutdown'
 import type { ModelMessage } from '@/server/tools/tool-helper'
 import type { Tool } from '@/server/tools/tool-helper'
 import { eq, and, desc, asc, inArray, like, or, sql, gte, lte, isNull, isNotNull } from 'drizzle-orm'
@@ -235,10 +236,10 @@ export function recoverStaleTasks() {
 
 const ACTIVE_STATUSES: TaskStatus[] = ['pending', 'in_progress', 'paused', 'awaiting_human_input', 'awaiting_agent_response', 'awaiting_subtask']
 
-async function countActiveTasksInGroup(group: string, excludeTaskId?: string): Promise<number> {
+function countActiveTasksInGroup(group: string, excludeTaskId?: string): number {
   const base = and(eq(tasks.concurrencyGroup, group), inArray(tasks.status, ACTIVE_STATUSES))
   const where = excludeTaskId ? and(base, sql`${tasks.id} != ${excludeTaskId}`) : base
-  const result = await db
+  const result = db
     .select({ count: sql<number>`count(*)` })
     .from(tasks)
     .where(where)
@@ -270,11 +271,11 @@ const EXECUTING_STATUSES: TaskStatus[] = ['pending', 'in_progress']
  *  counting itself: at the resume gate the row has already been claimed to
  *  'in_progress' (the atomic race-winner flip), so it would otherwise occupy a
  *  slot in this count and mis-report the cap. */
-async function countExecutingTasks(excludeTaskId?: string): Promise<number> {
+function countExecutingTasks(excludeTaskId?: string): number {
   const where = excludeTaskId
     ? and(inArray(tasks.status, EXECUTING_STATUSES), sql`${tasks.id} != ${excludeTaskId}`)
     : inArray(tasks.status, EXECUTING_STATUSES)
-  const result = await db
+  const result = db
     .select({ count: sql<number>`count(*)` })
     .from(tasks)
     .where(where)
@@ -302,38 +303,29 @@ async function countExecutingTasks(excludeTaskId?: string): Promise<number> {
  * row is still the one we claimed) so a racing promote/cancel can't be undone.
  */
 export async function runOrQueueResumedTask(taskId: string): Promise<boolean> {
-  const task = await db.select().from(tasks).where(eq(tasks.id, taskId)).get()
-  // If something already moved the task off in_progress (cancel, pause, a racing
-  // resolve), don't interfere — just don't run.
-  if (!task || task.status !== 'in_progress') return false
-
   const maxConcurrent = await getMaxConcurrentTasks()
-  const globalHasSlot = (await countExecutingTasks(taskId)) < maxConcurrent
-
-  let groupHasSlot = true
-  if (task.concurrencyGroup && task.concurrencyMax) {
-    // Exclude this task's own in_progress row from the group count: it's the
-    // resuming run, not a *second* concurrent run, so it must not block itself.
-    const groupActive = await countActiveTasksInGroup(task.concurrencyGroup, taskId)
-    groupHasSlot = groupActive < task.concurrencyMax
-  }
-
-  if (globalHasSlot && groupHasSlot) {
+  // No awaits inside the reservation: counts and the status decision share one
+  // SQLite write transaction with spawns and promotions.
+  const decision = sqlite.transaction(() => {
+    const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get()
+    if (!task || task.status !== 'in_progress') return null
+    const globalHasSlot = !isShuttingDown() && countExecutingTasks(taskId) < maxConcurrent
+    const groupHasSlot = !task.concurrencyGroup || !task.concurrencyMax
+      || countActiveTasksInGroup(task.concurrencyGroup, taskId) < task.concurrencyMax
+    if (globalHasSlot && groupHasSlot) return { task, run: true }
+    sqlite.run(
+      `UPDATE tasks SET status = 'queued', queued_at = ?, updated_at = ? WHERE id = ? AND status = 'in_progress'`,
+      [Date.now(), Date.now(), taskId],
+    )
+    return { task, run: false }
+  }).immediate()
+  if (!decision) return false
+  const { task } = decision
+  if (decision.run) {
     executeSubAgent(taskId).catch((err) =>
       log.error({ taskId, err }, 'Sub-Agent resume execution error'),
     )
     return true
-  }
-
-  // No slot — demote to queued. The injected reply/digest stays in history, so
-  // promoteGlobalQueue() runs it verbatim once a slot frees.
-  const demote = sqlite.run(
-    `UPDATE tasks SET status = 'queued', queued_at = ?, updated_at = ? WHERE id = ? AND status = 'in_progress'`,
-    [Date.now(), Date.now(), taskId],
-  )
-  if (demote.changes === 0) {
-    // Lost the row to a concurrent transition — leave it be.
-    return false
   }
 
   const executingAgentId = task.sourceAgentId ?? task.parentAgentId
@@ -372,62 +364,32 @@ export async function runOrQueueResumedTask(taskId: string): Promise<boolean> {
  * queued, so "promote = run executeSubAgent" works uniformly (executeSubAgent reads
  * the full history on (re-)entry).
  *
- * Concurrency-safe: each promotion claims the row with an atomic conditional
- * UPDATE (status = 'pending' WHERE id = ? AND status = 'queued'). If two
- * releases race, only one claim sees changes > 0 and runs executeSubAgent; the
- * loser skips that row. The claimed id is also tracked in-process so the same
- * invocation never re-counts a just-promoted row before the DB write lands.
+ * Concurrency-safe: counting global/group slots and claiming the next row share
+ * one SQLite write transaction. A spawn or another promotion cannot reserve a
+ * different task against the same free slot while this decision is in flight.
  */
 export async function promoteGlobalQueue(): Promise<void> {
-  // Guard against an unbounded loop if executeSubAgent's status flip lags: cap
-  // the number of promotions per call to the number of currently-queued tasks.
-  const queuedTotal = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(tasks)
-    .where(eq(tasks.status, 'queued'))
-    .all()
-  let budget = queuedTotal[0]?.count ?? 0
-
-  // Ids we've already inspected this pass and found un-promotable (group full)
-  // — skip them so the "oldest queued" query keeps advancing instead of
-  // re-selecting the same blocked head row forever.
-  const skipped = new Set<string>()
-
-  while (budget-- > 0) {
+  if (isShuttingDown()) return
+  // Limit each pass to the queue present at entry; slow notifications and LLM
+  // work happen only after a transaction has reserved the execution slot.
+  let budget = db.select({ count: sql<number>`count(*)` }).from(tasks)
+    .where(eq(tasks.status, 'queued')).get()?.count ?? 0
+  while (budget-- > 0 && !isShuttingDown()) {
     const maxConcurrent = await getMaxConcurrentTasks()
-    if ((await countExecutingTasks()) >= maxConcurrent) break
-
-    // Oldest queued task not already skipped this pass.
-    const candidates = await db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.status, 'queued'))
-      .orderBy(asc(tasks.queuedAt))
-      .all()
-    const next = candidates.find((t) => !skipped.has(t.id))
+    const next = sqlite.transaction(() => {
+      if (isShuttingDown() || countExecutingTasks() >= maxConcurrent) return null
+      const candidates = db.select().from(tasks).where(eq(tasks.status, 'queued'))
+        .orderBy(asc(tasks.queuedAt), asc(tasks.id)).all()
+      const candidate = candidates.find((task) => !task.concurrencyGroup || !task.concurrencyMax
+        || countActiveTasksInGroup(task.concurrencyGroup) < task.concurrencyMax)
+      if (!candidate) return null
+      const claim = sqlite.run(
+        `UPDATE tasks SET status = 'pending', queued_at = NULL, updated_at = ? WHERE id = ? AND status = 'queued'`,
+        [Date.now(), candidate.id],
+      )
+      return claim.changes > 0 ? candidate : null
+    }).immediate()
     if (!next) break
-
-    // Composition: a grouped task can only run when its group is under cap.
-    // If the group is full, skip this candidate and try the next-oldest — the
-    // global slot stays open for a runnable task behind it.
-    if (next.concurrencyGroup && next.concurrencyMax) {
-      const groupActive = await countActiveTasksInGroup(next.concurrencyGroup)
-      if (groupActive >= next.concurrencyMax) {
-        skipped.add(next.id)
-        continue
-      }
-    }
-
-    // Atomic claim: flip queued → pending only if still queued. Loses gracefully
-    // if a racing release already promoted this row.
-    const claim = sqlite.run(
-      `UPDATE tasks SET status = 'pending', queued_at = NULL, updated_at = ? WHERE id = ? AND status = 'queued'`,
-      [Date.now(), next.id],
-    )
-    if (claim.changes === 0) {
-      skipped.add(next.id)
-      continue
-    }
 
     // Resolve executing Agent info for SSE.
     const executingAgentId = next.sourceAgentId ?? next.parentAgentId
@@ -467,70 +429,24 @@ export async function promoteGlobalQueue(): Promise<void> {
   }
 }
 
-export async function promoteNextQueuedTask(group: string, maxConcurrent: number) {
-  const activeCount = await countActiveTasksInGroup(group)
-  if (activeCount >= maxConcurrent) return
-
-  // Get oldest queued task in this group
-  const next = await db
-    .select()
-    .from(tasks)
-    .where(and(eq(tasks.concurrencyGroup, group), eq(tasks.status, 'queued')))
-    .orderBy(asc(tasks.queuedAt))
-    .limit(1)
-    .get()
-
-  if (!next) return
-
-  // Promote: queued → pending
-  await db
-    .update(tasks)
-    .set({ status: 'pending', queuedAt: null, updatedAt: new Date() })
-    .where(eq(tasks.id, next.id))
-
-  // Resolve executing Agent info for SSE
-  const executingAgentId = next.sourceAgentId ?? next.parentAgentId
-  const executingAgent = await db.select().from(agents).where(eq(agents.id, executingAgentId)).get()
-
-  sseManager.sendToAgent(next.parentAgentId, {
-    type: 'task:status',
-    agentId: next.parentAgentId,
-    data: {
-      taskId: next.id,
-      agentId: next.parentAgentId,
-      status: 'pending',
-      title: next.title ?? next.description,
-      senderName: executingAgent?.name ?? null,
-      senderAvatarUrl: agentAvatarUrl(executingAgentId, executingAgent?.avatarPath ?? null, executingAgent?.updatedAt),
-    },
-  })
-
-  log.info({ taskId: next.id, group }, 'Queued task promoted to pending')
-
-  // Notify source Agent (for spawn_type = 'other')
-  if (next.spawnType === 'other' && next.sourceAgentId) {
-    const taskLabel = next.title ?? next.description
-    const briefDesc = next.description.length > 200
-      ? next.description.slice(0, 200) + '...'
-      : next.description
-    notifySourceAgent(next.sourceAgentId, next.parentAgentId, `[Task assigned: ${taskLabel}] ${briefDesc}`, next.id)
-      .catch((err) => log.warn({ taskId: next.id, sourceAgentId: next.sourceAgentId, err }, 'Failed to notify source Agent on promote'))
-  }
-
-  // Execute the sub-Agent
-  executeSubAgent(next.id).catch((err) =>
-    log.error({ taskId: next.id, err }, 'Sub-Agent execution error after promotion'),
-  )
+/** Compatibility entry point: every promotion must compose the group limit
+ * with the global limit. A separate group-only path could overbook global slots. */
+export async function promoteNextQueuedTask(_group: string, _maxConcurrent: number) {
+  await promoteGlobalQueue()
 }
 
 export async function forcePromoteTask(taskId: string): Promise<boolean> {
+  if (isShuttingDown()) return false
   const task = await db.select().from(tasks).where(eq(tasks.id, taskId)).get()
   if (!task || task.status !== 'queued') return false
 
-  await db
-    .update(tasks)
-    .set({ status: 'pending', queuedAt: null, updatedAt: new Date() })
-    .where(eq(tasks.id, taskId))
+  // Force intentionally overrides limits, but must never launch the same row
+  // twice when it races a normal promotion or another force request.
+  const claim = sqlite.run(
+    `UPDATE tasks SET status = 'pending', queued_at = NULL, updated_at = ? WHERE id = ? AND status = 'queued'`,
+    [Date.now(), taskId],
+  )
+  if (claim.changes === 0) return false
 
   const executingAgentId = task.sourceAgentId ?? task.parentAgentId
   const executingAgent = await db.select().from(agents).where(eq(agents.id, executingAgentId)).get()
@@ -646,9 +562,10 @@ interface SpawnParams {
    *  expands to all native tools). When absent, falls back to the built-in
    *  matching `toolPreset`, then to 'all'. */
   toolboxIds?: string[]
-  /** When true, insert the task row but do NOT kick off `executeSubAgent`. The
-   *  caller is responsible for starting execution (e.g. after seeding cloned
-   *  messages). Used by `retryTask`. */
+  /** Internal: persist retry history in the reservation transaction so a
+   * queued retry cannot be promoted before its history is available. */
+  initialMessages?: Array<typeof messages.$inferInsert>
+  /** Reserve without starting the runner (used by deterministic test harnesses). */
   skipExecute?: boolean
 }
 
@@ -762,47 +679,8 @@ export async function spawnTask(params: SpawnParams) {
   const taskId = uuid()
   const now = new Date()
 
-  // ─── Composed concurrency gate (global exec slots × per-group no-overlap) ──
-  //
-  // The task may START NOW only when BOTH constraints have room:
-  //   1. GLOBAL: countExecutingTasks() < maxConcurrent (resource cap, read live
-  //      from app_settings so the Settings UI takes effect without a restart).
-  //   2. PER-GROUP: no group, OR countActiveTasksInGroup(group) < concurrencyMax
-  //      (the existing no-overlap serialization — unchanged).
-  //
-  // If either is full, the task is QUEUED (status 'queued', queued_at=now) and
-  // promoteGlobalQueue() will start it once a slot frees — UNLESS the queue is
-  // already saturated (>= maxQueue 'queued' tasks), in which case we THROW
-  // TASK_QUEUE_FULL. This throw preserves the anti-runaway protection the old
-  // unconditional "max concurrent reached" throw used to give.
   const concurrencyGroup = params.concurrencyGroup ?? null
   const concurrencyMax = params.concurrencyMax ?? null
-
-  const maxConcurrent = await getMaxConcurrentTasks()
-  const globalHasSlot = (await countExecutingTasks()) < maxConcurrent
-
-  let groupHasSlot = true
-  if (concurrencyGroup && concurrencyMax) {
-    const activeCount = await countActiveTasksInGroup(concurrencyGroup)
-    groupHasSlot = activeCount < concurrencyMax
-  }
-
-  const canRun = globalHasSlot && groupHasSlot
-  let initialStatus: 'pending' | 'queued' = canRun ? 'pending' : 'queued'
-
-  if (initialStatus === 'queued') {
-    // Anti-runaway guard: reject (throw) instead of queueing once the queue is
-    // already at capacity, so a misbehaving spawner can't pile up unbounded.
-    const maxQueue = await getMaxQueuedTasks()
-    const queuedCount = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(tasks)
-      .where(eq(tasks.status, 'queued'))
-      .all()
-    if ((queuedCount[0]?.count ?? 0) >= maxQueue) {
-      throw new Error(`TASK_QUEUE_FULL: task queue is full (${maxQueue} queued)`)
-    }
-  }
 
   // Freeze the stable system context (Agent identity, global prompt,
   // Agent directory, cron context). Freezing keeps the sub-Agent's stable
@@ -825,33 +703,51 @@ export async function spawnTask(params: SpawnParams) {
   const effectiveToolboxIds: string[] | null =
     params.toolboxIds && params.toolboxIds.length > 0 ? params.toolboxIds : null
 
-  await db.insert(tasks).values({
-    id: taskId,
-    parentAgentId: params.parentAgentId,
-    sourceAgentId: params.sourceAgentId ?? null,
-    spawnType: params.spawnType,
-    mode: params.mode,
-    model: effectiveModel,
-    providerId: effectiveProviderId,
-    title: params.title ?? null,
-    description: params.description,
-    status: initialStatus,
-    depth,
-    parentTaskId: params.parentTaskId ?? null,
-    cronId: params.cronId ?? null,
-    channelOriginId: params.channelOriginId ?? null,
-    webhookId: params.webhookId ?? null,
-    promptContextSnapshot,
-    allowHumanPrompt: params.allowHumanPrompt ?? true,
-    thinkingConfig: effectiveThinkingConfig ? JSON.stringify(effectiveThinkingConfig) : null,
-    toolPreset: params.toolPreset ?? null,
-    toolboxIds: effectiveToolboxIds ? JSON.stringify(effectiveToolboxIds) : null,
-    concurrencyGroup,
-    concurrencyMax,
-    queuedAt: initialStatus === 'queued' ? now : null,
-    createdAt: now,
-    updatedAt: now,
-  })
+  const [maxConcurrent, maxQueue] = await Promise.all([getMaxConcurrentTasks(), getMaxQueuedTasks()])
+  const initialStatus = sqlite.transaction(() => {
+    const globalHasSlot = !isShuttingDown() && countExecutingTasks() < maxConcurrent
+    const groupHasSlot = !concurrencyGroup || !concurrencyMax
+      || countActiveTasksInGroup(concurrencyGroup) < concurrencyMax
+    const initialStatus = globalHasSlot && groupHasSlot ? 'pending' : 'queued'
+    if (initialStatus === 'queued') {
+      const queuedCount = db.select({ count: sql<number>`count(*)` }).from(tasks)
+        .where(eq(tasks.status, 'queued')).get()?.count ?? 0
+      if (queuedCount >= maxQueue) {
+        throw new Error(`TASK_QUEUE_FULL: task queue is full (${maxQueue} queued)`)
+      }
+    }
+    db.insert(tasks).values({
+      id: taskId,
+      parentAgentId: params.parentAgentId,
+      sourceAgentId: params.sourceAgentId ?? null,
+      spawnType: params.spawnType,
+      mode: params.mode,
+      model: effectiveModel,
+      providerId: effectiveProviderId,
+      title: params.title ?? null,
+      description: params.description,
+      status: initialStatus,
+      depth,
+      parentTaskId: params.parentTaskId ?? null,
+      cronId: params.cronId ?? null,
+      channelOriginId: params.channelOriginId ?? null,
+      webhookId: params.webhookId ?? null,
+      promptContextSnapshot,
+      allowHumanPrompt: params.allowHumanPrompt ?? true,
+      thinkingConfig: effectiveThinkingConfig ? JSON.stringify(effectiveThinkingConfig) : null,
+      toolPreset: params.toolPreset ?? null,
+      toolboxIds: effectiveToolboxIds ? JSON.stringify(effectiveToolboxIds) : null,
+      concurrencyGroup,
+      concurrencyMax,
+      queuedAt: initialStatus === 'queued' ? now : null,
+      createdAt: now,
+      updatedAt: now,
+    }).run()
+    for (const message of params.initialMessages ?? []) {
+      db.insert(messages).values({ ...message, taskId }).run()
+    }
+    return initialStatus
+  }).immediate()
 
   // Resolve executing Agent info for SSE metadata
   const executingAgentId = params.sourceAgentId ?? params.parentAgentId
@@ -1000,7 +896,20 @@ export async function startOrphanTask(
  */
 export const resumeSubAgent = executeSubAgent
 
+let activeTaskExecutions = 0
+export function getActiveTaskExecutionCount(): number { return activeTaskExecutions }
+export function abortActiveTaskExecutions(): void {
+  for (const controller of activeTaskAbortControllers.values()) controller.abort()
+}
+
 async function executeSubAgent(taskId: string, isNudge = false) {
+  if (isShuttingDown()) return
+  activeTaskExecutions++
+  try { await executeSubAgentTurn(taskId, isNudge) }
+  finally { activeTaskExecutions-- }
+}
+
+async function executeSubAgentTurn(taskId: string, isNudge = false) {
   const task = await db.select().from(tasks).where(eq(tasks.id, taskId)).get()
   if (!task) return
 
@@ -1989,13 +1898,6 @@ export async function resolveTask(
     }
   }
 
-  // Promote next queued task in the same concurrency group
-  if (task.concurrencyGroup && task.concurrencyMax) {
-    promoteNextQueuedTask(task.concurrencyGroup, task.concurrencyMax).catch((err) =>
-      log.error({ taskId, group: task.concurrencyGroup, err }, 'Failed to promote next queued task'),
-    )
-  }
-
   // A resolved task left the global executing set → a slot just freed. Drive
   // the global queue so the oldest runnable queued task starts immediately.
   promoteGlobalQueue().catch((err) =>
@@ -2073,13 +1975,6 @@ export async function cancelTask(taskId: string, agentId: string) {
     ).catch((err) => log.warn({ taskId: task.id, sourceAgentId: task.sourceAgentId, err }, 'Failed to notify source Agent on cancel'))
   }
 
-  // Promote next queued task in the same concurrency group
-  if (task.concurrencyGroup && task.concurrencyMax) {
-    promoteNextQueuedTask(task.concurrencyGroup, task.concurrencyMax).catch((err) =>
-      log.error({ taskId, group: task.concurrencyGroup, err }, 'Failed to promote next queued task after cancel'),
-    )
-  }
-
   // Cancellation is terminal → the task left the global executing set, freeing
   // a slot. Drive the global queue (only meaningful when the cancelled task was
   // itself executing; a no-op when it was suspended/queued).
@@ -2138,6 +2033,13 @@ export async function retryTask(
     }
   }
 
+  const initialMessages = opts.preserveHistory
+    ? (await db.select().from(messages).where(eq(messages.taskId, failedTaskId))
+      .orderBy(asc(messages.createdAt)).all()).map((message) => ({
+        ...message, id: uuid(), inReplyTo: null, requestId: null,
+      }))
+    : []
+
   const spawned = await spawnTask({
     parentAgentId: original.parentAgentId,
     sourceAgentId: original.sourceAgentId ?? undefined,
@@ -2158,46 +2060,13 @@ export async function retryTask(
     concurrencyMax: original.concurrencyMax ?? undefined,
     toolPreset: (original.toolPreset ?? undefined) as 'code' | 'research' | 'ops' | 'all' | undefined,
     toolboxIds: parseTaskToolboxIds(original.toolboxIds as string | null),
-    // Hold off on the runner so we can seed cloned messages (if asked)
-    // before the first stream reads from the DB.
-    skipExecute: true,
+    initialMessages,
   })
-
-  if (opts.preserveHistory) {
-    const originalMessages = await db
-      .select()
-      .from(messages)
-      .where(eq(messages.taskId, failedTaskId))
-      .orderBy(asc(messages.createdAt))
-      .all()
-
-    for (const m of originalMessages) {
-      await db.insert(messages).values({
-        ...m,
-        id: uuid(),
-        taskId: spawned.taskId,
-        // `in_reply_to` and `request_id` point at ids from the previous run;
-        // cloning them as-is would create dangling references in the new
-        // task's view. Drop both — the LLM never sees these columns.
-        inReplyTo: null,
-        requestId: null,
-      })
-    }
-  }
 
   log.info(
     { originalTaskId: failedTaskId, newTaskId: spawned.taskId, preserveHistory: opts.preserveHistory, queued: spawned.queued },
     'Task retried',
   )
-
-  // Kick the runner now that any seeded history is in place. Queued tasks
-  // wait for promotion — the promoter will call executeSubAgent when a slot
-  // opens, same as a normal spawn.
-  if (!spawned.queued) {
-    executeSubAgent(spawned.taskId).catch((err) =>
-      log.error({ taskId: spawned.taskId, err }, 'Sub-Agent retry execution error'),
-    )
-  }
 
   return spawned
 }

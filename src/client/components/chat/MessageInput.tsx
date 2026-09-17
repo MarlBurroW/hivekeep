@@ -16,6 +16,8 @@ import type { MentionableUser, MentionableAgent } from '@/client/hooks/useMentio
 import type { PendingFile } from '@/client/hooks/useFileUpload'
 import { ModelPicker, modelPickerValue } from '@/client/components/common/ModelPicker'
 import { ThinkingEffortPicker } from '@/client/components/chat/ThinkingEffortPicker'
+import { ChatWorkspaceFiles } from '@/client/components/chat/ChatWorkspaceFiles'
+import { workspacePathReference } from '@/client/lib/workspace-source'
 import type { AgentThinkingEffort } from '@/shared/types'
 import type { ProviderModel } from '@/client/hooks/useModels'
 import { modelReasoningInfo } from '@/client/lib/model-efforts'
@@ -50,6 +52,10 @@ interface MessageInputProps {
   onCommand?: (command: string, arg?: string) => void
   /** Agent ID for input history (Up/Down arrow to cycle through sent messages) */
   agentId?: string
+  /** Names the workspace shown in the file browser. */
+  agentName?: string
+  /** Private session: browse shared files, but upload through private attachments. */
+  sessionId?: string
   /** Users available for @mention autocomplete */
   mentionableUsers?: MentionableUser[]
   /** Agents available for @mention autocomplete */
@@ -92,6 +98,8 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
   onInject,
   onCommand,
   agentId,
+  agentName,
+  sessionId,
   mentionableUsers,
   mentionableAgents,
   llmModels,
@@ -219,7 +227,7 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
     // Files drop the @ and insert the relative path in backticks: agents read
     // the path with their filesystem tools and the renderer turns it into a
     // clickable chip; backticks delimit spaces/accents (files.md § 5.1).
-    const insertion = item.type === 'file' ? `\`${item.handle}\`` : `@${item.handle}`
+    const insertion = item.type === 'file' ? workspacePathReference(item.handle) : `@${item.handle}`
     const newValue = `${before}${insertion} ${after}`
     onChange(newValue)
     setMentionQuery(null)
@@ -256,7 +264,7 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
 
   const handleSubmit = () => {
     const trimmed = value.trim()
-    if ((!trimmed && !hasPendingFiles) || disabled || isUploading || trimmed.length > MAX_MESSAGE_LENGTH) return
+    if ((!trimmed && !readyFileIds?.length) || disabled || isUploading || trimmed.length > MAX_MESSAGE_LENGTH) return
 
     // Handle slash commands
     const cmdMatch = trimmed.match(/^\/(\S+)(?:\s+(.+))?$/s)
@@ -532,10 +540,10 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
         />
       )}
 
-      {/* Composer surface — borderless, blends into its container */}
+      {/* Keep the writing surface and keyboard focus easy to locate. */}
       <div className={cn(
-        'mx-auto max-w-3xl rounded-2xl bg-muted/50 transition-all duration-200',
-        'focus-within:bg-muted/70 focus-within:shadow-sm',
+        'mx-auto max-w-3xl rounded-2xl border border-border/70 bg-muted/40 transition-colors duration-200',
+        'focus-within:border-primary/50 focus-within:bg-muted/60 focus-within:ring-2 focus-within:ring-primary/10',
         isDragging && 'ring-2 ring-primary/50',
       )}>
 
@@ -563,7 +571,7 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
                   <FileIcon className="size-4 shrink-0" />
                 )}
 
-                <span className="max-w-28 truncate">{pf.name}</span>
+                <span className="max-w-40"><span className="block truncate">{pf.name}</span>{pf.status === 'error' && <span className="block text-xs">{t('experience.chat.uploadRetry', 'Upload failed. Remove and attach again.')}</span>}</span>
 
                 {pf.status === 'uploading' && (
                   <Loader2 className="size-3 shrink-0 animate-spin" />
@@ -629,9 +637,9 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
         </div>
 
         {/* Action bar */}
-        <div className="flex items-center gap-1 px-2 pb-2 pt-0.5">
-          {/* Left: attach + model + thinking */}
-          <div className="flex min-w-0 flex-1 items-center gap-0.5">
+        <div className="flex items-end gap-1 px-2 pb-2 pt-0.5">
+          {/* Composer controls wrap onto two rows on narrow screens. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             {onAddFiles && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -639,8 +647,9 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+                    className="size-10 shrink-0 rounded-lg text-muted-foreground hover:text-foreground sm:size-8"
                     disabled={disabled}
+                    aria-label={t('chat.attachFile')}
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Paperclip className="size-4" />
@@ -655,10 +664,29 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
                 models={llmModels}
                 value={modelPickerValue(model, providerId ?? '')}
                 onValueChange={onModelChange}
-                variant="ghost"
-                className="h-8 w-auto min-w-0 max-w-[160px] shrink gap-1.5 rounded-lg px-2 text-xs font-normal text-muted-foreground hover:text-foreground sm:max-w-[200px]"
+                className="h-10 w-auto min-w-0 max-w-[calc(100%-2.75rem)] shrink gap-1.5 rounded-lg px-2.5 text-xs font-normal text-foreground shadow-none sm:h-9 sm:max-w-[280px]"
               />
             )}
+
+            {agentId && <ChatWorkspaceFiles
+              key={`${agentId}:${sessionId ?? 'shared'}`}
+              agentId={agentId}
+              agentName={agentName}
+              isPrivate={!!sessionId}
+              disabled={disabled}
+              onAttachPrivateFile={() => fileInputRef.current?.click()}
+              onInsert={(paths) => {
+                onChange(`${value}${value && !value.endsWith('\n') ? '\n' : ''}${paths.map(workspacePathReference).join('\n')}\n`)
+                setMentionQuery(null)
+                setCommandQuery(null)
+              }}
+              onFocusComposer={() => {
+                const textarea = textareaRef.current
+                if (!textarea) return
+                textarea.focus()
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+              }}
+            />}
 
             {onChangeThinking && (
               <ThinkingEffortPicker
@@ -679,7 +707,8 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 shrink-0 gap-1 rounded-lg px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+                    className="h-10 shrink-0 gap-1 rounded-lg px-2 text-xs font-normal text-muted-foreground hover:text-foreground sm:h-8"
+                    aria-label={t('chat.toolsBadge.tooltip', { count: toolCount, defaultValue: '{{count}} tools available — click to list them' })}
                     onClick={onShowTools}
                   >
                     <Wrench className="size-3.5" />
@@ -718,9 +747,10 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    aria-label={t('chat.stop')}
                     onClick={onStop}
                     size="icon"
-                    className="size-8 shrink-0 rounded-full bg-foreground text-background transition-transform hover:bg-foreground/90 hover:scale-105 active:scale-95"
+                    className="size-10 shrink-0 rounded-full bg-foreground text-background transition-transform hover:bg-foreground/90 hover:scale-105 active:scale-95 sm:size-8"
                   >
                     <Square className="size-3 fill-current" />
                   </Button>
@@ -729,10 +759,11 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
               </Tooltip>
             ) : (
               <Button
+                aria-label={t('chat.send')}
                 onClick={handleSubmit}
-                disabled={disabled || isUploading || (!value.trim() && !hasPendingFiles) || value.length > MAX_MESSAGE_LENGTH}
+                disabled={disabled || isUploading || (!value.trim() && !readyFileIds?.length) || value.length > MAX_MESSAGE_LENGTH}
                 size="icon"
-                className="size-8 shrink-0 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+                className="size-10 shrink-0 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 sm:size-8"
               >
                 <ArrowUp className="size-4" />
               </Button>

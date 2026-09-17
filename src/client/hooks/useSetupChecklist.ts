@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, getErrorMessage } from '@/client/lib/api'
 import { useProviders } from '@/client/hooks/useProviders'
 import { useAgents } from '@/client/hooks/useAgents'
+import { isUserAgent } from '@/shared/agent-kind'
 import { useSSE } from '@/client/hooks/useSSE'
 
 /**
@@ -196,13 +197,13 @@ export function useSetupChecklist(): UseSetupChecklistResult {
       id: def.id,
       severity: def.severity,
       target: def.target,
-      isDone: def.isDone({ providers: validProviders, defaults, agentCount: agents.length }),
+      isDone: def.isDone({ providers: validProviders, defaults, agentCount: agents.filter(isUserAgent).length }),
       isDismissed: dismissedSet.has(def.id),
     }))
-  }, [allProviders, defaults, dismissed, agents.length])
+  }, [allProviders, defaults, dismissed, agents])
 
-  const pendingCount = items.filter((i) => !i.isDone && !i.isDismissed).length
-  const isComplete = items.every((i) => i.isDone || i.isDismissed)
+  const pendingCount = items.filter((i) => i.severity !== 'optional' && !i.isDone && !i.isDismissed).length
+  const isComplete = items.every((i) => i.severity === 'optional' || i.isDone || i.isDismissed)
 
   const dismissItem = useCallback(async (id: SetupItemId) => {
     try {

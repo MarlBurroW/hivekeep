@@ -1,115 +1,72 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAuth } from '@/client/hooks/useAuth'
+import { draftKey, loadDraft, saveDraft } from '@/client/lib/draft-storage'
 
-const DRAFT_PREFIX = 'hivekeep:draft:'
-const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
-const SAVE_DEBOUNCE_MS = 300
-
-/** Read a draft from localStorage */
-function loadDraft(agentId: string): string {
-  try {
-    const raw = localStorage.getItem(DRAFT_PREFIX + agentId)
-    if (!raw) return ''
-    const parsed = JSON.parse(raw) as { text: string; ts: number }
-    if (Date.now() - parsed.ts > DRAFT_MAX_AGE_MS) {
-      localStorage.removeItem(DRAFT_PREFIX + agentId)
-      return ''
-    }
-    return parsed.text
-  } catch {
-    return ''
-  }
+/** External actions write into the signed-in user's draft before navigation. */
+export function appendToDraft(agentId: string, text: string, userId: string | undefined) {
+  const key = draftKey(userId, agentId)
+  if (!key) return
+  const current = loadDraft(key)
+  saveDraft(key, `${current}${current && !current.endsWith(' ') ? ' ' : ''}${text} `)
+  window.dispatchEvent(new CustomEvent('hivekeep:draft-appended', { detail: key }))
 }
 
-/** Save a draft to localStorage (with timestamp for expiry) */
-function saveDraft(agentId: string, text: string) {
-  try {
-    if (!text) {
-      localStorage.removeItem(DRAFT_PREFIX + agentId)
-    } else {
-      localStorage.setItem(DRAFT_PREFIX + agentId, JSON.stringify({ text, ts: Date.now() }))
-    }
-  } catch {
-    // Storage full or unavailable
-  }
-}
+/** Drafts are private to an account and conversation, including private sessions. */
+export function useDraftMessage(conversationId: string | null) {
+  const { user } = useAuth()
+  const key = draftKey(user?.id, conversationId)
+  const [draft, setDraft] = useState(() => ({ key, content: key ? loadDraft(key) : '' }))
+  const pending = useRef<{ key: string; content: string } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-/** Clean up drafts older than 7 days */
-function cleanupOldDrafts() {
-  try {
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i)
-      if (!key?.startsWith(DRAFT_PREFIX)) continue
-      const raw = localStorage.getItem(key)
-      if (!raw) continue
-      try {
-        const parsed = JSON.parse(raw) as { ts: number }
-        if (Date.now() - parsed.ts > DRAFT_MAX_AGE_MS) {
-          localStorage.removeItem(key)
-        }
-      } catch {
-        localStorage.removeItem(key)
-      }
-    }
-  } catch {
-    // Ignore
-  }
-}
-
-// Run cleanup once on module load
-cleanupOldDrafts()
-
-/**
- * Append text to an agent's persisted draft from OUTSIDE the composer (e.g.
- * the Files tree "Insert in chat" action, files.md § 5.3). Writing the draft
- * BEFORE navigating avoids any mount race: MessageInput picks it up naturally
- * when the conversation opens.
- */
-export function appendToDraft(agentId: string, text: string) {
-  const current = loadDraft(agentId)
-  const glue = current && !current.endsWith(' ') ? ' ' : ''
-  saveDraft(agentId, `${current}${glue}${text} `)
-}
-
-/**
- * Persists draft message content per Agent across component unmounts
- * and page reloads via localStorage.
- */
-export function useDraftMessage(agentId: string | null) {
-  const [content, setContentState] = useState(() =>
-    agentId ? loadDraft(agentId) : '',
-  )
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Sync from storage when agentId changes
-  useEffect(() => {
-    setContentState(agentId ? loadDraft(agentId) : '')
-  }, [agentId])
-
-  // Cleanup debounce on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
+  const flush = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+    if (pending.current) saveDraft(pending.current.key, pending.current.content)
+    pending.current = null
   }, [])
 
-  const setContent = useCallback(
-    (value: string) => {
-      setContentState(value)
-      if (agentId) {
-        if (debounceRef.current) clearTimeout(debounceRef.current)
-        debounceRef.current = setTimeout(() => saveDraft(agentId, value), SAVE_DEBOUNCE_MS)
-      }
-    },
-    [agentId],
-  )
+  useEffect(() => {
+    flush()
+    setDraft({ key, content: key ? loadDraft(key) : '' })
+    // Route changes and unmount flush even a keystroke entered <300 ms ago.
+    return flush
+  }, [key, flush])
+
+  useEffect(() => {
+    const onAppend = (event: Event) => {
+      if ((event as CustomEvent).detail === key && key) setDraft({ key, content: loadDraft(key) })
+    }
+    window.addEventListener('hivekeep:draft-appended', onAppend)
+    return () => window.removeEventListener('hivekeep:draft-appended', onAppend)
+  }, [key])
+
+  useEffect(() => {
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flush()
+    }
+  }, [flush])
+
+  const setContent = useCallback((content: string) => {
+    setDraft({ key, content })
+    if (!key) return
+    if (pending.current?.key !== key) flush()
+    if (timer.current) clearTimeout(timer.current)
+    pending.current = { key, content }
+    timer.current = setTimeout(flush, 300)
+  }, [key, flush])
 
   const clearDraft = useCallback(() => {
-    if (agentId) {
-      saveDraft(agentId, '')
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-    setContentState('')
-  }, [agentId])
+    flush()
+    if (key) saveDraft(key, '')
+    setDraft({ key, content: '' })
+  }, [key, flush])
 
-  return { content, setContent, clearDraft }
+  // Never render the previous account/conversation while the effect is pending.
+  return { content: draft.key === key ? draft.content : (key ? loadDraft(key) : ''), setContent, clearDraft }
 }

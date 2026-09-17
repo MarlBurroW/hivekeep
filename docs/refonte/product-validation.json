@@ -1,0 +1,15 @@
+{
+  "results": [
+    "manual Agent creation by keyboard, redirect and first persisted exchange",
+    "identity editing preserves advanced configuration; advanced controls remain keyboard reachable",
+    "tool-call panel opens/closes by keyboard; closed controls leave the accessibility tree",
+    "member sees schedules and details without mutation controls; all five mutation APIs return 403",
+    "schedule API create/update/approve/disable/delete; create/edit forms reachable by keyboard",
+    "all 24 registry settings routes load directly and their navigation works by keyboard",
+    "command palette navigation and dismissal, plus color palette selection, work by keyboard",
+    "mobile settings select exposes 24 sections and Back is keyboard reachable",
+    "no browser errors or unnamed visible buttons in the inspected routes and forms"
+  ],
+  "errors": [],
+  "unnamedButtons": []
+}

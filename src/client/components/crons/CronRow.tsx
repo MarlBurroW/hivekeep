@@ -7,12 +7,12 @@ import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
 import { Switch } from '@/client/components/ui/switch'
 import { ProviderIcon } from '@/client/components/common/ProviderIcon'
+import { AutomationFlow } from '@/client/components/common/AutomationFlow'
 import { useAuth } from '@/client/hooks/useAuth'
 import { cn } from '@/client/lib/utils'
-import { formatRelativeTime } from '@/client/lib/time'
 import { cronToHuman } from '@/client/lib/cron-human'
 import { cronNextRun, formatCountdown } from '@/client/lib/cron-next'
-import { Clock, CheckCircle2, Loader2, GripVertical, FastForward, History, Bell, Bot, Sparkles, Wrench, Repeat } from 'lucide-react'
+import { CheckCircle2, Loader2, GripVertical, Bell, Bot, Sparkles, Wrench, Repeat } from 'lucide-react'
 import type { CronSummary, Toolbox } from '@/shared/types'
 
 interface LLMModel {
@@ -34,10 +34,8 @@ function Chip({ children, className, title }: { children: ReactNode; className?:
 }
 
 /**
- * One scheduled job rendered as a dense list row: identity and human schedule on
- * the left, configuration chips in the middle (wide screens only), next/last run
- * and the active switch on the right. Below `sm` the row folds into a stacked
- * card while keeping the same information order.
+ * Scheduled job with the same trigger/Agent/action/destination summary as
+ * webhooks and email triggers. Configuration chips remain secondary.
  */
 export function CronRow({
   cron,
@@ -70,9 +68,6 @@ export function CronRow({
   const humanSchedule = cronToHuman(cron.schedule, i18n.language)
   const nextRun = cron.isActive && !cron.requiresApproval ? cronNextRun(cron.schedule, serverTimezone) : null
 
-  const hasDifferentTarget = !!cron.targetAgentName && cron.targetAgentId !== cron.agentId
-  const lastRunValue = cron.lastTriggeredAt ? formatRelativeTime(cron.lastTriggeredAt) : t('sidebar.crons.never')
-
   // Effective model: the cron's own override, else the model of the Agent the task
   // runs as (delegated target if any, otherwise the owner).
   const runAgentId = cron.targetAgentId ?? cron.agentId
@@ -102,14 +97,13 @@ export function CronRow({
       ? 'bg-success'
       : 'bg-muted-foreground/40'
 
-  const runLabel = `${t('sidebar.crons.nextRunLabel')} / ${t('sidebar.crons.lastRunLabel')}`
-
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onClick()
@@ -163,28 +157,16 @@ export function CronRow({
             </Badge>
           )}
         </div>
-        <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Clock className="size-3 shrink-0" />
-          <span className="truncate" title={cron.schedule}>{humanSchedule ?? cron.schedule}</span>
-          <span className="shrink-0 text-muted-foreground/50">·</span>
-          <span className="truncate">
-            {hasDifferentTarget ? `${cron.agentName} → ${cron.targetAgentName}` : cron.agentName}
-          </span>
-        </div>
-        {/* Mobile fallback for the next/last run column below */}
-        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground sm:hidden">
-          {nextRun ? (
-            <>
-              <FastForward className="size-3 shrink-0 text-primary" />
-              <span className="text-primary">{formatCountdown(nextRun)}</span>
-            </>
-          ) : (
-            <>
-              <History className="size-3 shrink-0" />
-              <span className="truncate">{lastRunValue}</span>
-            </>
-          )}
-        </div>
+        <AutomationFlow
+          className="mt-2"
+          trigger={humanSchedule ?? cron.schedule}
+          agent={cron.targetAgentName ?? (cron.targetAgentId || cron.agentName)}
+          action={t('workspace.automationsFlow.createTask')}
+          actionDetail={cron.taskDescription}
+          destination={t('workspace.automationsFlow.reportTo', { name: cron.agentName })}
+          lastTriggeredAt={cron.lastTriggeredAt}
+          next={nextRun ? formatCountdown(nextRun) : cron.isActive && !cron.requiresApproval ? t('workspace.automationsFlow.unknownSchedule') : statusLabel}
+        />
       </div>
 
       {/* Configuration meta — the widest screens only, it is secondary */}
@@ -217,28 +199,13 @@ export function CronRow({
         )}
       </div>
 
-      {/* Next / last run */}
-      <div className="hidden w-32 shrink-0 flex-col items-end gap-0.5 text-[11px] tabular-nums sm:flex" title={runLabel}>
-        {nextRun ? (
-          <span className="flex items-center gap-1 font-medium text-primary">
-            <FastForward className="size-3 shrink-0" />
-            {formatCountdown(nextRun)}
-          </span>
-        ) : (
-          <span className="text-muted-foreground/50">—</span>
-        )}
-        <span className="flex items-center gap-1 truncate text-muted-foreground">
-          <History className="size-3 shrink-0" />
-          {lastRunValue}
-        </span>
-      </div>
-
       {/* Control */}
       {cron.requiresApproval && onApprove ? (
         <Button
           variant="outline"
           size="sm"
           className="h-7 shrink-0 gap-1.5 text-xs"
+          aria-label={t('sidebar.crons.approve')}
           onClick={(e) => { e.stopPropagation(); onApprove() }}
         >
           <CheckCircle2 className="size-3.5 text-success" />
@@ -307,6 +274,7 @@ export function SortableCronRow({
           <div
             {...attributes}
             {...listeners}
+            aria-label={t('workspace.automationsFlow.reorder', { name: cron.name })}
             className="flex cursor-grab items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
             onClick={(e) => e.stopPropagation()}
           >

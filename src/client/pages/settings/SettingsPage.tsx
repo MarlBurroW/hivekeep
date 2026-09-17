@@ -1,171 +1,40 @@
-import { useState, useEffect, useMemo, createContext, useContext } from 'react'
+import { createContext, useContext, Suspense, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ArrowLeft, SquareTerminal } from 'lucide-react'
+import { lazyWithRetry as lazy } from '@/client/lib/lazy-with-retry'
 import { useAuth } from '@/client/hooks/useAuth'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/client/components/ui/dialog'
-import {
-  SidebarProvider,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-} from '@/client/components/ui/sidebar'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/client/components/ui/select'
-import { GeneralSettings } from '@/client/pages/settings/GeneralSettings'
-import { ProvidersSettings } from '@/client/pages/settings/ProvidersSettings'
-import { ModelsSettings } from '@/client/pages/settings/ModelsSettings'
-import { ModelRegistrySettings } from '@/client/pages/settings/ModelRegistrySettings'
-import { AvatarsSettings } from '@/client/pages/settings/AvatarsSettings'
-import { VaultSettings } from '@/client/pages/settings/VaultSettings'
-import { McpServersSettings } from '@/client/pages/settings/McpServersSettings'
-import { ContactsSettings } from '@/client/pages/settings/ContactsSettings'
-import { FileStorageSettings } from '@/client/pages/settings/FileStorageSettings'
-import { MemoriesSettings } from '@/client/pages/settings/MemoriesSettings'
-import { WebhooksSettings } from '@/client/pages/settings/WebhooksSettings'
-import { ExternalApiSettings } from '@/client/pages/settings/ExternalApiSettings'
-import { ChannelsSettings } from '@/client/pages/settings/ChannelsSettings'
-import { EmailAccountsSettings } from '@/client/pages/settings/EmailAccountsSettings'
-import { UsersSettings } from '@/client/pages/settings/UsersSettings'
-import { NotificationPreferences } from '@/client/components/notifications/NotificationPreferences'
-import { PluginsSettings } from '@/client/pages/settings/PluginsSettings'
-import { PluginMarketplace } from '@/client/pages/settings/PluginMarketplace'
-import { ToolboxesSettings } from '@/client/pages/settings/ToolboxesSettings'
-import { CustomToolsSettings } from '@/client/pages/settings/CustomToolsSettings'
-import { CustomDomainsSettings } from '@/client/pages/settings/CustomDomainsSettings'
-import { LogsSettings } from '@/client/pages/settings/LogsSettings'
-import { TokenUsageSettings } from '@/client/pages/settings/TokenUsageSettings'
-import { UpdatesSettings } from '@/client/pages/settings/UpdatesSettings'
-import {
-  Bell,
-  Brain,
-  BrainCircuit,
-  Layers,
-  Table2,
-  Settings2,
-  Puzzle,
-  Lock,
-  Users,
-  UserPlus,
-  FolderOpen,
-  Webhook,
-  Radio,
-  Bot,
-  Plug,
-  Clock,
-  Timer,
-  Contact,
-  ShoppingBag,
-  ScrollText,
-  Coins,
-  Wrench,
-  Code2,
-  Shapes,
-  Mail,
-  Image as ImageIcon,
-  ArrowUpCircle,
-  Network,
-} from 'lucide-react'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/client/components/ui/tooltip'
-import { api } from '@/client/lib/api'
+import { settingsSections, visibleSettingsGroups, settingsUrl } from '@/client/lib/navigation'
+import { ThemeToggle } from '@/client/components/common/ThemeToggle'
+import { PaletteToggle } from '@/client/components/common/PaletteToggle'
+import { ErrorBoundary } from '@/client/components/common/ErrorBoundary'
+import { cn } from '@/client/lib/utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/client/components/ui/dialog'
 
-interface SectionItem {
-  id: string
-  icon: typeof Settings2
-  labelKey: string
-}
-
-interface SectionGroup {
-  groupKey: string
-  items: SectionItem[]
-}
-
-const sectionGroups: SectionGroup[] = [
-  {
-    groupKey: 'settings.groups.core',
-    items: [
-      { id: 'general', icon: Settings2, labelKey: 'settings.general.title' },
-      { id: 'providers', icon: BrainCircuit, labelKey: 'settings.providers.title' },
-      { id: 'models', icon: Layers, labelKey: 'settings.models.title' },
-      { id: 'modelRegistry', icon: Table2, labelKey: 'settings.modelRegistry.title' },
-      { id: 'avatars', icon: ImageIcon, labelKey: 'settings.avatars.title' },
-    ],
-  },
-  {
-    groupKey: 'settings.groups.extensions',
-    items: [
-      { id: 'plugins', icon: Plug, labelKey: 'settings.plugins.title' },
-      { id: 'marketplace', icon: ShoppingBag, labelKey: 'settings.marketplace.title' },
-      { id: 'mcp', icon: Puzzle, labelKey: 'settings.mcp.title' },
-      { id: 'toolboxes', icon: Wrench, labelKey: 'toolboxes.title' },
-      { id: 'customTools', icon: Code2, labelKey: 'customTools.title' },
-      { id: 'customDomains', icon: Shapes, labelKey: 'toolDomains.title' },
-      { id: 'vault', icon: Lock, labelKey: 'settings.vault.title' },
-      { id: 'memories', icon: Brain, labelKey: 'settings.memories.title' },
-      { id: 'files', icon: FolderOpen, labelKey: 'settings.files.title' },
-    ],
-  },
-  {
-    groupKey: 'settings.groups.connections',
-    items: [
-      { id: 'channels', icon: Radio, labelKey: 'settings.channels.title' },
-      { id: 'emailAccounts', icon: Mail, labelKey: 'settings.emailAccounts.title' },
-      { id: 'webhooks', icon: Webhook, labelKey: 'settings.webhooks.title' },
-      { id: 'externalApi', icon: Network, labelKey: 'settings.externalApi.title' },
-      { id: 'contacts', icon: Users, labelKey: 'settings.contacts.title' },
-    ],
-  },
-  {
-    groupKey: 'settings.groups.access',
-    items: [
-      { id: 'users', icon: UserPlus, labelKey: 'settings.users.title' },
-      { id: 'notifications', icon: Bell, labelKey: 'settings.notifications.title' },
-    ],
-  },
-  {
-    groupKey: 'settings.groups.system',
-    items: [
-      { id: 'logs', icon: ScrollText, labelKey: 'settings.logs.title' },
-      { id: 'tokenUsage', icon: Coins, labelKey: 'settings.tokenUsage.title' },
-      { id: 'updates', icon: ArrowUpCircle, labelKey: 'settings.updates.title' },
-    ],
-  },
-]
-
-const allSections = sectionGroups.flatMap((g) => g.items)
-
-// Sections a member (non-admin) can use. Everything else is platform
-// configuration whose routes reject non-admins, so the nav hides it.
-const MEMBER_SECTIONS = new Set<SectionId>(['general', 'files', 'contacts', 'notifications'])
-
-type SectionId = string
-
-/** Lets any settings sub-section navigate to another (e.g. the Plugins
- *  page surfacing an "Explore" button that jumps to the Marketplace). */
-const SettingsNavContext = createContext<((section: SectionId) => void) | null>(null)
-
-export function useSettingsNav(): (section: SectionId) => void {
-  const ctx = useContext(SettingsNavContext)
-  return ctx ?? (() => {})
-}
-
-/** Lets a settings sub-section close the whole modal — e.g. when deep-linking
- *  out to a routed page (the model registry lives at `/models`). */
-const SettingsCloseContext = createContext<(() => void) | null>(null)
-
-export function useSettingsClose(): () => void {
-  const ctx = useContext(SettingsCloseContext)
-  return ctx ?? (() => {})
-}
+const GeneralSettings = lazy(() => import('@/client/pages/settings/GeneralSettings').then(m => ({ default: m.GeneralSettings })))
+const ProvidersSettings = lazy(() => import('@/client/pages/settings/ProvidersSettings').then(m => ({ default: m.ProvidersSettings })))
+const ModelsSettings = lazy(() => import('@/client/pages/settings/ModelsSettings').then(m => ({ default: m.ModelsSettings })))
+const ModelRegistrySettings = lazy(() => import('@/client/pages/settings/ModelRegistrySettings').then(m => ({ default: m.ModelRegistrySettings })))
+const AvatarsSettings = lazy(() => import('@/client/pages/settings/AvatarsSettings').then(m => ({ default: m.AvatarsSettings })))
+const VaultSettings = lazy(() => import('@/client/pages/settings/VaultSettings').then(m => ({ default: m.VaultSettings })))
+const McpServersSettings = lazy(() => import('@/client/pages/settings/McpServersSettings').then(m => ({ default: m.McpServersSettings })))
+const ContactsSettings = lazy(() => import('@/client/pages/settings/ContactsSettings').then(m => ({ default: m.ContactsSettings })))
+const FileStorageSettings = lazy(() => import('@/client/pages/settings/FileStorageSettings').then(m => ({ default: m.FileStorageSettings })))
+const MemoriesSettings = lazy(() => import('@/client/pages/settings/MemoriesSettings').then(m => ({ default: m.MemoriesSettings })))
+const WebhooksSettings = lazy(() => import('@/client/pages/settings/WebhooksSettings').then(m => ({ default: m.WebhooksSettings })))
+const ExternalApiSettings = lazy(() => import('@/client/pages/settings/ExternalApiSettings').then(m => ({ default: m.ExternalApiSettings })))
+const ChannelsSettings = lazy(() => import('@/client/pages/settings/ChannelsSettings').then(m => ({ default: m.ChannelsSettings })))
+const EmailAccountsSettings = lazy(() => import('@/client/pages/settings/EmailAccountsSettings').then(m => ({ default: m.EmailAccountsSettings })))
+const UsersSettings = lazy(() => import('@/client/pages/settings/UsersSettings').then(m => ({ default: m.UsersSettings })))
+const NotificationPreferences = lazy(() => import('@/client/components/notifications/NotificationPreferences').then(m => ({ default: m.NotificationPreferences })))
+const PluginsSettings = lazy(() => import('@/client/pages/settings/PluginsSettings').then(m => ({ default: m.PluginsSettings })))
+const PluginMarketplace = lazy(() => import('@/client/pages/settings/PluginMarketplace').then(m => ({ default: m.PluginMarketplace })))
+const ToolboxesSettings = lazy(() => import('@/client/pages/settings/ToolboxesSettings').then(m => ({ default: m.ToolboxesSettings })))
+const CustomToolsSettings = lazy(() => import('@/client/pages/settings/CustomToolsSettings').then(m => ({ default: m.CustomToolsSettings })))
+const CustomDomainsSettings = lazy(() => import('@/client/pages/settings/CustomDomainsSettings').then(m => ({ default: m.CustomDomainsSettings })))
+const LogsSettings = lazy(() => import('@/client/pages/settings/LogsSettings').then(m => ({ default: m.LogsSettings })))
+const TokenUsageSettings = lazy(() => import('@/client/pages/settings/TokenUsageSettings').then(m => ({ default: m.TokenUsageSettings })))
+const UpdatesSettings = lazy(() => import('@/client/pages/settings/UpdatesSettings').then(m => ({ default: m.UpdatesSettings })))
 
 const sectionComponents: Record<string, React.FC> = {
   general: GeneralSettings,
@@ -194,228 +63,53 @@ const sectionComponents: Record<string, React.FC> = {
   updates: UpdatesSettings,
 }
 
-export interface SettingsFilters {
-  agentId?: string
-}
 
-interface SettingsModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  initialSection?: string
-  initialFilters?: SettingsFilters
-}
+export interface SettingsFilters { agentId?: string }
+const SettingsNavContext = createContext<((section: string) => void) | null>(null)
+const SettingsCloseContext = createContext<(() => void) | null>(null)
+export function useSettingsNav() { return useContext(SettingsNavContext) ?? (() => {}) }
+export function useSettingsClose() { return useContext(SettingsCloseContext) ?? (() => {}) }
 
-interface SystemInfo {
-  version: string
-  uptimeMs: number
-  stats: {
-    agents: number
-    providers: number
-    channels: number
-    crons: number
-    memories: number
-    mcpServers: number
-    contacts: number
-    users: number
-  }
-}
-
-function formatUptime(ms: number, t: (key: string) => string): string {
-  const totalMinutes = Math.floor(ms / 60_000)
-  const days = Math.floor(totalMinutes / 1440)
-  const hours = Math.floor((totalMinutes % 1440) / 60)
-  const minutes = totalMinutes % 60
-  const parts: string[] = []
-  if (days > 0) parts.push(`${days}${t('settings.info.days')}`)
-  if (hours > 0) parts.push(`${hours}${t('settings.info.hours')}`)
-  if (days === 0) parts.push(`${minutes}${t('settings.info.minutes')}`)
-  return parts.join(' ')
-}
-
-function SettingsFooter() {
-  const { t } = useTranslation()
-  const [info, setInfo] = useState<SystemInfo | null>(null)
-
-  useEffect(() => {
-    api.get<SystemInfo>('/info').then(setInfo).catch(() => {})
-  }, [])
-
-  if (!info) return null
-
-  const stats = [
-    { icon: Bot, label: t('settings.info.agents'), value: info.stats.agents },
-    { icon: BrainCircuit, label: t('settings.info.providers'), value: info.stats.providers },
-    { icon: Radio, label: t('settings.info.channels'), value: info.stats.channels },
-    { icon: Timer, label: t('settings.info.crons'), value: info.stats.crons },
-    { icon: Brain, label: t('settings.info.memories'), value: info.stats.memories },
-    { icon: Plug, label: t('settings.info.mcpServers'), value: info.stats.mcpServers },
-    { icon: Contact, label: t('settings.info.contacts'), value: info.stats.contacts },
-    { icon: Users, label: t('settings.info.users'), value: info.stats.users },
-  ]
-
-  return (
-    <div className="shrink-0 border-t px-4 py-2.5 flex items-center justify-between gap-3 text-[11px] text-muted-foreground/60 sm:px-6">
-      <div className="flex items-center gap-3">
-        <span className="font-medium">Hivekeep v{info.version}</span>
-        <span className="flex items-center gap-1">
-          <Clock className="size-3" />
-          {formatUptime(info.uptimeMs, t)}
-        </span>
-      </div>
-      <TooltipProvider>
-        <div className="hidden items-center gap-2 sm:flex">
-          {stats.filter((s) => s.value > 0).map(({ icon: Icon, label, value }) => (
-            <Tooltip key={label}>
-              <TooltipTrigger asChild>
-                <span className="flex items-center gap-0.5">
-                  <Icon className="size-3" />
-                  {value}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                {value} {label}
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-      </TooltipProvider>
-    </div>
-  )
-}
-
-export function SettingsModal({ open, onOpenChange, initialSection, initialFilters }: SettingsModalProps) {
+export function SettingsContent({ section, filters, onNavigate, onClose }: { section: string; filters?: SettingsFilters; onNavigate: (section: string) => void; onClose: () => void }) {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
-  const [activeSection, setActiveSection] = useState<SectionId>('general')
+  const available = visibleSettingsGroups(user?.role === 'admin').flatMap(group => group.items)
+  const allowed = available.some(item => item.id === section)
+  const Component = sectionComponents[section]
+  if (!allowed || !Component) return <div className="p-8"><h1 className="text-xl font-semibold">{t('workspace.unavailable')}</h1><p className="mt-2 text-muted-foreground">{t('workspace.unavailableDescription')}</p><button onClick={() => onNavigate('general')} className="mt-4 min-h-11 text-primary">{t('settings.title')}</button></div>
+  return <SettingsCloseContext.Provider value={onClose}><SettingsNavContext.Provider value={onNavigate}>
+    <ErrorBoundary key={section} compact><Suspense fallback={<p role="status" className="p-6 text-muted-foreground">{t('common.loading')}</p>}>
+      {section === 'general' && <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><span className="text-sm font-medium">{t('workspace.appearance')}</span><div className="flex gap-2"><PaletteToggle /><ThemeToggle /></div></div>}
+      {section === 'tokenUsage' ? <TokenUsageSettings initialAgentFilter={filters?.agentId} /> : <Component />}
+    </Suspense></ErrorBoundary>
+  </SettingsNavContext.Provider></SettingsCloseContext.Provider>
+}
 
-  const visibleGroups = useMemo(
-    () =>
-      isAdmin
-        ? sectionGroups
-        : sectionGroups
-            .map((g) => ({ ...g, items: g.items.filter((s) => MEMBER_SECTIONS.has(s.id)) }))
-            .filter((g) => g.items.length > 0),
-    [isAdmin],
-  )
-  const visibleSections = useMemo(() => visibleGroups.flatMap((g) => g.items), [visibleGroups])
+export function SettingsPage() {
+  const { section = 'general' } = useParams()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user } = useAuth()
+  const { t } = useTranslation()
+  const groups = visibleSettingsGroups(user?.role === 'admin')
+  const current = settingsSections.find(item => item.id === section)
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo
+  const close = () => navigate(returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/agents')
+  const change = (id: string) => navigate(settingsUrl(id, { agentId: params.get('agentId') ?? undefined }), { state: { returnTo } })
+  return <div className="surface-base flex h-full min-h-0 flex-col">
+    <header className="flex shrink-0 items-center gap-3 border-b px-4 py-3 md:px-6"><button onClick={close} aria-label={t('workspace.back')} className="flex size-11 items-center justify-center rounded-xl hover:bg-muted"><ArrowLeft className="size-5" /></button><div><p className="text-xs text-muted-foreground">{t('settings.title')}</p><h1 className="text-lg font-semibold">{current ? t(current.labelKey) : t('workspace.unavailable')}</h1></div></header>
+    <div className="min-h-0 flex flex-1 flex-col md:flex-row">
+      <div className="border-b p-3 md:hidden"><label className="sr-only" htmlFor="settings-section">{t('settings.title')}</label><select id="settings-section" className="min-h-11 w-full rounded-lg border bg-background px-3 text-sm" value={section} onChange={event => change(event.target.value)}>{groups.map(group => <optgroup key={group.labelKey} label={t(group.labelKey)}>{group.items.map(item => <option key={item.id} value={item.id}>{t(item.labelKey)}</option>)}</optgroup>)}</select></div>
+      <nav aria-label={t('settings.title')} className="surface-sidebar hidden w-56 shrink-0 overflow-y-auto border-r p-4 md:block">{groups.map(group => <div key={group.labelKey} className="mb-5"><h2 className="mb-2 px-2 text-xs font-semibold text-muted-foreground">{t(group.labelKey)}</h2>{group.items.map(item => <Link key={item.id} to={settingsUrl(item.id, { agentId: params.get('agentId') ?? undefined })} state={{ returnTo }} aria-current={section === item.id ? 'page' : undefined} className={cn('flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm', section === item.id ? 'bg-primary/10 font-medium text-primary' : 'text-muted-foreground hover:bg-muted')}><item.icon className="size-4 shrink-0" />{t(item.labelKey)}</Link>)}</div>)}{user?.role === 'admin' && <Link to="/terminal" className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground hover:bg-muted"><SquareTerminal className="size-4" />{t('activityBar.terminal')}</Link>}</nav>
+      <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-8"><div className="mx-auto max-w-3xl"><SettingsContent section={section} filters={{ agentId: params.get('agentId') ?? undefined }} onNavigate={change} onClose={close} /></div></main>
+    </div>
+  </div>
+}
 
-  // Navigate to requested section when modal opens
-  useEffect(() => {
-    if (open && initialSection && visibleSections.some((s) => s.id === initialSection)) {
-      setActiveSection(initialSection as SectionId)
-    }
-  }, [open, initialSection, visibleSections])
-
-  // A member can never be left on a hidden section (e.g. after a role change).
-  useEffect(() => {
-    if (!visibleSections.some((s) => s.id === activeSection)) {
-      setActiveSection('general')
-    }
-  }, [visibleSections, activeSection])
-
-  const ActiveComponent = sectionComponents[activeSection]
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(92vh,720px)] max-h-[92vh] flex-col overflow-hidden p-0 sm:max-w-5xl">
-        {/* Local SidebarProvider — required by SidebarMenuButton (uses useSidebar
-            for tooltip/mobile state). SettingsModal is now rendered at App.tsx
-            root, outside of ChatPage's SidebarProvider, so it needs its own. */}
-        <SidebarProvider className="!min-h-0 !h-full flex flex-col">
-        {/* Header */}
-        <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle>{t('settings.title')}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {t('settings.title')}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Body: sidebar + content */}
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          {/* Mobile section selector */}
-          <div className="shrink-0 border-b px-4 py-3 md:hidden">
-            <Select value={activeSection} onValueChange={(v) => setActiveSection(v)}>
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {(() => {
-                    const section = allSections.find((s) => s.id === activeSection)
-                    if (!section) return null
-                    const Icon = section.icon
-                    return (
-                      <span className="flex items-center gap-2">
-                        <Icon className="size-4" />
-                        {t(section.labelKey)}
-                      </span>
-                    )
-                  })()}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {visibleGroups.map((group) => (
-                  <div key={group.groupKey}>
-                    <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                      {t(group.groupKey)}
-                    </p>
-                    {group.items.map(({ id, icon: Icon, labelKey }) => (
-                      <SelectItem key={id} value={id}>
-                        <span className="flex items-center gap-2">
-                          <Icon className="size-4" />
-                          {t(labelKey)}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Desktop settings sidebar */}
-          <nav className="hidden md:block w-56 shrink-0 border-r surface-sidebar overflow-y-auto py-4 px-3">
-            {visibleGroups.map((group, gi) => (
-              <div key={group.groupKey} className={gi > 0 ? 'mt-4' : ''}>
-                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                  {t(group.groupKey)}
-                </p>
-                <SidebarMenu>
-                  {group.items.map(({ id, icon: Icon, labelKey }) => (
-                    <SidebarMenuItem key={id}>
-                      <SidebarMenuButton
-                        onClick={() => setActiveSection(id)}
-                        isActive={activeSection === id}
-                        tooltip={t(labelKey)}
-                      >
-                        <Icon className="size-4" />
-                        <span>{t(labelKey)}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </div>
-            ))}
-          </nav>
-
-          {/* Main content */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6">
-            <div className="mx-auto max-w-2xl">
-              <SettingsCloseContext.Provider value={() => onOpenChange(false)}>
-                <SettingsNavContext.Provider value={setActiveSection}>
-                  {ActiveComponent && (
-                    activeSection === 'tokenUsage' && initialFilters
-                      ? <TokenUsageSettings initialAgentFilter={initialFilters.agentId} />
-                      : <ActiveComponent />
-                  )}
-                </SettingsNavContext.Provider>
-              </SettingsCloseContext.Provider>
-            </div>
-          </div>
-        </div>
-
-        {/* Version + stats footer */}
-        <SettingsFooter />
-        </SidebarProvider>
-      </DialogContent>
-    </Dialog>
-  )
+// Kept for integrations that still embed the settings dialog.
+export function SettingsModal({ open, onOpenChange, initialSection = 'general', initialFilters }: { open: boolean; onOpenChange: (open: boolean) => void; initialSection?: string; initialFilters?: SettingsFilters }) {
+  const { t } = useTranslation()
+  const [section, setSection] = useState<string | null>(null)
+  return <Dialog open={open} onOpenChange={value => { setSection(null); onOpenChange(value) }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>{t('settings.title')}</DialogTitle></DialogHeader><SettingsContent section={section ?? initialSection} filters={initialFilters} onNavigate={setSection} onClose={() => onOpenChange(false)} /></DialogContent></Dialog>
 }

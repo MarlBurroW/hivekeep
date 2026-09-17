@@ -32,7 +32,7 @@ export function UserMenu({ user, onLogout, onOpenSettings, onOpenAccount }: User
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" className="rounded-full">
+        <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label={t('sidebar.account')}>
           <UserAvatar user={user} className="size-7" fallbackClassName="text-[10px]" />
         </Button>
       </DropdownMenuTrigger>

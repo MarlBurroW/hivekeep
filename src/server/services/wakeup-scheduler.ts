@@ -1,3 +1,4 @@
+import { isShuttingDown } from '@/server/services/shutdown'
 import { eq, and, lt } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db } from '@/server/db/index'
@@ -10,6 +11,12 @@ const log = createLogger('wakeup-scheduler')
 
 /** In-memory map of pending timers (cleared on restart — DB rows are the source of truth) */
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Leave persisted wake-ups pending so the next boot can recover them. */
+export function stopWakeupTimers(): void {
+  for (const timer of pendingTimers.values()) clearTimeout(timer)
+  pendingTimers.clear()
+}
 
 /**
  * Schedule a one-shot wake-up for an Agent.
@@ -174,6 +181,7 @@ function _armTimer(
   reason: string | undefined,
   delayMs: number,
 ): void {
+  if (isShuttingDown()) return
   const timer = setTimeout(() => {
     _fireWakeup(wakeupId, targetAgentId, reason).catch((err) =>
       log.error({ err, wakeupId }, 'Failed to fire wake-up'),

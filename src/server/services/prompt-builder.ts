@@ -44,15 +44,18 @@ How to run it:
 - **Be a proactive (not pushy) guide.** Match suggestions to who the user is (read their contact "fiche"). Lead with the core value — a team of AI agents that remember them and get better over time — then surface amplifiers when relevant: messaging channels (text your Agents from your phone), self-building tools & mini-apps, automation (crons / sub-Agents / email triggers that react to incoming mail). Propose, explain the benefit, don't force.
 - Keep the user's profile current. As you get to know them during onboarding, save what you learn with \`set_contact_note(contactId, "global", …)\` — **global** scope so every other Agent inherits the context and never has to re-learn who they are (reserve \`"private"\` for observations specific to your own interactions). Create the contact first with \`create_contact\` if none exists, and \`memorize\` their preferences.
 
-- Cover the WHOLE setup — never silently skip a category. Over the conversation (one thing at a time, at natural moments — never dump them all at once), make sure you OFFER each of these. The user may decline any, but you should have proposed it; use your read tools to see what is still missing before deciding what to suggest next:
-  (1) their profile / fiche (notes + memory); (2) a WEB SEARCH provider — offer it EARLY so you can look things up for them (e.g. a provider's API-key page); (3) an EMBEDDING model (long-term memory); (4) an IMAGE provider, then avatar style + type + optional neutral base; (5) the GLOBAL PROMPT — universal conduct rules every Agent must follow ("anything all your Agents should know or respect?"); read it first, then merge; (6) a VOICE provider (TTS / STT) for voice generation + transcription — heads-up: not yet wired into channels, but planned, say so honestly; (7) CHANNELS (Discord / Telegram); (8) their first real Agent; (9) inform about self-building tools and mini-apps.
-  At every "what's next?" moment, propose the categories you have NOT covered yet — not just channels + create-a-Agent. WEB SEARCH, the GLOBAL PROMPT, and VOICE are the easiest to forget: don't.
+- **Get to a useful first Agent promptly.** Ask what the user wants help with, create one focused Agent with suitable capabilities, and invite them to start its normal conversation. Queenie itself is not their first working Agent.
+- Additional search, embeddings, images, voice, channels, appearance and global preferences are optional. Offer one only when it helps the user's current task; never turn them into a required tour or a checklist the user must exhaust.
+- Use the live provider catalogue and effective tool names below as the source of truth. They override examples in the reference text. A provider being supported does not mean it is connected: use list_providers/get_setup_health to check configured state.
 
 You are admin-facing: provider/channel/default/global config is admin-only and will be refused otherwise — that's expected.`
 
-function buildConfiguratorBlock(): string {
+function buildConfiguratorBlock(catalogue?: string, toolNames?: string[]): string {
   const knowledge = getQueenieKnowledge()
-  return knowledge ? `${CONFIGURATOR_MISSION}\n\n## Hivekeep knowledge\n\n${knowledge}` : CONFIGURATOR_MISSION
+  const sections = [CONFIGURATOR_MISSION, knowledge ? `## Hivekeep knowledge\n\n${knowledge}` : '']
+  if (catalogue) sections.push(`## Available providers (live registry)\n\n${catalogue}`)
+  if (toolNames) sections.push(`## Effective capabilities this turn\n\nOnly these tool names are granted: ${toolNames.join(', ')}. Do not infer grants from examples in the reference text.`)
+  return sections.filter(Boolean).join('\n\n')
 }
 
 interface ContactSummary {
@@ -93,6 +96,8 @@ interface PromptParams {
     /** 'configurator' (Queenie) gets the onboarding mission + knowledge blocks. */
     kind?: AgentKind
   }
+  configuratorCatalogue?: string
+  configuratorToolNames?: string[]
   contacts: ContactSummary[]
   /** Curated memory profile document (see memory.md). Required so a new caller
    *  cannot silently build a prompt without it — pass null for sub-Agents,
@@ -624,8 +629,8 @@ export function buildSystemPrompt(params: PromptParams): BuiltSystemPrompt {
     }
 
     // [3.6] Configurator mission + knowledge (Queenie only)
-    if (params.agent.kind === 'configurator') {
-      stableBlocks.push(buildConfiguratorBlock())
+    if (params.agent.kind === 'configurator' && !params.isQuickSession) {
+      stableBlocks.push(buildConfiguratorBlock(params.configuratorCatalogue, params.configuratorToolNames))
     }
 
     // [3.7] Memory profile — stable. Unlike the v1 per-message memory

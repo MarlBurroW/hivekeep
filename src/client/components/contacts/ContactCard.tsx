@@ -117,7 +117,7 @@ export function ContactCard({ contact, agentInfo, onEdit, onDelete, onRefresh }:
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {onEdit && (
-              <Button variant="ghost" size="icon-xs" onClick={onEdit}>
+              <Button variant="ghost" size="icon-xs" onClick={onEdit} aria-label={t('common.edit')}>
                 <Pencil className="size-3.5" />
               </Button>
             )}

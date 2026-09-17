@@ -29,7 +29,7 @@ import { v4 as uuid } from 'uuid'
 import * as schema from '@/server/db/schema'
 
 // ─── Mock pollution guard (matches the other DB-backed service tests) ───────
-const schemaIsReal = !!(schema as any).tasks?.id
+if (!schema.tasks?.id) throw new Error("This suite requires isolated module mocks")
 
 mock.module('@/server/logger', () => ({
   createLogger: () => ({ info: () => {}, warn: () => {}, debug: () => {}, error: () => {} }),
@@ -51,6 +51,7 @@ mock.module('@/server/services/queue', () => ({
   isAgentProcessing: async () => false,
   getQueueSize: async () => 0,
   recoverStaleProcessingItems: () => {},
+  requeueProcessingItems: () => 0,
   popQueueMessageMetadata: () => undefined,
 }))
 
@@ -72,23 +73,17 @@ mock.module('@/server/llm/core/resolve', () => ({
 
 const sqlite = new Database(':memory:')
 sqlite.run('PRAGMA foreign_keys = ON')
-const db = schemaIsReal ? drizzle(sqlite, { schema }) : (null as any)
+const db = drizzle(sqlite, { schema })
 
-if (schemaIsReal) {
-  mock.module('@/server/db/index', () => ({ db, sqlite, initVirtualTables: () => {} }))
-}
+mock.module('@/server/db/index', () => ({ db, sqlite, initVirtualTables: () => {} }))
 
-const svc = schemaIsReal
-  ? await import('@/server/services/tasks')
-  : ({} as typeof import('@/server/services/tasks'))
+const svc = await import('@/server/services/tasks')
 const { suspendTaskForChild, resumeTaskFromChildResult, resolveTask } =
   svc as typeof import('@/server/services/tasks')
 
-const itReal = schemaIsReal ? it : it.skip
 
 // ─── Schema bootstrap (only the tables these paths touch) ────────────────────
 beforeAll(() => {
-  if (!schemaIsReal) return
   sqlite.run(`
     CREATE TABLE agents (
       id TEXT PRIMARY KEY,
@@ -195,7 +190,6 @@ let parentId: string
 let childId: string
 
 beforeEach(() => {
-  if (!schemaIsReal) return
   sqlite.run('DELETE FROM tasks')
   sqlite.run('DELETE FROM messages')
   enqueued.length = 0
@@ -224,7 +218,7 @@ function taskMessages(taskId: string): any[] {
 }
 
 describe('suspendTaskForChild', () => {
-  itReal('flips an in_progress parent to awaiting_subtask and records the child id', async () => {
+  it('flips an in_progress parent to awaiting_subtask and records the child id', async () => {
     const res = await suspendTaskForChild(parentId, childId)
     expect(res.success).toBe(true)
     const parent = getTask(parentId)
@@ -232,7 +226,7 @@ describe('suspendTaskForChild', () => {
     expect(parent.pending_child_task_id).toBe(childId)
   })
 
-  itReal('refuses to suspend a parent that is not in_progress', async () => {
+  it('refuses to suspend a parent that is not in_progress', async () => {
     sqlite.run(`UPDATE tasks SET status = 'completed' WHERE id = ?`, [parentId])
     const res = await suspendTaskForChild(parentId, childId)
     expect(res.success).toBe(false)
@@ -244,7 +238,7 @@ describe('suspendTaskForChild', () => {
 })
 
 describe('resumeTaskFromChildResult', () => {
-  itReal('resumes the parent and injects the scout digest as a user message', async () => {
+  it('resumes the parent and injects the scout digest as a user message', async () => {
     await suspendTaskForChild(parentId, childId)
     const ok = await resumeTaskFromChildResult(
       parentId,
@@ -269,7 +263,7 @@ describe('resumeTaskFromChildResult', () => {
     expect(msgs[0].content).toContain('[Scout result: Scout]')
   })
 
-  itReal('injects an error note when the scout child failed', async () => {
+  it('injects an error note when the scout child failed', async () => {
     await suspendTaskForChild(parentId, childId)
     const ok = await resumeTaskFromChildResult(
       parentId,
@@ -288,7 +282,7 @@ describe('resumeTaskFromChildResult', () => {
     expect(msgs[0].content).toContain('boom')
   })
 
-  itReal('is idempotent / race-safe — a second resume for the same child is a no-op', async () => {
+  it('is idempotent / race-safe — a second resume for the same child is a no-op', async () => {
     await suspendTaskForChild(parentId, childId)
     const first = await resumeTaskFromChildResult(parentId, childId, 'completed', 'D', null, 'Scout')
     expect(first).toBe(true)
@@ -298,7 +292,7 @@ describe('resumeTaskFromChildResult', () => {
     expect(taskMessages(parentId).length).toBe(1)
   })
 
-  itReal('does nothing when the parent is awaiting a DIFFERENT child', async () => {
+  it('does nothing when the parent is awaiting a DIFFERENT child', async () => {
     await suspendTaskForChild(parentId, childId)
     const ok = await resumeTaskFromChildResult(parentId, 'some-other-child', 'completed', 'D', null, 'Scout')
     expect(ok).toBe(false)
@@ -309,7 +303,7 @@ describe('resumeTaskFromChildResult', () => {
 })
 
 describe('resolveTask → parent resume integration', () => {
-  itReal('resolving the await scout child resumes the suspended parent (digest injected, no main-queue enqueue)', async () => {
+  it('resolving the await scout child resumes the suspended parent (digest injected, no main-queue enqueue)', async () => {
     // Parent suspends on the child (as the scout tool would).
     await suspendTaskForChild(parentId, childId)
     expect(getTask(parentId).status).toBe('awaiting_subtask')
@@ -343,7 +337,7 @@ describe('resolveTask → parent resume integration', () => {
     expect(getTask(childId).status).toBe('completed')
   })
 
-  itReal('a FAILED scout child still resumes the parent with an error note (no main-queue enqueue)', async () => {
+  it('a FAILED scout child still resumes the parent with an error note (no main-queue enqueue)', async () => {
     await suspendTaskForChild(parentId, childId)
     await resolveTask(childId, 'failed', undefined, 'scout exploded')
 

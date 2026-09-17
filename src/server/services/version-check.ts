@@ -364,7 +364,10 @@ export async function checkForUpdates(): Promise<VersionInfo> {
 
 // ─── Cron ────────────────────────────────────────────────────────────────────
 
+let versionCron: Cron | null = null
+let initialVersionTimer: ReturnType<typeof setTimeout> | null = null
 export function startVersionCheckCron(): void {
+  stopVersionCheckCron()
   if (!config.versionCheck.enabled) {
     log.info('Version check disabled')
     return
@@ -373,15 +376,22 @@ export function startVersionCheckCron(): void {
   const { intervalHours } = config.versionCheck
 
   // Initial check after a short delay to let the server finish booting
-  setTimeout(() => {
+  initialVersionTimer = setTimeout(() => {
     checkForUpdates().catch((err) => log.error({ err }, 'Initial version check failed'))
   }, 30_000)
 
   // Periodic check
-  new Cron(`0 */${intervalHours} * * *`, async () => {
+  versionCron = new Cron(`0 */${intervalHours} * * *`, async () => {
     log.debug('Running scheduled version check')
     await checkForUpdates().catch((err) => log.error({ err }, 'Scheduled version check failed'))
   })
 
   log.info({ intervalHours }, 'Version check cron started')
+}
+
+export function stopVersionCheckCron(): void {
+  versionCron?.stop()
+  if (initialVersionTimer) clearTimeout(initialVersionTimer)
+  versionCron = null
+  initialVersionTimer = null
 }

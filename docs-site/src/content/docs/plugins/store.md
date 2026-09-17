@@ -44,7 +44,11 @@ Plugin management is admin-only. From **Settings → Plugins** an admin can:
 | **Git URL** | Install from URL | Unpublished, private, or in-development plugins |
 | **Manual** | Drop a folder into `plugins/` | Local development |
 
-Installing from the registry runs `npm install` for the chosen package inside an isolated workspace, validates its `plugin.json`, checks host-version compatibility, then activates it. Updates are detected by comparing the installed version against the latest published version on npm.
+Installing from the registry runs `npm install --ignore-scripts` in a temporary directory inside `HIVEKEEP_DATA_DIR`, validates its manifest and version, checks host compatibility, then activates it. Package lifecycle scripts never run automatically. Plugins that require a native build must ship their runtime artifacts; an activation error remains visible in Settings. Dependencies are preserved with the plugin under `HIVEKEEP_DATA_DIR/plugins`, including across container recreation. Updates are staged and validated before replacing the working version.
+
+Existing installations from the old project-root `plugins/` directory are copied and verified on startup. Originals are preserved; a name collision keeps the data-directory copy and is logged. The `.plugin-migrations` records prevent a removed plugin from being imported again on the next startup. Include plugins and migration records when backing up the data directory.
+
+Plugins execute in the server process with its filesystem, network and secret access. Declared SDK permissions are documentation and API checks, not an operating-system sandbox. Install code you trust.
 
 ## Next Steps
 

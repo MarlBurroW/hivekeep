@@ -1,0 +1,9 @@
+Usage: bun run backup create --stopped --to <new-directory> [--data-dir <data>] [--include-folders] | verify --from <backup> [--data-dir <data>] | restore --from <backup> --to <new-directory>
+Plugin storage install passed as UID 1001
+Plugin storage verify passed as UID 1001
+Usage: bun run backup create --stopped --to <new-directory> [--data-dir <data>] [--include-folders] | verify --from <backup> [--data-dir <data>] | restore --from <backup> --to <new-directory>
+Backup created and verified: /tmp/hivekeep-backup-smoke-typtGK/snapshot (776 entries)
+Backup verified: /tmp/hivekeep-backup-smoke-typtGK/snapshot (Hivekeep 1.10.0, 2026-09-16T18:47:51.951Z)
+Restored into a new directory: /tmp/hivekeep-backup-smoke-typtGK/restored
+Storage paths are in restore-env.json. No service has been started or reconfigured.
+Production backup CLI, restored files, encryption key and plugin SDK passed as UID 1001

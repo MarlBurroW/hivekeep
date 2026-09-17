@@ -32,7 +32,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.13"
+          bun-version-file: ".bun-version"
 
       - name: Cache Bun dependencies
         uses: actions/cache@v5
@@ -56,6 +56,24 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Install test browser
+        run: bunx playwright install --with-deps chromium
+
+      - name: Browser journeys with temporary data and simulated provider
+        run: bun run test:e2e
+
+      - name: Conversation continuity and private sessions
+        run: bun run test:e2e:experience
+
+      - name: Workspace files from chat and private attachments
+        run: bun run test:e2e:chat-files
+
+      - name: Agent creation, automations and accessible settings
+        run: bun run test:e2e:product
+
+      - name: Simulated provider tool calls and recovery
+        run: bun run test:e2e:provider
+
   docker:
     name: Validate Docker image
     runs-on: ubuntu-latest
@@ -74,9 +92,27 @@ jobs:
           file: docker/Dockerfile
           platforms: linux/amd64
           push: false
-          load: false
+          load: true
+          tags: hivekeep-ci:smoke
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Plugin persistence and backup restore as production UID
+        run: |
+          plugin_test_volume="hivekeep-plugin-smoke-${GITHUB_RUN_ID}"
+          docker volume create "$plugin_test_volume"
+          trap 'docker volume rm "$plugin_test_volume"' EXIT
+          for phase in install verify; do
+            docker run --rm --network none \
+              -v "$PWD:/smoke:ro" \
+              -v "$plugin_test_volume:/app/data" \
+              -v "$plugin_test_volume:/data" \
+              hivekeep-ci:smoke bun --no-env-file /smoke/scripts/plugin-storage-smoke.ts "$phase"
+          done
+          docker run --rm --network none \
+            -v "$PWD:/smoke:ro" \
+            -v "$plugin_test_volume:/app/data" \
+            hivekeep-ci:smoke bun --no-env-file /smoke/scripts/backup-storage-smoke.ts
 
   scripts:
     name: Validate shell scripts

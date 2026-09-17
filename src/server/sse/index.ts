@@ -12,7 +12,19 @@ type SSEWriter = {
 /** A tap receives every event the manager fans out (in-process observers). */
 export type SSETap = (event: SSEEvent, scope: { kind: 'broadcast' | 'user' | 'agent'; userId?: string }) => void
 
-class SSEManager {
+export class SSEManager {
+  private sessionOwner: (sessionId: string) => string | null = () => null
+
+  /** Installed before workers start; unknown sessions fail closed. */
+  setSessionOwnerResolver(resolve: (sessionId: string) => string | null): void {
+    this.sessionOwner = resolve
+  }
+
+  private privateRecipient(event: SSEEvent): string | null | undefined {
+    const id = event.data?.sessionId
+    if (typeof id !== 'string' || !id) return undefined
+    try { return this.sessionOwner(id) } catch { return null }
+  }
   private connections = new Map<string, SSEWriter>()
   /** In-process observers of the event stream (e.g. mini-app event subscriptions). */
   private taps = new Set<SSETap>()
@@ -54,6 +66,11 @@ class SSEManager {
    * Send an event to all connected clients.
    */
   broadcast(event: SSEEvent): void {
+    const recipient = this.privateRecipient(event)
+    if (recipient !== undefined) {
+      if (recipient) this.sendToUser(recipient, event)
+      return
+    }
     const payload = formatSSE(event)
     for (const [, writer] of this.connections) {
       try {
@@ -69,6 +86,8 @@ class SSEManager {
    * Send an event to a specific user's connections.
    */
   sendToUser(userId: string, event: SSEEvent): void {
+    const recipient = this.privateRecipient(event)
+    if (recipient !== undefined && recipient !== userId) return
     const payload = formatSSE(event)
     for (const [, writer] of this.connections) {
       if (writer.userId === userId) {
@@ -79,7 +98,9 @@ class SSEManager {
         }
       }
     }
-    this.notifyTaps(event, { kind: 'user', userId })
+    // Shared Mini App backends subscribe to taps without user isolation.
+    // Private-session content must never enter that shared bus.
+    if (recipient === undefined && event.type !== 'log:entry') this.notifyTaps(event, { kind: 'user', userId })
   }
 
   /**
@@ -87,6 +108,11 @@ class SSEManager {
    * For now, broadcast to all — future: track which clients are watching which agents.
    */
   sendToAgent(agentId: string, event: SSEEvent): void {
+    const recipient = this.privateRecipient(event)
+    if (recipient !== undefined) {
+      if (recipient) this.sendToUser(recipient, { ...event, agentId })
+      return
+    }
     const payload = formatSSE({ ...event, agentId })
     for (const [, writer] of this.connections) {
       try {
@@ -100,6 +126,13 @@ class SSEManager {
 
   get connectionCount(): number {
     return this.connections.size
+  }
+
+  closeAll(): void {
+    for (const writer of this.connections.values()) {
+      try { writer.close() } catch { /* already disconnected */ }
+    }
+    this.connections.clear()
   }
 }
 

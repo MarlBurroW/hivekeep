@@ -8,6 +8,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/client/components/ui/collapsible'
 import { ConfirmDeleteButton } from '@/client/components/common/ConfirmDeleteButton'
+import { AutomationFlow } from '@/client/components/common/AutomationFlow'
 import { api, getErrorMessage } from '@/client/lib/api'
 import { toast } from 'sonner'
 import { cn } from '@/client/lib/utils'
@@ -59,9 +60,9 @@ export function AccountTriggersSection({ accountId }: { accountId: string }) {
           <p className="py-1 text-xs text-muted-foreground">{t('settings.triggers.empty')}</p>
         ) : (
           triggers.map((trg) => (
-            <div key={trg.id} className="flex items-start justify-between gap-2 rounded-lg border border-border bg-muted/20 p-2.5">
+            <div key={trg.id} className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-2.5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <p className="truncate text-sm font-medium">{trg.name}</p>
                   <Badge variant="secondary" className="text-[10px]">
                     {trg.dispatchMode === 'task' ? t('settings.triggers.dispatchTask') : t('settings.triggers.dispatchConversation')}
@@ -75,15 +76,19 @@ export function AccountTriggersSection({ accountId }: { accountId: string }) {
                     <Badge variant="outline" className="text-[10px] text-warning">{t('settings.triggers.pendingApproval')}</Badge>
                   )}
                 </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground" title={trg.conditionsSummary}>
-                  {trg.folder} · {trg.conditionsSummary}
-                </p>
-                <p className="truncate text-[11px] text-muted-foreground/80">
-                  → {trg.targetAgentName}
-                </p>
+                <AutomationFlow
+                  className="mt-2"
+                  trigger={`${trg.accountLabel} · ${trg.folder} · ${trg.conditionsSummary}`}
+                  agent={trg.targetAgentName}
+                  action={t(trg.dispatchMode === 'task' ? 'workspace.automationsFlow.createTask' : 'workspace.automationsFlow.sendMessage')}
+                  actionDetail={trg.prompt}
+                  destination={t(trg.dispatchMode === 'task' ? 'workspace.automationsFlow.reportTo' : 'workspace.automationsFlow.conversationOf', { name: trg.targetAgentName })}
+                  lastTriggeredAt={trg.lastTriggeredAt}
+                  next={t(trg.requiresApproval && !trg.isActive ? 'settings.triggers.pendingApproval' : trg.isActive ? 'workspace.automationsFlow.nextEmail' : 'workspace.automationsFlow.paused')}
+                />
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Switch checked={trg.isActive} onCheckedChange={() => void toggleActive(trg)} title={t('settings.triggers.active')} />
+              <div className="flex shrink-0 items-center justify-end gap-1">
+                <Switch checked={trg.isActive} onCheckedChange={() => void toggleActive(trg)} aria-label={t('workspace.automationsFlow.toggle', { name: trg.name })} />
                 <Button size="icon" variant="ghost" className="size-8" onClick={() => openEdit(trg)} title={t('common.edit')}>
                   <Pencil className="size-3.5" />
                 </Button>

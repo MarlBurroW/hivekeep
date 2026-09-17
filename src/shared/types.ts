@@ -669,6 +669,8 @@ export interface MessageFile {
 export type QuickSessionStatus = 'active' | 'closed'
 
 export interface QuickSessionSummary {
+  /** Server retention after closure, in days. */
+  retentionDays?: number
   id: string
   agentId: string
   title: string | null

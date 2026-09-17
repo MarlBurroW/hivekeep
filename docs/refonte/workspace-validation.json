@@ -1,0 +1,678 @@
+{
+  "results": [
+    "login, accueil et langue française",
+    "accueil : erreur de chargement visible et reprise",
+    "demande humaine depuis l’accueil, réponse et reprise après erreur",
+    "routes directes, productions, automatisations et réglages",
+    "anciennes URLs et page introuvable",
+    "brouillon conservé lors du démontage du chat",
+    "réponse en cours pendant navigation, reprise sans doublon",
+    "recherche au-delà des messages chargés et contexte ancien",
+    "droits membre et séparation des brouillons",
+    "session privée, pièces jointes, contexte et SSE protégés côté serveur",
+    "aucun débordement global à 320, 390, 768 et 1440 px",
+    "interruption du flux, bannière, reconnexion et brouillon conservé",
+    "variantes anglaises desktop et mobile",
+    "captures clair/sombre, aucune exception navigateur"
+  ],
+  "metrics": {
+    "login": [
+      {
+        "name": "index-BrYez3M9.js",
+        "encoded": 282651,
+        "decoded": 875711
+      },
+      {
+        "name": "fr-tr23es51.js",
+        "encoded": 55394,
+        "decoded": 172275
+      },
+      {
+        "name": "tool-domain-lookup-B1xPRnNo.js",
+        "encoded": 475,
+        "decoded": 1019
+      },
+      {
+        "name": "custom-tool-names-Cu7oWo5v.js",
+        "encoded": 903,
+        "decoded": 2064
+      },
+      {
+        "name": "LoginPage-DEptgFeb.js",
+        "encoded": 1052,
+        "decoded": 2582
+      },
+      {
+        "name": "input-Co2jkYDV.js",
+        "encoded": 440,
+        "decoded": 804
+      },
+      {
+        "name": "password-input-Cf0_bU6c.js",
+        "encoded": 404,
+        "decoded": 634
+      },
+      {
+        "name": "label-C5Zuk0h5.js",
+        "encoded": 404,
+        "decoded": 616
+      },
+      {
+        "name": "alert-CUz5qbSd.js",
+        "encoded": 517,
+        "decoded": 1030
+      },
+      {
+        "name": "eye-CEsAA4uK.js",
+        "encoded": 348,
+        "decoded": 640
+      },
+      {
+        "name": "circle-alert-DFN5NXtp.js",
+        "encoded": 189,
+        "decoded": 252
+      }
+    ],
+    "loginUsedSourceBytes": 583754,
+    "chat": [
+      {
+        "name": "index-BrYez3M9.js",
+        "encoded": 282651,
+        "decoded": 875711
+      },
+      {
+        "name": "fr-tr23es51.js",
+        "encoded": 55394,
+        "decoded": 172275
+      },
+      {
+        "name": "tool-domain-lookup-B1xPRnNo.js",
+        "encoded": 475,
+        "decoded": 1019
+      },
+      {
+        "name": "custom-tool-names-Cu7oWo5v.js",
+        "encoded": 903,
+        "decoded": 2064
+      },
+      {
+        "name": "ChatPage-D67JUMK6.js",
+        "encoded": 46236,
+        "decoded": 155788
+      },
+      {
+        "name": "use-mobile-DU0aXi6y.js",
+        "encoded": 243,
+        "decoded": 326
+      },
+      {
+        "name": "separator-BxZJ7Ta3.js",
+        "encoded": 401,
+        "decoded": 743
+      },
+      {
+        "name": "panel-left-Dx_4kqYu.js",
+        "encoded": 284,
+        "decoded": 420
+      },
+      {
+        "name": "sheet-D1y0R6FC.js",
+        "encoded": 903,
+        "decoded": 2613
+      },
+      {
+        "name": "input-Co2jkYDV.js",
+        "encoded": 440,
+        "decoded": 804
+      },
+      {
+        "name": "sortable.esm-B_-aRNLF.js",
+        "encoded": 16798,
+        "decoded": 50120
+      },
+      {
+        "name": "PlatformIcon-JtMgpFUT.js",
+        "encoded": 2844,
+        "decoded": 6928
+      },
+      {
+        "name": "context-menu-ynRugtAl.js",
+        "encoded": 2012,
+        "decoded": 6470
+      },
+      {
+        "name": "alert-dialog-BPwBO-oW.js",
+        "encoded": 1899,
+        "decoded": 5582
+      },
+      {
+        "name": "repeat-CLv0USRB.js",
+        "encoded": 310,
+        "decoded": 597
+      },
+      {
+        "name": "folder-CFhCibH8.js",
+        "encoded": 192,
+        "decoded": 230
+      },
+      {
+        "name": "trash-2-C1uWMWFc.js",
+        "encoded": 218,
+        "decoded": 330
+      },
+      {
+        "name": "EmptyState-DjjxuUOl.js",
+        "encoded": 537,
+        "decoded": 1484
+      },
+      {
+        "name": "plus-BWPO4XPb.js",
+        "encoded": 152,
+        "decoded": 155
+      },
+      {
+        "name": "bug-ILouv6_I.js",
+        "encoded": 326,
+        "decoded": 630
+      },
+      {
+        "name": "sparkles-BdnzsRlD.js",
+        "encoded": 286,
+        "decoded": 496
+      },
+      {
+        "name": "flask-conical-lXI7jIZZ.js",
+        "encoded": 233,
+        "decoded": 304
+      },
+      {
+        "name": "ToolDomainIcon-BDIDrULA.js",
+        "encoded": 152056,
+        "decoded": 561740
+      },
+      {
+        "name": "hash-BBm67ffe.js",
+        "encoded": 428,
+        "decoded": 776
+      },
+      {
+        "name": "app-window-B2RlgVUP.js",
+        "encoded": 207,
+        "decoded": 260
+      },
+      {
+        "name": "anchor-kZvNGpHT.js",
+        "encoded": 214,
+        "decoded": 261
+      },
+      {
+        "name": "arrow-left-5EHgV48H.js",
+        "encoded": 163,
+        "decoded": 167
+      },
+      {
+        "name": "arrow-right-eLRPXtf3.js",
+        "encoded": 163,
+        "decoded": 167
+      },
+      {
+        "name": "zoom-out-CaJ5Gz9e.js",
+        "encoded": 1466,
+        "decoded": 3976
+      },
+      {
+        "name": "share-2-DkTPLY_N.js",
+        "encoded": 316,
+        "decoded": 520
+      },
+      {
+        "name": "blocks-BV9pkSOq.js",
+        "encoded": 217,
+        "decoded": 268
+      },
+      {
+        "name": "arrow-up-right-BCzC3jtO.js",
+        "encoded": 161,
+        "decoded": 169
+      },
+      {
+        "name": "pin-whsjcK3q.js",
+        "encoded": 632,
+        "decoded": 1433
+      },
+      {
+        "name": "calendar-clock-C_Bg8KuI.js",
+        "encoded": 256,
+        "decoded": 380
+      },
+      {
+        "name": "crop-DOjxJKRi.js",
+        "encoded": 265,
+        "decoded": 396
+      },
+      {
+        "name": "camera-aHZjafyF.js",
+        "encoded": 255,
+        "decoded": 338
+      },
+      {
+        "name": "chevron-down-Cul__3ZY.js",
+        "encoded": 142,
+        "decoded": 130
+      },
+      {
+        "name": "chevron-left-C1o5Q9LA.js",
+        "encoded": 146,
+        "decoded": 132
+      },
+      {
+        "name": "chevron-right-Dn2iOrde.js",
+        "encoded": 143,
+        "decoded": 132
+      },
+      {
+        "name": "chevron-up-C7O3-e5L.js",
+        "encoded": 142,
+        "decoded": 130
+      },
+      {
+        "name": "chevrons-up-down-D5tqH11L.js",
+        "encoded": 163,
+        "decoded": 176
+      },
+      {
+        "name": "circle-alert-DFN5NXtp.js",
+        "encoded": 189,
+        "decoded": 252
+      },
+      {
+        "name": "circle-check-big-CU3XOg63.js",
+        "encoded": 182,
+        "decoded": 196
+      },
+      {
+        "name": "circle-question-mark-B3qOtLUC.js",
+        "encoded": 209,
+        "decoded": 250
+      },
+      {
+        "name": "circle-Dlm8RBXO.js",
+        "encoded": 133,
+        "decoded": 132
+      },
+      {
+        "name": "rotate-cw-DNZYPFdu.js",
+        "encoded": 419,
+        "decoded": 758
+      },
+      {
+        "name": "clock-3-B3D4sq4n.js",
+        "encoded": 167,
+        "decoded": 171
+      },
+      {
+        "name": "palette-BZ5eibzL.js",
+        "encoded": 442,
+        "decoded": 861
+      },
+      {
+        "name": "cpu-Bmedetko.js",
+        "encoded": 291,
+        "decoded": 644
+      },
+      {
+        "name": "sticky-note-CKbtEnxc.js",
+        "encoded": 490,
+        "decoded": 847
+      },
+      {
+        "name": "ellipsis-BqEYXmE-.js",
+        "encoded": 165,
+        "decoded": 228
+      },
+      {
+        "name": "eye-CEsAA4uK.js",
+        "encoded": 348,
+        "decoded": 640
+      },
+      {
+        "name": "text-wrap-LZenTWV4.js",
+        "encoded": 914,
+        "decoded": 3465
+      },
+      {
+        "name": "inbox-BQBScZT4.js",
+        "encoded": 413,
+        "decoded": 685
+      },
+      {
+        "name": "hard-drive-Dg0XjD1h.js",
+        "encoded": 451,
+        "decoded": 846
+      },
+      {
+        "name": "file-BM4cQ3AE.js",
+        "encoded": 212,
+        "decoded": 272
+      },
+      {
+        "name": "git-branch-DeFufk5y.js",
+        "encoded": 192,
+        "decoded": 231
+      },
+      {
+        "name": "globe-BHKkuIkW.js",
+        "encoded": 192,
+        "decoded": 244
+      },
+      {
+        "name": "shield-X9uPr7rc.js",
+        "encoded": 371,
+        "decoded": 559
+      },
+      {
+        "name": "image-up-DuT-u9mV.js",
+        "encoded": 253,
+        "decoded": 339
+      },
+      {
+        "name": "layout-grid-CBD8VvtK.js",
+        "encoded": 198,
+        "decoded": 348
+      },
+      {
+        "name": "key-round-DDqsG3eA.js",
+        "encoded": 262,
+        "decoded": 357
+      },
+      {
+        "name": "lightbulb-DkJTJoQM.js",
+        "encoded": 227,
+        "decoded": 288
+      },
+      {
+        "name": "list-todo-BWEb3Xw4.js",
+        "encoded": 222,
+        "decoded": 302
+      },
+      {
+        "name": "list-Bq8owfhQ.js",
+        "encoded": 189,
+        "decoded": 304
+      },
+      {
+        "name": "log-in-76L5kls2.js",
+        "encoded": 190,
+        "decoded": 233
+      },
+      {
+        "name": "maximize-2-HHVGNE-Z.js",
+        "encoded": 188,
+        "decoded": 240
+      },
+      {
+        "name": "message-circle-BBB3ow63.js",
+        "encoded": 212,
+        "decoded": 243
+      },
+      {
+        "name": "messages-square-CqOAgu-J.js",
+        "encoded": 254,
+        "decoded": 367
+      },
+      {
+        "name": "monitor-smartphone-CWRxRVv6.js",
+        "encoded": 245,
+        "decoded": 328
+      },
+      {
+        "name": "moon-Cskp51AB.js",
+        "encoded": 200,
+        "decoded": 219
+      },
+      {
+        "name": "package-N0tEHfpZ.js",
+        "encoded": 258,
+        "decoded": 374
+      },
+      {
+        "name": "pencil-CdwyHehF.js",
+        "encoded": 227,
+        "decoded": 278
+      },
+      {
+        "name": "play-CjbOGofe.js",
+        "encoded": 180,
+        "decoded": 192
+      },
+      {
+        "name": "smartphone-mR2Y7mmV.js",
+        "encoded": 372,
+        "decoded": 801
+      },
+      {
+        "name": "rotate-ccw-CFVFNKlf.js",
+        "encoded": 185,
+        "decoded": 202
+      },
+      {
+        "name": "send-CgsL3R08.js",
+        "encoded": 231,
+        "decoded": 292
+      },
+      {
+        "name": "shield-check-QNzuIZsT.js",
+        "encoded": 250,
+        "decoded": 322
+      },
+      {
+        "name": "shield-off-DXGBSXAB.js",
+        "encoded": 284,
+        "decoded": 402
+      },
+      {
+        "name": "star-DnvDpHgz.js",
+        "encoded": 295,
+        "decoded": 474
+      },
+      {
+        "name": "square-terminal-SElqGipY.js",
+        "encoded": 208,
+        "decoded": 244
+      },
+      {
+        "name": "sun-CuNRaTUl.js",
+        "encoded": 261,
+        "decoded": 474
+      },
+      {
+        "name": "timer-xn4INIma.js",
+        "encoded": 190,
+        "decoded": 240
+      },
+      {
+        "name": "upload-pFfYxUBe.js",
+        "encoded": 192,
+        "decoded": 232
+      },
+      {
+        "name": "volume-2-CiJ5_jJI.js",
+        "encoded": 273,
+        "decoded": 392
+      },
+      {
+        "name": "wand-sparkles-DuLnN0Mw.js",
+        "encoded": 294,
+        "decoded": 515
+      },
+      {
+        "name": "zap-D3LINph7.js",
+        "encoded": 208,
+        "decoded": 264
+      },
+      {
+        "name": "zoom-in-D8swU6FL.js",
+        "encoded": 211,
+        "decoded": 304
+      },
+      {
+        "name": "ProviderIcon-NbcLbz6z.js",
+        "encoded": 1904,
+        "decoded": 6397
+      },
+      {
+        "name": "useProviderTypes-CWsy9ZS0.js",
+        "encoded": 612,
+        "decoded": 1192
+      },
+      {
+        "name": "scroll-area-D-QFYszN.js",
+        "encoded": 3976,
+        "decoded": 12564
+      },
+      {
+        "name": "index-BdQq_4o_.js",
+        "encoded": 79,
+        "decoded": 64
+      },
+      {
+        "name": "collapsible-DLAUESlv.js",
+        "encoded": 1008,
+        "decoded": 2364
+      },
+      {
+        "name": "useHumanPrompts-H_1DOw7q.js",
+        "encoded": 36097,
+        "decoded": 184699
+      },
+      {
+        "name": "CustomToolRenderer-iqY2EKPv.js",
+        "encoded": 2948,
+        "decoded": 8339
+      },
+      {
+        "name": "tool-call-prefs-CcKsW_M_.js",
+        "encoded": 165,
+        "decoded": 209
+      },
+      {
+        "name": "MarkdownContent-_C_wURAf.js",
+        "encoded": 6518,
+        "decoded": 16195
+      },
+      {
+        "name": "billing-BwG7a8E9.js",
+        "encoded": 154,
+        "decoded": 290
+      },
+      {
+        "name": "progress-DboSFU2d.js",
+        "encoded": 1156,
+        "decoded": 2367
+      },
+      {
+        "name": "textarea-CY3rg3zt.js",
+        "encoded": 381,
+        "decoded": 620
+      },
+      {
+        "name": "useToolCatalog-D7QVDwZM.js",
+        "encoded": 307,
+        "decoded": 406
+      },
+      {
+        "name": "useWorkspaceFileSearch-Dx3rP81-.js",
+        "encoded": 688,
+        "decoded": 1280
+      },
+      {
+        "name": "ModelPicker-zXR87IoU.js",
+        "encoded": 1794,
+        "decoded": 4711
+      },
+      {
+        "name": "command-DcvDXHE2.js",
+        "encoded": 6292,
+        "decoded": 16574
+      },
+      {
+        "name": "model-efforts-CHybEewc.js",
+        "encoded": 319,
+        "decoded": 578
+      },
+      {
+        "name": "skeleton-CAzKfoSf.js",
+        "encoded": 175,
+        "decoded": 198
+      },
+      {
+        "name": "ToolSelector-OzcebzqU.js",
+        "encoded": 2096,
+        "decoded": 6141
+      },
+      {
+        "name": "index-DVyCqnPS.js",
+        "encoded": 174,
+        "decoded": 233
+      },
+      {
+        "name": "switch-Cd1wFcro.js",
+        "encoded": 1336,
+        "decoded": 2767
+      },
+      {
+        "name": "label-C5Zuk0h5.js",
+        "encoded": 404,
+        "decoded": 616
+      },
+      {
+        "name": "QrPairingView-fbgUKOFr.js",
+        "encoded": 486,
+        "decoded": 1069
+      },
+      {
+        "name": "useDraftMessage-D1Lv9FzP.js",
+        "encoded": 831,
+        "decoded": 1831
+      },
+      {
+        "name": "useUnreadPerAgent-WlRwlskU.js",
+        "encoded": 2631,
+        "decoded": 7758
+      },
+      {
+        "name": "useProviders-BlaJDAcR.js",
+        "encoded": 422,
+        "decoded": 683
+      },
+      {
+        "name": "useAgents-CaSDz9Oq.js",
+        "encoded": 1980,
+        "decoded": 5783
+      },
+      {
+        "name": "useModels-CrhJyR_5.js",
+        "encoded": 383,
+        "decoded": 669
+      },
+      {
+        "name": "CommandPalette-NPcHp3lg.js",
+        "encoded": 1065,
+        "decoded": 2466
+      },
+      {
+        "name": "index-Cj7SJGb1.js",
+        "encoded": 78567,
+        "decoded": 662750
+      },
+      {
+        "name": "iconBase-C0ah4VdB.js",
+        "encoded": 1081,
+        "decoded": 2449
+      }
+    ],
+    "chatUsedSourceBytes": 1404718
+  },
+  "errors": [],
+  "inferenceCount": 4
+}

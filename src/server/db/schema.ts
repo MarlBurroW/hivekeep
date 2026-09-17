@@ -722,6 +722,10 @@ export const queueItems = sqliteTable('queue_items', {
   // deep queue before its (perfectly healthy) turn even starts.
   processingStartedAt: integer('processing_started_at', { mode: 'timestamp_ms' }),
   createdMessageId: text('created_message_id'), // tracks whether the user message was already inserted (idempotency on recovery)
+  // Persist the complete inbound envelope before exposing the pending item.
+  fileIds: text('file_ids', { mode: 'json' }).$type<string[]>(),
+  clientMessageId: text('client_message_id'),
+  messageMetadata: text('message_metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   processedAt: integer('processed_at', { mode: 'timestamp_ms' }),
 }, (table) => [
@@ -730,6 +734,8 @@ export const queueItems = sqliteTable('queue_items', {
 
 export const files = sqliteTable('files', {
   id: text('id').primaryKey(),
+  // Scope generated and uploaded attachments before any message is persisted.
+  sessionId: text('session_id'),
   agentId: text('agent_id').notNull().references(() => agents.id),
   messageId: text('message_id').references(() => messages.id),
   uploadedBy: text('uploaded_by').references(() => user.id),
@@ -738,7 +744,9 @@ export const files = sqliteTable('files', {
   mimeType: text('mime_type').notNull(),
   size: integer('size').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-})
+}, (table) => [
+  index('idx_files_session').on(table.sessionId),
+])
 
 export const humanPrompts = sqliteTable('human_prompts', {
   id: text('id').primaryKey(),

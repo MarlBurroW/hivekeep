@@ -64,6 +64,8 @@ import { startBulkAvatarRegen, getBulkAvatarJob } from '@/server/services/avatar
 import { sseManager } from '@/server/sse/index'
 import type { AppVariables } from '@/server/app'
 import { createLogger } from '@/server/logger'
+import { config } from '@/server/config'
+import { getBackupStatus } from '@/server/services/backup-status'
 
 const log = createLogger('routes:settings')
 const settingsRoutes = new Hono<{ Variables: AppVariables }>()
@@ -99,6 +101,9 @@ settingsRoutes.use('*', async (c, next) => {
   }
   return next()
 })
+
+// Verification is performed by the offline CLI; this endpoint exposes dates only.
+settingsRoutes.get('/backup-status', async (c) => c.json(await getBackupStatus(config.dataDir)))
 
 // GET /api/settings/global-prompt
 settingsRoutes.get('/global-prompt', async (c) => {

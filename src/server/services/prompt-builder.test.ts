@@ -700,3 +700,30 @@ describe('buildSystemPrompt', () => {
     })
   })
 })
+
+
+describe('configurator guidance', () => {
+  it('uses the current provider catalogue and grants without caching them across turns', () => {
+    const params = makeParams({
+      agent: { name: 'Queenie', slug: 'queenie', role: 'guide', character: '', expertise: '', kind: 'configurator' },
+      configuratorCatalogue: '- plugin:new-provider: llm, embedding',
+      configuratorToolNames: ['get_setup_health', 'create_agent'],
+    })
+    const first = buildSystemPrompt(params)
+    expect(first).toContain('- plugin:new-provider: llm, embedding')
+    expect(first).toContain('Only these tool names are granted: get_setup_health, create_agent')
+    expect(first).toContain('Get to a useful first Agent promptly')
+    const second = buildSystemPrompt({ ...params, configuratorCatalogue: '- local-provider: llm' })
+    expect(second).toContain('- local-provider: llm')
+    expect(second).not.toContain('plugin:new-provider')
+  })
+
+  it('does not inject onboarding instructions to save shared memories into a private conversation', () => {
+    const prompt = buildSystemPrompt(makeParams({
+      agent: { name: 'Queenie', slug: 'queenie', role: 'guide', character: '', expertise: '', kind: 'configurator' },
+      isQuickSession: true,
+    }))
+    expect(prompt).not.toContain('## Configurator mission')
+    expect(prompt).toContain('Do not offer to save memories or create contacts')
+  })
+})

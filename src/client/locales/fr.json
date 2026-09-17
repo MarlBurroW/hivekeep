@@ -103,7 +103,9 @@
     "clearFilters": "Effacer",
     "perPage": "Par page",
     "listRange": "{{from}}-{{to}} sur {{total}}",
-    "clear": "Effacer"
+    "clear": "Effacer",
+    "showDetails": "Afficher les détails",
+    "hideDetails": "Masquer les détails"
   },
   "errors": {
     "backendUnavailable": "Impossible de joindre le serveur. Vérifiez que le backend est en cours d'exécution et réessayez.",
@@ -695,6 +697,37 @@
     }
   },
   "chat": {
+    "workspaceFiles": {
+      "open": "Fichiers du workspace",
+      "title": "Fichiers · {{name}}",
+      "scope": "Workspace partagé",
+      "description": "Les chemins des fichiers choisis seront ajoutés à votre message.",
+      "upload": "Importer des fichiers",
+      "uploading": "Import en cours…",
+      "destination": "Importer dans : {{directory}}",
+      "uploaded_one": "{{count}} fichier importé et sélectionné.",
+      "uploaded_other": "{{count}} fichiers importés et sélectionnés.",
+      "uploadErrors": "Import impossible : {{names}}. Vous pouvez réessayer ; les fichiers déjà importés restent sélectionnés.",
+      "privateHint": "Ce workspace est partagé. Pour un nouveau fichier réservé à cette conversation, utilisez une pièce jointe privée.",
+      "attachPrivate": "Joindre un fichier privé",
+      "search": "Rechercher dans tout le workspace…",
+      "clearSearch": "Effacer la recherche",
+      "location": "Dossier du workspace",
+      "root": "Racine",
+      "up": "Dossier précédent",
+      "allFiles": "Tous les fichiers",
+      "empty": "Ce dossier est vide",
+      "emptyHint": "Importez des fichiers ou déposez-les ici.",
+      "drop": "Déposer dans {{directory}}",
+      "download": "Télécharger {{name}}",
+      "selected_zero": "Sélectionnez des fichiers à ajouter au message.",
+      "selected_one": "{{count}} fichier sélectionné",
+      "selected_other": "{{count}} fichiers sélectionnés",
+      "clearSelection": "Tout désélectionner",
+      "insert": "Ajouter au message",
+      "remove": "Retirer {{path}} de la sélection",
+      "refine": "Les 50 premiers résultats sont affichés. Précisez votre recherche."
+    },
     "placeholder": "Comment puis-je vous aider ?",
     "attachmentUnsupported": "{{model}} ne peut pas les lire, ignorés : {{files}}",
     "send": "Envoyer",
@@ -942,7 +975,12 @@
       "previous": "Résultat précédent",
       "next": "Résultat suivant",
       "close": "Fermer la recherche",
-      "partialScope": "Recherche limitée à {{count}} messages chargés"
+      "partialScope": "Recherche limitée à {{count}} messages chargés",
+      "history": "Rechercher dans tout l’historique",
+      "total": "{{count}} résultats",
+      "more": "Charger la suite",
+      "context": "Contexte du message",
+      "contextDescription": "Un extrait de la conversation autour du résultat. Le fil actuel reste ouvert."
     },
     "collapse": {
       "showMore": "Voir plus",
@@ -1360,6 +1398,13 @@
         "recreate": "Recréer Queenie",
         "recreated": "Queenie a été recréée",
         "noProvider": "Aucun provider LLM valide disponible. Connecte-en un d'abord."
+      },
+      "backup": {
+        "title": "Sauvegarde des données",
+        "verified": "Dernière vérification réussie : {{date}}",
+        "unknown": "Aucune sauvegarde vérifiée pour cette installation.",
+        "description": "La sauvegarde complète se lance manuellement, serveur arrêté. La vérification contrôle les fichiers et la base ; elle ne garantit pas une restauration de production.",
+        "command": "Commande sur le serveur :"
       }
     },
     "avatars": {
@@ -2400,7 +2445,8 @@
       "sourceLocal": "Local",
       "resetHealth": "Réinitialiser les stats de santé",
       "healthReset": "Stats de santé réinitialisées",
-      "search": "Rechercher des plugins..."
+      "search": "Rechercher des plugins...",
+      "runtimeAccess": "Les extensions s’exécutent avec les droits du serveur et peuvent accéder à ses fichiers, au réseau et aux secrets. Les permissions déclarées décrivent leur usage du SDK ; elles ne constituent pas une sandbox."
     },
     "marketplace": {
       "title": "Explorer les plugins",
@@ -2583,6 +2629,8 @@
     }
   },
   "modelPicker": {
+    "label": "Modèle",
+    "change": "Changer de modèle, modèle actuel : {{model}}",
     "placeholder": "Sélectionnez un modèle",
     "search": "Rechercher un modèle...",
     "noResults": "Aucun modèle trouvé",
@@ -3608,6 +3656,123 @@
       "bug": "Bug",
       "suggestion": "Suggestion",
       "experience": "Expérience"
+    }
+  },
+  "workspace": {
+    "home": "Accueil",
+    "agents": "Agents",
+    "productions": "Productions",
+    "automations": "Automatisations",
+    "navigation": "Navigation principale",
+    "yourWorkspace": "Votre espace de travail",
+    "search": "Rechercher et naviguer",
+    "preferences": "Préférences personnelles",
+    "ai": "IA et modèles",
+    "connections": "Connexions",
+    "extensions": "Extensions et outils avancés",
+    "data": "Données et accès",
+    "system": "Système",
+    "appearance": "Apparence",
+    "back": "Revenir à la conversation",
+    "unavailable": "Page indisponible",
+    "unavailableDescription": "Cette page n’existe pas ou n’est pas accessible avec vos droits.",
+    "greeting": "Bonjour {{name}}",
+    "homeDescription": "Reprenez une conversation, répondez à vos Agents et retrouvez leurs derniers travaux.",
+    "startConversation": "Ouvrir une conversation",
+    "needsYou": "À traiter",
+    "running": "En cours",
+    "unread": "Messages non lus",
+    "reply": "Répondre",
+    "open": "Ouvrir",
+    "executions": "Toutes les exécutions",
+    "pendingApprovals": "Automatisations à approuver : {{count}}",
+    "unreadMessages": "{{count}} messages non lus",
+    "allClear": "Tout est à jour",
+    "allClearDescription": "Les demandes de vos Agents apparaîtront ici.",
+    "recentResults": "Résultats récents",
+    "seeAll": "Tout voir",
+    "noResults": "Vos travaux terminés et les éventuelles erreurs apparaîtront ici.",
+    "yourAgents": "Vos Agents",
+    "create": "Créer",
+    "allAgents": "Explorer vos Agents",
+    "productionsDescription": "Les apps et fichiers créés avec vos Agents, au même endroit.",
+    "apps": "Apps",
+    "plans": "Planifications",
+    "accountTriggers": "Déclencheurs de comptes",
+    "accounts": "Comptes",
+    "automationsDescription": "Choisissez ce qui déclenche le travail. Retrouvez les exécutions depuis l’accueil.",
+    "buildApp": "Construire une app",
+    "buildAppPrompt": "Aide-moi à concevoir et construire une app. Commence par me demander ce qu’elle doit faire et à qui elle est destinée.",
+    "chooseAgent": "Choisissez un Agent pour commencer",
+    "draftOnly": "Un brouillon s’ouvrira dans la conversation. Relisez-le avant de l’envoyer.",
+    "loadError": "Une partie de l’activité n’a pas pu être chargée. Réessaie pour afficher son état actuel.",
+    "loadMore": "Afficher plus de demandes",
+    "automationsFlow": {
+      "description": "Parcours de l’automatisation",
+      "trigger": "Déclencheur",
+      "agent": "Agent",
+      "action": "Action",
+      "destination": "Destination",
+      "last": "Dernier événement",
+      "next": "Prochain",
+      "never": "Aucun",
+      "createTask": "Créer une tâche",
+      "sendMessage": "Transmettre le message",
+      "reportTo": "Compte rendu à {{name}}",
+      "conversationOf": "Conversation de {{name}}",
+      "incomingRequest": "Requête webhook reçue",
+      "filteredRequest": "Requête webhook correspondant aux filtres",
+      "nextRequest": "À la prochaine requête correspondante",
+      "nextEmail": "Au prochain e-mail correspondant",
+      "paused": "En pause",
+      "unknownSchedule": "Échéance indisponible",
+      "reorder": "Déplacer {{name}}",
+      "toggle": "Activer ou mettre en pause {{name}}"
+    }
+  },
+  "experience": {
+    "changeAvatar": "Changer l’avatar",
+    "onboarding": {
+      "resume": "Continuer avec le fournisseur connecté",
+      "guidance": "Queenie peut vous aider à créer votre premier Agent. Retrouvez-la dans sa conversation quand vous le souhaitez.",
+      "openQueenie": "Discuter avec Queenie",
+      "dismiss": "Je préfère explorer"
+    },
+    "setup": {
+      "hideOptional": "Masquer les capacités facultatives",
+      "showOptional": "Explorer les capacités facultatives"
+    },
+    "buildAppDraft": "Aide-moi à créer une application. Commençons par définir ce qu’elle doit faire.",
+    "agent": {
+      "identity": "Identité",
+      "capabilities": "Capacités",
+      "advanced": "Réglages avancés",
+      "generationOptions": "Options de génération",
+      "linkOptions": "Lien de la conversation",
+      "advancedModels": "Réglages avancés des modèles",
+      "minimalHint": "Aucune boîte à outils sélectionnée : seules les capacités de base sont disponibles. Les plugins et outils MCP nécessitent toujours une autorisation explicite.",
+      "effectiveCapabilities": "{{count}} capacités disponibles",
+      "grantHint": "Choisissez les capacités utiles à cet Agent. Tous les outils natifs inclut les outils personnalisés activés ; MCP et plugins restent des choix explicites.",
+      "minimal": "Minimales",
+      "allNative": "Ajouter tous les outils natifs",
+      "templateResearch": "Un assistant de recherche qui compare les sources et prépare des synthèses concises.",
+      "templatePlanning": "Un assistant qui m’aide à planifier mes projets et à suivre les prochaines étapes.",
+      "templateWriting": "Un partenaire d’écriture qui m’aide à rédiger, réviser et traduire des textes clairs.",
+      "research": "Recherche",
+      "planning": "Organisation",
+      "writing": "Écriture"
+    },
+    "chat": {
+      "private": "Session privée",
+      "openPrivate": "Ouvrir une session privée",
+      "privateScope": "Vous seul pouvez consulter cette session. La fermer la conserve dans votre historique ; un résumé ne rejoint la mémoire partagée que si vous le choisissez.",
+      "memoryDestination": "Le résumé enregistré rejoint la mémoire partagée de cet Agent, utilisable dans ses autres conversations. Le reste de la conversation privée n’est pas transféré.",
+      "retention": "L’historique est supprimé {{count}} jours après la fermeture de la session.",
+      "shared": "Conversation partagée",
+      "details": "Détails",
+      "clearEffects": "Cela affecte la conversation partagée et ses fichiers joints. Les souvenirs existants sont conservés ; gérez-les séparément dans les réglages de mémoire de l’Agent.",
+      "uploadRetry": "Échec de l’envoi. Retirez le fichier puis ajoutez-le à nouveau.",
+      "sharedActions": "Les échanges et pièces jointes restent privés. Les actions des outils dans les espaces partagés restent visibles aux autres."
     }
   }
 }

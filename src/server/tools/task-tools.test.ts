@@ -81,8 +81,8 @@ mock.module('drizzle-orm', () => ({
 
 // Import after mocks (may fail if Bun mock.module() poisoned exports of
 // @/server/services/tasks from a previous test file in the same process — see
-// known issue #325. Wrap in try/catch and degrade tests to it.skip rather
-// than crashing the whole file with a SyntaxError on module load.)
+// Missing mock exports fail the isolated suite instead of hiding coverage.
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let spawnSelfTool: any, spawnAgentTool: any, respondToTaskTool: any, cancelTaskTool: any,
   listTasksTool: any, listActiveQueuesTool: any, getTaskDetailTool: any,
@@ -103,7 +103,8 @@ try {
   _mocksWorking = false
 }
 
-const itMocked = _mocksWorking ? it : it.skip
+if (!_mocksWorking) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itMocked = it
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

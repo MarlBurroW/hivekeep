@@ -10,6 +10,7 @@ import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import { remarkWorkspacePaths } from './remark-workspace-paths'
+import { workspacePathReference } from './workspace-source'
 import type { Root, RootContent } from 'mdast'
 
 function parse(input: string): Root {
@@ -36,6 +37,12 @@ function collectPaths(tree: Root): Array<{ path: string; wasCode: boolean }> {
 }
 
 describe('remarkWorkspacePaths — text nodes', () => {
+  it('preserves file-browser references through Markdown, including literal backticks', () => {
+    for (const path of ['Documents clients/brief été.md', 'notes `v2`.md', 'docs/``version``.txt', '`draft`.md']) {
+      expect(collectPaths(parse(workspacePathReference(path)))).toEqual([{ path, wasCode: true }])
+    }
+  })
+
   it('detects slashed paths and bare filenames with extensions', () => {
     const found = collectPaths(parse('See reports/analysis.md and also notes.txt for details'))
     expect(found.map((f) => f.path)).toEqual(['reports/analysis.md', 'notes.txt'])

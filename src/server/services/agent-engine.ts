@@ -1,3 +1,4 @@
+import { isShuttingDown } from '@/server/services/shutdown'
 import type { ModelMessage, UserContent, JSONValue } from '@/server/tools/tool-helper'
 import type { Tool } from '@/server/tools/tool-helper'
 import type { HivekeepMessage, HivekeepMessageBlock } from '@/server/llm/llm/types'
@@ -29,6 +30,7 @@ import { buildSegmentedMessages } from '@/server/services/llm-cache-hints'
 import { stringifyToolResultValue } from '@/server/llm/core/vercel-bridge'
 import { DEFAULT_MAX_LLM_TOOLS, getMaxToolsForRequest } from '@/server/services/tool-cap'
 import { toolTurnSampling } from '@/server/services/tool-sampling'
+import { persistQueuedMessage } from '@/server/services/queue-message-store'
 import { dequeueMessage, markQueueItemDone, isAgentProcessing, getQueueSize, recoverStaleProcessingItems, requeueProcessingItems, popQueueMessageMetadata } from '@/server/services/queue'
 import { recoverStaleTasks, promoteGlobalQueue } from '@/server/services/tasks'
 import { sseManager } from '@/server/sse/index'
@@ -248,6 +250,12 @@ export interface ActiveAgentStreamSnapshot {
 }
 
 const activeAgentStreams = new Map<string, ActiveAgentStreamSnapshot>()
+const activeQuickStreams = new Map<string, ActiveAgentStreamSnapshot>()
+
+/** Callers must verify session ownership before exposing this snapshot. */
+export function getActiveQuickStreamSnapshot(sessionId: string): ActiveAgentStreamSnapshot | undefined {
+  return activeQuickStreams.get(sessionId)
+}
 
 /** Read-only access to an in-flight main-thread stream snapshot. The returned
  *  arrays are live references owned by `processNextMessage` — callers MUST NOT
@@ -1078,6 +1086,7 @@ function shouldAutoDeliverToChannel(queueItem: { messageType: string }): boolean
  * Returns true if a message was processed, false if the queue was empty.
  */
 export async function processNextMessage(agentId: string): Promise<boolean> {
+  if (isShuttingDown()) return false
   // In-memory lock — prevents overlapping ticks from racing
   if (agentLocks.has(agentId)) return false
   // Don't process while compacting is running
@@ -1159,7 +1168,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
       // Build the message metadata bag. We merge known reserved keys
       // (resolvedTaskId, isAddendum) with any free-form structured context
       // attached by an enqueuer (e.g. a channel adapter via incoming.metadata).
-      // The free-form blob lives under the `channel` key (and other top-level
+      // The durable blob lives under the `channel` key (and other top-level
       // keys reserved by enqueueMessage callers) and is later injected into
       // the LLM prompt by buildMessageHistory.
       const sidebandMetadata = popQueueMessageMetadata(queueItem.id)
@@ -1176,7 +1185,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         }
       }
       const messageMetadata = Object.keys(metaBag).length > 0 ? JSON.stringify(metaBag) : null
-      await db.insert(messages).values({
+      userMessageId = persistQueuedMessage(queueItem.id, {
         id: userMessageId,
         agentId,
         role: 'user',
@@ -1193,14 +1202,9 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
         redactPending: !!(metaBag as { reveal?: unknown }).reveal,
         createdAt: new Date(),
       })
-      // Record the created message ID on the queue item for crash recovery
-      sqlite.run(
-        `UPDATE queue_items SET created_message_id = ? WHERE id = ?`,
-        [userMessageId, queueItem.id],
-      )
     }
 
-    // Link uploaded files to the actual message (fileIds come through the queue sideband)
+    // Link uploaded files to the actual message (file IDs remain durable until queue cleanup)
     if (queueItem.fileIds && queueItem.fileIds.length > 0) {
       await linkFilesToMessage(queueItem.fileIds, userMessageId)
     }
@@ -1472,9 +1476,23 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
 
     const accountTriggerSummaries = await listActiveTriggerSummariesForAgent(agent.id)
     const memoryProfile = await getProfile(agentId)
+    let configuratorCatalogue: string | undefined
+    let configuratorTools: Awaited<ReturnType<typeof resolveToolset>> | undefined
+    if (agent.kind === 'configurator') {
+      const { PROVIDER_META } = await import('@/shared/provider-metadata')
+      const { getPluginProviderMeta, getCapabilitiesForType } = await import('@/server/providers')
+      configuratorCatalogue = Object.entries({ ...PROVIDER_META, ...getPluginProviderMeta() })
+        .map(([type, metadata]) => ({ type, name: metadata.displayName, capabilities: getCapabilitiesForType(type) }))
+        .filter((provider) => provider.capabilities.length > 0)
+        .map((provider) => `- ${provider.type}: ${provider.capabilities.join(', ')}`)
+        .join('\n')
+      configuratorTools = await resolveToolset({ agentId, toolboxIds: agent.toolboxIds, isSubAgent: false, userId: effectiveUserId })
+    }
     const systemSegments = buildSystemPrompt({
       agent: { name: agent.name, slug: agent.slug, role: agent.role, character: agent.character, expertise: agent.expertise, kind: agent.kind },
       contacts: contactsWithSlug,
+      configuratorCatalogue,
+      configuratorToolNames: configuratorTools ? Object.keys(configuratorTools).sort() : undefined,
       profile: memoryProfile.content,
       agentDirectory,
       mcpTools: mcpToolsSummary,
@@ -1572,7 +1590,7 @@ export async function processNextMessage(agentId: string): Promise<boolean> {
     // Unified toolset resolution: the toolbox is the sole tool-grant primitive
     // across native + plugin + MCP + custom. A null/empty `agents.toolbox_ids`
     // resolves to the 'all' built-in at runtime (no SQL backfill).
-    const mergedTools = await resolveToolset({
+    const mergedTools = configuratorTools ?? await resolveToolset({
       agentId,
       toolboxIds: agent.toolboxIds,
       isSubAgent: false,
@@ -2347,6 +2365,8 @@ export const QUICK_SESSION_EXCLUDED_TOOLS = new Set([
   // Spawning / Tasks
   'spawn_self', 'spawn_agent', 'respond_to_task', 'cancel_task', 'list_tasks',
   'report_to_parent', 'update_task_status', 'request_input',
+  // Structured prompts publish to the shared inbox; ask in private text instead.
+  'prompt_human', 'request_tool_access', 'browser_request_human',
   // Inter-Agent
   'send_message', 'reply', 'list_kins',
   // Crons
@@ -2366,7 +2386,9 @@ export const QUICK_SESSION_EXCLUDED_TOOLS = new Set([
   // Platform
   'get_platform_logs',
   // Memory WRITE (read-only in quick sessions)
-  'memorize', 'update_memory', 'forget',
+  'memorize', 'update_memory', 'forget', 'edit_profile',
+  // Contact notes are another shared memory surface.
+  'create_contact', 'update_contact', 'delete_contact', 'set_contact_note',
 ])
 
 /**
@@ -2374,6 +2396,7 @@ export const QUICK_SESSION_EXCLUDED_TOOLS = new Set([
  * Runs in a separate slot from the main session (parallel processing).
  */
 export async function processQuickMessage(agentId: string): Promise<boolean> {
+  if (isShuttingDown()) return false
   if (quickLocks.has(agentId)) return false
   quickLocks.add(agentId)
 
@@ -2393,32 +2416,36 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     const agent = await db.select().from(agents).where(eq(agents.id, agentId)).get()
     if (!agent) return false
 
-    // Save the incoming user message to DB (with sessionId). Reuse the id
-    // recorded on the queue item when this is a crash/requeue recovery —
-    // inserting fresh every time duplicated the user turn in the session
-    // history whenever the item was reprocessed (same mechanism as the main
-    // lane at the top of processNextMessage).
-    const userMessageId = queueItem.createdMessageId ?? uuid()
-    if (!queueItem.createdMessageId) {
-      await db.insert(messages).values({
-        id: userMessageId,
-        agentId,
-        sessionId,
-        role: 'user',
-        content: queueItem.content,
-        sourceType: queueItem.sourceType,
-        sourceId: queueItem.sourceId,
-        createdAt: new Date(),
-      })
-      sqlite.run(
-        `UPDATE queue_items SET created_message_id = ? WHERE id = ?`,
-        [userMessageId, queueItem.id],
-      )
-    }
+    // The same atomic receipt is used in both lanes: recovery reuses the user
+    // message even when the process stopped between persistence and inference.
+    const userMessageId = persistQueuedMessage(queueItem.id, {
+      id: uuid(),
+      agentId,
+      sessionId,
+      role: 'user',
+      content: queueItem.content,
+      sourceType: queueItem.sourceType,
+      sourceId: queueItem.sourceId,
+      metadata: JSON.stringify(popQueueMessageMetadata(queueItem.id) ?? {}),
+      createdAt: new Date(),
+    })
 
     // Link uploaded files if any
     if (queueItem.fileIds && queueItem.fileIds.length > 0) {
       await linkFilesToMessage(queueItem.fileIds, userMessageId)
+    }
+
+    if (!queueItem.createdMessageId && queueItem.sourceType === 'user') {
+      const attached = (await getFilesForMessage(userMessageId)).map(serializeFile)
+      sseManager.sendToAgent(agentId, {
+        type: 'chat:message', agentId,
+        data: {
+          id: userMessageId, role: 'user', content: queueItem.content,
+          sourceType: 'user', sourceId: queueItem.sourceId,
+          sessionId, files: attached, createdAt: Date.now(),
+          reconcileId: queueItem.clientMessageId,
+        },
+      })
     }
 
     // Get user language
@@ -2582,6 +2609,7 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       isSubAgent: false,
       userId: quickEffectiveUserId,
       quick: !isApiSession,
+      sessionId,
     })
     // Apply quick session exclusion list (skipped for full-power API sessions)
     if (!isApiSession) {
@@ -2596,10 +2624,12 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
     let fullContent = ''
     const reasoningSegments: ReasoningSegment[] = []
     const toolCallsLog: Array<{ id: string; name: string; args: unknown; result?: unknown; offset: number }> = []
-    // Committed-text state for the stream runner (drives the inter-step
-    // markdown separator). Not registered anywhere: quick sessions have no
-    // mid-stream rehydration route.
-    const qsContentSnapshot = { content: '', provisional: '' }
+    const qsContentSnapshot: ActiveAgentStreamSnapshot = {
+      agentId, messageId: assistantMessageId, content: '', provisional: '',
+      reasoning: reasoningSegments, toolCalls: toolCallsLog, outputTokens: 0,
+      sourceName: agent.name, sourceAvatarUrl: null, startedAt: Date.now(),
+    }
+    activeQuickStreams.set(sessionId, qsContentSnapshot)
 
     const abortController = new AbortController()
     quickAbortControllers.set(sessionId, abortController)
@@ -2658,11 +2688,8 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
         qsResolved.config,
       )
 
-      // Text streams live and commits at each normal step end (see
-      // stream-runner.ts). Quick sessions have no rehydration route (no
-      // client-side remount support) and no first-token attribution payload;
-      // the local snapshot below only feeds the runner's committed-text state
-      // (inter-step markdown separator).
+      // Keep the snapshot aligned with SSE contentLength for exact replay
+      // deduplication when a private conversation is reopened mid-stream.
       const outcome = await runStreamStep(stream, {
         agentId,
         assistantMessageId,
@@ -2676,7 +2703,10 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
           'Dropped in-flight step text (step died: error/abort/stall, quick session)',
         ),
       }, step)
-      if (outcome.usage) stepUsages.push(outcome.usage)
+      if (outcome.usage) {
+        stepUsages.push(outcome.usage)
+        qsContentSnapshot.outputTokens += outcome.usage.outputTokens ?? 0
+      }
 
       if (outcome.error && !outcome.wasAborted) {
         // Same guarantee as the main lane: tools already executed this turn
@@ -2884,6 +2914,8 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       })
     }
 
+    activeQuickStreams.delete(sessionId)
+
     // Emit chat:done (with sessionId)
     sseManager.sendToAgent(agentId, {
       type: 'chat:done',
@@ -2953,8 +2985,17 @@ export async function processQuickMessage(agentId: string): Promise<boolean> {
       })
     }
 
+    if (queueItem?.sessionId) {
+      activeQuickStreams.delete(queueItem.sessionId)
+      sseManager.sendToAgent(agentId, {
+        type: 'chat:done', agentId,
+        data: { sessionId: queueItem.sessionId },
+      })
+    }
+
     return true
   } finally {
+    if (queueItem?.sessionId) activeQuickStreams.delete(queueItem.sessionId)
     if (queueItem) {
       await markQueueItemDone(queueItem.id).catch((err) =>
         log.error({ agentId, err }, 'Failed to mark quick session queue item done in finally'),
@@ -3571,4 +3612,14 @@ export function stopQueueWorker() {
     clearInterval(workerInterval)
     workerInterval = null
   }
+}
+
+/** Count whole turns, including pre-stream setup and final persistence. */
+export function getActiveQueueTurnCount(): number {
+  return agentLocks.size + quickLocks.size
+}
+
+export function abortActiveQueueTurns(): void {
+  for (const controller of activeAbortControllers.values()) controller.abort()
+  for (const controller of quickAbortControllers.values()) controller.abort()
 }

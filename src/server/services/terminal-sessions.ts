@@ -770,3 +770,13 @@ export function restorePersistedSessions(): number {
   }
   return restored
 }
+
+/** Preserve session descriptors and scrollback; keep tmux shells alive. */
+export function flushTerminalSessionsForShutdown(): void {
+  stopProbePoller()
+  for (const session of sessions.values()) {
+    if (session.detachTimer) clearTimeout(session.detachTimer)
+    session.detachTimer = null
+    persistSession(session)
+  }
+}

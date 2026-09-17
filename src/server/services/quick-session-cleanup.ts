@@ -1,6 +1,7 @@
-import { eq, and, lt, inArray } from 'drizzle-orm'
+import { eq, and, lt } from 'drizzle-orm'
 import { db } from '@/server/db/index'
-import { quickSessions, messages } from '@/server/db/schema'
+import { quickSessions, messages, files } from '@/server/db/schema'
+import { deleteMessagesCascade } from '@/server/services/message-deletion'
 import { config } from '@/server/config'
 import { createLogger } from '@/server/logger'
 import { sseManager } from '@/server/sse/index'
@@ -54,7 +55,7 @@ export function startQuickSessionCleanup() {
       // 2. Delete closed sessions older than retentionDays
       const cutoff = new Date(now.getTime() - config.quickSessions.retentionDays * 24 * 60 * 60 * 1000)
       const stale = await db
-        .select({ id: quickSessions.id })
+        .select({ id: quickSessions.id, agentId: quickSessions.agentId })
         .from(quickSessions)
         .where(and(
           eq(quickSessions.status, 'closed'),
@@ -63,11 +64,15 @@ export function startQuickSessionCleanup() {
         .all()
 
       if (stale.length > 0) {
-        const staleIds = stale.map((s) => s.id)
-        // Delete messages first — the DB DDL may lack ON DELETE CASCADE
-        await db.delete(messages).where(inArray(messages.sessionId, staleIds))
-        for (const s of stale) {
-          await db.delete(quickSessions).where(eq(quickSessions.id, s.id))
+        for (const session of stale) {
+          const rows = db.select({ id: messages.id }).from(messages).where(eq(messages.sessionId, session.id)).all()
+          await deleteMessagesCascade(session.agentId, rows.map((row) => row.id))
+          // Generated artifacts may not be attached to a message; their explicit
+          // session scope still makes them eligible for the same retention.
+          const orphanFiles = db.select().from(files).where(eq(files.sessionId, session.id)).all()
+          await db.delete(files).where(eq(files.sessionId, session.id))
+          for (const file of orphanFiles) await Bun.file(file.storedPath).delete().catch(() => {})
+          await db.delete(quickSessions).where(eq(quickSessions.id, session.id))
         }
         log.info({ count: stale.length }, 'Deleted stale quick sessions')
       }

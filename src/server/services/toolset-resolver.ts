@@ -12,8 +12,7 @@
  *            + the Agent's custom tools      (resolveCustomTools)
  *
  *   allowed  = CORE_TOOLS ∪ resolveToolboxNames(toolboxIds)
- *              where a null/empty toolbox selection resolves to the 'all'
- *              built-in (by NAME, at runtime — never a SQL backfill).
+ *              where a null/empty toolbox selection grants only CORE_TOOLS.
  *
  *   toolset  = { name ∈ universe | name ∈ allowed }
  *
@@ -96,7 +95,7 @@ export function resolveAgentToolboxIds(raw: string[] | string | null | undefined
 export interface ResolveToolsetOptions {
   agentId: string
   /** Raw toolbox selection from the Agent or task row (JSON string, array, or
-   *  null). Null / empty → the 'all' built-in. */
+   *  null). Null / empty → CORE_TOOLS only. */
   toolboxIds: string[] | string | null | undefined
   isSubAgent: boolean
   taskId?: string
@@ -104,6 +103,7 @@ export interface ResolveToolsetOptions {
   channelOriginId?: string
   cronId?: string
   userId?: string
+  sessionId?: string
   /** Reserved for quick-session callers (Stage 3 applies
    *  QUICK_SESSION_EXCLUDED_TOOLS at the call site, not here). */
   quick?: boolean
@@ -126,6 +126,7 @@ export async function resolveToolset(
     channelOriginId,
     cronId,
     userId,
+    sessionId,
   } = opts
 
   // ── Universe ──────────────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ export async function resolveToolset(
   const registryTools = toolRegistry.resolve({
     agentId,
     userId,
+    sessionId,
     isSubAgent,
     taskId,
     taskDepth,

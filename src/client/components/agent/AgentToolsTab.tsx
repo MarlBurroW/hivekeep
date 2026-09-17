@@ -31,7 +31,7 @@ interface AgentToolsTabProps {
  * The TOOLBOX is the sole tool-grant primitive for an Agent. This tab lets the
  * user assign one or more toolboxes; the resolved toolset is CORE_TOOLS unioned
  * with every selected toolbox's listed tools (intersected with what actually
- * exists). A null/empty selection defaults to the built-in 'all' toolbox.
+ * exists). A null/empty selection grants only core tools.
  *
  * Below the picker we render a read-only preview of the tools the current
  * selection grants, sourced from the unified tool catalog (native + plugin +
@@ -62,14 +62,10 @@ export function AgentToolsTab({ agentId, toolboxIds, onToolboxIdsChange, extraTo
     onExtraToolNamesChange?.(next.length > 0 ? next : null)
   }
 
-  // Resolve the *effective* selection used for the preview: when the Agent has no
-  // explicit selection it defaults to the 'all' built-in (matching the server's
-  // resolveAgentToolboxIds fallback), so the preview never looks empty.
+  // Null/empty grants only core tools. Legacy agents were migrated explicitly;
+  // never preview or assign the "all" toolbox as an implicit fallback.
   const allBuiltin = useMemo(() => toolboxes.find((tb) => tb.builtin && tb.name === 'all') ?? null, [toolboxes])
-  const effectiveIds = useMemo<string[]>(() => {
-    if (toolboxIds && toolboxIds.length > 0) return toolboxIds
-    return allBuiltin ? [allBuiltin.id] : []
-  }, [toolboxIds, allBuiltin])
+  const effectiveIds = useMemo(() => toolboxIds ?? [], [toolboxIds])
 
   // Compute the set of tool names the selection grants. Mirror the server
   // resolver: CORE_TOOLS ∪ (selected toolboxes' listed names); "*" expands to
@@ -126,6 +122,14 @@ export function AgentToolsTab({ agentId, toolboxIds, onToolboxIdsChange, extraTo
 
   return (
     <div className="space-y-6">
+      <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+        <p className="text-sm font-medium">{t('experience.agent.effectiveCapabilities', '{{count}} available capabilities', { count: previewSelected.size })}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{t('experience.agent.grantHint', 'Choose only what this Agent needs. All native tools includes enabled custom tools; MCP and plugins remain explicit choices.')}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => { onToolboxIdsChange(null); onExtraToolNamesChange?.(null) }}>{t('experience.agent.minimal', 'Minimal')}</Button>
+          {allBuiltin && <Button type="button" variant="outline" size="sm" onClick={() => onToolboxIdsChange(Array.from(new Set([...effectiveIds, allBuiltin.id])))}>{t('experience.agent.allNative', 'Add all native tools')}</Button>}
+        </div>
+      </div>
       {/* ── Toolbox selection ─────────────────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-start justify-between gap-3">
@@ -160,7 +164,7 @@ export function AgentToolsTab({ agentId, toolboxIds, onToolboxIdsChange, extraTo
         )}
 
         {(!toolboxIds || toolboxIds.length === 0) && toolboxes.length > 0 && (
-          <p className="text-xs text-muted-foreground">{t('agent.tools.defaultsToAll')}</p>
+          <p className="text-xs text-muted-foreground">{t('experience.agent.minimalHint', 'No toolbox selected: only core capabilities are available. Plugins and MCP tools always require an explicit grant.')}</p>
         )}
       </div>
 

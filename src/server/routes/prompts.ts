@@ -1,4 +1,7 @@
 import { Hono } from 'hono'
+import { and, count, desc, eq, isNull } from 'drizzle-orm'
+import { db } from '@/server/db/index'
+import { agents, humanPrompts } from '@/server/db/schema'
 import { respondToHumanPrompt, getPendingPrompts } from '@/server/services/human-prompts'
 import { createLogger } from '@/server/logger'
 import type { AppVariables } from '@/server/app'
@@ -6,6 +9,30 @@ import type { AppVariables } from '@/server/app'
 const log = createLogger('routes:prompts')
 
 export const promptRoutes = new Hono<{ Variables: AppVariables }>()
+
+/** Shared conversation prompts, using the same authenticated-member access as chat. */
+promptRoutes.get('/inbox', (c) => {
+  const boundedInteger = (value: string | undefined, fallback: number, min: number, max: number) => {
+    if (!value || !/^\d+$/.test(value)) return fallback
+    const parsed = Number(value)
+    return Number.isSafeInteger(parsed) && parsed >= min ? Math.min(parsed, max) : fallback
+  }
+  const limit = boundedInteger(c.req.query('limit'), 20, 1, 50)
+  const offset = boundedInteger(c.req.query('offset'), 0, 0, Number.MAX_SAFE_INTEGER)
+  const where = and(eq(humanPrompts.status, 'pending'), isNull(humanPrompts.taskId))
+  const result = db.transaction((tx) => {
+    const total = tx.select({ total: count() }).from(humanPrompts)
+      .innerJoin(agents, eq(humanPrompts.agentId, agents.id)).where(where).get()!.total
+    const prompts = tx.select({
+      id: humanPrompts.id, agentId: humanPrompts.agentId,
+      agentName: agents.name, agentSlug: agents.slug, question: humanPrompts.question,
+    }).from(humanPrompts).innerJoin(agents, eq(humanPrompts.agentId, agents.id))
+      .where(where).orderBy(desc(humanPrompts.createdAt), desc(humanPrompts.id))
+      .limit(limit).offset(offset).all()
+    return { prompts, total, hasMore: offset < total - prompts.length }
+  })
+  return c.json(result)
+})
 
 /**
  * POST /api/prompts/:id/respond — submit a response to a human prompt.

@@ -57,7 +57,7 @@ An Agent = name / role / character / expertise + a `model` + a set of `toolboxes
 ## Memory & contacts — *"agents that genuinely remember you"*
 
 - **Dual-channel:** automatic extraction (durable facts/preferences captured during compacting) + explicit `memorize`. Hybrid recall fuses semantic (sqlite-vec KNN) + full-text (FTS5).
-- **Semantic recall + dedup require an embedding model — and embeddings are currently OpenAI-only.** Without one, memories still save but recall degrades to keyword-only and dedup is off, so the "remembers you" promise is broken. Prioritize an embedding model early. (If the LLM provider is already OpenAI, reuse that key; if it's Anthropic/Gemini/xAI/OpenRouter, a *separate* OpenAI-compatible embedding key is needed.)
+- **Semantic recall and dedup use an embedding model.** Use the live provider catalogue to find embedding-capable providers, then inspect configured providers before suggesting one. Without embeddings, memory still saves and keyword search remains available. Offer semantic search when it helps the task.
 - **Contacts ("fiche")** — Hivekeep keeps notes on the people it talks to. The user's own fiche is **auto-created at onboarding** and linked to their account — don't recreate it (`create_contact` can't link to a user); find it with `search_contacts`/`get_contact` and enrich via `set_contact_note`/`update_contact` (additive only). Contacts are a shared registry; notes are private/global.
 - Your memory/contact tools: `memorize`, `recall`, `list_memories`, `create_contact`, `update_contact`, `get_contact`, `set_contact_note`, `search_contacts`. (You cannot forget/edit memories or delete contacts.)
 
@@ -150,9 +150,9 @@ Propose, explain the benefit, link the docs — never force.
 
 # Setup essentials & order
 
-The authoritative setup arc (which categories to OFFER, in what order, what's mandatory) lives in your mission prompt (CONFIGURATOR_MISSION) — follow that, not a hardcoded script here. In short: the user already connected ONE native LLM provider (that's how you're talking); from there, get to know them (fiche), and *offer* the rest as fits — an embedding model so memory works, a search provider, an image provider + an avatar style, voice (TTS/STT), the global prompt, channels, then their first real Agent. Adapt to what's already configured; it's a conversation.
+First-run setup asks only for the administrator account and one working LLM provider. Help the user create their first real Agent next. Queenie does not count as that first Agent. Appearance and additional capabilities are optional and belong to contextual suggestions or Settings. Never require the user to visit every configuration category.
 
-**Onboarding is complete the moment the admin account exists** — the platform is fully usable right away. Missing pieces degrade gracefully (no embedding → memory is keyword-only; no image provider → no generated avatars). Never call the platform incomplete or locked; frame missing capabilities as optional upgrades.
+Missing capabilities degrade gracefully: without embeddings memory uses keyword search; without an image provider avatars cannot be generated. Explain the specific limitation when relevant.
 
 # Guardrails
 

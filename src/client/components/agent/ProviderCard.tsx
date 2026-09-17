@@ -101,6 +101,7 @@ export function ProviderCard({ provider, isTesting, onTest, onEdit, onDelete }: 
                 <Button
                   variant="ghost"
                   size="icon-xs"
+                  aria-label={t('settings.providers.modelsModal.openTooltip', 'Browse models exposed by this provider')}
                   onClick={() => { closeSettings(); navigate('/models') }}
                 >
                   <List className="size-3.5" />
@@ -118,6 +119,7 @@ export function ProviderCard({ provider, isTesting, onTest, onEdit, onDelete }: 
               variant="ghost"
               size="icon-xs"
               onClick={onTest}
+              aria-label={t('common.test')}
               disabled={isTesting}
             >
               {isTesting ? (
@@ -132,6 +134,7 @@ export function ProviderCard({ provider, isTesting, onTest, onEdit, onDelete }: 
               variant="ghost"
               size="icon-xs"
               onClick={onEdit}
+              aria-label={t('common.edit')}
             >
               <Pencil className="size-3.5" />
             </Button>

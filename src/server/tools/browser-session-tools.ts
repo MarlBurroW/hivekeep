@@ -7,6 +7,7 @@ import { playwrightManager, parseCookieInput, type CookieSpec } from '@/server/s
 import { getPageState, locatorForRef } from '@/server/services/browser-snapshot'
 import { isBlockedUrl } from '@/server/services/web-browse'
 import { createFileFromContent } from '@/server/services/file-storage'
+import { storeBrowserScreenshot } from '@/server/services/browser-screenshots'
 import { createHumanPrompt } from '@/server/services/human-prompts'
 import { createLogger } from '@/server/logger'
 import { config } from '@/server/config'
@@ -395,12 +396,7 @@ export const browserScreenshotTool: ToolRegistration = {
           const buffer = await session.page.screenshot({ type: 'png', fullPage: full_page ?? false })
           const hostname = new URL(session.page.url()).hostname.replace(/[^a-z0-9.-]/gi, '_')
           const name = `session-screenshot-${hostname}-${Date.now()}`
-          const file = await createFileFromContent(ctx.agentId, name, buffer.toString('base64'), 'image/png', {
-            isBase64: true,
-            description: `Browser session screenshot of ${session.page.url()}`,
-            isPublic: true,
-            createdByAgentId: ctx.agentId,
-          })
+          const file = await storeBrowserScreenshot(ctx, name, buffer, session.page.url())
           await playwrightManager.refreshSessionMeta(session)
           return {
             url: session.page.url(),
@@ -587,6 +583,10 @@ export const browserRequestHumanTool: ToolRegistration = {
           .describe('Capture the full scrollable page instead of just the viewport. Default: false.'),
       }),
       execute: async ({ session_id, reason, continue_label, cancel_label, full_page }) => {
+        // Intervention cards, screenshots and notifications are shared.
+        if (ctx.sessionId) {
+          return err('browser_request_human is not available in private sessions. Ask the user in the private conversation text instead.')
+        }
         try {
           if (calledThisTurn) {
             return err('You already requested human intervention this turn. Wait for the user response before asking again.')

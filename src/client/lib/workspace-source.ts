@@ -1,5 +1,12 @@
 import type { WorkspaceSourceRef } from '@/shared/types'
 
+/** Inline code preserves spaces and punctuation in a path sent to the agent. */
+export function workspacePathReference(path: string): string {
+  const fence = '`'.repeat(Math.max(0, ...(path.match(/`+/g) ?? []).map((run) => run.length)) + 1)
+  const padding = path.startsWith('`') || path.endsWith('`') ? ' ' : ''
+  return `${fence}${padding}${path}${padding}${fence}`
+}
+
 /**
  * Client helpers for the generalized Files API (agent / folder / mini-app
  * sources). Every workspace hook builds its URLs and SSE filters through these

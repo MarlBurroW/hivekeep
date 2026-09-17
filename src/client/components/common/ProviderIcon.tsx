@@ -118,7 +118,9 @@ const reactComponentCache = new Map<string, ReactIcon>()
 export function registerProviderReactIcon(providerType: string, identifier: string, brandColor?: string): void {
   const [collection, componentName] = identifier.split('/')
   if (!collection || !componentName) return
-  if (!loadReactCollection(collection)) return  // unknown collection
+  // Registration must stay pure: calling the loader here downloaded whole
+  // icon collections for every known provider, even when none was displayed.
+  if (!['ai', 'bi', 'bs', 'fa', 'fa6', 'fi', 'hi', 'hi2', 'io5', 'lu', 'md', 'pi', 'ri', 'si', 'tb'].includes(collection)) return
   REACT_ICON_LOADERS.set(providerType, { collection, componentName, ...(brandColor ? { brandColor } : {}) })
 }
 

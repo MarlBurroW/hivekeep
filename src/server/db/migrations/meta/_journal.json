@@ -834,6 +834,20 @@
       "when": 1786479200000,
       "tag": "0118_clumsy_jack_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "6",
+      "when": 1789552800000,
+      "tag": "0119_durable_queue_payload",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "6",
+      "when": 1789552900000,
+      "tag": "0120_private_file_scope",
+      "breakpoints": true
     }
   ]
 }

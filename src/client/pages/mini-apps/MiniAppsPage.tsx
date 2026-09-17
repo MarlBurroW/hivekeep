@@ -1,3 +1,6 @@
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/client/hooks/useAuth'
+import { appendToDraft } from '@/client/hooks/useDraftMessage'
 import { useState, useMemo, useCallback, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import { lazyWithRetry as lazy } from '@/client/lib/lazy-with-retry'
@@ -25,8 +28,11 @@ const MiniAppViewer = lazy(() => import('@/client/components/mini-app/MiniAppVie
 
 const VIEW_MODE_KEY = 'hivekeep:miniapps-page-view-mode'
 
-export function MiniAppsPage() {
+export function MiniAppsPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [buildOpen, setBuildOpen] = useState(false)
   const { apps, isLoading, deleteApp } = useMiniApps(null, 'all')
   const { agents } = useAgents()
   const { activeAppId, badges, openApp, closePanel } = useSidePanel()
@@ -85,16 +91,19 @@ export function MiniAppsPage() {
 
   return (
     <div className="surface-base flex h-full overflow-hidden">
+      <Dialog open={buildOpen} onOpenChange={setBuildOpen}><DialogContent><DialogHeader><DialogTitle>{t('workspace.chooseAgent')}</DialogTitle><DialogDescription>{t('workspace.draftOnly')}</DialogDescription></DialogHeader><div className="space-y-2">{agents.map(agent => <Button key={agent.id} variant="outline" className="min-h-12 w-full justify-start" onClick={() => { appendToDraft(agent.id, t('workspace.buildAppPrompt'), user?.id); setBuildOpen(false); navigate(`/agent/${agent.slug}`) }}>{agent.name}</Button>)}</div></DialogContent></Dialog>
       <main className="flex min-w-0 flex-1 flex-col">
         {/* Page header */}
         <PageHeader
+          embedded={embedded}
           icon={Blocks}
           title={t('activityBar.apps')}
           actions={
             <>
+              <Button className="min-h-11" onClick={() => setBuildOpen(true)} disabled={agents.length === 0}>{t('workspace.buildApp')}</Button>
               {showAgentFilter && (
                 <Select value={filterAgentId} onValueChange={setFilterAgentId}>
-                  <SelectTrigger className="h-9 w-full sm:w-44"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label={t('sidebar.miniApps.allAgents')} className="w-full data-[size=default]:h-11 sm:w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t('sidebar.miniApps.allAgents', 'All Agents')}</SelectItem>
                     {agents.map((a) => (
@@ -104,25 +113,28 @@ export function MiniAppsPage() {
                 </Select>
               )}
               {apps.length > 0 && (
-                <div className="relative w-full sm:w-72">
+                <div className="relative min-w-36 flex-1 sm:max-w-72">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={list.query}
                     onChange={(e) => list.setQuery(e.target.value)}
                     placeholder={t('sidebar.miniApps.search')}
-                    className="h-9 pl-8"
+                    aria-label={t('sidebar.miniApps.search')}
+                    className="h-11 pl-8"
                   />
                 </div>
               )}
-              <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-border p-0.5">
+              <div className="ml-auto flex shrink-0 items-center rounded-lg border border-border">
                 <button
                   type="button"
                   onClick={() => toggleView('grid')}
                   className={cn(
-                    'rounded p-1.5 transition-colors',
+                    'flex size-11 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-ring',
                     viewMode === 'grid' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
                   )}
                   title={t('sidebar.miniApps.viewGrid')}
+                  aria-label={t('sidebar.miniApps.viewGrid')}
+                  aria-pressed={viewMode === 'grid'}
                 >
                   <LayoutGrid className="size-4" />
                 </button>
@@ -130,10 +142,12 @@ export function MiniAppsPage() {
                   type="button"
                   onClick={() => toggleView('list')}
                   className={cn(
-                    'rounded p-1.5 transition-colors',
+                    'flex size-11 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-ring',
                     viewMode === 'list' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
                   )}
                   title={t('sidebar.miniApps.viewList')}
+                  aria-label={t('sidebar.miniApps.viewList')}
+                  aria-pressed={viewMode === 'list'}
                 >
                   <List className="size-4" />
                 </button>
@@ -162,10 +176,10 @@ export function MiniAppsPage() {
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
             <div className="mx-auto max-w-6xl">
               {viewMode === 'grid' ? (
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {filteredApps.map((app) => (
                     <MiniAppTile
                       key={app.id}
@@ -179,7 +193,7 @@ export function MiniAppsPage() {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                   {filteredApps.map((app) => (
                     <MiniAppCard
                       key={app.id}

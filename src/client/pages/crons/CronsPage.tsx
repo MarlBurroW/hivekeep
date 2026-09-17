@@ -26,6 +26,7 @@ import { CronRow, SortableCronRow } from '@/client/components/crons/CronRow'
 import { useCronsContext } from '@/client/contexts/CronsContext'
 import { useTasksContext } from '@/client/contexts/TasksContext'
 import { useAgents } from '@/client/hooks/useAgents'
+import { useAuth } from '@/client/hooks/useAuth'
 import { useToolboxes } from '@/client/hooks/useToolboxes'
 import { Plus, Loader2, Search, Timer, CalendarClock } from 'lucide-react'
 import { EmptyState } from '@/client/components/common/EmptyState'
@@ -35,8 +36,10 @@ import type { CronSummary } from '@/shared/types'
 const CronFormModal = lazy(() => import('@/client/components/sidebar/CronFormModal').then(m => ({ default: m.CronFormModal })))
 const CronDetailModal = lazy(() => import('@/client/components/sidebar/CronDetailModal').then(m => ({ default: m.CronDetailModal })))
 
-export function CronsPage() {
+export function CronsPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const { agents, llmModels } = useAgents()
   const { toolboxes } = useToolboxes()
   const { activeCronIds } = useTasksContext()
@@ -101,7 +104,7 @@ export function CronsPage() {
   const regularCronIds = regularCrons.map((c) => c.id)
   // Reordering a filtered subset would persist a misleading order, so drag is
   // only enabled when the full list is shown.
-  const isDraggable = !isFiltering
+  const isDraggable = isAdmin && !isFiltering
 
   const LIST = 'surface-card divide-y divide-border/60 overflow-hidden rounded-xl border border-border'
 
@@ -109,13 +112,14 @@ export function CronsPage() {
     <div className="surface-base flex h-full flex-col overflow-hidden">
       {/* Page header */}
       <PageHeader
+        embedded={embedded}
         icon={CalendarClock}
         title={t('activityBar.crons')}
         actions={
           <>
             {showAgentFilter && (
               <Select value={filterAgentId} onValueChange={setFilterAgentId}>
-                <SelectTrigger className="h-9 w-full sm:w-44"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('sidebar.crons.allAgents')} className="w-full data-[size=default]:h-11 sm:w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('sidebar.crons.allAgents', 'All Agents')}</SelectItem>
                   {cronAgents.map((a) => (
@@ -125,20 +129,21 @@ export function CronsPage() {
               </Select>
             )}
             {crons.length > 0 && (
-              <div className="relative w-full sm:w-72">
+              <div className="relative min-w-36 flex-1 sm:max-w-72">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={list.query}
                   onChange={(e) => list.setQuery(e.target.value)}
                   placeholder={t('sidebar.crons.search')}
-                  className="h-9 pl-8"
+                  aria-label={t('sidebar.crons.search')}
+                  className="h-11 pl-8"
                 />
               </div>
             )}
-            <Button onClick={() => setShowCreateModal(true)} className="shrink-0 gap-1.5">
+            {isAdmin && <Button onClick={() => setShowCreateModal(true)} className="ml-auto min-h-11 shrink-0 gap-1.5" aria-label={t('sidebar.crons.create')}>
               <Plus className="size-4" />
-              <span className="max-sm:hidden">{t('sidebar.crons.create')}</span>
-            </Button>
+              <span>{t('sidebar.crons.create')}</span>
+            </Button>}
           </>
         }
       />
@@ -158,8 +163,8 @@ export function CronsPage() {
                 icon={Timer}
                 title={t('sidebar.crons.empty')}
                 description={t('sidebar.crons.emptyDescription')}
-                actionLabel={t('sidebar.crons.create')}
-                onAction={() => setShowCreateModal(true)}
+                actionLabel={isAdmin ? t('sidebar.crons.create') : undefined}
+                onAction={isAdmin ? () => setShowCreateModal(true) : undefined}
               />
             )}
           </div>
@@ -182,7 +187,7 @@ export function CronsPage() {
                       toolboxes={toolboxes}
                       agents={agents}
                       onClick={() => setDetailCron(cron)}
-                      onApprove={() => approveCron(cron.id)}
+                      onApprove={isAdmin ? () => approveCron(cron.id) : undefined}
                       isRunning={activeCronIds?.has(cron.id)}
                     />
                   ))}
@@ -204,7 +209,7 @@ export function CronsPage() {
                           toolboxes={toolboxes}
                           agents={agents}
                           onClick={() => setDetailCron(cron)}
-                          onToggleActive={(isActive) => updateCron(cron.id, { isActive })}
+                          onToggleActive={isAdmin ? (isActive) => updateCron(cron.id, { isActive }) : undefined}
                           isRunning={activeCronIds?.has(cron.id)}
                         />
                       ))}
@@ -221,7 +226,7 @@ export function CronsPage() {
                       toolboxes={toolboxes}
                       agents={agents}
                       onClick={() => setDetailCron(cron)}
-                      onToggleActive={(isActive) => updateCron(cron.id, { isActive })}
+                      onToggleActive={isAdmin ? (isActive) => updateCron(cron.id, { isActive }) : undefined}
                       isRunning={activeCronIds?.has(cron.id)}
                     />
                   ))}
@@ -233,7 +238,7 @@ export function CronsPage() {
       )}
 
       {/* Create modal */}
-      {showCreateModal && (
+      {isAdmin && showCreateModal && (
         <Suspense fallback={null}>
           <CronFormModal
             open={showCreateModal}
@@ -250,7 +255,7 @@ export function CronsPage() {
       )}
 
       {/* Edit modal */}
-      {editCron !== null && (
+      {isAdmin && editCron !== null && (
         <Suspense fallback={null}>
           <CronFormModal
             open={editCron !== null}

@@ -1,5 +1,7 @@
-import { resolve, join, basename } from 'path'
-import { readdir, readFile, access, rm, mkdir } from 'fs/promises'
+import { resolve, join, basename, relative, isAbsolute } from 'path'
+import { readdir, readFile, access, rm, mkdir, rename, mkdtemp } from 'fs/promises'
+import { pluginPaths, preparePluginStorage, stageNpmPlugin, publishPlugin, readPluginPackageVersion } from './plugin-files'
+import { preparePluginSdk } from './plugin-sdk'
 import { watch, type FSWatcher } from 'fs'
 import { eq, and, like } from 'drizzle-orm'
 import { db } from '@/server/db/index'
@@ -711,8 +713,40 @@ class PluginManager {
   private hivekeepVersion: string | null = null
 
   constructor() {
-    this.pluginsDir = resolve(process.cwd(), 'plugins')
-    this.installWorkspace = resolve(process.cwd(), 'data', '.plugin-install')
+    const paths = pluginPaths(appConfig.dataDir)
+    this.pluginsDir = paths.pluginsDir
+    this.installWorkspace = paths.installWorkspace
+  }
+
+  private storageReady: Promise<void> | null = null
+  private updatesInProgress = new Set<string>()
+
+  private prepareStorage(): Promise<void> {
+    if (!this.storageReady) {
+      this.storageReady = preparePluginStorage(pluginPaths(appConfig.dataDir)).then(async ({ migrated, collisions }) => {
+        if (migrated.length) log.info({ migrated }, 'Legacy plugins copied to the persistent data directory; originals preserved')
+        if (collisions.length) log.warn({ collisions }, 'Plugin migration kept existing data-directory copies; legacy copies preserved')
+        await preparePluginSdk(this.pluginsDir, this.installWorkspace)
+      }).catch((error) => { this.storageReady = null; throw error })
+    }
+    return this.storageReady
+  }
+
+  private async validateStagedPlugin(directory: string, expectedName?: string): Promise<PluginManifest> {
+    const data = JSON.parse(await readFile(join(directory, 'plugin.json'), 'utf8'))
+    const validation = validateManifest(data)
+    if (!validation.valid) throw new Error(`Invalid plugin manifest: ${validation.errors.join('; ')}`)
+    const manifest = data as PluginManifest
+    if (expectedName && manifest.name !== expectedName) throw new Error(`Updated plugin name must remain ${expectedName}`)
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(manifest.version)) throw new Error('Plugin version must be a semantic version')
+    const entry = relative(directory, resolve(directory, manifest.main))
+    if (entry.startsWith('..') || isAbsolute(entry)) throw new Error('Plugin entry point must stay inside its directory')
+    await access(join(directory, manifest.main))
+    const packageVersion = await readPluginPackageVersion(directory)
+    if (packageVersion && packageVersion !== manifest.version) throw new Error('Plugin package.json and plugin.json versions must match')
+    const compatibility = await this.checkCompatibility(manifest)
+    if (!compatibility.compatible) throw new Error(compatibility.error)
+    return manifest
   }
 
   /** Get the current Hivekeep version from package.json (cached) */
@@ -779,6 +813,7 @@ class PluginManager {
 
   /** Scan plugins/ directory and load all valid plugins */
   async scan(): Promise<void> {
+    await this.prepareStorage()
     log.info({ dir: this.pluginsDir }, 'Scanning for plugins')
 
     let entries: string[] = []
@@ -1795,14 +1830,11 @@ class PluginManager {
       throw new Error('Only HTTPS and HTTP git URLs are allowed')
     }
 
-    // Ensure plugins dir + install workspace exist
-    await mkdir(this.pluginsDir, { recursive: true })
-    await mkdir(this.installWorkspace, { recursive: true })
+    await this.prepareStorage()
 
     // Clone into install workspace (outside plugins/ to bypass the internal
     // file watcher) then mv into plugins/<name> once validated.
-    const tempName = `_installing_${Date.now()}`
-    const tempDir = join(this.installWorkspace, tempName)
+    const tempDir = await mkdtemp(join(this.installWorkspace, 'git-'))
 
     try {
       // Clone the repo
@@ -1841,7 +1873,8 @@ class PluginManager {
       }
 
       // Rename temp dir to plugin name
-      await this.runSpawn(['mv', tempDir, targetDir])
+      await this.validateStagedPlugin(tempDir)
+      await publishPlugin(tempDir, targetDir)
 
       // Remove .git directory to save space (keep it simple)
       // Actually keep .git for updates via git pull
@@ -1891,6 +1924,7 @@ class PluginManager {
       })
 
       await this.activatePlugin(manifest.name)
+      await this.setState(manifest.name, this.plugins.get(manifest.name)?.enabled ?? false)
 
       // Broadcast SSE
       sseManager.broadcast({
@@ -1912,7 +1946,7 @@ class PluginManager {
     log.info({ package: packageName }, 'npm install: start')
 
     // Validate package name (prevent path traversal and command injection)
-    if (packageName.includes('..') || packageName.includes('/') && !packageName.startsWith('@')) {
+    if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(packageName)) {
       throw new Error('Invalid npm package name')
     }
     // Scoped packages: @scope/name - validate both parts
@@ -1923,14 +1957,12 @@ class PluginManager {
       }
     }
 
-    await mkdir(this.pluginsDir, { recursive: true })
-    await mkdir(this.installWorkspace, { recursive: true })
+    await this.prepareStorage()
 
     // Workspace and cache live OUTSIDE plugins/ so they don't trigger the
     // PluginManager's internal file watcher (which would kick off a full
     // rescan mid-install and deadlock `bun add`).
-    const tempName = `_npm_${Date.now()}`
-    const tempDir = join(this.installWorkspace, tempName)
+    const tempDir = await mkdtemp(join(this.installWorkspace, 'npm-'))
 
     try {
       await mkdir(tempDir, { recursive: true })
@@ -1954,7 +1986,7 @@ class PluginManager {
       // including ENOSPC / EACCES / peer-dep errors and left users
       // staring at '(no output)' with no way to diagnose.
       const { exitCode, stderr, stdout } = await this.runSpawn(
-        ['npm', 'install', packageName, '--no-audit', '--no-fund', '--loglevel', 'error'],
+        ['npm', 'install', packageName, '--ignore-scripts', '--no-audit', '--no-fund', '--loglevel', 'error'],
         {
           cwd: tempDir,
           timeoutMs: 90_000,
@@ -1963,7 +1995,7 @@ class PluginManager {
       if (exitCode !== 0) {
         throw new Error(`npm install failed (exit ${exitCode}): ${stderr.trim() || stdout.trim() || '(no output — try `npm install ' + packageName + '` manually to see the real error)'}`)
       }
-      log.info({ package: packageName }, 'npm install: bun add done')
+      log.info({ package: packageName }, 'npm install: completed without lifecycle scripts')
 
       // Find the installed package's plugin.json
       const nodeModulesDir = join(tempDir, 'node_modules', packageName)
@@ -2014,7 +2046,9 @@ class PluginManager {
 
       // Move the package contents to plugins/<name>
       const targetDir = join(this.pluginsDir, manifest.name)
-      await this.runSpawn(['mv', nodeModulesDir, targetDir], { timeoutMs: 10_000 })
+      await this.validateStagedPlugin(nodeModulesDir)
+      const staged = await stageNpmPlugin(tempDir, packageName)
+      await publishPlugin(staged, targetDir)
       log.info({ plugin: manifest.name, targetDir }, 'npm install: mv to plugins/ done')
 
       // Cleanup temp dir
@@ -2057,6 +2091,7 @@ class PluginManager {
       log.info({ plugin: manifest.name }, 'npm install: db + state updated, activating')
 
       await this.activatePlugin(manifest.name)
+      await this.setState(manifest.name, this.plugins.get(manifest.name)?.enabled ?? false)
       log.info({ plugin: manifest.name }, 'npm install: activation done')
 
       sseManager.broadcast({
@@ -2185,122 +2220,91 @@ class PluginManager {
     }, 2000)
   }
 
-  /** Update a plugin (git pull or npm update) */
+  /** Stage and validate updates before replacing a working install. */
   async updatePlugin(name: string): Promise<void> {
+    if (this.updatesInProgress.has(name)) throw new Error(`Plugin "${name}" is already being updated`)
+    this.updatesInProgress.add(name)
+    try { await this.performUpdate(name) }
+    finally { this.updatesInProgress.delete(name) }
+  }
+
+  private async performUpdate(name: string): Promise<void> {
     const plugin = this.plugins.get(name)
     if (!plugin) throw new Error(`Plugin "${name}" not found`)
-
     const source = plugin.installSource
+    if (source !== 'git' && source !== 'npm') throw new Error('Cannot update a local plugin')
+    await this.prepareStorage()
     const pluginDir = join(this.pluginsDir, name)
-
-    if (source === 'git') {
-      const { exitCode, stderr } = await this.runSpawn(['git', 'pull'], { cwd: pluginDir })
-      if (exitCode !== 0) {
-        throw new Error(`Git pull failed: ${stderr.trim()}`)
-      }
-    } else if (source === 'npm') {
-      const packageName = plugin.installMeta?.package
-      if (!packageName) throw new Error('No package name stored for npm plugin')
-
-      log.info({ plugin: name, package: packageName }, 'npm update: start')
-
-      // Re-install from npm (overwrite) — workspace outside plugins/
-      await mkdir(this.installWorkspace, { recursive: true })
-      const tempDir = join(this.installWorkspace, `_update_${Date.now()}`)
-      await mkdir(tempDir, { recursive: true })
-      // Try/finally guarantees the tempDir is removed even if bun add
-      // times out — without it the workspace accumulates `_update_*`
-      // shells forever.
-      try {
-        await Bun.write(join(tempDir, 'package.json'), JSON.stringify({ name: 'hivekeep-plugin-update', private: true }))
-
-        // Same `npm install` (rather than `bun add`) trick as installFromNpm —
-        // see the comment there for why we can't spawn bun from a bun parent.
-        // `--loglevel error` instead of `--silent` so npm's failure text
-        // actually surfaces in the thrown message; `--silent` left users
-        // looking at '(no output)' with nothing to debug from.
-        const { exitCode, stderr, stdout } = await this.runSpawn(
-          ['npm', 'install', `${packageName}@latest`, '--no-audit', '--no-fund', '--loglevel', 'error'],
-          {
-            cwd: tempDir,
-            timeoutMs: 90_000,
-          },
-        )
-        if (exitCode !== 0) {
-          throw new Error(`npm update failed (exit ${exitCode}): ${stderr.trim() || stdout.trim() || '(no output — try `npm install ' + packageName + '@latest` manually to see the real error)'}`)
-        }
-        log.info({ plugin: name }, 'npm update: npm install done')
-
-        // Replace plugin dir
-        await rm(pluginDir, { recursive: true, force: true })
-        await this.runSpawn(['mv', join(tempDir, 'node_modules', packageName), pluginDir], { timeoutMs: 10_000 })
-      } finally {
-        await rm(tempDir, { recursive: true, force: true }).catch(() => {})
-      }
-    } else {
-      throw new Error('Cannot update a local plugin')
-    }
-
-    // Re-read manifest
-    const raw = await readFile(join(pluginDir, 'plugin.json'), 'utf-8')
-    const data = JSON.parse(raw)
-    const validation = validateManifest(data)
-    if (!validation.valid) {
-      throw new Error(`Updated manifest is invalid: ${validation.errors.join('; ')}`)
-    }
-
-    const manifest = data as PluginManifest
-
-    // Same version-mismatch check as installFromNpm — if the author bumped
-    // package.json but forgot plugin.json, the UI keeps offering an update
-    // that doesn't change anything visible.
-    try {
-      const pkgRaw = await readFile(join(pluginDir, 'package.json'), 'utf-8')
-      const pkgVersion = (JSON.parse(pkgRaw) as { version?: string }).version
-      if (pkgVersion && pkgVersion !== manifest.version) {
-        log.warn(
-          { plugin: name, packageJsonVersion: pkgVersion, pluginJsonVersion: manifest.version },
-          'Plugin package.json and plugin.json have mismatched versions — bump both together to keep update detection accurate',
-        )
-      }
-    } catch {
-      // package.json missing or malformed
-    }
-
-    // Deactivate and re-activate
+    const workspace = await mkdtemp(join(this.installWorkspace, 'update-'))
+    const backup = join(this.installWorkspace, `rollback-${name}`)
+    const previousManifest = plugin.manifest
+    const previousMeta = plugin.installMeta ? { ...plugin.installMeta } : undefined
     const wasEnabled = plugin.enabled
-    if (wasEnabled) {
-      await this.deactivatePlugin(name)
+    let replaced = false
+    let deactivated = false
+    try {
+      let staged: string
+      if (source === 'git') {
+        const url = plugin.installMeta?.url
+        if (!url) throw new Error('No repository URL stored for git plugin')
+        staged = join(workspace, 'plugin')
+        const branch = await this.runSpawn(['git', 'branch', '--show-current'], { cwd: pluginDir, timeoutMs: 10_000 })
+        const args = ['git', 'clone', '--depth', '1']
+        if (branch.exitCode === 0 && branch.stdout.trim()) args.push('--branch', branch.stdout.trim())
+        args.push(url, staged)
+        const result = await this.runSpawn(args, { timeoutMs: 90_000 })
+        if (result.exitCode !== 0) throw new Error(`Git update failed: ${result.stderr.trim()}`)
+      } else {
+        const packageName = plugin.installMeta?.package
+        if (!packageName) throw new Error('No package name stored for npm plugin')
+        await Bun.write(join(workspace, 'package.json'), JSON.stringify({ name: 'hivekeep-plugin-update', private: true }))
+        const result = await this.runSpawn(
+          ['npm', 'install', `${packageName}@latest`, '--ignore-scripts', '--no-audit', '--no-fund', '--loglevel', 'error'],
+          { cwd: workspace, timeoutMs: 90_000 },
+        )
+        if (result.exitCode !== 0) throw new Error(`npm update failed: ${result.stderr.trim() || result.stdout.trim()}`)
+        staged = await stageNpmPlugin(workspace, packageName)
+      }
+      const manifest = await this.validateStagedPlugin(staged, name)
+      // The last working directory stays recoverable until activation succeeds.
+      if (wasEnabled) { await this.deactivatePlugin(name); deactivated = true }
+      await rename(pluginDir, backup)
+      replaced = true
+      await rename(staged, pluginDir)
+      plugin.manifest = manifest
+      if (plugin.installMeta) {
+        plugin.installMeta.version = manifest.version
+        const repository = await this.readPackageRepository(pluginDir)
+        if (repository) plugin.installMeta.repository = repository
+      }
+      if (wasEnabled) {
+        await this.activatePlugin(name)
+        if (!plugin.enabled) throw new Error(plugin.error ?? 'Updated plugin could not be activated')
+      }
+      await db.update(pluginStates).set({
+        installMeta: JSON.stringify(plugin.installMeta), updatedAt: new Date(),
+      }).where(eq(pluginStates.name, name))
+      // Once committed, cleanup failure must never remove the working version.
+      replaced = false
+      deactivated = false
+      await rm(backup, { recursive: true, force: true }).catch((error) => {
+        log.warn({ plugin: name, error }, 'Could not remove update backup; next startup will restore the previous version')
+      })
+      sseManager.broadcast({ type: 'plugin:updated', data: { name, version: manifest.version } })
+      log.info({ plugin: name, version: manifest.version }, 'Plugin updated')
+    } catch (error) {
+      if (replaced) {
+        if (plugin.enabled) await this.deactivatePlugin(name)
+        await rm(pluginDir, { recursive: true, force: true })
+        await rename(backup, pluginDir)
+        plugin.manifest = previousManifest
+        plugin.installMeta = previousMeta
+      }
+      if (deactivated && wasEnabled) await this.activatePlugin(name)
+      throw error
+    } finally {
+      await rm(workspace, { recursive: true, force: true })
     }
-
-    plugin.manifest = manifest
-    if (plugin.installMeta) {
-      plugin.installMeta.version = manifest.version
-      // Re-read repository URL in case the plugin author switched repos
-      // between versions (rare but cheap to keep in sync).
-      const repo = await this.readPackageRepository(pluginDir)
-      if (repo) plugin.installMeta.repository = repo
-    }
-
-    // Update DB
-    const now = new Date()
-    await db.update(pluginStates).set({
-      installMeta: JSON.stringify(plugin.installMeta),
-      updatedAt: now,
-    }).where(eq(pluginStates.name, name))
-
-    // Re-activate if was enabled before the update
-    if (wasEnabled) {
-      await this.activatePlugin(name)
-      await this.setState(name, true)
-    }
-
-    sseManager.broadcast({
-      type: 'plugin:updated',
-      data: { name, version: manifest.version },
-    })
-
-    log.info({ plugin: name, version: manifest.version }, 'Plugin updated')
   }
 
   // ─── Update Checks ─────────────────────────────────────────────────────────
@@ -2427,6 +2431,16 @@ class PluginManager {
       clearTimeout(timer)
     }
     this.reloadTimers.clear()
+  }
+
+  /** Release runtime resources without changing the user's enabled settings. */
+  async shutdown(): Promise<void> {
+    this.stopWatching()
+    const active = [...this.plugins].filter(([, plugin]) => plugin.enabled || plugin.exports)
+    await Promise.allSettled(active.map(async ([name]) => {
+      try { await this.deactivatePlugin(name) }
+      catch (error) { log.warn({ plugin: name, error }, 'Plugin shutdown failed') }
+    }))
   }
 
   /** Hot-reload a single plugin */

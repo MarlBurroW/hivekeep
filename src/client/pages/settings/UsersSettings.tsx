@@ -243,6 +243,7 @@ export function UsersSettings() {
                   size="icon"
                   className="text-muted-foreground hover:text-destructive"
                   onClick={() => setDeletingUser(u)}
+                  aria-label={`${t('common.delete')} ${u.email}`}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -309,6 +310,7 @@ export function UsersSettings() {
                     variant="ghost"
                     size="icon"
                     onClick={() => copyToClipboard(inv.url, { successKey: 'settings.users.invitations.linkCopied' })}
+                    aria-label={t('common.copy')}
                   >
                     <Copy className="size-4" />
                   </Button>
@@ -317,6 +319,7 @@ export function UsersSettings() {
                     size="icon"
                     className="text-muted-foreground hover:text-destructive"
                     onClick={() => setRevokingInvitation(inv)}
+                    aria-label={t('settings.users.invitations.revoke')}
                   >
                     <XCircle className="size-4" />
                   </Button>

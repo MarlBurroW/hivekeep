@@ -60,16 +60,9 @@ const schemaTableNames: string[] = Object.values(schema)
   .filter((name): name is string => typeof name === 'string')
   .sort()
 
-// Several sibling tests do `mock.module('@/server/db/schema', () => fullMockSchema)`
-// where each table is a plain `{}` (not a SQLiteTable). Because bun's module
-// mocks leak across files within a single `bun test` run, the `schema` import
-// above can resolve to that stub when this file runs after one of them. In that
-// case `schemaTableNames` comes back empty. We detect that and skip ONLY the
-// schema<->DB completeness comparison (which needs the real schema); the
-// migration apply, FK, idempotency, and core-table-by-name checks all still run
-// and are immune to the leak. Mirrors the `schemaIsReal` guard used in the
-// other schema-touching test files.
+// Schema coverage is mandatory; the runner isolates module mocks per file.
 const schemaIsReal = schemaTableNames.length > 0
+if (!schemaIsReal) throw new Error("Real schema required: run migrations through bun run test in an isolated process")
 
 // A representative subset of core domain tables. These are spot-checked by name
 // so a wholesale rename (the kind that broke things during the Kin -> Agent
@@ -142,7 +135,7 @@ describe('database migrations', () => {
     })
   })
 
-  it.skipIf(!schemaIsReal)(
+  it(
     'derives a non-trivial set of table names from the schema',
     () => {
       // When the real schema is loaded it must expose a substantial table set;
@@ -152,7 +145,7 @@ describe('database migrations', () => {
     },
   )
 
-  it.skipIf(!schemaIsReal)(
+  it(
     'every spot-checked core table is actually declared in the schema',
     () => {
       for (const name of CORE_TABLES) {
@@ -180,7 +173,7 @@ describe('database migrations', () => {
     }
   })
 
-  it.skipIf(!schemaIsReal)(
+  it(
     'creates every table declared in the Drizzle schema',
     () => {
       const sqlite = openDb()
@@ -343,6 +336,7 @@ describe('database migrations', () => {
       seedRow(sqlite, 'messages', { id: 'msg_pop', agent_id: 'agent_pop' })
       seedRow(sqlite, 'tasks', { id: 'task_pop', parent_agent_id: 'agent_pop' })
       seedRow(sqlite, 'memories', { id: 'mem_pop', agent_id: 'agent_pop' })
+      seedRow(sqlite, 'queue_items', { id: 'queue_pop', agent_id: 'agent_pop', content: 'waiting before upgrade' })
 
       expect(() => runMigrations(sqlite, db, migrationsFolder)).not.toThrow()
 
@@ -352,12 +346,17 @@ describe('database migrations', () => {
         ['messages', 'msg_pop'],
         ['tasks', 'task_pop'],
         ['memories', 'mem_pop'],
+        ['queue_items', 'queue_pop'],
       ] as const) {
         const row = sqlite
           .query<{ id: string }, [string]>(`SELECT id FROM ${table} WHERE id = ?`)
           .get(id)
         expect(row?.id).toBe(id)
       }
+      expect(sqlite.query('SELECT content, file_ids, client_message_id, message_metadata FROM queue_items WHERE id = ?')
+        .get('queue_pop')).toEqual({
+          content: 'waiting before upgrade', file_ids: null, client_message_id: null, message_metadata: null,
+        })
       const violations = sqlite
         .query<Record<string, unknown>, []>('PRAGMA foreign_key_check')
         .all()

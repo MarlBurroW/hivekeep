@@ -181,3 +181,8 @@ export function startModelInfoRefreshCron(): void {
   })
   log.info({ schedule: config.modelInfoRefreshCron }, 'Model-info cache refresh cron started')
 }
+
+export function stopModelInfoRefreshCron(): void {
+  refreshCron?.stop()
+  refreshCron = null
+}

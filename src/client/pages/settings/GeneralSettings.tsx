@@ -32,6 +32,7 @@ export function GeneralSettings() {
 
   // Configured public URL (best-effort, for the misconfiguration warning).
   const [publicUrl, setPublicUrl] = useState<string | null>(null)
+  const [lastVerifiedAt, setLastVerifiedAt] = useState<string | null>(null)
 
   // Global prompt
   const [globalPrompt, setGlobalPrompt] = useState('')
@@ -59,7 +60,7 @@ export function GeneralSettings() {
   useEffect(() => {
     setFetchError(null)
     fetchSettings().catch(() => {})
-  }, [])
+  }, [user?.role])
 
   // Best-effort — the public-URL warning must never block the settings load.
   useEffect(() => {
@@ -71,6 +72,9 @@ export function GeneralSettings() {
 
   useEffect(() => {
     if (user?.role !== 'admin') return
+    api.get<{ lastVerifiedAt: string | null }>('/settings/backup-status')
+      .then((status) => setLastVerifiedAt(status.lastVerifiedAt))
+      .catch(() => setLastVerifiedAt(null))
     api
       .get<{ agents: Array<{ kind: string }> }>('/agents')
       .then((data) => setConfiguratorMissing(!data.agents.some((a) => a.kind === 'configurator')))
@@ -97,6 +101,7 @@ export function GeneralSettings() {
   }
 
   const fetchSettings = async () => {
+    if (user?.role !== 'admin') { setIsLoading(false); return }
     try {
       const [prompt, taskLimits] = await Promise.all([
         api.get<{ globalPrompt: string }>('/settings/global-prompt'),
@@ -248,6 +253,7 @@ export function GeneralSettings() {
         </div>
       )}
 
+      {isAdmin && <>
       {/* Global prompt */}
       <div className="space-y-2">
         <Label htmlFor="global-prompt" className="inline-flex items-center gap-1.5">
@@ -286,6 +292,8 @@ export function GeneralSettings() {
         )}
       </div>
 
+      </>}
+
       {/* Interface preferences (applied instantly, stored locally) */}
       <div className="space-y-3 border-t border-border/60 pt-6">
         <h3 className="text-sm font-medium">{t('settings.general.interface.title')}</h3>
@@ -305,6 +313,16 @@ export function GeneralSettings() {
           />
         </div>
       </div>
+
+      {isAdmin && <>
+      <section className="space-y-2 rounded-lg border p-4" aria-labelledby="backup-status-title">
+        <h3 id="backup-status-title" className="text-sm font-medium">{t('settings.general.backup.title')}</h3>
+        <p className="text-sm">{lastVerifiedAt
+          ? t('settings.general.backup.verified', { date: new Date(lastVerifiedAt).toLocaleString() })
+          : t('settings.general.backup.unknown')}</p>
+        <p className="text-sm text-muted-foreground">{t('settings.general.backup.description')}</p>
+        <p className="text-sm text-muted-foreground">{t('settings.general.backup.command')} <code className="rounded bg-muted px-1 py-0.5">bun run backup</code></p>
+      </section>
 
       {/* Global task execution-slot limits */}
       <div className="space-y-3 border-t border-border/60 pt-6">
@@ -375,6 +393,8 @@ export function GeneralSettings() {
           )}
         </div>
       </div>
+
+      </>}
 
       <HelpPanel
         contentKey="settings.general.help.content"

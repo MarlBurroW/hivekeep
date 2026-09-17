@@ -52,7 +52,7 @@ export function MiniAppViewer() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const isMobile = useIsMobile()
-  const { panelOpen, activeAppId, activeAppVersion, activeAppReloadSignal, isFullPage, customTitle, openApp, closePanel, toggleFullPage, setFullPage, setCustomTitle, setBadge } = useSidePanel()
+  const { panelOpen, activeAppId, activeAppVersion, activeAppReloadSignal, isFullPage, customTitle, openApp, closePanel, toggleFullPage, setFullPage, setCustomTitle, setBadge, activeTab, activeTask, switchTab, closeTask } = useSidePanel()
   const [app, setApp] = useState<MiniAppSummary | null>(null)
   const [iframeKey, setIframeKey] = useState(0)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -792,7 +792,6 @@ export function MiniAppViewer() {
     )
   }
 
-  const { activeTab, activeTask, switchTab, closeTask } = useSidePanel()
   const hasBothTabs = activeAppId !== null && activeTask !== null
   const showMiniApp = activeTab === 'mini-app'
   const showTask = activeTab === 'task'
@@ -1005,7 +1004,10 @@ export function MiniAppViewer() {
     )
   }
 
-  // Desktop (>= 768px): inline fixed-width side column — unchanged behavior.
+  // Keep closed panels out of keyboard navigation and the accessibility tree.
+  if (!panelOpen) return null
+
+  // Desktop: inline side column.
   return (
     <div
       className={`shrink-0 overflow-hidden transition-[width] duration-300 ease-out ${

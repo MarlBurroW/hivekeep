@@ -64,6 +64,13 @@ function resetMocks() {
 describe('promptHumanTool', () => {
   beforeEach(resetMocks)
 
+  it('rejects private sessions before creating a shared prompt or looking up tasks', async () => {
+    const result = await execute({ ...baseCtx, sessionId: 'private-session' }, validArgs)
+    expect(result.error).toContain('private sessions')
+    expect(mockHumanPrompts.createHumanPrompt).not.toHaveBeenCalled()
+    expect(mockDb.select).not.toHaveBeenCalled()
+  })
+
   describe('registration', () => {
     it('is available to main and sub-agent', () => {
       expect(promptHumanTool.availability).toEqual(['main', 'sub-agent'])

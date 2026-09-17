@@ -67,14 +67,14 @@ interface QuickChatPanelProps {
 export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel, llmModels, sessionId, expiresAt, onHide, onEnd, onShowHistory, agentThinkingEnabled, agentThinkingEffort, onEditTools }: QuickChatPanelProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const { messages, session, streamingMessage, isProcessing, isStreaming, sendMessage, stopStreaming, updateSessionOverrides } = useQuickChat(sessionId, agentId)
+  const { messages, session, streamingMessage, isProcessing, isSending, isStreaming, sendMessage, stopStreaming, updateSessionOverrides } = useQuickChat(sessionId, agentId)
   // Tools badge: the quick-session variant of the resolved toolset (the
   // session-excluded tools — tasks, crons, inter-agent… — are not counted).
   const { tools: quickTools, count: quickToolCount, refetch: refetchQuickTools } = useAgentTools(agentId, { quick: true })
   const [toolsModalOpen, setToolsModalOpen] = useState(false)
   const { toolCallsByMessage } = useToolCalls(agentId, messages)
   const { content: draftContent, setContent: setDraftContent, clearDraft } = useDraftMessage(`quick-${sessionId}`)
-  const { pendingFiles, addFiles, removeFile, clearFiles, isUploading } = useFileUpload(agentId)
+  const { pendingFiles, addFiles, removeFile, clearFiles, isUploading } = useFileUpload(agentId, `quick-${sessionId}`)
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [saveAsMemory, setSaveAsMemory] = useState(false)
   const [memorySummary, setMemorySummary] = useState('')
@@ -125,7 +125,7 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
   ])
 
   const handleSend = useCallback(
-    (content: string, fileIds?: string[]) => {
+    async (content: string, fileIds?: string[]) => {
       const optimisticFiles = pendingFiles
         .filter((f) => f.status === 'done' && f.serverId && f.serverUrl)
         .map((f) => ({
@@ -136,9 +136,8 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
           url: f.serverUrl!,
         }))
 
-      sendMessage(content, fileIds, optimisticFiles.length > 0 ? optimisticFiles : undefined)
-      clearDraft()
-      clearFiles()
+      const sent = await sendMessage(content, fileIds, optimisticFiles.length > 0 ? optimisticFiles : undefined)
+      if (sent) { clearDraft(); clearFiles() }
     },
     [sendMessage, clearDraft, clearFiles, pendingFiles],
   )
@@ -170,7 +169,7 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
             fallbackIcon={<Zap className="size-3.5" />}
           />
           <div className="min-w-0">
-            <p className="text-sm font-semibold leading-tight">{t('quickChat.title')}</p>
+            <p className="text-sm font-semibold leading-tight">{t('experience.chat.private', 'Private session')}</p>
             <p className="text-xs text-muted-foreground truncate">
               {agentName}
               {timeLeft && <span className="ml-1.5 opacity-60">· {timeLeft}</span>}
@@ -192,7 +191,7 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
           {onShowHistory && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8" onClick={onShowHistory}>
+                <Button variant="ghost" size="icon" className="size-11" onClick={onShowHistory} aria-label={t('quickChat.history.open')}>
                   <History className="size-4" />
                 </Button>
               </TooltipTrigger>
@@ -201,17 +200,23 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
           )}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleEndSession}>
+              <Button aria-label={t('quickChat.endSession')} variant="ghost" size="icon" className="size-11 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleEndSession}>
                 <LogOut className="size-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">{t('quickChat.endSession')}</TooltipContent>
           </Tooltip>
-          <Button variant="ghost" size="icon" className="size-8" onClick={onHide}>
+          <Button variant="ghost" size="icon" className="size-11" onClick={onHide} aria-label={t('common.close')}>
             <X className="size-4" />
           </Button>
         </div>
       </div>
+
+      <p className="border-b px-4 py-2 text-xs leading-relaxed text-muted-foreground">
+        {t('experience.chat.privateScope', 'Only you can view this session. Closing it keeps it in your history; memories are shared only if you choose to save a summary.')}
+        <span className="mt-1 block">{t('experience.chat.sharedActions', 'Messages and attachments stay private. Actions performed by tools in shared spaces remain visible to others.')}</span>
+        {session?.retentionDays != null && <span className="mt-1 block">{t('experience.chat.retention', 'History is deleted {{count}} days after the session closes.', { count: session.retentionDays })}</span>}
+      </p>
 
       {/* Messages */}
       <div className="relative min-h-0 flex-1 overflow-y-auto" ref={scrollContainerRef}>
@@ -275,6 +280,7 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
               ? 'bg-primary text-primary-foreground hover:opacity-90'
               : 'bg-muted text-muted-foreground hover:bg-muted/80',
           )}
+          aria-label={autoScroll ? t('chat.autoScroll.on') : t('chat.autoScroll.off')}
           title={autoScroll ? t('chat.autoScroll.on') : t('chat.autoScroll.off')}
         >
           {autoScroll ? <Pin className="size-3" /> : <PinOff className="size-3" />}
@@ -288,12 +294,16 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
         onSend={handleSend}
         onStop={stopStreaming}
         isStreaming={isStreaming}
+        isProcessing={isProcessing}
+        disabled={isSending || session?.status === 'closed' || !!(session?.expiresAt && session.expiresAt <= Date.now())}
         pendingFiles={pendingFiles}
         isUploading={isUploading}
         onAddFiles={addFiles}
         onRemoveFile={removeFile}
         agentId={agentId}
         llmModels={llmModels}
+        agentName={agentName}
+        sessionId={sessionId}
         model={session?.model ?? agentModel}
         providerId={session?.providerId ?? null}
         onModelChange={(modelId, providerId) => void updateSessionOverrides({ model: modelId, providerId })}
@@ -330,6 +340,7 @@ export function QuickChatPanel({ agentId, agentName, agentAvatarUrl, agentModel,
             <AlertDialogTitle>{t('quickChat.closing.title')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t('quickChat.closing.description')}
+              <span className="mt-2 block">{t('experience.chat.memoryDestination', 'A saved summary becomes part of this Agent’s shared memory, available in other conversations. The rest of the private conversation is not transferred.')}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
 

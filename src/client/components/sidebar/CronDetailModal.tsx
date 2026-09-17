@@ -80,6 +80,7 @@ export function CronDetailModal({
 }: CronDetailModalProps) {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const { toolboxes } = useToolboxes()
   const serverTimezone = user?.serverTimezone
   const { openTask } = useSidePanel()
@@ -337,7 +338,7 @@ export function CronDetailModal({
               )}
 
               {/* Active toggle */}
-              {!cron.requiresApproval && (
+              {isAdmin && !cron.requiresApproval && (
                 <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
                   <Label htmlFor="cronActiveToggle" className="text-sm cursor-pointer">
                     {t('sidebar.crons.active')}
@@ -424,7 +425,7 @@ export function CronDetailModal({
 
           {/* Footer */}
           <DialogFooter className="flex-row flex-wrap items-center gap-2">
-            {cron.requiresApproval && (
+            {isAdmin && cron.requiresApproval && (
               <Button
                 size="sm"
                 onClick={handleApprove}
@@ -435,7 +436,7 @@ export function CronDetailModal({
                 {t('sidebar.crons.approve')}
               </Button>
             )}
-            <Button
+            {isAdmin && <Button
               type="button"
               variant="outline"
               size="sm"
@@ -443,8 +444,8 @@ export function CronDetailModal({
             >
               <Pencil className="mr-1.5 size-3.5" />
               {t('common.edit')}
-            </Button>
-            {onDuplicate && (
+            </Button>}
+            {isAdmin && onDuplicate && (
               <Button
                 type="button"
                 variant="outline"
@@ -455,7 +456,7 @@ export function CronDetailModal({
                 {t('cron.detail.duplicate')}
               </Button>
             )}
-            <Button
+            {isAdmin && <Button
               type="button"
               variant="outline"
               size="sm"
@@ -464,7 +465,7 @@ export function CronDetailModal({
             >
               {isTriggering ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Play className="mr-1.5 size-3.5" />}
               {t('cron.detail.runNow')}
-            </Button>
+            </Button>}
             <Button
               type="button"
               variant="ghost"

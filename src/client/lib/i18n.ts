@@ -66,6 +66,11 @@ export async function changeAppLanguage(lng: string): Promise<void> {
   await i18n.changeLanguage(target)
 }
 
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = i18n.language
+  i18n.on('languageChanged', language => { document.documentElement.lang = language })
+}
+
 // Kick off the pre-login best guess immediately (async: English renders for a
 // frame at most while the locale chunk loads from the same origin).
 void changeAppLanguage(detectBrowserLanguage())

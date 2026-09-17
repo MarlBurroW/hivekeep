@@ -35,7 +35,7 @@ mock.module('@/server/logger', () => ({
 }))
 
 // Note: Bun's mock.module may not intercept cached modules in certain
-// environments (coverage mode, CI runners). Detect this and skip gracefully.
+// environments (coverage mode, CI runners). Detect this and fail explicitly.
 
 // Import after mocks
 const { sendMessageTool, replyTool, listAgentsTool } = await import(
@@ -62,7 +62,8 @@ const mocksWorking = await (async () => {
 mockSendInterAgentMessage.mockClear()
 mockResolveAgentId.mockClear()
 
-const itMocked = mocksWorking ? it : it.skip
+if (!mocksWorking) throw new Error("Test isolation failed. Run this suite with bun run test; never hide missing mocks with skipped tests.")
+const itMocked = it
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

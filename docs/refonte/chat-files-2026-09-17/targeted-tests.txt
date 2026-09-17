@@ -1,0 +1,7 @@
+$ bun --no-env-file scripts/test.ts useWorkspaceFileSearch remark-workspace-paths workspace-files
+Running 3 test files in isolated processes (4 workers, Bun 1.4.0).
+PASS src/client/hooks/useWorkspaceFileSearch.test.ts (5 tests)
+PASS src/client/lib/remark-workspace-paths.test.ts (10 tests)
+PASS src/server/services/workspace-files.test.ts (30 tests)
+
+45 passed · 0 failed · 0 skipped · 3 files · 0 unsuccessful suites

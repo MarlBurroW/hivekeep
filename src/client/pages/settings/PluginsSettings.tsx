@@ -313,6 +313,10 @@ export function PluginsSettings() {
         </div>
       </div>
 
+      <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+        {t('settings.plugins.runtimeAccess', 'Extensions run with the server’s permissions and can access its files, network and secrets. Declared SDK permissions are not a sandbox.')}
+      </p>
+
       {/* Plugin list */}
       {plugins.length === 0 ? (
         <EmptyState

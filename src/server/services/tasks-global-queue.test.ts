@@ -34,7 +34,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { v4 as uuid } from 'uuid'
 import * as schema from '@/server/db/schema'
 
-const schemaIsReal = !!(schema as any).tasks?.id
+if (!schema.tasks?.id) throw new Error("This suite requires isolated module mocks")
 
 mock.module('@/server/logger', () => ({
   createLogger: () => ({ info: () => {}, warn: () => {}, debug: () => {}, error: () => {} }),
@@ -54,6 +54,7 @@ mock.module('@/server/services/queue', () => ({
   isAgentProcessing: async () => false,
   getQueueSize: async () => 0,
   recoverStaleProcessingItems: () => {},
+  requeueProcessingItems: () => 0,
   popQueueMessageMetadata: () => undefined,
 }))
 
@@ -74,15 +75,11 @@ mock.module('@/server/llm/core/resolve', () => ({
 
 const sqlite = new Database(':memory:')
 sqlite.run('PRAGMA foreign_keys = ON')
-const db = schemaIsReal ? drizzle(sqlite, { schema }) : (null as any)
+const db = drizzle(sqlite, { schema })
 
-if (schemaIsReal) {
-  mock.module('@/server/db/index', () => ({ db, sqlite, initVirtualTables: () => {} }))
-}
+mock.module('@/server/db/index', () => ({ db, sqlite, initVirtualTables: () => {} }))
 
-const svc = schemaIsReal
-  ? await import('@/server/services/tasks')
-  : ({} as typeof import('@/server/services/tasks'))
+const svc = await import('@/server/services/tasks')
 const {
   spawnTask,
   resolveTask,
@@ -92,16 +89,12 @@ const {
   recoverStaleTasks,
 } = svc as typeof import('@/server/services/tasks')
 
-const settings = schemaIsReal
-  ? await import('@/server/services/app-settings')
-  : ({} as typeof import('@/server/services/app-settings'))
+const settings = await import('@/server/services/app-settings')
 const { setMaxConcurrentTasks, setMaxQueuedTasks, getMaxQueuedTasks } = settings
 
-const itReal = schemaIsReal ? it : it.skip
 
 // ─── Schema bootstrap (only the tables these paths touch) ────────────────────
 beforeAll(() => {
-  if (!schemaIsReal) return
   sqlite.run(`
     CREATE TABLE agents (
       id TEXT PRIMARY KEY,
@@ -254,7 +247,6 @@ function seedTask(opts: {
 }
 
 beforeEach(async () => {
-  if (!schemaIsReal) return
   sqlite.run('DELETE FROM tasks')
   sqlite.run('DELETE FROM messages')
   enqueued.length = 0
@@ -266,7 +258,91 @@ beforeEach(async () => {
 
 // ─── (d) maxQueue guard ──────────────────────────────────────────────────────
 describe('spawnTask global gate', () => {
-  itReal('(a) queues a fresh task spawned beyond maxConcurrent, then promotes it on resolve', async () => {
+  it('reserves global slots and queue capacity atomically across simultaneous spawns', async () => {
+    await setMaxConcurrentTasks(3)
+    await setMaxQueuedTasks(5)
+    const results = await Promise.allSettled(Array.from({ length: 40 }, (_, index) => spawnTask({
+      parentAgentId: 'agent-a', description: `concurrent ${index}`, mode: 'async',
+      spawnType: 'self', skipExecute: true,
+    })))
+    expect(countByStatus('pending')).toBe(3)
+    expect(countByStatus('queued')).toBe(5)
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(8)
+    const rejected = results.filter((result) => result.status === 'rejected')
+    expect(rejected).toHaveLength(32)
+    expect(rejected.every((result) => String(result.reason).includes('TASK_QUEUE_FULL'))).toBe(true)
+  })
+
+  it('does not reserve one group slot twice during simultaneous spawns', async () => {
+    await setMaxConcurrentTasks(4)
+    const results = await Promise.all(Array.from({ length: 12 }, (_, index) => spawnTask({
+      parentAgentId: 'agent-a', description: `grouped ${index}`, mode: 'async',
+      spawnType: 'self', concurrencyGroup: 'cron-group', concurrencyMax: 1, skipExecute: true,
+    })))
+    expect(results.filter((result) => !result.queued)).toHaveLength(1)
+    expect(countByStatus('pending')).toBe(1)
+    expect(countByStatus('queued')).toBe(11)
+  })
+
+  it('composes the global cap across racing spawns and promotions', async () => {
+    await setMaxConcurrentTasks(3)
+    for (let index = 0; index < 8; index++) seedTask({ status: 'queued' })
+    await Promise.all([
+      ...Array.from({ length: 12 }, () => promoteGlobalQueue()),
+      ...Array.from({ length: 8 }, (_, index) => spawnTask({
+        parentAgentId: 'agent-a', description: `new ${index}`, mode: 'async',
+        spawnType: 'self', skipExecute: true,
+      })),
+    ])
+    expect(countByStatus('pending') + countByStatus('in_progress')).toBe(3)
+    expect(countByStatus('queued')).toBe(13)
+  })
+
+  it('group promotion cannot bypass a full global cap', async () => {
+    await setMaxConcurrentTasks(1)
+    seedTask({ status: 'in_progress' })
+    const queued = seedTask({ status: 'queued', group: 'free-group', groupMax: 1 })
+    await svc.promoteNextQueuedTask('free-group', 1)
+    expect(getTask(queued).status).toBe('queued')
+  })
+
+  it('force promotion has a single winner when called concurrently', async () => {
+    const queued = seedTask({ status: 'queued' })
+    const results = await Promise.all(Array.from({ length: 8 }, () => svc.forcePromoteTask(queued)))
+    expect(results.filter(Boolean)).toHaveLength(1)
+    expectExecuting(queued)
+  })
+
+  it('persists retry history before a queued reservation can be promoted', async () => {
+    await setMaxConcurrentTasks(1)
+    seedTask({ status: 'in_progress' })
+    const failed = seedTask({ status: 'failed' })
+    sqlite.run(`INSERT INTO messages (id, agent_id, task_id, role, content, source_type, request_id, in_reply_to, created_at)
+      VALUES ('old-message', 'agent-a', ?, 'user', 'previous context', 'user', 'old-request', 'old-reply', 0)`, [failed])
+    const [retry] = await Promise.all([
+      svc.retryTask(failed, { preserveHistory: true }),
+      ...Array.from({ length: 8 }, () => promoteGlobalQueue()),
+    ])
+    expect(retry.queued).toBe(true)
+    const history = taskMessages(retry.taskId)
+    expect(history).toHaveLength(1)
+    expect(history[0].content).toBe('previous context')
+    expect(history[0].id).not.toBe('old-message')
+    expect(history[0].request_id).toBeNull()
+    expect(history[0].in_reply_to).toBeNull()
+  })
+
+  it('releases the reservation if initial history cannot be persisted', async () => {
+    await expect(spawnTask({
+      parentAgentId: 'agent-a', description: 'invalid history', mode: 'async', spawnType: 'self',
+      initialMessages: [{ id: 'broken', agentId: 'agent-a', role: 'user', sourceType: 'user', createdAt: null as never }],
+      skipExecute: true,
+    })).rejects.toThrow()
+    expect(countByStatus('pending')).toBe(0)
+    expect(countByStatus('queued')).toBe(0)
+  })
+
+  it('(a) queues a fresh task spawned beyond maxConcurrent, then promotes it on resolve', async () => {
     await setMaxConcurrentTasks(2)
     // Two executing tasks already hold both slots.
     const exec1 = seedTask({ status: 'in_progress' })
@@ -293,7 +369,7 @@ describe('spawnTask global gate', () => {
     expectExecuting(res.taskId)
   })
 
-  itReal('(d) rejects with TASK_QUEUE_FULL once the queue is already at maxQueue', async () => {
+  it('(d) rejects with TASK_QUEUE_FULL once the queue is already at maxQueue', async () => {
     await setMaxConcurrentTasks(1)
     await setMaxQueuedTasks(2)
     // Fill the single global slot.
@@ -312,7 +388,7 @@ describe('spawnTask global gate', () => {
     expect(countByStatus('in_progress')).toBe(1)
   })
 
-  itReal('starts immediately (pending→in_progress) when a global slot is free', async () => {
+  it('starts immediately (pending→in_progress) when a global slot is free', async () => {
     await setMaxConcurrentTasks(5)
     const res = await spawnTask({
       parentAgentId: 'agent-a',
@@ -326,7 +402,7 @@ describe('spawnTask global gate', () => {
     expectExecuting(res.taskId)
   })
 
-  itReal('(d2) maxQueue=0 disables queueing — first overflow spawn throws TASK_QUEUE_FULL', async () => {
+  it('(d2) maxQueue=0 disables queueing — first overflow spawn throws TASK_QUEUE_FULL', async () => {
     // 0 is a legitimate "never queue" setting; it must round-trip through the
     // getter (not get floored back to the default) and make spawnTask reject the
     // moment the global slots are full instead of parking a 'queued' row.
@@ -345,7 +421,7 @@ describe('spawnTask global gate', () => {
 
 // ─── (b) suspended tasks release the global slot ─────────────────────────────
 describe('global slot release on suspend', () => {
-  itReal('(b) a suspended (awaiting_subtask) task does NOT occupy a slot — a queued task is promoted', async () => {
+  it('(b) a suspended (awaiting_subtask) task does NOT occupy a slot — a queued task is promoted', async () => {
     // Cap = 2. Two executing tasks (the runner + its scout child) fill both
     // slots; one task waits in the queue behind them.
     await setMaxConcurrentTasks(2)
@@ -376,7 +452,7 @@ describe('global slot release on suspend', () => {
 
 // ─── (c) resume gates on a slot ──────────────────────────────────────────────
 describe('resume gating', () => {
-  itReal('(c) a resume when full → re-queued, then promoted with the injected reply still in history', async () => {
+  it('(c) a resume when full → re-queued, then promoted with the injected reply still in history', async () => {
     await setMaxConcurrentTasks(1)
 
     // A parent suspended on a scout child (awaiting_subtask → idle, no slot).
@@ -413,7 +489,7 @@ describe('resume gating', () => {
     expect(taskMessages(parent).some((m) => String(m.content).includes('DIGEST: found it'))).toBe(true)
   })
 
-  itReal('a resume with a free slot proceeds straight to in_progress', async () => {
+  it('a resume with a free slot proceeds straight to in_progress', async () => {
     await setMaxConcurrentTasks(5)
     const parent = seedTask({ status: 'in_progress', mode: 'await' })
     const child = seedTask({ status: 'in_progress', mode: 'await', description: 'scout' })
@@ -428,7 +504,7 @@ describe('resume gating', () => {
 
 // ─── (e) per-group no-overlap composes with the global queue ─────────────────
 describe('per-group no-overlap composition', () => {
-  itReal('(e) a 2nd cron-group task stays queued while the 1st is awaiting (group still active), runs only after it leaves the group', async () => {
+  it('(e) a 2nd cron-group task stays queued while the 1st is awaiting (group still active), runs only after it leaves the group', async () => {
     // Generous global cap so the GLOBAL queue never gates here — we isolate the
     // PER-GROUP constraint.
     await setMaxConcurrentTasks(10)
@@ -452,7 +528,7 @@ describe('per-group no-overlap composition', () => {
     expectExecuting(second)
   })
 
-  itReal('global promotion SKIPS a group-full candidate and promotes a runnable one behind it', async () => {
+  it('global promotion SKIPS a group-full candidate and promotes a runnable one behind it', async () => {
     await setMaxConcurrentTasks(2)
     const group = 'cron:xyz'
 
@@ -472,7 +548,7 @@ describe('per-group no-overlap composition', () => {
 
 // ─── (restart survival) recoverStaleTasks no longer fails queued ─────────────
 describe('restart survival', () => {
-  itReal('recoverStaleTasks does NOT fail queued tasks; startup promote drives them', async () => {
+  it('recoverStaleTasks does NOT fail queued tasks; startup promote drives them', async () => {
     await setMaxConcurrentTasks(5)
     const queued = seedTask({ status: 'queued' })
     // A genuinely stale in_progress row IS recovered to failed.

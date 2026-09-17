@@ -172,6 +172,7 @@ export const ConversationHeader = memo(function ConversationHeader({
   const navigate = useNavigate()
 
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
 
   const isProcessing = queueState?.isProcessing ?? false
@@ -229,9 +230,9 @@ export const ConversationHeader = memo(function ConversationHeader({
   // ResizeObserver reports a width (initial width is +Infinity). At >=768px the
   // hook returns false, so desktop behaviour stays driven purely by the
   // width thresholds — byte-identical to before.
-  const showDateNav = !isMobile && headerWidth >= HIDE_DATE_NAV_BELOW
-  const showStats = !isMobile && headerWidth >= HIDE_STATS_BELOW
-  const showUsageIcon = !isMobile && headerWidth >= FOLD_USAGE_BELOW
+  const showDateNav = detailsOpen && !isMobile && headerWidth >= HIDE_DATE_NAV_BELOW
+  const showStats = detailsOpen && !isMobile && headerWidth >= HIDE_STATS_BELOW
+  const showUsageIcon = detailsOpen && !isMobile && headerWidth >= FOLD_USAGE_BELOW
   const showQuickIcon = !isMobile && headerWidth >= FOLD_QUICK_BELOW
   // The "⋯" overflow only appears when at least one *foldable* action (a simple
   // onClick — quick session, usage) couldn't fit. Stats/date-nav don't fold.
@@ -276,13 +277,13 @@ export const ConversationHeader = memo(function ConversationHeader({
               {t('agent.queue', { count: queueSize })}
             </span>
           )}
-          {lastTurnCache && (
+          {detailsOpen && lastTurnCache && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
                   className={cn(
                     'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums cursor-default',
-                    cacheExpired && 'bg-muted text-muted-foreground/70',
+                    cacheExpired && 'bg-muted text-muted-foreground',
                     !cacheExpired && lastTurnCache.hitRate >= 0.7 && 'bg-success/15 text-success',
                     !cacheExpired && lastTurnCache.hitRate >= 0.3 && lastTurnCache.hitRate < 0.7 && 'bg-warning/15 text-warning',
                     !cacheExpired && lastTurnCache.hitRate < 0.3 && 'bg-muted text-muted-foreground',
@@ -316,6 +317,7 @@ export const ConversationHeader = memo(function ConversationHeader({
           )}
         </div>
 
+        <p className="text-xs font-medium text-muted-foreground">{t('experience.chat.shared', 'Shared conversation')}</p>
         {/* Desktop: show role */}
         <p className="hidden truncate text-xs text-muted-foreground sm:block">{role}</p>
 
@@ -324,7 +326,7 @@ export const ConversationHeader = memo(function ConversationHeader({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1.5 truncate text-xs text-muted-foreground sm:hidden"
+              className="flex max-w-full items-center gap-1.5 truncate text-xs text-muted-foreground sm:hidden"
             >
               <span className="truncate">{selectedModelName}</span>
               <span className="shrink-0 text-[10px]">·</span>
@@ -364,7 +366,7 @@ export const ConversationHeader = memo(function ConversationHeader({
 
       {/* Context usage + compacting proximity (desktop only — mobile shows it
           in the name-tap popover above). Always visible; never folds. */}
-      <div className="hidden min-w-0 items-center sm:flex">
+      <div className={cn("min-w-0 items-center", detailsOpen ? "hidden sm:flex" : "hidden")} inert={!detailsOpen} aria-hidden={!detailsOpen}>
         <ContextBar
           agentId={agentId}
           estimatedTokens={estimatedTokens}
@@ -382,6 +384,8 @@ export const ConversationHeader = memo(function ConversationHeader({
         />
       </div>
 
+      <Button type="button" variant={detailsOpen ? 'secondary' : 'ghost'} size="sm" onClick={() => setDetailsOpen((value) => !value)} aria-expanded={detailsOpen} className="hidden sm:inline-flex">{t('experience.chat.details', 'Details')}</Button>
+
       {/* Tool calls toggle — always visible (highest priority) */}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -389,6 +393,7 @@ export const ConversationHeader = memo(function ConversationHeader({
             variant="ghost"
             size="icon-sm"
             className={cn('relative', isToolCallsOpen && 'bg-muted')}
+            aria-label={t('tools.viewer.title')}
             onClick={onToggleToolCalls}
           >
             <Wrench className="size-4" />
@@ -409,7 +414,7 @@ export const ConversationHeader = memo(function ConversationHeader({
       {onSearch && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={onSearch}>
+            <Button aria-label={t('chat.search.title')} variant="ghost" size="icon-sm" onClick={onSearch}>
               <Search className="size-4" />
             </Button>
           </TooltipTrigger>
@@ -421,11 +426,11 @@ export const ConversationHeader = memo(function ConversationHeader({
       {onQuickSession && showQuickIcon && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={onQuickSession}>
+            <Button aria-label={t('experience.chat.private', 'Private session')} variant="ghost" size="icon-sm" onClick={onQuickSession}>
               <Zap className="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">{t('quickChat.open')}</TooltipContent>
+          <TooltipContent side="bottom">{t('experience.chat.openPrivate', 'Open a private session')}</TooltipContent>
         </Tooltip>
       )}
 
@@ -433,7 +438,7 @@ export const ConversationHeader = memo(function ConversationHeader({
       {onViewUsage && showUsageIcon && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={onViewUsage}>
+            <Button aria-label={t('chat.viewUsage')} variant="ghost" size="icon-sm" onClick={onViewUsage}>
               <Coins className="size-4" />
             </Button>
           </TooltipTrigger>
@@ -459,7 +464,7 @@ export const ConversationHeader = memo(function ConversationHeader({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-sm">
+                <Button aria-label={t('chat.moreActions')} variant="ghost" size="icon-sm">
                   <MoreHorizontal className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -470,7 +475,7 @@ export const ConversationHeader = memo(function ConversationHeader({
             {onQuickSession && !showQuickIcon && (
               <DropdownMenuItem onClick={onQuickSession}>
                 <Zap className="mr-2 size-4" />
-                {t('quickChat.open')}
+                {t('experience.chat.openPrivate', 'Open a private session')}
               </DropdownMenuItem>
             )}
             {onViewUsage && !showUsageIcon && (
@@ -501,7 +506,7 @@ export const ConversationHeader = memo(function ConversationHeader({
           {isMobile && onQuickSession && (
             <DropdownMenuItem onClick={onQuickSession}>
               <Zap className="mr-2 size-4" />
-              {t('quickChat.open')}
+              {t('experience.chat.openPrivate', 'Open a private session')}
             </DropdownMenuItem>
           )}
           {isMobile && onViewUsage && (
@@ -572,7 +577,7 @@ export const ConversationHeader = memo(function ConversationHeader({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t('chat.clear.title')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('chat.clear.description')}</AlertDialogDescription>
+              <AlertDialogDescription>{t('chat.clear.description')}<span className="mt-2 block">{t('experience.chat.clearEffects', 'This affects the shared conversation and its attached files. Existing memories are kept; manage them separately in the Agent’s memory settings.')}</span></AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>

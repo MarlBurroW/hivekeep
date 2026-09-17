@@ -3,6 +3,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarSeparator,
+  useSidebar,
 } from '@/client/components/ui/sidebar'
 import { AgentList } from '@/client/components/sidebar/AgentList'
 import { SidebarFooterContent } from '@/client/components/sidebar/SidebarFooterContent'
@@ -57,6 +58,7 @@ export function AppSidebar({
   onReorderAgents,
   onOpenSettings,
 }: AppSidebarProps) {
+  const { isMobile, setOpenMobile } = useSidebar()
   return (
     <Sidebar className="surface-sidebar">
       {/* Brand/logo lives in <AppTopBar /> now. SystemHealthBar takes the top slot. */}
@@ -73,7 +75,7 @@ export function AppSidebar({
             unavailableAgentIds={unavailableAgentIds}
             agentQueueState={agentQueueState}
             unreadCounts={unreadCounts}
-            onSelectAgent={onSelectAgent}
+            onSelectAgent={(slug) => { onSelectAgent(slug); if (isMobile) setOpenMobile(false) }}
             onCreateAgent={onCreateAgent}
             onEditAgent={onEditAgent}
             onDeleteAgent={onDeleteAgent}

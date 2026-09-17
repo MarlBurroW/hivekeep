@@ -4,6 +4,7 @@ import { HivekeepLogo } from '@/client/components/common/HivekeepLogo'
 
 interface Props {
   children: ReactNode
+  compact?: boolean
 }
 
 interface State {
@@ -27,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     return (
-      <div className="surface-base flex min-h-screen items-center justify-center p-6">
+      <div role="alert" className={`surface-base flex ${this.props.compact ? 'h-full min-h-64' : 'min-h-screen'} items-center justify-center p-6`}>
         <div className="max-w-md space-y-4 text-center animate-fade-in">
           <HivekeepLogo size={64} title={null} className="mx-auto" />
           <h1 className="text-4xl font-extrabold text-foreground">Hivekeep</h1>
@@ -38,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </pre>
           )}
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => this.props.compact ? this.setState({ hasError: false, error: null }) : window.location.reload()}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             {i18n.t('errorBoundary.reload')}

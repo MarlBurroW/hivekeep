@@ -18,6 +18,7 @@ export function PageHeader({
   actions,
   className,
   children,
+  embedded = false,
 }: {
   icon?: LucideIcon
   title: ReactNode
@@ -29,15 +30,18 @@ export function PageHeader({
   /** Extra content rendered on a second row below the title row (e.g. a project
    *  description + progress bar). */
   children?: ReactNode
+  /** Parent workspace already provides the visible page title and tabs. */
+  embedded?: boolean
 }) {
   return (
     <header
       className={cn(
         'flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center',
+        embedded && 'md:px-6',
         className,
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+      {embedded ? <h2 className="sr-only">{title}</h2> : <div className="flex min-w-0 flex-1 items-center gap-2.5">
         {leading}
         {Icon && <Icon className="size-5 shrink-0 text-primary" />}
         <div className="min-w-0 flex-1">
@@ -48,8 +52,8 @@ export function PageHeader({
           )}
           {children}
         </div>
-      </div>
-      {actions && <div className="flex items-center gap-2 sm:ml-auto">{actions}</div>}
+      </div>}
+      {actions && <div className={cn('flex min-w-0 flex-wrap items-center gap-2', embedded ? 'w-full' : 'sm:ml-auto')}>{actions}</div>}
     </header>
   )
 }

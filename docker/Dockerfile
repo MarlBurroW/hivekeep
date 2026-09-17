@@ -1,5 +1,5 @@
 # ─── Stage 1: Install dependencies ────────────────────────────────────────────
-FROM oven/bun:1 AS deps
+FROM oven/bun:1.4.0 AS deps
 WORKDIR /app
 
 # better-sqlite3 needs native build tools for node-gyp
@@ -18,7 +18,7 @@ COPY . .
 RUN bun run build
 
 # ─── Stage 3: Production image ───────────────────────────────────────────────
-FROM oven/bun:1 AS production
+FROM oven/bun:1.4.0 AS production
 WORKDIR /app
 
 LABEL org.opencontainers.image.title="Hivekeep" \
@@ -35,7 +35,7 @@ COPY package.json bun.lock ./
 # AND must persist in the final image (Bun runs the SDK's src directly).
 COPY packages ./packages
 # Remove husky prepare script (not needed in production, bun ignores HUSKY=0)
-RUN sed -i '/"prepare":/d' package.json && \
+RUN bun -e 'const file = Bun.file("package.json"); const pkg = await file.json(); delete pkg.scripts.prepare; await Bun.write(file, JSON.stringify(pkg, null, 2));' && \
     bun install --frozen-lockfile --production && \
     apt-get purge -y python3 make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
@@ -75,6 +75,8 @@ COPY --from=build /app/dist ./dist
 # Copy server source + shared types + config files
 COPY --from=build /app/src/server ./src/server
 COPY --from=build /app/src/shared ./src/shared
+# Offline full-backup CLI is part of the production image.
+COPY --from=build /app/scripts/backup.ts ./scripts/backup.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
 # .env.example is the config catalog surfaced via list_platform_config_options

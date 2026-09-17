@@ -78,6 +78,17 @@ class LogStore {
           : Date.now(),
       }
 
+      // This ring is readable by platform tools as well as the admin UI. Keep
+      // private-session text, provider errors and previews out of that shared
+      // surface; the original operational record still goes to the server log.
+      if (typeof parsed.sessionId === 'string' && parsed.sessionId) {
+        entry.message = 'Private session activity (details omitted)'
+        delete parsed.sessionId
+        for (const key of Object.keys(parsed)) {
+          if (!EXCLUDED_KEYS.has(key) && key !== 'agentId') delete parsed[key]
+        }
+      }
+
       // Collect extra fields as data
       const data: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(parsed)) {

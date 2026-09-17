@@ -151,6 +151,8 @@ export type ToolAvailability = 'main' | 'sub-agent'
 
 /** Runtime context passed to a tool factory by Hivekeep when the tool is resolved. */
 export interface ToolExecutionContext {
+  /** Private/API conversation scope for generated artifacts. */
+  sessionId?: string
   agentId: string
   userId?: string
   taskId?: string
