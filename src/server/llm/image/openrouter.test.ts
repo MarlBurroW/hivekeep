@@ -72,7 +72,9 @@ describe('openrouterImageProvider.generate', () => {
       expect(calls[0]?.body.n).toBe(1)
       expect(calls[0]?.body.quality).toBe('high')
       expect(calls[0]?.body.size).toBeUndefined()
-      expect(calls[0]?.body.input_references).toEqual(['data:image/png;base64,AQID'])
+      expect(calls[0]?.body.input_references).toEqual([
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,AQID' } },
+      ])
       expect(result.mediaType).toBe('image/webp')
       expect(result.data.length).toBe(3)
     } finally {

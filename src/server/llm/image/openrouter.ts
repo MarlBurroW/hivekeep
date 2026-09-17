@@ -288,7 +288,9 @@ export const openrouterImageProvider: ImageProvider = {
 
   async generate(model: ImageModel, request: ImageRequest, config: ProviderConfig): Promise<ImageResult> {
     const maxRefs = model.maxImageInputs ?? 0
-    const inputReferences = (request.imageInputs ?? []).slice(0, Math.max(0, maxRefs)).map(dataUrlFor)
+    const inputReferences = (request.imageInputs ?? [])
+      .slice(0, Math.max(0, maxRefs))
+      .map((input) => ({ type: 'image_url', image_url: { url: dataUrlFor(input) } }))
     // Spread caller params first, then set the provider-controlled fields, so
     // request.params can supply model-specific options (quality, resolution, …)
     // but cannot override the model id, prompt, or force n > 1 (extra cost).
