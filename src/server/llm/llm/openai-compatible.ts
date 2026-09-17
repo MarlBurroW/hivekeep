@@ -4,9 +4,10 @@
  * Unlike the branded OpenAI-compatible providers (`deepseek`, `openrouter`,
  * `xai`, …) which hardcode a vendor `BASE_URL`, this one takes the base URL
  * from the user's config. It targets the long tail of gateways and local
- * servers that expose an OpenAI-style `/chat/completions` + `/models`:
- * NewAPI, LiteLLM, llama.cpp (`llama-server`), LM Studio, vLLM, Ollama's
- * OpenAI shim, and similar.
+ * servers that expose an OpenAI-style `/chat/completions` + `/models`
+ * (and, when the endpoint implements it, `/images/generations` via the
+ * image companion): NewAPI, LiteLLM, llama.cpp (`llama-server`),
+ * LM Studio, vLLM, Ollama's OpenAI shim, and similar.
  *
  * We reuse the official `openai` SDK with a `baseURL` override for the chat
  * stream (message conversion, streaming tool calls, error mapping, usage all
@@ -91,7 +92,7 @@ const CONFIG_SCHEMA: readonly ConfigField[] = [
     required: true,
     placeholder: 'http://localhost:1234/v1',
     description:
-      'OpenAI-compatible endpoint base, including the version path (e.g. `…/v1`). The provider appends `/chat/completions` and `/models`. Works with NewAPI, LiteLLM, llama.cpp, LM Studio, vLLM, and similar.',
+      'OpenAI-compatible endpoint base, including the version path (e.g. `…/v1`). The provider appends `/chat/completions`, `/embeddings`, `/images/generations`, and `/models`. Works with NewAPI, LiteLLM, llama.cpp, LM Studio, vLLM, and similar.',
   },
   {
     key: 'apiKey',
@@ -100,6 +101,15 @@ const CONFIG_SCHEMA: readonly ConfigField[] = [
     required: false,
     placeholder: 'sk-… (leave empty if your server needs no key)',
     description: 'Optional. Local servers like llama.cpp or LM Studio usually need none.',
+  },
+  {
+    key: 'imageModels',
+    type: 'text',
+    label: 'Image model IDs',
+    required: false,
+    placeholder: 'dall-e-3, flux-schnell (optional)',
+    description:
+      'Optional. Comma-separated model IDs to advertise as image models, in addition to ids the catalogue heuristic already recognizes (dall-e, gpt-image, flux, sdxl, imagen, …). Leave empty unless your /models listing uses names Hivekeep does not recognize. The endpoint must implement the OpenAI Images API (`/images/generations`).',
   },
 ]
 

@@ -1,9 +1,9 @@
 /**
  * Generic OpenAI-compatible embeddings provider: a BYO-endpoint connector.
  *
- * The companion of the `openai-compatible` LLM provider
+ * The companion of the `openai-compatible` LLM (and image) providers
  * (`src/server/llm/llm/openai-compatible.ts`): same `type`, so a single
- * provider row can serve both `llm` and `embedding` (capabilities are
+ * provider row can serve `llm`, `embedding`, and `image` (capabilities are
  * auto-detected from the registries). Takes the base URL from config instead
  * of hardcoding OpenAI's, so embeddings can run against Ollama, llama.cpp,
  * LM Studio, vLLM, LiteLLM, NewAPI, and similar via `/v1/embeddings`.
@@ -59,6 +59,15 @@ const CONFIG_SCHEMA: readonly ConfigField[] = [
     required: false,
     placeholder: 'sk-… (leave empty if your server needs no key)',
     description: 'Optional. Local servers like Ollama or llama.cpp usually need none.',
+  },
+  {
+    key: 'imageModels',
+    type: 'text',
+    label: 'Image model IDs',
+    required: false,
+    placeholder: 'dall-e-3, flux-schnell (optional)',
+    description:
+      'Optional. Comma-separated model IDs to advertise as image models, in addition to ids the catalogue heuristic already recognizes (dall-e, gpt-image, flux, sdxl, imagen, …). Leave empty unless your /models listing uses names Hivekeep does not recognize. The endpoint must implement the OpenAI Images API (`/images/generations`).',
   },
 ]
 

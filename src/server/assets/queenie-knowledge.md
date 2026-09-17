@@ -57,16 +57,16 @@ An Agent = name / role / character / expertise + a `model` + a set of `toolboxes
 ## Memory & contacts — *"agents that genuinely remember you"*
 
 - **Dual-channel:** automatic extraction (durable facts/preferences captured during compacting) + explicit `memorize`. Hybrid recall fuses semantic (sqlite-vec KNN) + full-text (FTS5).
-- **Semantic recall + dedup require an embedding model — and embeddings are currently OpenAI-only.** Without one, memories still save but recall degrades to keyword-only and dedup is off, so the "remembers you" promise is broken. Prioritize an embedding model early. (If the LLM provider is already OpenAI, reuse that key; if it's Anthropic/Gemini/xAI/OpenRouter, a *separate* OpenAI-compatible embedding key is needed.)
+- **Semantic recall + dedup require an embedding model.** Built in via **OpenAI** or the **OpenAI-compatible** connector (Ollama / llama.cpp / LiteLLM / NewAPI via `/embeddings`). Without one, memories still save but recall degrades to keyword-only and dedup is off. Prioritize an embedding model early. (If the LLM provider is already OpenAI or OpenAI-compatible, enable the embedding capability on that same row.)
 - **Contacts ("fiche")** — Hivekeep keeps notes on the people it talks to. The user's own fiche is **auto-created at onboarding** and linked to their account — don't recreate it (`create_contact` can't link to a user); find it with `search_contacts`/`get_contact` and enrich via `set_contact_note`/`update_contact` (additive only). Contacts are a shared registry; notes are private/global.
 - Your memory/contact tools: `memorize`, `recall`, `list_memories`, `create_contact`, `update_contact`, `get_contact`, `set_contact_note`, `search_contacts`. (You cannot forget/edit memories or delete contacts.)
 
 ## Providers & capabilities — *"connect one account, light up many capabilities"*
 
 - One provider account can serve several capabilities. **Built-in provider types:**
-  - **llm:** `anthropic`, `anthropic-oauth` (Claude Max subscription, no API key), `openai`, `openai-codex` (Codex CLI, no API key), `gemini`, `openrouter`, `xai`
-  - **embedding:** `openai` **only**
-  - **image:** `openai` (gpt-image-1, DALL·E), `gemini` (incl. Nano Banana / Imagen)
+  - **llm:** `anthropic`, `anthropic-oauth` (Claude Max subscription, no API key), `openai`, `openai-codex` (Codex CLI, no API key), `gemini`, `openrouter`, `xai`, `openai-compatible` (custom base URL)
+  - **embedding:** `openai`, `openai-compatible` (Ollama / llama.cpp / LiteLLM / NewAPI via `/embeddings`)
+  - **image:** `openai` (gpt-image-1, DALL·E), `gemini` (incl. Nano Banana / Imagen), `openai-compatible` (same connector, OpenAI Images API: `/images/generations`)
   - **search:** `brave-search`, `serpapi`, `tavily`, `perplexity-sonar`
   - **tts / stt:** `openai`, `elevenlabs`
   - Plugins add more provider types.
@@ -133,9 +133,9 @@ You can read system info (`get_system_info`), read the config and its catalog (`
 Users name models by marketing nicknames, NOT by provider. These are NOT separate providers or plugins — map the nickname to the right built-in provider, add/enable that provider (the user may already have a key), then pick the model via `list_image_models` / `list_models`:
 
 - **"Nano Banana" / "Nano Banana Pro"** → Google **Gemini** image model. Add a **Gemini** provider with the `image` capability, then select its image model and `set_default_model(service:'image', model:<id>, provider_id:<gemini>)`. (It is NOT a plugin.)
-- **"DALL·E" / "GPT Image" / "gpt-image-1"** → **OpenAI** image models. **"Imagen"** → Google **Gemini** image models.
+- **"DALL·E" / "GPT Image" / "gpt-image-1"** → **OpenAI** image models (or the same ids through an **OpenAI-compatible** gateway). **"Imagen"** / **"Nano Banana"** → Google **Gemini** image models.
 - **"Claude" (Opus/Sonnet/Haiku)** → **Anthropic**. **"GPT" / "o-series"** → **OpenAI**. **"Gemini" / "Flash" / "Pro"** → **Gemini**. **"Grok"** → **xAI**.
-- **"Flux", "Stable Diffusion", "Midjourney", "Llama", "Mistral", "DeepSeek"** → not built-in; need a plugin or OpenRouter — say so honestly.
+- **"Flux", "Stable Diffusion", "Midjourney"** → not a branded built-in. If the user already has a gateway that exposes the OpenAI Images API (`/v1/images/generations` — LiteLLM, NewAPI, LocalAI, …), add/enable **OpenAI-compatible** with the `image` capability and pick the model via `list_image_models` (set `imageModels` on the provider if the id is not recognized). Otherwise they need a plugin. **"Llama", "Mistral", "DeepSeek"** as *chat* models → OpenRouter, the branded built-in, or OpenAI-compatible — not image providers.
 
 Rule: if a user names a model you don't recognize, DON'T assume it's a plugin — first map the nickname above, check `list_provider_types`, and (for images) remember the user may need to connect the matching provider before the model appears.
 
@@ -179,7 +179,7 @@ Symptom → diagnosis → exact fix:
 | "It worked yesterday, now the model errors" | A default in `defaultModels` with `status:"stale"` (model no longer in the provider's catalogue) — provider deprecated/renamed it | `list_models` (or `list_models(capability:…)`) for that provider, then `set_default_model(service:<service>, model:<current id>, provider_id:<slug>)`. |
 | Default points at a deleted/failing provider | `defaultModels[...].status:"no-provider"`, or a `capabilityCoverage` default whose provider is gone/invalid | Re-point it: `set_default_model(service:<service>, model:<id>, provider_id:<slug>)` for model services, or `set_default_provider(capability:…, provider_id:<slug>)` for search/tts/stt. |
 | "I picked a model but nothing is selected" | A capability has a valid provider but no default (`defaultProviderId:null` / `defaultModels[...].status:"unset"`) | Set it: `set_default_model(service:…, …)` for llm/embedding/image/scout/compacting/extraction; `set_default_provider(capability:…, …)` for search/tts/stt. |
-| "No avatars / images generate" | `capabilityCoverage.image.hasValidProvider:false` | Add an image provider (OpenAI/Gemini) or `enable_provider_capability(... "image")` on an existing one, then `set_default_model(service:"image", …)`. (Map nicknames like "Nano Banana" → Gemini per the section above.) |
+| "No avatars / images generate" | `capabilityCoverage.image.hasValidProvider:false` | Add an image provider (OpenAI / Gemini / OpenAI-compatible with an Images API) or `enable_provider_capability(... "image")` on an existing one, then `set_default_model(service:"image", …)`. (Map nicknames like "Nano Banana" → Gemini per the section above.) |
 | "Voice doesn't work" (no speech in/out) | `capabilityCoverage.tts.hasValidProvider:false` / `.stt.hasValidProvider:false` | Add a TTS/STT-capable provider with `request_provider_setup`, then `set_default_provider(capability:"tts"|"stt", …)`. Note: voice is not yet wired into channels — be honest about that limit. |
 | "Web search isn't available" | `capabilityCoverage.search.hasValidProvider:false` | Add a search provider (brave-search/tavily/serpapi/perplexity) with `request_provider_setup`, then `set_default_provider(capability:"search", …)`. |
 
