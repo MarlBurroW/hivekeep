@@ -70,26 +70,7 @@ export default defineConfig({
     // (CI, `bun run build`) leave it unset and target dist/client as before.
     outDir: path.resolve(__dirname, process.env.HIVEKEEP_BUILD_OUTDIR || 'dist/client'),
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // React core - rarely changes
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          // UI framework
-          'vendor-ui': ['radix-ui', 'lucide-react', 'class-variance-authority', 'clsx', 'tailwind-merge', 'sonner', 'cmdk'],
-          // Markdown rendering (heavy)
-          // react-markdown core; remark-math (pulls katex), rehype-katex & rehype-highlight are lazy-loaded on demand
-'vendor-markdown': ['react-markdown', 'remark-gfm'],
-          // CodeMirror editor (heavy, used only in specific views)
-          'vendor-codemirror': ['@uiw/react-codemirror', '@codemirror/lang-markdown', '@codemirror/language-data', '@codemirror/view'],
-          // Forms
-          'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          // i18n
-          'vendor-i18n': ['i18next', 'react-i18next'],
-          // DnD
-          'vendor-dnd': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
-        },
-      },
-    },
+    // Vite 8 uses Rolldown, which splits shared dependencies automatically.
+    // The former Rollup manualChunks object is not supported.
   },
 })
