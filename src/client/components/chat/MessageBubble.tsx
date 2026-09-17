@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCopyToClipboard } from '@/client/hooks/useCopyToClipboard'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/client/components/ui/collapsible'
@@ -11,6 +11,7 @@ import { ImageLightbox } from '@/client/components/chat/ImageLightbox'
 import { TokenUsageIndicator } from '@/client/components/chat/TokenUsageIndicator'
 import { ChatAvatar } from '@/client/components/chat/ChatAvatar'
 import { cn } from '@/client/lib/utils'
+import { getSelectedTextInNode, resolveMessageCopyText, writeSelectedTextToClipboard } from '@/client/lib/message-copy'
 import { PlatformIcon } from '@/client/components/common/PlatformIcon'
 import {
   ContextMenu,
@@ -652,19 +653,40 @@ function MessageContextMenu({
 }) {
   const { t } = useTranslation()
   const { copy } = useCopyToClipboard()
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Radix focuses the menu on open, which collapses the live Selection.
+  // Snapshot on contextmenu (capture) so Copy/Quote still see the highlight.
+  const savedSelectionRef = useRef('')
+
+  const handleContextMenuCapture = useCallback(() => {
+    savedSelectionRef.current = getSelectedTextInNode(rootRef.current)
+  }, [])
+
+  const handleNativeCopy = useCallback((e: ClipboardEvent<HTMLDivElement>) => {
+    const selected = getSelectedTextInNode(rootRef.current)
+    if (writeSelectedTextToClipboard(e.clipboardData, selected)) {
+      e.preventDefault()
+    }
+  }, [])
 
   const handleCopy = useCallback(() => {
-    copy(content, { successKey: 'chat.copied', errorKey: 'chat.copyFailed' })
+    const text = resolveMessageCopyText(content, savedSelectionRef.current)
+    copy(text, { successKey: 'chat.copied', errorKey: 'chat.copyFailed' })
   }, [content, copy])
 
   const handleQuote = useCallback(() => {
-    if (onQuoteReply) {
-      // Build a blockquote from first 3 lines of content
-      const lines = content.split('\n').filter((l) => l.trim())
-      const preview = lines.slice(0, 3).map((l) => `> ${l}`).join('\n')
-      const suffix = lines.length > 3 ? '\n> ...' : ''
-      onQuoteReply(`${preview}${suffix}\n\n`)
+    if (!onQuoteReply) return
+    const selected = savedSelectionRef.current
+    if (selected) {
+      const preview = selected.split('\n').map((l) => `> ${l}`).join('\n')
+      onQuoteReply(`${preview}\n\n`)
+      return
     }
+    // No highlight: quote a short preview of the whole message
+    const lines = content.split('\n').filter((l) => l.trim())
+    const preview = lines.slice(0, 3).map((l) => `> ${l}`).join('\n')
+    const suffix = lines.length > 3 ? '\n> ...' : ''
+    onQuoteReply(`${preview}${suffix}\n\n`)
   }, [content, onQuoteReply])
 
   const handleEditResend = useCallback(() => {
@@ -674,8 +696,16 @@ function MessageContextMenu({
   }, [content, onEditResend])
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+    <ContextMenu onOpenChange={(open) => { if (!open) savedSelectionRef.current = '' }}>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={rootRef}
+          onContextMenuCapture={handleContextMenuCapture}
+          onCopy={handleNativeCopy}
+        >
+          {children}
+        </div>
+      </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <ContextMenuItem onClick={handleCopy}>
           <Copy className="size-4" />
