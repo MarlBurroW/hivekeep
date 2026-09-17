@@ -65,7 +65,7 @@ What that means in practice:
 - **Edit support is inferred, not probed.** `maxImageInputs` is `1` for `gpt-image*`, `dall-e-2`, and names that look like edit models (`kontext`, `seededit`, `*-edit`); `0` (text-to-image only) otherwise, including `dall-e-3`. A generate-only model advertised as editable will 400 when the Agent passes `imageUrls`.
 - **`response_format` is sent only for the DALL·E family** (`b64_json`). GPT Image rejects that flag; unknown families omit it. When the gateway returns a `url` instead of `b64_json`, Hivekeep fetches the bytes.
 - **Existing OpenAI-compatible rows** created before this capability shipped keep their stored `["llm","embedding"]` until you tick **Image** on the provider (or re-test / `enable_provider_capability`). Set a default image model afterwards so avatars and `generate_image` do not pick a chat-only connector first.
-- **Gemini-via-proxy and OpenRouter images are out of scope.** Gemini image models stay on the branded `gemini` provider. OpenRouter is still LLM-only in this release.
+- **Use the matching connector for vendor-specific image APIs.** The generic connector does not translate Gemini or OpenRouter image protocols. Use the built-in `gemini` or `openrouter` provider for those APIs; OpenRouter supports LLMs, embeddings, and images.
 
 ## Search-provider capabilities at a glance
 

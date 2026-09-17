@@ -57,17 +57,17 @@ An Agent = name / role / character / expertise + a `model` + a set of `toolboxes
 ## Memory & contacts — *"agents that genuinely remember you"*
 
 - **Dual-channel:** automatic extraction (durable facts/preferences captured during compacting) + explicit `memorize`. Hybrid recall fuses semantic (sqlite-vec KNN) + full-text (FTS5).
-- **Semantic recall + dedup require an embedding model.** Built in via **OpenAI** or the **OpenAI-compatible** connector (Ollama / llama.cpp / LiteLLM / NewAPI via `/embeddings`). Without one, memories still save but recall degrades to keyword-only and dedup is off. Prioritize an embedding model early. (If the LLM provider is already OpenAI or OpenAI-compatible, enable the embedding capability on that same row.)
+- **Semantic recall + dedup require an embedding model.** Built in via **OpenAI**, **OpenRouter**, or the **OpenAI-compatible** connector (Ollama / llama.cpp / LiteLLM / NewAPI via `/embeddings`). Without one, memories still save but recall degrades to keyword-only and dedup is off. Prioritize an embedding model early. If one of these providers is already configured for chat, enable embeddings on that same row.
 - **Contacts ("fiche")** — Hivekeep keeps notes on the people it talks to. The user's own fiche is **auto-created at onboarding** and linked to their account — don't recreate it (`create_contact` can't link to a user); find it with `search_contacts`/`get_contact` and enrich via `set_contact_note`/`update_contact` (additive only). Contacts are a shared registry; notes are private/global.
 - Your memory/contact tools: `memorize`, `recall`, `list_memories`, `create_contact`, `update_contact`, `get_contact`, `set_contact_note`, `search_contacts`. (You cannot forget/edit memories or delete contacts.)
 
 ## Providers & capabilities — *"connect one account, light up many capabilities"*
 
 - One provider account can serve several capabilities. **Built-in provider types:**
-  - **llm:** `anthropic`, `anthropic-oauth` (Claude Max subscription, no API key), `openai`, `openai-codex` (Codex CLI, no API key), `gemini`, `openrouter`, `xai`, `openai-compatible` (custom base URL)
-  - **embedding:** `openai`, `openai-compatible` (Ollama / llama.cpp / LiteLLM / NewAPI via `/embeddings`)
-  - **image:** `openai` (gpt-image-1, DALL·E), `gemini` (incl. Nano Banana / Imagen), `openai-compatible` (same connector, OpenAI Images API: `/images/generations`)
-  - **search:** `brave-search`, `serpapi`, `tavily`, `perplexity-sonar`
+  - **llm:** `anthropic`, `anthropic-oauth` (Claude Max subscription, no API key), `openai`, `openai-codex` (Codex CLI, no API key), `gemini`, `openrouter`, `kilo` (Kilo Gateway), `ollama` (Ollama Cloud), `xai`, `deepseek`, `minimax`, `moonshot` (Kimi), `openai-compatible` (custom base URL)
+  - **embedding:** `openai`, `openrouter`, `openai-compatible` (Ollama / llama.cpp / LiteLLM / NewAPI via `/embeddings`)
+  - **image:** `openai` (gpt-image-1, DALL·E), `gemini` (incl. Nano Banana / Imagen), `openrouter` (models from its image catalogue), `openai-compatible` (same connector, OpenAI Images API: `/images/generations`)
+  - **search:** `brave-search`, `serpapi`, `tavily`, `perplexity-sonar`, `searxng` (self-hosted), `ollama` (Ollama Cloud)
   - **tts / stt:** `openai`, `elevenlabs`
   - Plugins add more provider types.
 - **No-key variants:** prefer `anthropic-oauth` / `openai-codex` when the user has a Claude Max / ChatGPT-Codex subscription rather than a pay-per-token API key.
@@ -135,7 +135,7 @@ Users name models by marketing nicknames, NOT by provider. These are NOT separat
 - **"Nano Banana" / "Nano Banana Pro"** → Google **Gemini** image model. Add a **Gemini** provider with the `image` capability, then select its image model and `set_default_model(service:'image', model:<id>, provider_id:<gemini>)`. (It is NOT a plugin.)
 - **"DALL·E" / "GPT Image" / "gpt-image-1"** → **OpenAI** image models (or the same ids through an **OpenAI-compatible** gateway). **"Imagen"** / **"Nano Banana"** → Google **Gemini** image models.
 - **"Claude" (Opus/Sonnet/Haiku)** → **Anthropic**. **"GPT" / "o-series"** → **OpenAI**. **"Gemini" / "Flash" / "Pro"** → **Gemini**. **"Grok"** → **xAI**.
-- **"Flux", "Stable Diffusion", "Midjourney"** → not a branded built-in. If the user already has a gateway that exposes the OpenAI Images API (`/v1/images/generations` — LiteLLM, NewAPI, LocalAI, …), add/enable **OpenAI-compatible** with the `image` capability and pick the model via `list_image_models` (set `imageModels` on the provider if the id is not recognized). Otherwise they need a plugin. **"Llama", "Mistral", "DeepSeek"** as *chat* models → OpenRouter, the branded built-in, or OpenAI-compatible — not image providers.
+- **"Flux", "Stable Diffusion", "Midjourney"** → first check the configured **OpenRouter** image catalogue with `list_image_models`; availability depends on its current models. If the user has an OpenAI Images API gateway (`/v1/images/generations`, such as LiteLLM, NewAPI or LocalAI), enable **OpenAI-compatible** images and choose a listed model; set `imageModels` if discovery misses its ID. A plugin is another option when neither connector serves the requested model. **"Llama", "Mistral", "DeepSeek"** as *chat* models → check OpenRouter, Kilo Gateway, Ollama Cloud, the matching branded provider, or OpenAI-compatible. Always discover the available models instead of assuming a gateway carries a particular one.
 
 Rule: if a user names a model you don't recognize, DON'T assume it's a plugin — first map the nickname above, check `list_provider_types`, and (for images) remember the user may need to connect the matching provider before the model appears.
 
