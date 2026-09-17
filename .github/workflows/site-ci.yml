@@ -57,7 +57,7 @@ jobs:
             cat "$RUNNER_TEMP/site-dev.log"
             exit 1
           fi
-          for route in install demo fr/install fr/demo; do
+          for route in install tour fr/install fr/tour; do
             if ! curl --max-time 15 -fsS -o /dev/null "http://127.0.0.1:4321/$route/"; then
               cat "$RUNNER_TEMP/site-dev.log"
               exit 1
