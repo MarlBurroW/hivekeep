@@ -390,6 +390,42 @@ describe('openaiCompatibleImageProvider.generate', () => {
     expect(call?.['quality']).toBe('high')
   })
 
+  it.each([false, true])('keeps the selected model, prompt and single output when editing=%s', async (editing) => {
+    const source = { data: new Uint8Array([1, 2, 3]), mediaType: 'image/png' }
+    await openaiCompatibleImageProvider.generate(
+      { id: 'gpt-image-1', name: 'GPT Image 1' },
+      {
+        prompt: 'a cat',
+        ...(editing ? { imageInputs: [source] } : {}),
+        params: { model: 'another-model', prompt: 'another prompt', n: 10, image: 'another image', quality: 'high' },
+      },
+      CONFIG,
+    )
+    const calls = editing ? mockImagesEdit.mock.calls : mockImagesGenerate.mock.calls
+    const call = (calls as unknown as Array<[Record<string, unknown>]>)[0]?.[0]
+    expect(call?.model).toBe('gpt-image-1')
+    expect(call?.prompt).toBe('a cat')
+    expect(call?.n).toBe(1)
+    expect(call?.quality).toBe('high')
+    if (editing) expect(call?.image).toEqual({ data: source.data, name: 'input.png' })
+  })
+
+  it.each(['file:///tmp/provider-image.png', 'ftp://example.com/image.png', 'javascript:alert(1)', 'not a URL'])(
+    'rejects an image URL without fetching it: %s',
+    async (url) => {
+      mockImagesGenerate.mockImplementation(() => Promise.resolve({ data: [{ url }] }))
+      const fetchImage = mock(() => new Response('unexpected fetch'))
+      await withFetch(fetchImage, async () => {
+        await expect(openaiCompatibleImageProvider.generate(
+          { id: 'flux-schnell', name: 'Flux' },
+          { prompt: 'a cat' },
+          CONFIG,
+        )).rejects.toBeInstanceOf(ProviderServerError)
+      })
+      expect(fetchImage).not.toHaveBeenCalled()
+    },
+  )
+
   it('fetches a URL when the endpoint returns url instead of b64_json', async () => {
     mockImagesGenerate.mockImplementation(() =>
       Promise.resolve({ data: [{ url: 'https://cdn.example/out.png' }] }),

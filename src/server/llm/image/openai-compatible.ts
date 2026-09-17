@@ -364,9 +364,19 @@ async function decodeImageItem(
         mediaType: mediaTypeFromContentType(match[1] ?? null),
       }
     }
+    let imageUrl: URL
+    try {
+      imageUrl = new URL(item.url)
+    } catch {
+      throw new ProviderServerError('OpenAI-compatible image API returned an invalid image URL')
+    }
+    // Bun can fetch file: URLs too. Only download remote HTTP(S) images.
+    if (imageUrl.protocol !== 'http:' && imageUrl.protocol !== 'https:') {
+      throw new ProviderServerError('OpenAI-compatible image API returned a non-HTTP(S) image URL')
+    }
     let res: Response
     try {
-      res = await fetch(item.url)
+      res = await fetch(imageUrl)
     } catch (err) {
       throw new NetworkError(
         `Failed to fetch image URL returned by the endpoint: ${err instanceof Error ? err.message : String(err)}`,
@@ -499,11 +509,12 @@ export const openaiCompatibleImageProvider: ImageProvider = {
           type: firstInput.mediaType,
         })
         response = await client.images.edit({
+          size,
+          ...extraParams,
           model: model.id,
           image: file,
           prompt: request.prompt,
-          size,
-          ...extraParams,
+          n: 1,
         }, { signal: request.signal })
       } else {
         // dall-e (official OpenAI) defaults to a hosted URL unless we
@@ -512,11 +523,12 @@ export const openaiCompatibleImageProvider: ImageProvider = {
         // either b64_json or url below.
         const wantsB64 = isDallEFamily(model.id) && !isGptImageFamily(model.id)
         response = await client.images.generate({
+          size,
+          ...extraParams,
           model: model.id,
           prompt: request.prompt,
-          size,
+          n: 1,
           ...(wantsB64 ? { response_format: 'b64_json' as const } : {}),
-          ...extraParams,
         }, { signal: request.signal })
       }
     } catch (err) {
