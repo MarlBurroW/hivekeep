@@ -145,6 +145,13 @@ export const CONFIGURATOR_MODEL_PREFERENCES: Record<string, readonly string[]> =
   'openai-codex': ['gpt-5', 'gpt-4.1', 'gpt-4o'],
   gemini: ['pro', 'flash'],
   openrouter: ['sonnet', 'gpt-4o', 'gpt-4.1', 'llama'],
+  // Kilo Gateway aggregates hundreds of models (ids like `anthropic/claude-sonnet-5`,
+  // `openai/gpt-5.5`), so seed on a strong, tool-reliable frontier model rather
+  // than the arbitrary first-listed one.
+  kilo: ['sonnet', 'gpt-5', 'opus', 'gemini', 'qwen', 'llama'],
+  // Ollama Cloud serves open models (ids like `qwen3-coder:480b`, `gpt-oss:120b`,
+  // `deepseek-v3.1:671b`); list strong tool-reliable families as hints.
+  ollama: ['qwen3', 'gpt-oss', 'deepseek', 'glm', 'llama', 'mistral'],
   xai: ['grok-4', 'grok-3', 'grok-2', 'grok'],
   deepseek: ['pro', 'flash', 'deepseek'],
   minimax: ['m3', 'minimax'],

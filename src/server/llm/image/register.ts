@@ -2,6 +2,7 @@ import { registerImageProvider } from '@/server/llm/image/registry'
 import { openaiImageProvider } from '@/server/llm/image/openai'
 import { geminiImageProvider } from '@/server/llm/image/gemini'
 import { openaiCompatibleImageProvider } from '@/server/llm/image/openai-compatible'
+import { openrouterImageProvider } from '@/server/llm/image/openrouter'
 
 /**
  * Register every built-in image-generation provider in the registry. Called
@@ -11,4 +12,5 @@ export function registerBuiltinImageProviders(): void {
   registerImageProvider(openaiImageProvider)
   registerImageProvider(geminiImageProvider)
   registerImageProvider(openaiCompatibleImageProvider)
+  registerImageProvider(openrouterImageProvider)
 }

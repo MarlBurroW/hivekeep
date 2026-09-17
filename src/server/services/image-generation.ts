@@ -439,7 +439,7 @@ Rules:
 
 /**
  * No-LLM fallback: produce a serviceable prompt straight from agent metadata.
- * Used when no LLM provider is configured or the configured one isn't supported here.
+ * Used when no LLM provider is available or the prompt writer returns no text.
  */
 function fallbackAvatarPrompt(
   agent: { role: string; expertise: string },
@@ -550,7 +550,8 @@ export async function buildAvatarPrompt(
     },
   })
 
-  return avatarResult.text.trim()
+  const prompt = avatarResult.text.trim()
+  return prompt || fallbackAvatarPrompt(agent, mode, subject, style)
 }
 
 /** A generic, character-less headshot prompt for the neutral base image. */
