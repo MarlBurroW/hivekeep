@@ -2,20 +2,21 @@
 import { Icon } from 'astro-icon/components';
 import { getDict, localePath, type Locale } from '../i18n';
 // Colored brand marks from @lobehub/icons (same set the Hivekeep app uses, see ProviderIcon.tsx).
+// Render the SVG components directly, without importing the interactive avatar/UI helpers.
 // Rendered server-side → static HTML, no client JS.
-import Claude from '@lobehub/icons/es/Claude';
-import OpenAI from '@lobehub/icons/es/OpenAI';
-import Gemini from '@lobehub/icons/es/Gemini';
-import OpenRouter from '@lobehub/icons/es/OpenRouter';
-import XAI from '@lobehub/icons/es/XAI';
-import DeepSeek from '@lobehub/icons/es/DeepSeek';
-import Minimax from '@lobehub/icons/es/Minimax';
-import Kimi from '@lobehub/icons/es/Kimi';
-import Ollama from '@lobehub/icons/es/Ollama';
-import Perplexity from '@lobehub/icons/es/Perplexity';
+import Claude from '@lobehub/icons/es/Claude/components/Color';
+import OpenAI from '@lobehub/icons/es/OpenAI/components/Mono';
+import Gemini from '@lobehub/icons/es/Gemini/components/Color';
+import OpenRouter from '@lobehub/icons/es/OpenRouter/components/Mono';
+import XAI from '@lobehub/icons/es/XAI/components/Mono';
+import DeepSeek from '@lobehub/icons/es/DeepSeek/components/Color';
+import Minimax from '@lobehub/icons/es/Minimax/components/Color';
+import Kimi from '@lobehub/icons/es/Kimi/components/Color';
+import Ollama from '@lobehub/icons/es/Ollama/components/Mono';
+import Perplexity from '@lobehub/icons/es/Perplexity/components/Mono';
 // Mistral & Replicate are plugin-only providers, shown in the plugin cards below (not the built-in chips).
-import Mistral from '@lobehub/icons/es/Mistral';
-import Replicate from '@lobehub/icons/es/Replicate';
+import Mistral from '@lobehub/icons/es/Mistral/components/Color';
+import Replicate from '@lobehub/icons/es/Replicate/components/Mono';
 
 const S = 18;
 
@@ -34,7 +35,7 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
     <p>{t.intro}</p>
 
     <div class="prov-sub">
-      <span class="prov-sub-marks"><Claude.Color size={20} /><OpenAI size={20} /></span>
+      <span class="prov-sub-marks"><Claude size={20} /><OpenAI size={20} /></span>
       <span set:html={t.subCallout}></span>
     </div>
 
@@ -42,13 +43,13 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
       <div class="pgroup">
         <div class="ptitle"><Icon name="lucide:brain-circuit" /> {t.groupLlm}</div>
         <div class="picons">
-          <span class="pchip"><Claude.Color size={S} /> Anthropic</span>
+          <span class="pchip"><Claude size={S} /> Anthropic</span>
           <span class="pchip"><OpenAI size={S} /> OpenAI</span>
-          <span class="pchip"><Gemini.Color size={S} /> Gemini</span>
+          <span class="pchip"><Gemini size={S} /> Gemini</span>
           <span class="pchip"><XAI size={S} /> xAI</span>
-          <span class="pchip"><DeepSeek.Color size={S} /> DeepSeek</span>
-          <span class="pchip"><Minimax.Color size={S} /> MiniMax</span>
-          <span class="pchip"><Kimi.Color size={S} /> Kimi</span>
+          <span class="pchip"><DeepSeek size={S} /> DeepSeek</span>
+          <span class="pchip"><Minimax size={S} /> MiniMax</span>
+          <span class="pchip"><Kimi size={S} /> Kimi</span>
           <span class="pchip"><OpenRouter size={S} /> OpenRouter</span>
           <span class="pchip"><Icon name="lucide:route" /> Kilo Gateway</span>
           <span class="pchip"><Ollama size={S} /> Ollama Cloud</span>
@@ -60,7 +61,7 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
         <div class="ptitle"><Icon name="lucide:image" /> {t.groupImage}</div>
         <div class="picons">
           <span class="pchip"><OpenAI size={S} /> OpenAI</span>
-          <span class="pchip"><Gemini.Color size={S} /> Gemini</span>
+          <span class="pchip"><Gemini size={S} /> Gemini</span>
           <span class="pchip"><OpenRouter size={S} /> OpenRouter</span>
           <span class="pchip"><Icon name="lucide:server" /> OpenAI-compatible</span>
         </div>
@@ -117,7 +118,7 @@ const pluginsHref = `${base}${localePath(lang, '/plugins')}`;
       </a>
       <a class="plug" href="https://github.com/MarlBurroW/hivekeep-plugin-mistral" target="_blank" rel="noopener">
         <span class="ptag">{t.tagLlm}</span>
-        <h4><Mistral.Color size={19} /> Mistral</h4>
+        <h4><Mistral size={19} /> Mistral</h4>
         <p set:html={t.mistralDesc}></p>
         <span class="gh"><Icon name="simple-icons:github" /> {t.viewGithub}</span>
       </a>
