@@ -34,6 +34,11 @@ HIVEKEEP_DRY_RUN=false
 HIVEKEEP_QUIET="${HIVEKEEP_QUIET:-false}"
 HIVEKEEP_START_TIME=""
 HIVEKEEP_YES="${HIVEKEEP_YES:-false}"
+HIVEKEEP_SYSTEM_BUN_INSTALL="/usr/local/lib/hivekeep/bun"
+HIVEKEEP_SYSTEM_CONFIG_DIR="/etc/hivekeep"
+HIVEKEEP_SYSTEMD_UNIT="/etc/systemd/system/hivekeep.service"
+HIVEKEEP_LEGACY_BUN_LINK="/usr/local/bin/bun"
+HIVEKEEP_LEGACY_BUN_ROOT="/root/.bun"
 
 # ─── Colors (auto-detect terminal support) ───────────────────────────────────
 setup_colors() {
@@ -774,6 +779,185 @@ ENV
 # Minimum Bun version required (lockfileVersion 1 needs Bun 1.2+)
 BUN_MIN_VERSION="1.2.0"
 
+configure_bun_environment() {
+  if [ -z "${BUN_INSTALL:-}" ]; then
+    if [ "${IS_ROOT:-false}" = true ] && [ "${OS:-$(uname -s)}" = "Linux" ]; then
+      BUN_INSTALL="$HIVEKEEP_SYSTEM_BUN_INSTALL"
+    else
+      BUN_INSTALL="$HOME/.bun"
+    fi
+  fi
+
+  export BUN_INSTALL
+  case ":${PATH:-}:" in
+    *":$BUN_INSTALL/bin:"*) ;;
+    *) export PATH="$BUN_INSTALL/bin:${PATH:-}" ;;
+  esac
+}
+
+prepare_managed_bun_directory() {
+  local managed_parent
+  managed_parent="$(dirname "$HIVEKEEP_SYSTEM_BUN_INSTALL")"
+
+  case "$HIVEKEEP_SYSTEM_BUN_INSTALL" in
+    /*) ;;
+    *) error "Managed Bun path must be absolute: $HIVEKEEP_SYSTEM_BUN_INSTALL" ;;
+  esac
+  case "$HIVEKEEP_SYSTEM_BUN_INSTALL" in
+    *[!A-Za-z0-9_./-]*) error "Managed Bun path contains unsupported characters: $HIVEKEEP_SYSTEM_BUN_INSTALL" ;;
+  esac
+
+  install -d -o root -g root -m 0755 \
+    "$managed_parent" \
+    "$HIVEKEEP_SYSTEM_BUN_INSTALL" \
+    "$HIVEKEEP_SYSTEM_BUN_INSTALL/bin"
+
+  if [ -f "$HIVEKEEP_SYSTEM_BUN_INSTALL/bin/bun" ]; then
+    chown root:root "$HIVEKEEP_SYSTEM_BUN_INSTALL/bin/bun"
+    chmod 0755 "$HIVEKEEP_SYSTEM_BUN_INSTALL/bin/bun"
+  fi
+}
+
+canonical_executable_path() {
+  local executable="$1"
+  if command -v readlink &>/dev/null; then
+    readlink -f -- "$executable" 2>/dev/null && return 0
+  fi
+  if command -v realpath &>/dev/null; then
+    realpath "$executable" 2>/dev/null && return 0
+  fi
+  return 1
+}
+
+run_as_service_user() {
+  local executable="$1"
+  shift
+
+  local env_bin service_path
+  env_bin="$(command -v env 2>/dev/null || true)"
+  [ -n "$env_bin" ] || return 127
+  service_path="${executable%/*}:/usr/local/bin:/usr/bin:/bin"
+  local -a clean_command=(
+    "$env_bin" -i
+    "HOME=$HIVEKEEP_DIR"
+    "USER=$HIVEKEEP_USER"
+    "LOGNAME=$HIVEKEEP_USER"
+    "PATH=$service_path"
+    "$executable" "$@"
+  )
+
+  if command -v runuser &>/dev/null; then
+    runuser -u "$HIVEKEEP_USER" -- "${clean_command[@]}"
+    return
+  fi
+
+  if command -v su &>/dev/null && command -v sh &>/dev/null; then
+    local command="" arg quoted
+    for arg in "${clean_command[@]}"; do
+      printf -v quoted '%q' "$arg"
+      command+="${quoted} "
+    done
+    su -s "$(command -v sh)" -c "exec $command" "$HIVEKEEP_USER"
+    return
+  fi
+
+  return 127
+}
+
+bun_runs_as_service_user() {
+  run_as_service_user "$1" --version &>/dev/null
+}
+
+run_configured_bun() {
+  local executable="$1"
+  shift
+
+  if [ "${IS_ROOT:-false}" = true ] && [ "${OS:-}" = "Linux" ] && [ "${INIT_SYSTEM:-}" = "systemd" ]; then
+    id "$HIVEKEEP_USER" &>/dev/null || return 127
+    run_as_service_user "$executable" "$@"
+    return
+  fi
+
+  "$executable" "$@"
+}
+
+escape_systemd_environment_value() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//%/%%}"
+  printf '%s' "$value"
+}
+
+escape_systemd_exec_token() {
+  escape_systemd_environment_value "$1"
+}
+
+persist_bun_path() {
+  local path_dir="$HIVEKEEP_DATA_DIR"
+  if [ "${IS_ROOT:-false}" = true ]; then
+    path_dir="$HIVEKEEP_SYSTEM_CONFIG_DIR"
+    case "$path_dir" in
+      /*) ;;
+      *) error "System config path must be absolute: $path_dir" ;;
+    esac
+    case "$path_dir" in
+      *[!A-Za-z0-9_./-]*) error "System config path contains unsupported characters: $path_dir" ;;
+    esac
+    install -d -o root -g root -m 0755 "$path_dir"
+  else
+    mkdir -p "$path_dir"
+  fi
+
+  local path_file="$path_dir/bun.path"
+  local staged_path="${path_file}.tmp.$$"
+
+  case "$BUN_BIN" in
+    *$'\n'*|*$'\r'*) error "Bun path contains an unsupported newline" ;;
+  esac
+
+  rm -f "$staged_path"
+  printf '%s\n' "$BUN_BIN" > "$staged_path"
+  chmod 0644 "$staged_path"
+  if [ "${IS_ROOT:-false}" = true ]; then
+    chown root:root "$staged_path"
+  fi
+  mv -f "$staged_path" "$path_file"
+}
+
+configured_bun_path() {
+  local path_dir="$HIVEKEEP_DATA_DIR"
+  [ "${IS_ROOT:-false}" = true ] && path_dir="$HIVEKEEP_SYSTEM_CONFIG_DIR"
+  local path_file="$path_dir/bun.path"
+  local configured=""
+  if [ -f "$path_file" ]; then
+    if [ "${IS_ROOT:-false}" = true ]; then
+      local dir_owner dir_mode file_owner file_mode
+      dir_owner="$(stat -c '%U' "$path_dir" 2>/dev/null || stat -f '%Su' "$path_dir" 2>/dev/null || true)"
+      dir_mode="$(stat -c '%a' "$path_dir" 2>/dev/null || stat -f '%Lp' "$path_dir" 2>/dev/null || true)"
+      file_owner="$(stat -c '%U' "$path_file" 2>/dev/null || stat -f '%Su' "$path_file" 2>/dev/null || true)"
+      file_mode="$(stat -c '%a' "$path_file" 2>/dev/null || stat -f '%Lp' "$path_file" 2>/dev/null || true)"
+      [ "$dir_owner" = root ] || return 1
+      [ -n "$dir_mode" ] || return 1
+      (( (8#$dir_mode & 8#022) == 0 )) || return 1
+      [ "$file_owner" = root ] || return 1
+      [ -n "$file_mode" ] || return 1
+      (( (8#$file_mode & 8#022) == 0 )) || return 1
+    fi
+    IFS= read -r configured < "$path_file" || true
+    if [ -n "$configured" ] && [ -f "$configured" ]; then
+      printf '%s' "$configured"
+      return 0
+    fi
+    return 1
+  fi
+
+  local selected_bun
+  selected_bun="$(command -v bun 2>/dev/null || true)"
+  [ -n "$selected_bun" ] || return 1
+  canonical_executable_path "$selected_bun" || printf '%s' "$selected_bun"
+}
+
 # Compare two semver strings: returns 0 if $1 >= $2, 1 otherwise
 version_gte() {
   local IFS='.'
@@ -821,9 +1005,10 @@ ensure_bun() {
       ;;
   esac
 
-  BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-  export BUN_INSTALL
-  export PATH="$BUN_INSTALL/bin:$PATH"
+  configure_bun_environment
+  if [ "$IS_ROOT" = true ] && [ "$OS" = "Linux" ] && [ "$BUN_INSTALL" = "$HIVEKEEP_SYSTEM_BUN_INSTALL" ]; then
+    prepare_managed_bun_directory
+  fi
 
   if command -v bun &>/dev/null; then
     local current_version
@@ -1160,8 +1345,7 @@ rollback() {
 
       # Try to rebuild the old version so the service can restart
       info "Rebuilding previous version..."
-      BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-      export PATH="$BUN_INSTALL/bin:$PATH"
+      configure_bun_environment
       if command -v bun &>/dev/null; then
         cd "$HIVEKEEP_DIR"
         if bun install --frozen-lockfile &>/dev/null && bun run build &>/dev/null; then
@@ -1397,25 +1581,89 @@ setup_system_user() {
     success "User '$HIVEKEEP_USER' already exists"
   fi
 
-  chown -R "$HIVEKEEP_USER:$HIVEKEEP_USER" "$HIVEKEEP_DIR" "$HIVEKEEP_DATA_DIR"
+  local ownership_paths=()
+  [ -e "$HIVEKEEP_DIR" ] && ownership_paths+=("$HIVEKEEP_DIR")
+  [ -e "$HIVEKEEP_DATA_DIR" ] && ownership_paths+=("$HIVEKEEP_DATA_DIR")
+  if [ ${#ownership_paths[@]} -gt 0 ]; then
+    chown -R "$HIVEKEEP_USER:$HIVEKEEP_USER" "${ownership_paths[@]}"
+  fi
   success "Permissions set"
 }
 
 # ─── Resolve Bun path ────────────────────────────────────────────────────────
 resolve_bun_path() {
-  BUN_BIN="$(command -v bun)"
+  configure_bun_environment
 
-  if [ "$IS_ROOT" = true ] && [ "$BUN_BIN" != "/usr/local/bin/bun" ]; then
-    ln -sf "$BUN_BIN" /usr/local/bin/bun
-    BUN_BIN="/usr/local/bin/bun"
-    success "Bun symlinked to /usr/local/bin/bun"
+  local selected_bun
+  selected_bun="$(command -v bun 2>/dev/null || true)"
+  [ -n "$selected_bun" ] || error "Bun is not available on PATH after installation"
+
+  if [ "$IS_ROOT" != true ] || [ "$OS" != "Linux" ] || [ "${INIT_SYSTEM:-}" != "systemd" ]; then
+    BUN_BIN="$(canonical_executable_path "$selected_bun" || printf '%s' "$selected_bun")"
+    return 0
   fi
+
+  BUN_BIN="$(canonical_executable_path "$selected_bun" || true)"
+  [ -n "$BUN_BIN" ] || error "Could not resolve the Bun executable: $selected_bun"
+
+  id "$HIVEKEEP_USER" &>/dev/null || error "Service user '$HIVEKEEP_USER' does not exist"
+  if ! command -v runuser &>/dev/null && ! command -v su &>/dev/null; then
+    error "Cannot validate Bun as '$HIVEKEEP_USER': install runuser or su and retry"
+  fi
+
+  local path_requires_managed_copy=false
+  case "$BUN_BIN" in
+    *[!A-Za-z0-9_./-]*) path_requires_managed_copy=true ;;
+  esac
+
+  if [ "$path_requires_managed_copy" = false ] && bun_runs_as_service_user "$BUN_BIN"; then
+    success "Bun is executable by '$HIVEKEEP_USER' ($BUN_BIN)"
+    return 0
+  fi
+
+  prepare_managed_bun_directory
+
+  local managed_bun="$HIVEKEEP_SYSTEM_BUN_INSTALL/bin/bun"
+  local managed_canonical=""
+  managed_canonical="$(canonical_executable_path "$managed_bun" || true)"
+
+  if [ -n "$managed_canonical" ] && [ "$BUN_BIN" = "$managed_canonical" ]; then
+    BUN_BIN="$managed_bun"
+    bun_runs_as_service_user "$BUN_BIN" || \
+      error "Managed Bun is not executable by '$HIVEKEEP_USER': $BUN_BIN"
+    success "Bun permissions repaired for '$HIVEKEEP_USER' ($BUN_BIN)"
+    return 0
+  fi
+
+  local staged_bun="${managed_bun}.tmp.$$"
+  rm -f "$staged_bun"
+  install -o root -g root -m 0755 "$BUN_BIN" "$staged_bun"
+
+  if ! bun_runs_as_service_user "$staged_bun"; then
+    rm -f "$staged_bun"
+    error "Bun cannot execute as '$HIVEKEEP_USER' after staging it at $staged_bun"
+  fi
+
+  mv -f "$staged_bun" "$managed_bun"
+  chown root:root "$managed_bun"
+  chmod 0755 "$managed_bun"
+  BUN_BIN="$managed_bun"
+
+  bun_runs_as_service_user "$BUN_BIN" || \
+    error "Managed Bun is not executable by '$HIVEKEEP_USER': $BUN_BIN"
+  success "Bun prepared for '$HIVEKEEP_USER' ($BUN_BIN)"
 }
 
 # ─── Service: systemd system (root) ──────────────────────────────────────────
 create_systemd_system_service() {
   local env_file="$HIVEKEEP_DATA_DIR/hivekeep.env"
-  UNIT_FILE="/etc/systemd/system/hivekeep.service"
+  local bun_dir
+  local escaped_bun_bin
+  local service_path
+  bun_dir="$(dirname "$BUN_BIN")"
+  escaped_bun_bin="$(escape_systemd_exec_token "$BUN_BIN")"
+  service_path="$(escape_systemd_environment_value "${bun_dir}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")"
+  UNIT_FILE="$HIVEKEEP_SYSTEMD_UNIT"
 
   if [ "$IS_UPDATE" = true ] && systemctl is-active --quiet hivekeep 2>/dev/null; then
     info "Stopping existing service..."
@@ -1435,7 +1683,8 @@ User=$HIVEKEEP_USER
 Group=$HIVEKEEP_USER
 WorkingDirectory=$HIVEKEEP_DIR
 EnvironmentFile=-${env_file}
-ExecStart=$BUN_BIN src/server/index.ts
+Environment="PATH=${service_path}"
+ExecStart="$escaped_bun_bin" src/server/index.ts
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -1448,13 +1697,71 @@ UNIT
 
   systemctl daemon-reload
   systemctl enable hivekeep
+  systemctl reset-failed hivekeep 2>/dev/null || true
   systemctl start hivekeep
   success "systemd system service started"
+}
+
+legacy_system_bun_service_needs_repair() {
+  [ "$(id -u)" -eq 0 ] || return 1
+  [ "$(uname -s)" = "Linux" ] || return 1
+  [ -f "$HIVEKEEP_SYSTEMD_UNIT" ] || return 1
+  [ -L "$HIVEKEEP_LEGACY_BUN_LINK" ] || return 1
+  grep -Fq "ExecStart=$HIVEKEEP_LEGACY_BUN_LINK " "$HIVEKEEP_SYSTEMD_UNIT" || return 1
+
+  local legacy_target
+  legacy_target="$(canonical_executable_path "$HIVEKEEP_LEGACY_BUN_LINK" || true)"
+  case "$legacy_target" in
+    "${HIVEKEEP_LEGACY_BUN_ROOT%/}"/*) ;;
+    *) return 1 ;;
+  esac
+
+  id "$HIVEKEEP_USER" &>/dev/null || return 1
+  ! bun_runs_as_service_user "$HIVEKEEP_LEGACY_BUN_LINK"
+}
+
+repair_legacy_system_bun_service() {
+  info "Repairing the legacy root-only Bun service path..."
+  detect_os
+  configure_bun_environment
+  setup_system_user
+  resolve_bun_path
+
+  local previous_is_update="${IS_UPDATE:-false}"
+  IS_UPDATE=true
+  create_systemd_system_service
+  IS_UPDATE="$previous_is_update"
+  persist_bun_path
+
+  local env_file="$HIVEKEEP_DATA_DIR/hivekeep.env"
+  if [ -f "$env_file" ]; then
+    local configured_port
+    configured_port="$(grep '^PORT=' "$env_file" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
+    [ -n "$configured_port" ] && HIVEKEEP_PORT="$configured_port"
+  fi
+
+  HIVEKEEP_HEALTHY=false
+  verify_running
+  [ "$HIVEKEEP_HEALTHY" = true ] || error "Legacy Bun path was migrated, but Hivekeep did not become healthy"
+
+  systemctl is-active --quiet hivekeep || error "Legacy Bun path was migrated, but the systemd service is not active"
+  local main_pid exec_status
+  main_pid="$(systemctl show hivekeep -p MainPID --value 2>/dev/null || echo 0)"
+  exec_status="$(systemctl show hivekeep -p ExecMainStatus --value 2>/dev/null || echo 1)"
+  [ "$main_pid" -gt 0 ] 2>/dev/null || error "Legacy Bun path was migrated, but systemd has no Hivekeep process"
+  [ "$exec_status" = "0" ] || error "Legacy Bun path was migrated, but systemd reports exit status $exec_status"
+  success "Legacy Bun service path migrated to $BUN_BIN"
 }
 
 # ─── Service: systemd user (non-root) ────────────────────────────────────────
 create_systemd_user_service() {
   local env_file="$HIVEKEEP_DATA_DIR/hivekeep.env"
+  local bun_dir
+  local escaped_bun_bin
+  local service_path
+  bun_dir="$(dirname "$BUN_BIN")"
+  escaped_bun_bin="$(escape_systemd_exec_token "$BUN_BIN")"
+  service_path="$(escape_systemd_environment_value "${bun_dir}:${PATH:-/usr/local/bin:/usr/bin:/bin}")"
   UNIT_DIR="$HOME/.config/systemd/user"
   UNIT_FILE="$UNIT_DIR/hivekeep.service"
 
@@ -1474,7 +1781,8 @@ After=network.target
 Type=simple
 WorkingDirectory=$HIVEKEEP_DIR
 EnvironmentFile=-${env_file}
-ExecStart=$BUN_BIN src/server/index.ts
+Environment="PATH=${service_path}"
+ExecStart="$escaped_bun_bin" src/server/index.ts
 Restart=always
 RestartSec=5
 
@@ -2023,6 +2331,8 @@ create_service() {
   else
     create_systemd_user_service
   fi
+
+  persist_bun_path
 }
 
 # ─── Post-start health check ─────────────────────────────────────────────────
@@ -2362,6 +2672,9 @@ uninstall() {
   echo ""
 
   detect_os
+  configure_bun_environment
+  local retained_bun_path
+  retained_bun_path="$(configured_bun_path || true)"
 
   # Stop and disable service
   header "Stopping service..."
@@ -2404,6 +2717,13 @@ uninstall() {
     rm -f "$HOME/.config/systemd/user/hivekeep.service"
     systemctl --user daemon-reload
     success "systemd user service removed"
+  fi
+
+  if [ "$IS_ROOT" = true ]; then
+    rm -f "$HIVEKEEP_SYSTEM_CONFIG_DIR/bun.path"
+    rmdir "$HIVEKEEP_SYSTEM_CONFIG_DIR" 2>/dev/null || true
+  else
+    rm -f "$HIVEKEEP_DATA_DIR/bun.path"
   fi
 
   # Remove app directory
@@ -2526,8 +2846,8 @@ uninstall() {
 
   # Post-uninstall hints
   local hints=()
-  if command -v bun &>/dev/null; then
-    hints+=("Bun runtime is still installed. Remove it with: rm -rf ~/.bun")
+  if [ -n "$retained_bun_path" ] && [ -f "$retained_bun_path" ]; then
+    hints+=("Bun runtime is still installed at $retained_bun_path")
   fi
   if [ -d "$HIVEKEEP_DATA_DIR" ] && [[ ! "$remove_data" =~ ^[Yy]$ ]]; then
     hints+=("Data preserved at $HIVEKEEP_DATA_DIR (re-install will reuse it)")
@@ -2972,19 +3292,29 @@ check_status() {
 
   # Check Bun
   header "Runtime"
-  BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-  export PATH="$BUN_INSTALL/bin:$PATH"
-  if command -v bun &>/dev/null; then
+  configure_bun_environment
+  local doctor_bun
+  doctor_bun="$(configured_bun_path || true)"
+  if [ -n "$doctor_bun" ]; then
     local bun_ver
-    bun_ver="$(bun --version 2>/dev/null || echo "0.0.0")"
+    bun_ver="$(run_configured_bun "$doctor_bun" --version 2>/dev/null || echo "0.0.0")"
     if version_gte "$bun_ver" "$BUN_MIN_VERSION"; then
       success "Bun v${bun_ver}"
     else
       warn "Bun v${bun_ver} is outdated (need v${BUN_MIN_VERSION}+). Run the installer to upgrade."
       has_issues=true
     fi
+
+    if [ "$IS_ROOT" = true ] && [ "$OS" = "Linux" ] && [ "${INIT_SYSTEM:-}" = "systemd" ] && id "$HIVEKEEP_USER" &>/dev/null; then
+      if bun_runs_as_service_user "$doctor_bun"; then
+        success "Bun is executable by '$HIVEKEEP_USER'"
+      else
+        warn "Bun cannot execute as '$HIVEKEEP_USER' ($doctor_bun)"
+        has_issues=true
+      fi
+    fi
   else
-    warn "Bun not found"
+    warn "Configured Bun runtime not found"
     has_issues=true
   fi
 
@@ -3550,10 +3880,18 @@ do_doctor() {
 
   # ── Runtime ──
   echo "## Runtime"
-  BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-  export PATH="$BUN_INSTALL/bin:$PATH"
-  if command -v bun &>/dev/null; then
-    echo "- Bun: $(bun --version 2>/dev/null || echo error) ($(command -v bun))"
+  configure_bun_environment
+  local diagnose_bun
+  diagnose_bun="$(configured_bun_path || true)"
+  if [ -n "$diagnose_bun" ]; then
+    echo "- Bun: $(run_configured_bun "$diagnose_bun" --version 2>/dev/null || echo error) ($diagnose_bun)"
+    if [ "$IS_ROOT" = true ] && [ "$OS" = "Linux" ] && [ "${INIT_SYSTEM:-}" = "systemd" ] && id "$HIVEKEEP_USER" &>/dev/null; then
+      if bun_runs_as_service_user "$diagnose_bun"; then
+        echo "- Service user Bun execution: ok ($HIVEKEEP_USER)"
+      else
+        echo "- Service user Bun execution: FAILED ($HIVEKEEP_USER)"
+      fi
+    fi
   else
     echo "- Bun: NOT FOUND"
   fi
@@ -3799,8 +4137,7 @@ dry_run() {
   done
 
   # Bun
-  BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-  export PATH="$BUN_INSTALL/bin:$PATH"
+  configure_bun_environment
   if command -v bun &>/dev/null; then
     local bun_ver
     bun_ver="$(bun --version 2>/dev/null || echo "0.0.0")"
@@ -5001,6 +5338,9 @@ do_update() {
   if [ "$local_head" = "$remote_head" ]; then
     local version
     version="$(git -C "$HIVEKEEP_DIR" describe --tags 2>/dev/null || git -C "$HIVEKEEP_DIR" rev-parse --short HEAD)"
+    if legacy_system_bun_service_needs_repair; then
+      repair_legacy_system_bun_service
+    fi
     echo ""
     echo -e "  ${GREEN}✓ Already up to date${NC} ($version, $channel channel)"
     echo ""
@@ -5177,6 +5517,11 @@ do_reset() {
   STEP_TOTAL=7
   STEP_CURRENT=0
 
+  # Validate the runtime before stopping the service or removing the checkout.
+  ensure_bun
+  setup_system_user
+  resolve_bun_path
+
   # 1. Back up the database
   step "Backing up database"
   backup_database
@@ -5245,7 +5590,6 @@ do_reset() {
   success "Cloned $new_version"
 
   # 5. Rebuild
-  ensure_bun
   IS_UPDATE=true
   build_hivekeep
   setup_database
@@ -5436,6 +5780,13 @@ do_test() {
     HIVEKEEP_DIR="${HIVEKEEP_DIR:-$HOME/hivekeep}"
     HIVEKEEP_DATA_DIR="${HIVEKEEP_DATA_DIR:-$HOME/.local/share/hivekeep}"
   fi
+  if [ "$OS" = "Darwin" ]; then
+    INIT_SYSTEM="launchd"
+  elif command -v systemctl &>/dev/null && systemctl --version &>/dev/null 2>&1; then
+    INIT_SYSTEM="systemd"
+  else
+    INIT_SYSTEM="script"
+  fi
 
   local passed=0
   local failed=0
@@ -5511,11 +5862,12 @@ do_test() {
 
   # ── 3. Runtime ──
   header "Runtime"
-  BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-  export PATH="$BUN_INSTALL/bin:$PATH"
-  if command -v bun &>/dev/null; then
+  configure_bun_environment
+  local test_bun
+  test_bun="$(configured_bun_path || true)"
+  if [ -n "$test_bun" ]; then
     local bun_ver
-    bun_ver="$(bun --version 2>/dev/null || echo "0.0.0")"
+    bun_ver="$(run_configured_bun "$test_bun" --version 2>/dev/null || echo "0.0.0")"
     BUN_MIN_VERSION="${BUN_MIN_VERSION:-1.2.0}"
     if version_gte "$bun_ver" "$BUN_MIN_VERSION"; then
       test_pass "Bun v${bun_ver} (meets v${BUN_MIN_VERSION}+ requirement)"
@@ -5524,13 +5876,21 @@ do_test() {
     fi
 
     # Verify Bun can actually execute (not just present on PATH)
-    if bun -e "console.log('ok')" 2>/dev/null | grep -q "ok"; then
+    if run_configured_bun "$test_bun" -e "console.log('ok')" 2>/dev/null | grep -q "ok"; then
       test_pass "Bun runtime is functional"
     else
-      test_fail "Bun is on PATH but cannot execute JavaScript"
+      test_fail "Configured Bun runtime cannot execute JavaScript"
+    fi
+
+    if [ "$IS_ROOT" = true ] && [ "$OS" = "Linux" ] && [ "${INIT_SYSTEM:-}" = "systemd" ] && id "$HIVEKEEP_USER" &>/dev/null; then
+      if bun_runs_as_service_user "$test_bun"; then
+        test_pass "Bun executes as service user '$HIVEKEEP_USER'"
+      else
+        test_fail "Bun cannot execute as service user '$HIVEKEEP_USER' ($test_bun)"
+      fi
     fi
   else
-    test_fail "Bun not found on PATH"
+    test_fail "Configured Bun runtime not found"
   fi
 
   # ── 4. Configuration ──
@@ -6479,4 +6839,6 @@ main() {
   print_summary
 }
 
-main "$@"
+if [ -z "${BASH_SOURCE[0]:-}" ] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
