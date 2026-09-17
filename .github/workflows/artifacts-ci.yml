@@ -1,0 +1,66 @@
+name: Release artifact checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/release.yml'
+      - '.github/workflows/artifacts-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: Upload release-shaped fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prepare client files and architecture digests
+        run: |
+          mkdir -p client/assets amd64 arm64
+          printf '<html>artifact roundtrip</html>\n' > client/index.html
+          printf 'console.log("artifact roundtrip")\n' > client/assets/app.js
+          (cd client && sha256sum index.html assets/app.js > SHA256SUMS)
+          touch amd64/aaaaaaaa arm64/bbbbbbbb
+      - uses: actions/upload-artifact@v7
+        with:
+          name: client-build
+          path: client/
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digests-amd64
+          path: amd64/*
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digests-arm64
+          path: arm64/*
+          if-no-files-found: error
+          retention-days: 1
+
+  download:
+    name: Verify client and merged digest artifacts
+    needs: upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: client-build
+          path: dist/client
+      # Match the multi-architecture manifest job in release.yml.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digests-*
+          path: digests
+          merge-multiple: true
+      - name: Verify contents and directory layout
+        run: |
+          (cd dist/client && sha256sum --check SHA256SUMS)
+          test -f digests/aaaaaaaa
+          test -f digests/bbbbbbbb
+          test "$(find digests -type f | wc -l)" -eq 2

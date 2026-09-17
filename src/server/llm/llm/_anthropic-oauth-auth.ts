@@ -29,6 +29,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createHash, randomBytes, randomUUID } from 'crypto'
 import { join } from 'path'
+import { REAL_HOME, normalizeAbsoluteHome } from '@/server/llm/llm/_home-paths'
 import { createLogger } from '@/server/logger'
 import type { ProviderConfig } from '@/server/llm/core/types'
 import type { PkceClient } from '@/server/llm/llm/_oauth-pkce'
@@ -64,30 +65,34 @@ export const ANTHROPIC_PKCE_CLIENT: PkceClient = {
 const CLAUDE_CODE_VERSION = '2.1.212'
 const BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
 
-/**
- * Resolve the real user home directory.
- * Bun installed via snap sets HOME to a sandboxed path (e.g. ~/snap/bun-js/87/).
- * We prefer the REAL_HOME or the home from /etc/passwd via the USER env var.
- */
-function getRealHome(): string {
-  // REAL_HOME is set by some snap environments
-  if (process.env.REAL_HOME) return process.env.REAL_HOME
-  // Fall back to HOME, but strip snap paths
-  const home = process.env.HOME ?? ''
-  const snapMatch = home.match(/^(\/home\/[^/]+)\/snap\//)
-  if (snapMatch) return snapMatch[1]!
-  // Last resort: construct from USER
-  if (process.env.USER) return `/home/${process.env.USER}`
-  return home
+// Credential filenames the Claude CLI may use, relative to a home directory.
+const CLAUDE_CREDENTIAL_RELPATHS: string[][] = [
+  ['.claude', '.credentials.json'],
+  ['.claude.json'],
+  ['.claude', 'credentials.json'],
+]
+
+// Search the plain env HOME first, then the snap-adjusted REAL_HOME. On macOS
+// and nonstandard homes REAL_HOME can resolve to the wrong place (e.g. getRealHome
+// builds /home/$USER while the real home is /Users/$USER), so the env HOME
+// candidate is what actually finds the credentials there.
+function claudeCredentialCandidates(): string[] {
+  const bases: string[] = []
+  for (const home of [process.env.HOME, REAL_HOME]) {
+    const base = normalizeAbsoluteHome(home)
+    if (base && !bases.includes(base)) bases.push(base)
+  }
+  const paths: string[] = []
+  for (const base of bases) {
+    for (const rel of CLAUDE_CREDENTIAL_RELPATHS) {
+      const p = join(base, ...rel)
+      if (!paths.includes(p)) paths.push(p)
+    }
+  }
+  return paths
 }
 
-const REAL_HOME = getRealHome()
-
-const CANDIDATE_PATHS = [
-  join(REAL_HOME, '.claude', '.credentials.json'),
-  join(REAL_HOME, '.claude.json'),
-  join(REAL_HOME, '.claude', 'credentials.json'),
-]
+const CANDIDATE_PATHS = claudeCredentialCandidates()
 
 // ---------------------------------------------------------------------------
 // Types

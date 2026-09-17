@@ -14,12 +14,14 @@ Hivekeep ships with built-in providers across six capability families: language 
 | [OpenAI](https://platform.openai.com/api-keys) | ✅ | ✅ | ✅ | | ✅ | ✅ | ✅ |
 | OpenAI (Codex CLI) | ✅ | | | | | | ❌ (OAuth) |
 | [Google Gemini](https://aistudio.google.com/apikey) | ✅ | | ✅ | | | | ✅ |
-| [OpenRouter](https://openrouter.ai/keys) | ✅ | | | | | | ✅ |
+| [OpenRouter](https://openrouter.ai/keys) | ✅ | ✅ | ✅ | | | | ✅ |
+| [Kilo Gateway](https://kilo.ai/gateway) | ✅ | | | | | | ✅ |
+| [Ollama Cloud](https://ollama.com/) | ✅ | | | ✅ | | | ✅ |
 | [xAI](https://console.x.ai) | ✅ | | | | | | ✅ |
 | [DeepSeek](https://platform.deepseek.com/api_keys) | ✅ | | | | | | ✅ |
 | [MiniMax](https://platform.minimax.io/user-center/basic-information/interface-key) | ✅ | | | | | | ✅ |
 | [Kimi (Moonshot)](https://platform.moonshot.ai/console/api-keys) | ✅ | | | | | | ✅ |
-| OpenAI-compatible (custom base URL) | ✅ | ✅ | | | | | ⚪ (optional) |
+| OpenAI-compatible (custom base URL) | ✅ | ✅ | ✅ | | | | ⚪ (optional) |
 | [Brave Search](https://brave.com/search/api/) | | | | ✅ | | | ✅ |
 | [SerpAPI](https://serpapi.com/manage-api-key) | | | | ✅ | | | ✅ |
 | [Tavily](https://app.tavily.com/home) | | | | ✅ | | | ✅ |
@@ -29,12 +31,14 @@ Hivekeep ships with built-in providers across six capability families: language 
 
 This table is the exact set of built-in providers (see `src/shared/provider-metadata.ts`). Notably:
 
-- **Embeddings** are built in for **OpenAI** and the generic **OpenAI-compatible** connector (point it at Ollama, llama.cpp, LM Studio, vLLM, etc. for fully local embeddings). Other embedding sources come from plugins.
-- **Image generation** is built in for **OpenAI** and **Gemini**.
+- **Embeddings** are built in for **OpenAI**, **OpenRouter**, and the generic **OpenAI-compatible** connector (point it at Ollama, llama.cpp, LM Studio, vLLM, etc. for fully local embeddings). Other embedding sources come from plugins.
+- **Image generation** is built in for **OpenAI**, **Gemini**, **OpenRouter**, and the generic **OpenAI-compatible** connector (any endpoint that implements the OpenAI Images API, `POST /v1/images/generations`).
+- **Ollama Cloud** is built in for LLMs and result-only web search via Ollama's API.
+- **Kilo Gateway** is built in as an LLM gateway.
 - **STT and TTS** are built in for **OpenAI** and **ElevenLabs**.
 - **SearXNG** is a self-hosted search connector: point it at your own [SearXNG](https://github.com/searxng/searxng) instance (custom base URL) to run web search privately, with no commercial search API. The instance must have the `json` format enabled (`search.formats` in `settings.yml`); the API key is optional and only needed for protected instances (sent via a configurable auth header). Do not configure it through the Tavily provider: SearXNG is not Tavily-compatible and will fail with HTTP 401.
 - Providers such as **Mistral** and **Replicate** are not built in: they ship as plugins.
-- **OpenAI-compatible** is a generic connector: you supply a **custom base URL** (and an optional API key) to point Hivekeep at any OpenAI-style endpoint, NewAPI, LiteLLM, llama.cpp, LM Studio, vLLM, Ollama, and similar. It serves **both LLM and embedding** capabilities (`/chat/completions` and `/embeddings`), so a single connector can run your agents and your semantic memory fully locally. Its model list comes from the endpoint's `/models`; the API key is optional (local servers often need none).
+- **OpenAI-compatible** is a generic connector: you supply a **custom base URL** (and an optional API key) to point Hivekeep at any OpenAI-style endpoint, NewAPI, LiteLLM, llama.cpp, LM Studio, vLLM, Ollama, and similar. It serves **LLM, embedding, and image** capabilities (`/chat/completions`, `/embeddings`, and `/images/generations`) on one row, so a single connector can run your agents, semantic memory, and `generate_image` against the same gateway. Its chat/embedding model list comes from the endpoint's `/models`; image models are the listing entries that look like image-generation ids (dall-e, gpt-image, flux, sdxl, imagen, …) plus an optional `imageModels` allowlist for names the heuristic misses. The API key is optional (local servers often need none). See [gaps](#openai-compatible-image-gaps) below.
 - **Local models without native tool calling still work.** Some self-hosted models reject the native tools API (for example Gemma on Ollama, which returns `400 does not support tools`). When Hivekeep detects this, it automatically switches that model to a prompt-based tool protocol, describing the tools in the prompt and parsing the model's tool calls back out, so the agent keeps working. This happens transparently, with no configuration, and is remembered per model so there is no repeated failed attempt. A low [`TOOLS_TEMPERATURE`](/docs/getting-started/configuration/) and tolerant parsing further steady tool calls on small models.
 
 Per-model metadata (context window, image/PDF support, reasoning, pricing, and the display label) is **not configured per provider**. It's auto-filled from [models.dev](https://models.dev) and managed in the [Model Registry](/docs/providers/model-registry/), where you can also enable/disable models, fix a wrong match, or override any value.
@@ -48,6 +52,21 @@ Per-model metadata (context window, image/PDF support, reasoning, pricing, and t
 - **STT**: Speech-to-text (used by `transcribe_audio`)
 - **TTS**: Text-to-speech (used by `text_to_speech`)
 
+## OpenAI-compatible image gaps
+
+The OpenAI-compatible image path speaks the official OpenAI Images API (`POST /images/generations` and `POST /images/edits`) at your base URL. It does **not** invent a private protocol, and it does **not** wrap Gemini `generateContent` / Imagen `predict`, Replicate predictions, or vendor-specific Flux HTTP APIs.
+
+What that means in practice:
+
+- **Chat-only servers do not generate images.** Stock Ollama, llama.cpp, LM Studio, and vLLM typically expose `/chat/completions` (and sometimes `/embeddings`) but not `/images/generations`. Enabling the Image family on those connectors will authenticate (the `/models` probe still works) but `list_image_models` stays empty and `generate_image` fails with a clear "this endpoint does not expose the OpenAI Images API" error. Use LiteLLM, NewAPI, LocalAI, or another Images-API shim — or the branded OpenAI / Gemini providers.
+- **Vision is not image generation.** Multimodal chat models (`llava`, `qwen-vl`, `gpt-4o`, `llama-3.2-vision`, …) are filtered out of the image catalogue. They can *see* pictures in chat; they cannot be used as `generate_image` models through this connector.
+- **Model discovery is a name heuristic.** A generic `/models` listing mixes every id the gateway serves. Hivekeep keeps entries whose names look like image-generation models (`dall-e*`, `gpt-image*`, `flux`, `sdxl` / `stable-diffusion`, `imagen`, `midjourney`, `ideogram`, `recraft`, `kontext`, …) and drops the rest. If your image model is named something else (`my-art-v2`), put its id in the provider's **Image model IDs** field.
+- **Size, quality, and extra knobs are not discovered.** `supportedSizes` and `describe_image_model` params are filled only for the well-known OpenAI families (`gpt-image-1`, `dall-e-3`, `dall-e-2`). Other models get an empty param schema; the host still sends `size` (default `1024x1024`) and any `params` the Agent supplied. An upstream 400/422 (unsupported size, unknown quality enum, rejected `response_format`) is returned to the Agent as a tool error so it can retry. Typical limits — DALL·E 3 `1024x1024` / `1024x1792` / `1792x1024` plus `standard`/`hd`; GPT Image `1024x1024` / `1024x1536` / `1536x1024` / `auto` plus `low`/`medium`/`high`; Flux/SDXL whatever the gateway mapped — are enforced by the upstream, not by Hivekeep.
+- **Edit support is inferred, not probed.** `maxImageInputs` is `1` for `gpt-image*`, `dall-e-2`, and names that look like edit models (`kontext`, `seededit`, `*-edit`); `0` (text-to-image only) otherwise, including `dall-e-3`. A generate-only model advertised as editable will 400 when the Agent passes `imageUrls`.
+- **`response_format` is sent only for the DALL·E family** (`b64_json`). GPT Image rejects that flag; unknown families omit it. When the gateway returns a `url` instead of `b64_json`, Hivekeep fetches the bytes.
+- **Existing OpenAI-compatible rows** created before this capability shipped keep their stored `["llm","embedding"]` until you tick **Image** on the provider (or re-test / `enable_provider_capability`). Set a default image model afterwards so avatars and `generate_image` do not pick a chat-only connector first.
+- **Use the matching connector for vendor-specific image APIs.** The generic connector does not translate Gemini or OpenRouter image protocols. Use the built-in `gemini` or `openrouter` provider for those APIs; OpenRouter supports LLMs, embeddings, and images.
+
 ## Search-provider capabilities at a glance
 
 Search providers declare static capability flags so an Agent can pick the right one for the job. `web_search` honors what each provider supports and emits a warning when the LLM asks for something the provider doesn't expose.
@@ -59,6 +78,7 @@ Search providers declare static capability flags so an Agent can pick the right 
 | Tavily | ✅ | ✅ | ✅ | ❌ | ❌ | Purpose-built for LLM grounding; native answer synthesis. |
 | Perplexity Sonar | ✅ | ✅ | ✅ | ❌ | ❌ | LLM-with-search; recency caps at one month (`year` → `month` with warning). |
 | SearXNG | ❌ | ✅ | ✅ | ✅ | ❌ | Self-hosted metasearch; needs `json` enabled in `search.formats`. Domain filter via `site:` operators. |
+| Ollama Cloud | ❌ | ❌ | ❌ | ❌ | ❌ | Result-only web search through Ollama's `/web_search` endpoint; no synthesized answer or advanced filters advertised. |
 
 ## Configuration
 
@@ -101,10 +121,10 @@ Hivekeep exposes several provider management endpoints:
 
 To use Hivekeep, you need at minimum:
 
-1. **One LLM provider**: For Agent conversations (Anthropic, OpenAI, Gemini, OpenRouter, xAI, or the built-in **OpenAI-compatible** connector pointed at any custom endpoint)
-2. **One embedding provider**: For memory to work. Built in via **OpenAI** (e.g. `text-embedding-3-small`) or the **OpenAI-compatible** connector pointed at a local endpoint (e.g. Ollama with `nomic-embed-text` or `qwen3-embedding`); other embedding sources come from plugins
+1. **One LLM provider**: For Agent conversations (Anthropic, OpenAI, Gemini, OpenRouter, Kilo Gateway, Ollama Cloud, xAI, or the built-in **OpenAI-compatible** connector pointed at any custom endpoint)
+2. **One embedding provider**: For memory to work. Built in via **OpenAI** (e.g. `text-embedding-3-small`), **OpenRouter**, or the **OpenAI-compatible** connector pointed at a local endpoint (e.g. Ollama with `nomic-embed-text` or `qwen3-embedding`); other embedding sources come from plugins
 
 Optional but recommended:
-- A **search provider** for `web_search` (Brave, SerpAPI, Tavily, Perplexity Sonar, or a self-hosted SearXNG instance)
-- An **image provider** for `generate_image` (OpenAI or Gemini)
+- A **search provider** for `web_search` (Brave, SerpAPI, Tavily, Perplexity Sonar, Ollama Cloud, or a self-hosted SearXNG instance)
+- An **image provider** for `generate_image` (OpenAI, Gemini, OpenRouter, or an OpenAI-compatible gateway that implements `/images/generations`)
 - A **voice provider** for `text_to_speech` / `transcribe_audio` (OpenAI or ElevenLabs)

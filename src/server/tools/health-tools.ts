@@ -259,7 +259,7 @@ export const getSetupHealthTool: ToolRegistration = {
           issues.push({
             severity: 'info',
             problem: 'No image provider — generated avatars and images are unavailable.',
-            fix: 'Add an image-capable provider (OpenAI, Gemini), or enable_provider_capability on an existing one, then set_default_model(service:"image", …).',
+            fix: 'Add an image-capable provider (OpenAI, Gemini, or OpenAI-compatible with an Images API), or enable_provider_capability on an existing one, then set_default_model(service:"image", …).',
           })
         }
         if (!coverage.tts.hasValidProvider) {

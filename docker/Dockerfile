@@ -35,7 +35,7 @@ COPY package.json bun.lock ./
 # AND must persist in the final image (Bun runs the SDK's src directly).
 COPY packages ./packages
 # Remove husky prepare script (not needed in production, bun ignores HUSKY=0)
-RUN sed -i '/"prepare":/d' package.json && \
+RUN bun -e "const p=require('./package.json');delete p.scripts.prepare;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" && \
     bun install --frozen-lockfile --production && \
     apt-get purge -y python3 make g++ && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
