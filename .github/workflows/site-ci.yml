@@ -38,3 +38,28 @@ jobs:
       - name: Build site
         working-directory: site
         run: bun run build
+      # A static build can pass while the React integration fails in dev.
+      - name: Check development pages
+        working-directory: site
+        run: |
+          node node_modules/astro/astro.js dev --host 127.0.0.1 --port 4321 > "$RUNNER_TEMP/site-dev.log" 2>&1 &
+          site_dev_pid=$!
+          trap 'kill "$site_dev_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for ((attempt = 0; attempt < 30; attempt++)); do
+            if curl --max-time 5 -fsS -o /dev/null http://127.0.0.1:4321/ 2>/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/site-dev.log"
+            exit 1
+          fi
+          for route in install demo fr/install fr/demo; do
+            if ! curl --max-time 15 -fsS -o /dev/null "http://127.0.0.1:4321/$route/"; then
+              cat "$RUNNER_TEMP/site-dev.log"
+              exit 1
+            fi
+          done
