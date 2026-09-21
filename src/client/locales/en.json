@@ -245,7 +245,23 @@
       "contextMenu": {
         "edit": "Edit settings",
         "delete": "Delete Agent",
-        "viewUsage": "Token usage"
+        "viewUsage": "Token usage",
+        "moveToGroup": "Move to group",
+        "noGroup": "No group",
+        "newGroup": "New group…"
+      },
+      "groups": {
+        "manage": "Group options",
+        "create": "Create a group",
+        "createTitle": "New group",
+        "rename": "Rename",
+        "renameTitle": "Rename group",
+        "delete": "Delete group",
+        "deleteTitle": "Delete \"{{name}}\"?",
+        "deleteDescription": "The group is removed. Its Agents are not deleted — they move back to the ungrouped list.",
+        "dialogDescription": "Groups organise the Agent list in the sidebar.",
+        "namePlaceholder": "e.g. Finances",
+        "empty": "No Agent in this group yet"
       }
     },
     "tasks": {

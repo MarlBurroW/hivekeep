@@ -83,6 +83,10 @@ export interface UpdateAgentInput {
   expertise?: string
   model?: string
   providerId?: string | null
+  /** Sidebar group this Agent is filed under. Null ungroups it; undefined
+   *  leaves the current group untouched. The id is expected to be resolved by
+   *  the caller (resolveGroupIdForWrite in services/agent-groups.ts). */
+  groupId?: string | null
   /** Cheap scout model for the `scout` tool. Coupled with `scoutProviderId`:
    *  pass both (set the override) or pass null/null (clear it). A partial pair
    *  is normalized to "cleared". */
@@ -111,6 +115,8 @@ export interface AgentRecord {
   kind: AgentKind
   model: string
   providerId: string | null
+  /** Sidebar group this Agent is filed under; null = ungrouped. */
+  groupId: string | null
   scoutModel: string | null
   scoutProviderId: string | null
   scoutThinkingConfig: string | null
@@ -230,6 +236,7 @@ export async function updateAgent(
   if (input.expertise !== undefined) updates.expertise = input.expertise
   if (input.model !== undefined) updates.model = input.model
   if (input.providerId !== undefined) updates.providerId = input.providerId
+  if (input.groupId !== undefined) updates.groupId = input.groupId
   // Scout model/provider are coupled: setting requires both non-empty strings;
   // an explicit null on either side (or a partial pair) clears both. Only
   // touched when at least one of the two keys is present in the input.
@@ -303,6 +310,7 @@ export async function updateAgent(
       role: details.role,
       avatarUrl: details.avatarUrl,
       providerId: details.providerId,
+      groupId: details.groupId ?? null,
       thinkingEnabled: resolvedThinking.enabled === true,
       thinkingEffort: resolvedThinking.effort ?? null,
     },

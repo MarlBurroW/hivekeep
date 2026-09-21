@@ -16,6 +16,8 @@ interface AgentSummary {
   avatarUrl: string | null
   model: string
   providerId: string | null
+  /** Sidebar group this Agent belongs to; null = ungrouped. */
+  groupId?: string | null
   createdAt: string
 }
 
@@ -32,6 +34,8 @@ interface AppSidebarProps {
   onEditAgent: (id: string) => void
   onDeleteAgent?: (id: string) => void
   onReorderAgents: (newOrder: string[]) => void
+  /** File an Agent into a sidebar group (null ungroups it). */
+  onMoveAgentToGroup?: (agentId: string, groupId: string | null) => void
   onOpenSettings?: (section?: string, filters?: { agentId?: string }) => void
 }
 
@@ -55,6 +59,7 @@ export function AppSidebar({
   onEditAgent,
   onDeleteAgent,
   onReorderAgents,
+  onMoveAgentToGroup,
   onOpenSettings,
 }: AppSidebarProps) {
   return (
@@ -79,6 +84,7 @@ export function AppSidebar({
             onDeleteAgent={onDeleteAgent}
             onViewUsage={onOpenSettings ? (agentId: string) => onOpenSettings('tokenUsage', { agentId }) : undefined}
             onReorderAgents={onReorderAgents}
+            onMoveAgentToGroup={onMoveAgentToGroup}
           />
         </div>
       </SidebarContent>
