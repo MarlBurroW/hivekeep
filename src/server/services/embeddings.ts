@@ -2,7 +2,7 @@ import { db } from '@/server/db/index'
 import { createLogger } from '@/server/logger'
 import { providers } from '@/server/db/schema'
 import { config } from '@/server/config'
-import { getEmbeddingModel } from '@/server/services/app-settings'
+import { getEmbeddingModel, getEmbeddingProviderId } from '@/server/services/app-settings'
 import { loadProviderConfig } from '@/server/services/provider-config'
 import { recordUsage } from '@/server/services/token-usage'
 import { getEmbeddingProvider } from '@/server/llm/embedding/registry'
@@ -63,19 +63,51 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   return result.vector
 }
 
-async function findEmbeddingProvider() {
-  const allProviders = await db.select().from(providers).all()
+/** The provider fields this choice depends on — everything else is irrelevant here. */
+type EmbeddingCandidate = { id: string; capabilities: string; isValid: boolean }
 
-  for (const p of allProviders) {
+/**
+ * Pick the embedding provider, honouring the explicit choice in Settings.
+ *
+ * FORK: upstream scanned the table and returned the first valid provider that
+ * declared the `embedding` capability, so the picker in Settings — persisted
+ * as `embedding_provider_id`, read back by the health and config tools — had
+ * no effect on which provider actually ran. With two embedding providers
+ * configured, insertion order decided, and the UI showed the other one.
+ *
+ * Order now: the configured provider, when it still exists, is still valid and
+ * still declares `embedding`; otherwise the first valid one, as before. The
+ * fallback is deliberate — a provider deleted or gone invalid should degrade to
+ * a working embedding, not to none — but it is logged, because silently
+ * embedding through a provider the operator did not choose is how a bill and a
+ * vector space end up somewhere unexpected.
+ */
+export function selectEmbeddingProvider<T extends EmbeddingCandidate>(
+  all: T[],
+  preferredId: string | null,
+): T | null {
+  const canEmbed = (p: T) => {
+    if (!p.isValid) return false
     try {
-      const capabilities = JSON.parse(p.capabilities) as string[]
-      if (capabilities.includes('embedding') && p.isValid) {
-        return p
-      }
+      return (JSON.parse(p.capabilities) as string[]).includes('embedding')
     } catch {
-      // Skip
+      return false
     }
   }
 
-  return null
+  if (preferredId) {
+    const chosen = all.find((p) => p.id === preferredId)
+    if (chosen && canEmbed(chosen)) return chosen
+    log.warn(
+      { preferredId, reason: chosen ? 'not valid or cannot embed' : 'no such provider' },
+      'Configured embedding provider is unusable — falling back to the first valid one',
+    )
+  }
+
+  return all.find(canEmbed) ?? null
+}
+
+async function findEmbeddingProvider() {
+  const allProviders = await db.select().from(providers).all()
+  return selectEmbeddingProvider(allProviders, await getEmbeddingProviderId())
 }
