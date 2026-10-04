@@ -62,7 +62,7 @@ export const ANTHROPIC_PKCE_CLIENT: PkceClient = {
 }
 // Track the latest published Claude Code CLI version. Bump when Anthropic
 // releases new versions to avoid being flagged as an outdated client.
-const CLAUDE_CODE_VERSION = '2.1.212'
+const CLAUDE_CODE_VERSION = '2.1.285'
 const BUFFER_MS = 5 * 60 * 1000 // refresh 5 min before expiry
 
 // Credential filenames the Claude CLI may use, relative to a home directory.
@@ -291,7 +291,7 @@ export const STAINLESS_HEADERS: Record<string, string> = {
  * Mirrors what the official Claude Code CLI sends (and the headers that
  * `kristianvast/hermes-claude-auth` confirmed are required to stay on the
  * regular plan-billing pool):
- *   - `anthropic-beta` matches the beta set Claude Code 2.1.212 sends on a chat request
+ *   - `anthropic-beta` matches the beta set Claude Code 2.1.285 sends on a chat request
  *   - `user-agent` matches the latest released CLI version
  *   - `x-app: cli` identifies the request shape
  *   - `X-Stainless-*` family identifies the request as coming from the
@@ -419,12 +419,12 @@ export function getOAuthAccountUuid(): string | null {
 // ---------------------------------------------------------------------------
 // Anthropic's request router reads a billing tag injected as the FIRST text
 // block in the `system` array. Without it, OAuth requests can be re-routed to
-// the "extra usage" billing pool. Real Claude Code 2.1.212 emits, on a normal
+// the "extra usage" billing pool. Real Claude Code 2.1.285 emits, on a normal
 // chat request (captured on the wire):
 //
 //   x-anthropic-billing-header: cc_version=<version>.<suffix>; cc_entrypoint=cli;
 //
-// Older builds also appended `cch=<hash>;`; 2.1.212 dropped it. Sub-agent and
+// Older builds also appended `cch=<hash>;`; 2.1.285 dropped it. Sub-agent and
 // cron requests append further fields we never send (cc_workload, cc_prev_req,
 // cc_is_subagent).
 //
@@ -470,7 +470,7 @@ function computeBillingSuffix(messageText: string, version: string): string {
 
 /**
  * Build the billing tag that goes as a system text block on every OAuth
- * Messages API request. Format mirrors what Claude Code 2.1.212 sends so OAuth
+ * Messages API request. Format mirrors what Claude Code 2.1.285 sends so OAuth
  * traffic bills against the user's plan limits instead of the "extra usage"
  * pool. See the note above for the suffix caveat.
  */
