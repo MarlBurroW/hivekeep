@@ -235,9 +235,9 @@ export async function getOAuthAccessToken(config: ProviderConfig = {}): Promise<
   return ensureFresh(credsPath, () => refreshFromFile(credsPath))
 }
 
-// Latest published @anthropic-ai/sdk version. The official Claude Code CLI
-// uses this SDK and sends `X-Stainless-Package-Version` accordingly.
-const ANTHROPIC_SDK_VERSION = '0.94.0'
+// @anthropic-ai/sdk version the official Claude Code CLI reports in
+// `X-Stainless-Package-Version` (0.128.0 as of Claude Code 2.1.296).
+const ANTHROPIC_SDK_VERSION = '0.128.0'
 
 /**
  * Map Node-style `process.platform` to the Stainless `X-Stainless-OS` value.
@@ -291,8 +291,7 @@ export const STAINLESS_HEADERS: Record<string, string> = {
  * Mirrors what the official Claude Code CLI sends (and the headers that
  * `kristianvast/hermes-claude-auth` confirmed are required to stay on the
  * regular plan-billing pool):
- *   - `anthropic-beta` matches the beta set Claude Code 2.1.212 sends on a chat request
- *     (2.1.296 sends a slightly different set; not resynced, see OAUTH_HEADERS)
+ *   - `anthropic-beta` matches the beta set Claude Code 2.1.296 sends on a chat request
  *   - `user-agent` matches the latest released CLI version
  *   - `x-app: cli` identifies the request shape
  *   - `X-Stainless-*` family identifies the request as coming from the
@@ -317,20 +316,31 @@ export const OAUTH_HEADERS = {
   // use. We intentionally do NOT send the `context_management` request param
   // (Hivekeep has its own compacting), only the header. `context-1m` actually
   // enables the 1M context window for the [1m] models.
+  //
+  // Order and content match a Claude Code 2.1.296 chat request. Left out on
+  // purpose: `dangerous-tool-use-2026-09-03` and `afk-mode-2026-01-31`, which
+  // CC only adds in its auto mode. CC pairs `thinking-display-updates` with
+  // `thinking.display:'updates'` (empty thinking text, progress counts only);
+  // Hivekeep does not send that param, so the header alone changes nothing on
+  // the wire. Dropping `redact-thinking` makes Opus 4.6 stream its thinking
+  // text again (other models we tested already omit it either way).
   'anthropic-beta': [
     'claude-code-20250219',
     'oauth-2025-04-20',
     LONG_CONTEXT_BETA,
     'interleaved-thinking-2025-05-14',
-    'redact-thinking-2026-02-12',
     'thinking-token-count-2026-05-13',
     'context-management-2025-06-27',
     'prompt-caching-scope-2026-01-05',
     'mid-conversation-system-2026-04-07',
+    'per-turn-control-2026-07-01',
+    'mid-conversation-tool-changes-2026-07-01',
+    'inline-tools-2026-09-15',
     'advisor-tool-2026-03-01',
     // Adaptive-thinking effort dial (`output_config.effort` +
     // `thinking:{type:'adaptive'}`) — required for the server to honor effort.
     'effort-2025-11-24',
+    'thinking-display-updates-2026-08-18',
     'extended-cache-ttl-2025-04-11',
   ].join(','),
   'user-agent': `claude-cli/${CLAUDE_CODE_VERSION} (external, cli)`,
