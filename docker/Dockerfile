@@ -47,7 +47,11 @@ RUN bun -e "const p=require('./package.json');delete p.scripts.prepare;require('
 # admin web terminal backs sessions with tmux when available so they
 # survive a server restart with their running processes — see
 # services/terminal-sessions.ts; without tmux only scrollback is restored).
-RUN apt-get update && apt-get install -y --no-install-recommends gosu npm tmux && rm -rf /var/lib/apt/lists/*
+# + git: install.sh installs it as a prerequisite on bare metal (Agents clone,
+# branch and push from run_shell), but the image had no git, so every git
+# command from an Agent failed with "git: not found" and npx fell over on any
+# package that resolves a git dependency (`npm ERR! syscall spawn git`).
+RUN apt-get update && apt-get install -y --no-install-recommends gosu npm tmux git && rm -rf /var/lib/apt/lists/*
 
 # Install Chromium for Playwright (the browse_url / screenshot_url tools and the
 # browser_* session tools in src/server/tools/ drive a headless Chromium via
