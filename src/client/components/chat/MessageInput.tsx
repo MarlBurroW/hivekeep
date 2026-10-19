@@ -20,6 +20,9 @@ import type { AgentThinkingEffort } from '@/shared/types'
 import type { ProviderModel } from '@/client/hooks/useModels'
 import { modelReasoningInfo } from '@/client/lib/model-efforts'
 
+/** Folga entre o topo da linha do cursor e a base do popover de / e @. */
+const POPOVER_GAP = 8
+
 export interface MessageInputHandle {
   focus: () => void
 }
@@ -167,7 +170,7 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
           const coords = getCaretCoordinates(textarea, i)
           const textareaRect = textarea.getBoundingClientRect()
           // Position the popover above the caret line (bottom-anchored)
-          const distanceFromBottom = textareaRect.height - coords.top - coords.height
+          const distanceFromBottom = textareaRect.height - coords.top + POPOVER_GAP
           setMentionPosition({ top: Math.max(distanceFromBottom, 8), left: coords.left })
         }
         return
@@ -192,7 +195,7 @@ export const MessageInput = memo(forwardRef<MessageInputHandle, MessageInputProp
         if (textarea) {
           const coords = getCaretCoordinates(textarea, 0)
           const textareaRect = textarea.getBoundingClientRect()
-          const distanceFromBottom = textareaRect.height - coords.top - coords.height
+          const distanceFromBottom = textareaRect.height - coords.top + POPOVER_GAP
           setCommandPosition({ top: Math.max(distanceFromBottom, 8), left: coords.left })
         }
         return
