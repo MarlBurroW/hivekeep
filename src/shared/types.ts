@@ -160,6 +160,18 @@ export interface ToolCallEntry {
   offset?: number
 }
 
+/** A named folder Agents can be filed under in the sidebar. Global, like the
+ *  Agent roster itself — not a per-user view preference. An Agent with
+ *  `groupId: null` is ungrouped and renders in a plain list above the groups. */
+export interface AgentGroup {
+  id: string
+  name: string
+  /** Ascending display order among groups; ties break by name. */
+  sortOrder: number
+  createdAt: number
+  updatedAt: number
+}
+
 /** A global, named set of native tools assignable to tasks. The resolved
  *  native toolset of a task is CORE_TOOLS unioned with every referenced
  *  toolbox's `toolNames` (the special value "*" expands to all native tools).

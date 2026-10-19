@@ -14,6 +14,8 @@ interface AgentSummary {
   avatarUrl: string | null
   model: string
   providerId: string | null
+  /** Sidebar group this Agent is filed under; null = ungrouped. */
+  groupId: string | null
   createdAt: string
   thinkingEnabled: boolean
   thinkingEffort: AgentThinkingEffort | null
@@ -69,6 +71,8 @@ interface UpdateAgentData {
   expertise?: string
   model?: string
   providerId?: string | null
+  /** Sidebar group to file this Agent under; null ungroups it. */
+  groupId?: string | null
   scoutModel?: string | null
   scoutProviderId?: string | null
   toolboxIds?: string[] | null
@@ -169,6 +173,7 @@ export function useAgents() {
         kind: (data.kind as AgentKind | undefined) ?? 'regular',
         model: data.model as string,
         providerId: (data.providerId as string | null) ?? null,
+        groupId: (data.groupId as string | null) ?? null,
         avatarUrl: (data.avatarUrl as string | null) ?? null,
         createdAt: data.createdAt as string,
         thinkingEnabled: (data.thinkingEnabled as boolean) ?? false,
@@ -192,6 +197,7 @@ export function useAgents() {
                 ...(data.role !== undefined && { role: data.role as string }),
                 ...(data.model !== undefined && { model: data.model as string }),
                 ...(data.providerId !== undefined && { providerId: data.providerId as string | null }),
+                ...(data.groupId !== undefined && { groupId: data.groupId as string | null }),
                 ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl as string | null }),
                 ...(data.thinkingEnabled !== undefined && { thinkingEnabled: data.thinkingEnabled as boolean }),
                 ...(data.thinkingEffort !== undefined && { thinkingEffort: data.thinkingEffort as AgentThinkingEffort | null }),
@@ -208,6 +214,15 @@ export function useAgents() {
         next.delete(agentId)
         return next
       })
+    },
+    // Deleting a group ungroups its Agents server-side; mirror that here so the
+    // cards move to the ungrouped list without waiting for a refetch. Without
+    // this they would keep pointing at a group that no longer exists and
+    // silently disappear from the sidebar.
+    'agent-group:deleted': (data) => {
+      const ids = new Set((data.ungroupedAgentIds as string[] | undefined) ?? [])
+      if (ids.size === 0) return
+      setAgents((prev) => prev.map((k) => (ids.has(k.id) ? { ...k, groupId: null } : k)))
     },
     'queue:update': (data) => {
       const agentId = data.agentId as string
@@ -332,6 +347,7 @@ export function useAgents() {
               ...(data.role !== undefined && { role: data.role }),
               ...(data.model !== undefined && { model: data.model }),
               ...(data.providerId !== undefined && { providerId: data.providerId }),
+              ...(data.groupId !== undefined && { groupId: data.groupId }),
               ...(data.thinkingConfig !== undefined && {
                 thinkingEnabled: data.thinkingConfig?.enabled === true,
                 thinkingEffort: data.thinkingConfig?.effort ?? null,

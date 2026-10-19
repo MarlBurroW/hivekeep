@@ -124,12 +124,29 @@ export const modelRegistry = sqliteTable('model_registry', {
   index('idx_model_registry_provider').on(table.providerId),
 ])
 
+/** Optional named folder used to group Agents in the sidebar. Global (not
+ *  per-user), like the Agents themselves: this organises the shared Agent
+ *  roster, it is not a personal view preference. Per-user ordering stays in
+ *  `user_profiles.agent_order` and is applied within each group at render time. */
+export const agentGroups = sqliteTable('agent_groups', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('idx_agent_groups_name').on(table.name),
+])
+
 export const agents = sqliteTable('agents', {
   id: text('id').primaryKey(),
   slug: text('slug').unique(),
   name: text('name').notNull(),
   role: text('role').notNull(),
   avatarPath: text('avatar_path'),
+  /** Optional group this Agent belongs to. Null = ungrouped, which is the
+   *  default and renders as a plain list exactly like before groups existed. */
+  groupId: text('group_id').references(() => agentGroups.id, { onDelete: 'set null' }),
   character: text('character').notNull(),
   expertise: text('expertise').notNull(),
   /** Agent kind. 'regular' for user-created Agents; 'configurator' for the seeded
@@ -161,7 +178,9 @@ export const agents = sqliteTable('agents', {
   createdBy: text('created_by').references(() => user.id),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-})
+}, (table) => [
+  index('idx_agents_group').on(table.groupId),
+])
 
 export const mcpServers = sqliteTable('mcp_servers', {
   id: text('id').primaryKey(),

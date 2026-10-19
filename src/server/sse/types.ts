@@ -80,6 +80,11 @@ export type SSEEventType =
   | 'toolbox:created'
   | 'toolbox:updated'
   | 'toolbox:deleted'
+  // Sidebar folders for the Agent roster. 'agent-group:deleted' also carries
+  // `ungroupedAgentIds`, since deleting a group ungroups its Agents.
+  | 'agent-group:created'
+  | 'agent-group:updated'
+  | 'agent-group:deleted'
   | 'tool-domain:created'
   | 'tool-domain:updated'
   | 'tool-domain:deleted'

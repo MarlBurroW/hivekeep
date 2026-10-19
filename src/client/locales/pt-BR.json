@@ -245,7 +245,23 @@
       "contextMenu": {
         "edit": "Editar configurações",
         "delete": "Excluir Agente",
-        "viewUsage": "Uso de tokens"
+        "viewUsage": "Uso de tokens",
+        "moveToGroup": "Mover para o grupo",
+        "noGroup": "Sem grupo",
+        "newGroup": "Novo grupo…"
+      },
+      "groups": {
+        "manage": "Opções do grupo",
+        "create": "Criar um grupo",
+        "createTitle": "Novo grupo",
+        "rename": "Renomear",
+        "renameTitle": "Renomear grupo",
+        "delete": "Excluir grupo",
+        "deleteTitle": "Excluir \"{{name}}\"?",
+        "deleteDescription": "O grupo é removido. Os Agentes dele não são excluídos — voltam para a lista sem grupo.",
+        "dialogDescription": "Grupos organizam a lista de Agentes na barra lateral.",
+        "namePlaceholder": "ex.: Finanças",
+        "empty": "Nenhum Agente neste grupo ainda"
       }
     },
     "tasks": {
