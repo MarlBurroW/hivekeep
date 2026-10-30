@@ -1,11 +1,9 @@
 /**
  * OpenAI Codex CLI provider (ChatGPT Plus/Pro subscription).
  *
- * Talks directly to the Codex backend (`chatgpt.com/backend-api/codex`),
- * which exposes a Responses-style API billed against the user's ChatGPT
- * subscription. Auth is via OAuth tokens read from `~/.codex/auth.json`
- * (refreshed automatically); the model catalog is read from
- * `~/.codex/models_cache.json`, kept in sync by the Codex CLI itself.
+ * Uses ChatGPT OAuth tokens for subscription-backed inference. Model discovery
+ * is account-specific and live, with the Codex CLI cache used only when the
+ * live catalog is temporarily unavailable.
  *
  * Uses raw fetch + a hand-rolled SSE parser rather than the official `openai`
  * SDK because the Codex backend's wire shape (proprietary URL, custom auth
@@ -19,6 +17,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { REAL_HOME, normalizeAbsoluteHome } from '@/server/llm/llm/_home-paths'
+import { createLogger } from '@/server/logger'
 import {
   getCodexOAuthCredentials,
   CODEX_BASE_URL,
@@ -52,6 +51,8 @@ import type {
   ThinkingEffort,
 } from '@/server/llm/llm/types'
 import { downgradeEffort, THINKING_EFFORT_ORDER } from '@/server/llm/llm/types'
+
+const log = createLogger('provider:openai-codex')
 
 // ─── Config schema ───────────────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@ export function modelsCacheCandidates(envHome: string | undefined, realHome: str
 }
 const MODELS_CACHE_CANDIDATES = modelsCacheCandidates(process.env.HOME, REAL_HOME)
 
-interface CodexModelCacheEntry {
+export interface CodexModelCacheEntry {
   slug: string
   display_name?: string
   visibility?: 'list' | 'hide' | string
@@ -121,16 +122,17 @@ interface CodexModelsCacheFile {
  * required `client_version` query param when fetching the live catalog.
  * (Verified empirically: 0.39.0 → [], 0.142.2 → full catalog.)
  */
-const CODEX_CLIENT_VERSION = '0.142.2'
+const CODEX_CLIENT_VERSION = '0.166.0'
+const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models'
 
 /** Keep only API-listable models, drop superseded ones, order by priority. */
-function selectCodexEntries(models: CodexModelCacheEntry[] | undefined): CodexModelCacheEntry[] {
+export function selectCodexEntries(models: CodexModelCacheEntry[] | undefined): CodexModelCacheEntry[] {
   if (!models || !Array.isArray(models)) return []
   const filtered = models.filter(
     (m) =>
       typeof m.slug === 'string' &&
       m.slug.length > 0 &&
-      m.supported_in_api === true &&
+      m.supported_in_api !== false &&
       m.visibility === 'list' &&
       m.upgrade == null,
   )
@@ -139,33 +141,56 @@ function selectCodexEntries(models: CodexModelCacheEntry[] | undefined): CodexMo
 }
 
 /**
- * Fetch the live, per-account Codex catalog from the backend. This is the
- * authoritative source: the available model slugs (gpt-5.4, gpt-5.5, …) change
- * over time and vary by plan, so they must never be hardcoded. Returns null on
- * any failure or an empty catalog so the caller can fall back.
+ * Fetch the live, per-account catalog. Prefer the public endpoint documented
+ * for ChatGPT OAuth tokens; retain the Codex backend endpoint for compatibility
+ * with older CLI tokens. The available slugs change over time and vary by plan,
+ * so an empty or failed response is never replaced by a hardcoded model.
  */
-async function fetchCodexModelsFromApi(config: ProviderConfig): Promise<CodexModelCacheEntry[] | null> {
-  try {
-    const { accessToken, accountId } = await getCodexOAuthCredentials(config)
-    const res = await fetch(`${CODEX_BASE_URL}/models?client_version=${CODEX_CLIENT_VERSION}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'ChatGPT-Account-ID': accountId,
-      },
-    })
-    if (!res.ok) return null
-    const parsed = (await res.json()) as CodexModelsCacheFile
-    const selected = selectCodexEntries(parsed.models)
-    return selected.length > 0 ? selected : null
-  } catch {
-    return null
+async function fetchCodexModelsFromApi(config: ProviderConfig): Promise<CodexModelCacheEntry[]> {
+  const { accessToken, accountId } = await getCodexOAuthCredentials(config)
+  const attempts: Array<{ source: string; url: string; headers: Record<string, string> }> = [
+    {
+      source: 'OpenAI models API',
+      url: OPENAI_MODELS_URL,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+    {
+      source: 'Codex models API',
+      url: `${CODEX_BASE_URL}/models?client_version=${CODEX_CLIENT_VERSION}`,
+      headers: { Authorization: `Bearer ${accessToken}`, 'ChatGPT-Account-ID': accountId },
+    },
+  ]
+  let lastError: HivekeepProviderError | undefined
+
+  for (const attempt of attempts) {
+    try {
+      const res = await fetch(attempt.url, { headers: attempt.headers })
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        lastError = errorFromResponse(res.status, body)
+        log.warn({ source: attempt.source, status: res.status }, 'Codex model discovery request failed')
+        continue
+      }
+      const parsed = (await res.json()) as CodexModelsCacheFile
+      const selected = selectCodexEntries(parsed.models)
+      if (selected.length > 0) {
+        log.debug({ source: attempt.source, modelCount: selected.length }, 'Codex model discovery succeeded')
+        return selected
+      }
+      lastError = new ProviderServerError(`${attempt.source} returned no API-listable models`)
+      log.warn({ source: attempt.source }, 'Codex model discovery returned an empty catalog')
+    } catch (err) {
+      lastError = wrapError(err)
+      log.warn({ source: attempt.source, error: lastError.message }, 'Codex model discovery request failed')
+    }
   }
+
+  throw lastError ?? new ProviderServerError('Codex model discovery failed')
 }
 
 /**
  * Read the Codex catalog from the on-disk cache maintained by the Codex CLI.
- * Returns null when the cache is missing or unreadable (so the caller can
- * decide whether to error out or fall back).
+ * Returns null when the cache is missing or unreadable.
  */
 function readCodexModelsFromCache(): CodexModelCacheEntry[] | null {
   for (const path of MODELS_CACHE_CANDIDATES) {
@@ -175,7 +200,8 @@ function readCodexModelsFromCache(): CodexModelCacheEntry[] | null {
       const parsed = JSON.parse(raw) as CodexModelsCacheFile
       const selected = selectCodexEntries(parsed.models)
       if (selected.length > 0) return selected
-    } catch {
+    } catch (err) {
+      log.warn({ path, error: err instanceof Error ? err.message : String(err) }, 'Ignoring unreadable Codex model cache')
       // try the next candidate path
     }
   }
@@ -183,22 +209,39 @@ function readCodexModelsFromCache(): CodexModelCacheEntry[] | null {
 }
 
 /**
- * Last-resort catalog for when both the live API and the CLI cache are
- * unavailable (e.g. a transient network failure during onboarding). These
- * slugs go stale (the API is the real source), so this only exists so the
- * provider degrades to something rather than listing zero models.
+ * Resolve the Codex catalog: live API (authoritative) → CLI cache. A cache is
+ * allowed to cover a transient discovery failure, but an invented model is not.
  */
-export const STATIC_CODEX_MODELS: CodexModelCacheEntry[] = [
-  { slug: 'gpt-5.5', display_name: 'GPT-5.5', context_window: 272000, supported_in_api: true, visibility: 'list' },
-]
+export async function resolveCodexModels(
+  config: ProviderConfig,
+  deps: {
+    fetchLive?: (config: ProviderConfig) => Promise<CodexModelCacheEntry[]>
+    readCache?: () => CodexModelCacheEntry[] | null
+  } = {},
+): Promise<{ models: CodexModelCacheEntry[]; source: 'live' | 'cache' }> {
+  const fetchLive = deps.fetchLive ?? fetchCodexModelsFromApi
+  const readCache = deps.readCache ?? readCodexModelsFromCache
+  let liveError: HivekeepProviderError
+  try {
+    const models = await fetchLive(config)
+    if (models.length > 0) return { models, source: 'live' }
+    liveError = new ProviderServerError('Live Codex model discovery returned no API-listable models')
+  } catch (err) {
+    liveError = wrapError(err)
+  }
 
-/**
- * Resolve the Codex catalog: live API (authoritative) → CLI cache → static
- * floor. The API path works in every mode (in-app sign-in and CLI), which is
- * why a stale hardcoded list is no longer the primary source.
- */
-async function resolveCodexModels(config: ProviderConfig): Promise<CodexModelCacheEntry[]> {
-  return (await fetchCodexModelsFromApi(config)) ?? readCodexModelsFromCache() ?? STATIC_CODEX_MODELS
+  const cached = readCache()
+  if (cached && cached.length > 0) {
+    log.warn(
+      { error: liveError.message, modelCount: cached.length },
+      'Live Codex model discovery failed; using the CLI model cache',
+    )
+    return { models: cached, source: 'cache' }
+  }
+  log.error({ error: liveError.message }, 'Codex model discovery failed and no valid cache is available')
+  throw new ProviderServerError(
+    `Codex model discovery failed and no valid CLI model cache is available: ${liveError.message}`,
+  )
 }
 
 /**
@@ -533,7 +576,7 @@ export const openaiCodexProvider: LLMProvider = {
   async authenticate(config: ProviderConfig): Promise<AuthResult> {
     try {
       const { accessToken, accountId } = await getCodexOAuthCredentials(config)
-      const testModel = (await resolveCodexModels(config))[0]?.slug
+      const testModel = (await resolveCodexModels(config)).models[0]?.slug
       if (!testModel) {
         return { valid: false, error: 'No Codex models available to test against.' }
       }
@@ -574,9 +617,9 @@ export const openaiCodexProvider: LLMProvider = {
   },
 
   async listModels(config: ProviderConfig): Promise<LLMModel[]> {
-    // Live per-account catalog from the backend (works in both sign-in and CLI
-    // modes), falling back to the CLI cache then the static floor.
-    return (await resolveCodexModels(config)).map(mapCodexModel)
+    // Live per-account catalog in both sign-in and CLI modes, with a valid CLI
+    // cache as the only fallback.
+    return (await resolveCodexModels(config)).models.map(mapCodexModel)
   },
 
   chat(model, request, config) {
