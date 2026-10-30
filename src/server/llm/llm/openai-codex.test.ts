@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { STATIC_CODEX_MODELS, mapCodexModel, modelsCacheCandidates } from './openai-codex'
+import { join } from 'path'
+import {
+  mapCodexModel,
+  modelsCacheCandidates,
+  resolveCodexModels,
+  selectCodexEntries,
+} from './openai-codex'
 import { codexAccountIdFromTokens } from './_codex-auth'
 import type { PkceTokenResponse } from './_oauth-pkce'
 
@@ -8,31 +14,70 @@ describe('modelsCacheCandidates', () => {
     // On macOS getRealHome() can wrongly yield /home/$USER; the real cache lives
     // under /Users/$USER, so the env HOME candidate must be searched first.
     expect(modelsCacheCandidates('/Users/tester', '/home/tester')).toEqual([
-      '/Users/tester/.codex/models_cache.json',
-      '/home/tester/.codex/models_cache.json',
+      join('/Users/tester', '.codex', 'models_cache.json'),
+      join('/home/tester', '.codex', 'models_cache.json'),
     ])
   })
 
   it('dedupes when env HOME and REAL_HOME match', () => {
-    expect(modelsCacheCandidates('/home/u', '/home/u')).toEqual(['/home/u/.codex/models_cache.json'])
+    expect(modelsCacheCandidates('/home/u', '/home/u')).toEqual([join('/home/u', '.codex', 'models_cache.json')])
   })
 
   it('falls back to REAL_HOME when env HOME is missing or relative', () => {
-    expect(modelsCacheCandidates(undefined, '/home/u')).toEqual(['/home/u/.codex/models_cache.json'])
-    expect(modelsCacheCandidates('relative/path', '/home/u')).toEqual(['/home/u/.codex/models_cache.json'])
+    expect(modelsCacheCandidates(undefined, '/home/u')).toEqual([join('/home/u', '.codex', 'models_cache.json')])
+    expect(modelsCacheCandidates('relative/path', '/home/u')).toEqual([join('/home/u', '.codex', 'models_cache.json')])
   })
 
   it('never emits a relative candidate (drops non-absolute homes)', () => {
     expect(modelsCacheCandidates('relative/env', 'also/relative')).toEqual([])
     expect(modelsCacheCandidates(undefined, undefined)).toEqual([])
-    expect(modelsCacheCandidates('/Users/t', '')).toEqual(['/Users/t/.codex/models_cache.json'])
+    expect(modelsCacheCandidates('/Users/t', '')).toEqual([join('/Users/t', '.codex', 'models_cache.json')])
   })
 })
 
-describe('STATIC_CODEX_MODELS (last-resort fallback catalog)', () => {
-  it('ships at least one API-listable Codex slug', () => {
-    expect(STATIC_CODEX_MODELS.length).toBeGreaterThan(0)
-    expect(STATIC_CODEX_MODELS.every((m) => m.supported_in_api && m.visibility === 'list')).toBe(true)
+describe('Codex model discovery', () => {
+  const liveModel = { slug: 'account-model', visibility: 'list' as const, supported_in_api: true }
+  const cachedModel = { slug: 'cached-model', visibility: 'list' as const, supported_in_api: true }
+
+  it('accepts public-catalog entries unless they are explicitly unsupported', () => {
+    expect(
+      selectCodexEntries([
+        { slug: 'public-model', visibility: 'list' },
+        { slug: 'unsupported', visibility: 'list', supported_in_api: false },
+        { slug: 'hidden', visibility: 'hide' },
+      ]).map((m) => m.slug),
+    ).toEqual(['public-model'])
+  })
+
+  it('prefers the signed-in account live catalog', async () => {
+    const result = await resolveCodexModels({}, {
+      fetchLive: async () => [liveModel],
+      readCache: () => [cachedModel],
+    })
+    expect(result).toEqual({ models: [liveModel], source: 'live' })
+  })
+
+  it('uses a valid CLI cache when live discovery fails', async () => {
+    const result = await resolveCodexModels({}, {
+      fetchLive: async () => { throw new Error('temporary outage') },
+      readCache: () => [cachedModel],
+    })
+    expect(result).toEqual({ models: [cachedModel], source: 'cache' })
+  })
+
+  it('uses a valid CLI cache when live discovery returns an empty catalog', async () => {
+    const result = await resolveCodexModels({}, {
+      fetchLive: async () => [],
+      readCache: () => [cachedModel],
+    })
+    expect(result).toEqual({ models: [cachedModel], source: 'cache' })
+  })
+
+  it('fails clearly instead of inventing a static model', async () => {
+    await expect(resolveCodexModels({}, {
+      fetchLive: async () => { throw new Error('catalog unavailable') },
+      readCache: () => null,
+    })).rejects.toThrow('no valid CLI model cache is available')
   })
 })
 
