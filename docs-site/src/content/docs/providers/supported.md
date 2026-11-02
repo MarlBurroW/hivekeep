@@ -16,6 +16,7 @@ Hivekeep ships with built-in providers across six capability families: language 
 | [Google Gemini](https://aistudio.google.com/apikey) | ✅ | | ✅ | | | | ✅ |
 | [OpenRouter](https://openrouter.ai/keys) | ✅ | ✅ | ✅ | | | | ✅ |
 | [Kilo Gateway](https://kilo.ai/gateway) | ✅ | | | | | | ✅ |
+| [Cheaper Inference](https://cheaperinference.com) | ✅ | | | | | | ✅ |
 | [Ollama Cloud](https://ollama.com/) | ✅ | | | ✅ | | | ✅ |
 | [xAI](https://console.x.ai) | ✅ | | | | | | ✅ |
 | [DeepSeek](https://platform.deepseek.com/api_keys) | ✅ | | | | | | ✅ |
@@ -35,6 +36,7 @@ This table is the exact set of built-in providers (see `src/shared/provider-meta
 - **Image generation** is built in for **OpenAI**, **Gemini**, **OpenRouter**, and the generic **OpenAI-compatible** connector (any endpoint that implements the OpenAI Images API, `POST /v1/images/generations`).
 - **Ollama Cloud** is built in for LLMs and result-only web search via Ollama's API.
 - **Kilo Gateway** is built in as an LLM gateway.
+- **Cheaper Inference** is built in as an LLM gateway (OpenAI-compatible, `https://api.cheaperinference.com/v1`).
 - **STT and TTS** are built in for **OpenAI** and **ElevenLabs**.
 - **SearXNG** is a self-hosted search connector: point it at your own [SearXNG](https://github.com/searxng/searxng) instance (custom base URL) to run web search privately, with no commercial search API. The instance must have the `json` format enabled (`search.formats` in `settings.yml`); the API key is optional and only needed for protected instances (sent via a configurable auth header). Do not configure it through the Tavily provider: SearXNG is not Tavily-compatible and will fail with HTTP 401.
 - Providers such as **Mistral** and **Replicate** are not built in: they ship as plugins.
@@ -121,7 +123,7 @@ Hivekeep exposes several provider management endpoints:
 
 To use Hivekeep, you need at minimum:
 
-1. **One LLM provider**: For Agent conversations (Anthropic, OpenAI, Gemini, OpenRouter, Kilo Gateway, Ollama Cloud, xAI, or the built-in **OpenAI-compatible** connector pointed at any custom endpoint)
+1. **One LLM provider**: For Agent conversations (Anthropic, OpenAI, Gemini, OpenRouter, Kilo Gateway, Cheaper Inference, Ollama Cloud, xAI, or the built-in **OpenAI-compatible** connector pointed at any custom endpoint)
 2. **One embedding provider**: For memory to work. Built in via **OpenAI** (e.g. `text-embedding-3-small`), **OpenRouter**, or the **OpenAI-compatible** connector pointed at a local endpoint (e.g. Ollama with `nomic-embed-text` or `qwen3-embedding`); other embedding sources come from plugins
 
 Optional but recommended:

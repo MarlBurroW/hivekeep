@@ -149,6 +149,9 @@ export const CONFIGURATOR_MODEL_PREFERENCES: Record<string, readonly string[]> =
   // `openai/gpt-5.5`), so seed on a strong, tool-reliable frontier model rather
   // than the arbitrary first-listed one.
   kilo: ['sonnet', 'gpt-5', 'opus', 'gemini', 'qwen', 'llama'],
+  // Cheaper Inference serves models from several labs under bare ids (like
+  // `claude-sonnet-5`, `gpt-5.4`), so seed on a strong, tool-reliable model.
+  cheaperinference: ['sonnet', 'gpt-5', 'opus', 'gemini', 'deepseek', 'glm'],
   // Ollama Cloud serves open models (ids like `qwen3-coder:480b`, `gpt-oss:120b`,
   // `deepseek-v3.1:671b`); list strong tool-reliable families as hints.
   ollama: ['qwen3', 'gpt-oss', 'deepseek', 'glm', 'llama', 'mistral'],

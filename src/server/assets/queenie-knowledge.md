@@ -64,7 +64,7 @@ An Agent = name / role / character / expertise + a `model` + a set of `toolboxes
 ## Providers & capabilities — *"connect one account, light up many capabilities"*
 
 - One provider account can serve several capabilities. **Built-in provider types:**
-  - **llm:** `anthropic`, `anthropic-oauth` (Claude Max subscription, no API key), `openai`, `openai-codex` (Codex CLI, no API key), `gemini`, `openrouter`, `kilo` (Kilo Gateway), `ollama` (Ollama Cloud), `xai`, `deepseek`, `minimax`, `moonshot` (Kimi), `openai-compatible` (custom base URL)
+  - **llm:** `anthropic`, `anthropic-oauth` (Claude Max subscription, no API key), `openai`, `openai-codex` (Codex CLI, no API key), `gemini`, `openrouter`, `kilo` (Kilo Gateway), `cheaperinference` (Cheaper Inference), `ollama` (Ollama Cloud), `xai`, `deepseek`, `minimax`, `moonshot` (Kimi), `openai-compatible` (custom base URL)
   - **embedding:** `openai`, `openrouter`, `openai-compatible` (Ollama / llama.cpp / LiteLLM / NewAPI via `/embeddings`)
   - **image:** `openai` (gpt-image-1, DALL·E), `gemini` (incl. Nano Banana / Imagen), `openrouter` (models from its image catalogue), `openai-compatible` (same connector, OpenAI Images API: `/images/generations`)
   - **search:** `brave-search`, `serpapi`, `tavily`, `perplexity-sonar`, `searxng` (self-hosted), `ollama` (Ollama Cloud)
