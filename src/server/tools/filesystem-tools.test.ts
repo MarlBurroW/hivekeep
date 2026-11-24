@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
 import { resolve, join } from 'path'
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'fs'
 import { fullMockConfig } from '../../test-helpers'
 import type { ToolRegistration } from '@/server/tools/types'
 import type { ToolExecutionContext } from '@/server/tools/types'
@@ -35,6 +35,7 @@ const {
   editFileTool,
   listDirectoryTool,
 } = await import('@/server/tools/filesystem-tools')
+const { multiEditTool } = await import('@/server/tools/multi-edit-tools')
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -335,6 +336,13 @@ describe('filesystem-tools', () => {
       expect(result.applied).toBe(true)
     })
 
+    it('inserts newText literally when it contains $ sequences', async () => {
+      writeFileSync(p('dollar.sh'), 'echo one\nPLACEHOLDER\necho three\n')
+      const newText = "IFS=$'\\n'; echo $$ $& $`"
+      await exec({ path: p('dollar.sh'), oldText: 'PLACEHOLDER', newText })
+      expect(readFileSync(p('dollar.sh'), 'utf-8')).toBe(`echo one\n${newText}\necho three\n`)
+    })
+
     it('correctly persists the edit', async () => {
       writeFileSync(p('persist.txt'), 'alpha beta gamma')
       await exec({ path: p('persist.txt'), oldText: 'beta', newText: 'BETA' })
@@ -374,6 +382,25 @@ describe('filesystem-tools', () => {
         const result = await subAgentEdit({ path: p('ready.txt'), oldText: 'hello', newText: 'world' })
         expect(result.success).toBe(true)
       })
+    })
+  })
+
+  // ── multi_edit ───────────────────────────────────────────
+
+  describe('multi_edit', () => {
+    const exec = createTool(multiEditTool)
+
+    it('inserts newText literally when it contains $ sequences', async () => {
+      writeFileSync(p('dollar.sh'), 'echo one\nFIRST\nSECOND\n')
+      const result = await exec({
+        path: p('dollar.sh'),
+        edits: [
+          { oldText: 'FIRST', newText: "IFS=$'\\n'" },
+          { oldText: 'SECOND', newText: 'echo $$ $&' },
+        ],
+      })
+      expect(result.success).toBe(true)
+      expect(readFileSync(p('dollar.sh'), 'utf-8')).toBe("echo one\nIFS=$'\\n'\necho $$ $&\n")
     })
   })
 

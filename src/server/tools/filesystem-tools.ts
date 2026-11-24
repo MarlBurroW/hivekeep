@@ -345,7 +345,7 @@ export const editFileTool: ToolRegistration = {
           // Apply the edit(s)
           const newContent = replaceAll
             ? content.split(oldText).join(newText)
-            : content.replace(oldText, newText)
+            : content.replace(oldText, () => newText)
           await writeFile(absPath, newContent, 'utf-8')
           emitWorkspaceChangedForTool(ctx, absPath, 'modified')
 

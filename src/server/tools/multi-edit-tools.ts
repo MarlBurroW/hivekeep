@@ -100,7 +100,7 @@ export const multiEditTool: ToolRegistration = {
               }
             }
 
-            content = content.replace(oldText, newText)
+            content = content.replace(oldText, () => newText)
           }
 
           // All edits succeeded — write once
