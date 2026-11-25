@@ -722,7 +722,7 @@ export const editMiniAppFileTool: ToolRegistration = {
           // Apply the edit(s)
           const newContent = replaceAll
             ? content.split(oldText).join(newText)
-            : content.replace(oldText, newText)
+            : content.replace(oldText, () => newText)
 
           await writeAppFile(app_id, path, newContent)
 
@@ -810,7 +810,7 @@ export const multiEditMiniAppFileTool: ToolRegistration = {
               }
             }
 
-            content = content.replace(oldText, newText)
+            content = content.replace(oldText, () => newText)
           }
 
           // All edits succeeded — write once

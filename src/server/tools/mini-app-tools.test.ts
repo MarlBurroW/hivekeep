@@ -783,6 +783,19 @@ describe('mini-app-tools', () => {
   // ─── edit_mini_app_file ─────────────────────────────────────────────────
 
   describe('editMiniAppFileTool', () => {
+    it('inserts newText literally when it contains $ sequences', async () => {
+      mockMiniApps.readAppFile.mockImplementation(() =>
+        Promise.resolve(Buffer.from('const label = LABEL;\nrender();'))
+      )
+      const tool = mod.editMiniAppFileTool.create(ctx)
+      await tool.execute(
+        { app_id: 'app-1', path: 'app.jsx', oldText: 'LABEL', newText: "'Price in $'" },
+        execOpts
+      )
+      const callArgs = mockMiniApps.writeAppFile.mock.calls[0] as any
+      expect(callArgs[2]).toBe("const label = 'Price in $';\nrender();")
+    })
+
     it('replaces single occurrence', async () => {
       mockMiniApps.readAppFile.mockImplementation(() =>
         Promise.resolve(Buffer.from('const interval = 120000;'))
@@ -892,6 +905,23 @@ describe('mini-app-tools', () => {
   // ─── multi_edit_mini_app_file ───────────────────────────────────────────
 
   describe('multiEditMiniAppFileTool', () => {
+    it('inserts newText literally when it contains $ sequences', async () => {
+      mockMiniApps.readAppFile.mockImplementation(() =>
+        Promise.resolve(Buffer.from('const label = LABEL;\nrender();'))
+      )
+      const tool = mod.multiEditMiniAppFileTool.create(ctx)
+      await tool.execute(
+        {
+          app_id: 'app-1',
+          path: 'app.jsx',
+          edits: [{ oldText: 'LABEL', newText: "'Price in $'" }],
+        },
+        execOpts
+      )
+      const callArgs = mockMiniApps.writeAppFile.mock.calls[0] as any
+      expect(callArgs[2]).toBe("const label = 'Price in $';\nrender();")
+    })
+
     it('applies multiple edits atomically', async () => {
       mockMiniApps.readAppFile.mockImplementation(() =>
         Promise.resolve(Buffer.from('const a = 1;\nconst b = 2;'))
